@@ -1,0 +1,5 @@
+git add . (para preparar los cambios).
+
+git commit -m "Descripción de lo que hiciste" (para guardar el cambio en el historial).
+
+git push (para enviarlo a GitHub, donde ya no deberías tener que escribir el usuario ni el token, pues Git lo ha guardado).

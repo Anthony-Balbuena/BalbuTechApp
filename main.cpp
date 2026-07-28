@@ -1,136 +1,29 @@
-//#include <cfenv>
-//#include <cstdio>
-//#include <functional>
-//#include <algorithm>
-#include <cppconn/connection.h>
-#include <cppconn/datatype.h>
-#include <cstdio>
-#include <cstdlib>
-//#include <cwchar>
-#include <exception>
 #include <iostream>
-//#include <iterator>
-//#include <memory_resource>
-#include <mysql_driver.h>
+#include <string>
 #include <mysql_connection.h>
 #include <cppconn/driver.h>
 #include <cppconn/exception.h>
-#include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
-#include <ostream>
-#include <openssl/sha.h>
-#include <sstream>
-#include <iomanip>
-//#include <ratio>
-//#include <pstl/parallel_backend_tbb.h>
-#include <string>
-#include <sys/types.h>
-#include <stdexcept> // Requerido para la excepción global
+#include <cppconn/prepared_statement.h>
+
+// Tus archivos de cabecera personalizados
+#include "database.h"
+#include "seguridad.h"
 
 using namespace std;
-
-// CLASE ====
-// =========================================================================
-// CONTROL GLOBAL DE CANCELACIÓN
-// =========================================================================
-class CancelarOperacionException : public exception {
-public:
-    const char* what() const noexcept override {
-        return "Operación cancelada. Regresando al menú principal...";
-    }
-};
-// FUNCION========================================================
-string leerDatoSeguro(const string& mensaje) {
-    string entrada;
-    cout << mensaje;
-    
-    // Si el buffer trae un residuo de un menú numérico previo, lo limpia antes del getline
-    if (cin.peek() == '\n') {
-        cin.ignore(); 
-    }
-    
-    getline(cin, entrada);
-
-    // COMODÍN GLOBAL: Si digitas 'xxx' en cualquier lado, se dispara la salida
-    if (entrada == "xxx") {
-        throw CancelarOperacionException();
-    }
-
-    return entrada;
-}
-
-// =========================================================================
-// CONEXIÓN Y UTILIDADES DE BASE DE DATOS
-// =========================================================================
-sql::Connection* conectar() {
-    try {
-        sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();
-        sql::Connection *con = driver->connect("tcp://127.0.0.1:3306", "root", "linux01");
-        con->setSchema("BALBU_TECH");
-        return con;
-    } catch (sql::SQLException &e) {
-        cout << "Error en la conexion: " << e.what() << endl;
-        return nullptr;
-    }
-}
-//FUNTION=============================================================
-// Trae el mensaje del sql 
-string Recogermensaje(sql::PreparedStatement *pstmt) {
-    string mensaje = "Proceso completado (Sin mensaje de retorno).";
-    try {
-        // Ejecutamos el SP que devuelve un SELECT
-        sql::ResultSet *res = pstmt->executeQuery();
-
-        if (res && res->next()) {
-            // Buscamos la columna que llamaste "MENSAJE" en tus SPs
-            mensaje = res->getString("MENSAJE");
-        }
-
-        delete res; // Limpieza vital de memoria
-    } 
-    catch (sql::SQLException &e) {
-        // Si el SP falla (por un SIGNAL SQLSTATE), capturamos el error aquí
-        mensaje = "ERROR DB: " + string(e.what());
-    }
-    return mensaje;
-}
-
-
-
-string aplicarHash(const string& input) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input.c_str(), input.size());
-    SHA256_Final(hash, &sha256);
-
-    stringstream ss;
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        ss << hex << setw(2) << setfill('0') << (int)hash[i];
-    }
-    return ss.str();
-}
-
-
-
-
-
-
-
-
 
 
 // =========================================================================
 // PROGRAMA PRINCIPAL
 // ========================================================================
 int main() {
-    sql::Connection* con = conectar();
-    if (con != nullptr) {
-        cout << "¡Conexión exitosa a BALBU_TECH!" << endl;
+    inicializarConexion();
+if (globalCon != nullptr) {
+    cout << "¡Conexión exitosa a BALBU_TECH!" << endl;
+}
         
-        sql::Statement *stmt = con->createStatement();
+       sql::Statement *stmt = globalCon->createStatement();
         int opcionPrincipal = 0; // Inicializar variable
 
         // --- 1. ESTE BUCLE ES EL QUE ARREGLA EL ERROR DEL CONTINUE ---
@@ -204,7 +97,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     string telefono = leerDatoSeguro("Teléfono: ");
                     string email    = leerDatoSeguro("Email: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?)");
                     pstmt->setString(1, nombre);
                     pstmt->setString(2, cedula);
                     pstmt->setString(3, cargo);
@@ -248,7 +141,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     string salStr   = leerDatoSeguro("Salario (0 para no cambiar): ");
                     double salario  = salStr.empty() ? 0 : stod(salStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_EMPLEADO(?, ?, ?, ?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_EMPLEADO(?, ?, ?, ?, ?, ?, ?)");
                     pstmt->setInt(1, id_empleado);
                     
                     if(nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -296,7 +189,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     
                     string fechadespido = leerDatoSeguro("Ingrese fecha (YYYY-MM-DD) o presione ENTER para hoy: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_DESPEDIR_EMPLEADO(?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_DESPEDIR_EMPLEADO(?, ?)");
                     pstmt->setInt(1, id_empleado);
 
                     if (fechadespido.empty()) {
@@ -333,7 +226,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     string salStr      = leerDatoSeguro("Nuevo Salario para la reactivacion: ");
                     double nuevoSalario = stod(salStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_REACTIVAR_EMPLEADO(?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_REACTIVAR_EMPLEADO(?, ?)");
                     pstmt->setInt(1, id_empleado);
                     
                     // Usamos Recogermensaje pasándole el statement preparado
@@ -361,7 +254,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     string idStr    = leerDatoSeguro("ID del empleado (NUMERO): ");
                     int id_empleado = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_GENERAR_RECIBO_EMPLEADO(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_GENERAR_RECIBO_EMPLEADO(?)");
                     pstmt->setInt(1, id_empleado);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -407,7 +300,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                 try {
                     string termino = leerDatoSeguro("Ingrese ID, Nombre o Cargo (O ENTER para ver todos): ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_BUSQUEDA_RAPIDA_EMPLEADOS(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSQUEDA_RAPIDA_EMPLEADOS(?)");
                     
                     if (termino.empty()) {
                         pstmt->setNull(1, sql::DataType::VARCHAR);
@@ -463,7 +356,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
                     string porcStr    = leerDatoSeguro("Porcentaje de aumento (ej: 10.5): ");
                     double porcentaje = stod(porcStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_AUMENTO_POR_CARGO(?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_AUMENTO_POR_CARGO(?, ?, ?)");
 
                     if (id_empleado <= 0) pstmt->setNull(1, sql::DataType::INTEGER);
                     else pstmt->setInt(1, id_empleado);
@@ -493,7 +386,7 @@ case 1:  { // MÓDULO DE EMPLEADOS
             else if (subOpcion1 == 8) {
                 cout << "\n --- ANIVERSARIOS LABORALES DEL MES ---" << endl;
                 try {
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ANIVERSARIOS_MES()");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ANIVERSARIOS_MES()");
                     sql::ResultSet *res = pstmt->executeQuery();
 
                     if (res->next()) {
@@ -562,7 +455,7 @@ case 2: { // MÓDULO DE CATEGORIAS
                     string descripcion = leerDatoSeguro("Descripcion: ");
                     string icono       = leerDatoSeguro("Icono (Presione Enter para dejar vacio): ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?,?,?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?,?,?)");
                     pstmt->setString(1, nombre);
                     pstmt->setString(2, descripcion);
 
@@ -602,7 +495,7 @@ case 2: { // MÓDULO DE CATEGORIAS
                     string descripcion = leerDatoSeguro("Descripcion: ");
                     string icono       = leerDatoSeguro("Icono: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?, ?, ?)");
                     pstmt->setInt(1, id_categoria);
 
                     if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -639,7 +532,7 @@ case 2: { // MÓDULO DE CATEGORIAS
                     string idStr = leerDatoSeguro("Ingrese el ID de la categoria (NUMERO): ");
                     int id_categoria = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_CATEGORIA(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CATEGORIA(?)");
                     pstmt->setInt(1, id_categoria);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -670,7 +563,7 @@ case 2: { // MÓDULO DE CATEGORIAS
                 try {
                     string busqueda = leerDatoSeguro("Ingrese NOMBRE o DESCRIPCION (Enter para ver todas): ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_BUSCAR_CATEGORIAS(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_CATEGORIAS(?)");
                     pstmt->setString(1, busqueda);
                     sql::ResultSet *res = pstmt->executeQuery();
 
@@ -741,7 +634,7 @@ case 3:  { // MODULO DE MARCAS
                 try {
                     string nombre = leerDatoSeguro("Nombre de la marca: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_MARCA (?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_MARCA (?)");
                     pstmt->setString(1, nombre);
                     pstmt->execute();
 
@@ -771,7 +664,7 @@ case 3:  { // MODULO DE MARCAS
 
                     string nombre = leerDatoSeguro("Nombre de la marca: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_MARCA (?,?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_MARCA (?,?)");
                     pstmt->setInt(1, id_marca);
                     pstmt->setString(2, nombre);
                     
@@ -799,7 +692,7 @@ case 3:  { // MODULO DE MARCAS
                 try {
                     string busqueda = leerDatoSeguro("Ingrese Nombre de la marca (Enter para ver todas): ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_BUSCAR_MARCAS(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_MARCAS(?)");
                     pstmt->setString(1, busqueda);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -845,7 +738,7 @@ case 3:  { // MODULO DE MARCAS
                     string idStr = leerDatoSeguro("Ingrese el ID de la marca para cambiar su estado: ");
                     int id_marca = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_MARCA(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_MARCA(?)");
                     pstmt->setInt(1, id_marca);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -904,7 +797,7 @@ case 4:  { // MÓDULO CLIENTES
                     string email     = leerDatoSeguro("Email: ");
                     string direccion = leerDatoSeguro("Direccion: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_CLIENTES(?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_CLIENTES(?, ?, ?, ?)");
                     pstmt->setString(1, nombre);
                     pstmt->setString(2, telefono);
                     pstmt->setString(3, email);
@@ -947,7 +840,7 @@ case 4:  { // MÓDULO CLIENTES
                     string email     = leerDatoSeguro("Nuevo Email: ");
                     string direccion = leerDatoSeguro("Nueva Direccion: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_CLIENTES (?, ?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_CLIENTES (?, ?, ?, ?, ?)");
                     pstmt->setInt(1, id_cliente);
 
                     if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -990,7 +883,7 @@ case 4:  { // MÓDULO CLIENTES
                 try {
                     string filtro = leerDatoSeguro("Ingrese (NOMBRE, TELEFONO o EMAIL) o Enter para ver todos: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_LISTAR_CLIENTES(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_LISTAR_CLIENTES(?)");
                     pstmt->setString(1, filtro);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1039,7 +932,7 @@ case 4:  { // MÓDULO CLIENTES
                     string idStr = leerDatoSeguro("Ingrese el ID del cliente: ");
                     int id_cliente = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_CLIENTES(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CLIENTES(?)");
                     pstmt->setInt(1, id_cliente);
 
                     string respuesta = Recogermensaje(pstmt);
@@ -1096,7 +989,7 @@ case 5:  {// MODULO PROVEEDORES
                     string EMAIL     = leerDatoSeguro("Email: ");
                     string DIRECCION = leerDatoSeguro("Direccion: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_PROVEEDOR (?,?,?,?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_PROVEEDOR (?,?,?,?)");
                     pstmt->setString(1, NOMBRE);
                     pstmt->setString(2, TELEFONO);
                     pstmt->setString(3, EMAIL);
@@ -1139,7 +1032,7 @@ case 5:  {// MODULO PROVEEDORES
                     string email     = leerDatoSeguro("Nuevo Email: ");
                     string direccion = leerDatoSeguro("Nueva Direccion: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_PROVEEDOR(?, ?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_PROVEEDOR(?, ?, ?, ?, ?)");
                     pstmt->setInt(1, id_proveedor);
 
                     if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -1183,7 +1076,7 @@ case 5:  {// MODULO PROVEEDORES
                     string idStr = leerDatoSeguro("Ingrese el ID del proveedor: ");
                     int id_proveedor = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_PROVEEDOR(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PROVEEDOR(?)");
                     pstmt->setInt(1, id_proveedor);
 
                     string respuesta = Recogermensaje(pstmt);
@@ -1214,7 +1107,7 @@ case 5:  {// MODULO PROVEEDORES
                 try {
                     string filtro = leerDatoSeguro("Ingrese (NOMBRE o TELEFONO) o presione Enter para ver todos: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_LISTAR_PROVEEDORES(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_LISTAR_PROVEEDORES(?)");
                     pstmt->setString(1, filtro);
                     
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1286,7 +1179,7 @@ case 6:  { // MODULO METODOS DE PAGOS
                 try {
                     string nombre = leerDatoSeguro("Nombre del metodo: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_METODO_PAGO (?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_METODO_PAGO (?)");
                     pstmt->setString(1, nombre);
 
                     string respuesta = Recogermensaje(pstmt);
@@ -1318,7 +1211,7 @@ case 6:  { // MODULO METODOS DE PAGOS
 
                     string nombre = leerDatoSeguro("Nuevo nombre: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_METODO_PAGO (?,?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_METODO_PAGO (?,?)");
                     pstmt->setInt(1, id_metodo);
 
                     if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -1353,7 +1246,7 @@ case 6:  { // MODULO METODOS DE PAGOS
                     string idStr = leerDatoSeguro("Ingrese el ID del método de pago (NÚMERO): ");
                     int id_metodo = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_METODO_PAGO(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_METODO_PAGO(?)");
                     pstmt->setInt(1, id_metodo);
 
                     string respuesta = Recogermensaje(pstmt);
@@ -1384,7 +1277,7 @@ case 6:  { // MODULO METODOS DE PAGOS
                 try {
                     string busqueda = leerDatoSeguro("Ingrese NOMBRE del metodo o Presione Enter para ver todos: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_BUSCAR_METODOS_PAGO(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_METODOS_PAGO(?)");
                     pstmt->setString(1, busqueda);
                     
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1452,7 +1345,7 @@ case 7: { // MODULO ROLES
                 try {
                     string nombre_rol = leerDatoSeguro("Nombre del ROL: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_ROL(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_ROL(?)");
                     pstmt->setString(1, nombre_rol);
                     
                     string respuesta = Recogermensaje(pstmt);
@@ -1487,7 +1380,7 @@ case 7: { // MODULO ROLES
 
                     string nombre = leerDatoSeguro("Nuevo nombre del rol: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_ROL(?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_ROL(?, ?)");
                     pstmt->setInt(1, id_rol);
 
                     if (nombre.empty()) {
@@ -1524,7 +1417,7 @@ case 7: { // MODULO ROLES
                 try {
                     string busqueda = leerDatoSeguro("Ingrese nombre del rol o Enter para ver todos: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_BUSCAR_ROLES(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_ROLES(?)");
                     pstmt->setString(1, busqueda);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1608,7 +1501,7 @@ case 8: { // MODULO PRODUCTOS
                     string precioStr    = leerDatoSeguro("Precio del Producto $: ");
                     double PRECIO       = stod(precioStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?)");
                     pstmt->setString(1, NOMBRE);
                     pstmt->setString(2, DESCRIPCION);
                     pstmt->setDouble(3, PRECIO);
@@ -1658,7 +1551,7 @@ case 8: { // MODULO PRODUCTOS
                     string marca_raw     = leerDatoSeguro("Nueva Marca (ID NUMERO): ");
                     string categoria_raw = leerDatoSeguro("Nueva Categoria (ID NUMERO): ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?)");
                     pstmt->setInt(1, ID_PRODUCTO);
 
                     if (NOMBRE.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -1720,7 +1613,7 @@ case 8: { // MODULO PRODUCTOS
                     string idStr = leerDatoSeguro("Ingrese el ID del producto (NUMERO): ");
                     int ID_PRODUCTO = stoi(idStr);
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)");
                     pstmt->setInt(1, ID_PRODUCTO);
 
                     string respuesta = Recogermensaje(pstmt);
@@ -1754,7 +1647,7 @@ case 8: { // MODULO PRODUCTOS
                 try {
                     string busqueda = leerDatoSeguro("Ingrese (NOMBRE O CODIGO DEL PRODUCTO) o Enter para todos: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)");
                     pstmt->setString(1, busqueda);
 
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1810,7 +1703,7 @@ case 8: { // MODULO PRODUCTOS
                     cout << "Ingrese término de búsqueda (Código, Nombre o Categoría)\n";
                     string BUSQUEDA = leerDatoSeguro("[Presione Enter para listar todo el inventario]: ");
 
-                    sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_CONSULTAR_INVENTARIO(?)");
+                    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_CONSULTAR_INVENTARIO(?)");
                     pstmt->setString(1, BUSQUEDA);
                     
                     sql::ResultSet *res = pstmt->executeQuery();
@@ -1874,7 +1767,7 @@ case 8: { // MODULO PRODUCTOS
     cout << " Listando productos que están en o por debajo de su mínimo:\n\n";
 
     try {
-        sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_REPORTE_STOCK_CRITICO()");
+        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_REPORTE_STOCK_CRITICO()");
         sql::ResultSet *res = pstmt->executeQuery();
 
         string separator = string(80, '-');
@@ -1975,7 +1868,7 @@ if (subOpcion9 == 1) {
         int id_empleado = stoi(idEmpStr);
 
         // El orden debe ser: P_ID_EMPLEADO, P_ID_ROL, P_USUARIO, P_CONTRASENA
-        sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_INSERTAR_USUARIO(?, ?, ?, ?)");
+        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_USUARIO(?, ?, ?, ?)");
         
         pstmt->setInt(1, id_empleado);
         pstmt->setInt(2, id_rol);
@@ -2020,7 +1913,7 @@ else if (subOpcion9 == 2) {
         string id_emp_str    = leerDatoSeguro("Nuevo ID Empleado (Enter para omitir): ");
 
         // Ajustado a 5 parámetros para coincidir con tu SP
-        sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_ACTUALIZAR_USUARIO(?, ?, ?, ?, ?)");
+        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_USUARIO(?, ?, ?, ?, ?)");
         
         pstmt->setInt(1, id_usuario);
 
@@ -2060,7 +1953,7 @@ try {
 string idStr = leerDatoSeguro("Ingrese el ID del usuario (NUMERO): ");
 int id_usuario = stoi(idStr);
 
-sql:: PreparedStatement *pstmt = con -> prepareStatement(" CALL SP_TOGGLE_ESTADO_USUARIO (?)");
+sql:: PreparedStatement *pstmt = globalCon -> prepareStatement(" CALL SP_TOGGLE_ESTADO_USUARIO (?)");
  pstmt -> setInt(1,id_usuario);
 
  string respuesta = Recogermensaje(pstmt);
@@ -2099,26 +1992,27 @@ try {
 string busqueda = leerDatoSeguro("Ingrese Nombre del Usuario (Enter para ver todos): ");
 
 
-sql ::PreparedStatement *pstmt =con ->prepareStatement(" CALL SP_BUSCAR_USUARIOS_FILTRADO (?)" );
+sql ::PreparedStatement *pstmt =globalCon ->prepareStatement(" CALL SP_BUSCAR_USUARIOS_FILTRADO (?)" );
 pstmt ->setString(1, busqueda);
 
 sql :: ResultSet *res= pstmt ->executeQuery();
 
-string separator = string (50, '_');
+string separator = string (75, '_');
 cout << "\n" << separator << endl;
-cout <<"---------------------------------------------------------" << endl;
-printf("%-5s | %-20s | %-30s\n", "ID" , "NOMBRE", "ESTADO");
-
-cout <<  separator << endl;
+printf("%-5s | %-20s | %-20s | %-15s | %-10s\n", "ID", "USUARIO", "EMPLEADO", "ROL", "ESTADO");
+cout << separator << endl;
 
 bool encontrado = false;
-while (res-> next()) {
+while (res->next()) {
     encontrado = true;
-    printf("%-5d | %-30.30s | %-30.30s\n",
-            res -> getInt("ID_USUARIO"),
-            res->getString("Nombre_Usuario" ) ->c_str(),
-            res->getString("Estado")->c_str()
+    printf("%-5d | %-20.20s | %-20.20s | %-15.15s | %-10.10s\n",
+            res->getInt(1),                    // ID_USUARIO
+            res->getString(2).c_str(),         // USUARIO
+            res->getString(3).c_str(),         // EMPLEADO
+            res->getString(4).c_str(),         // ROL
+            res->getString(5).c_str()          // ESTADO
     );
+
 
 } 
 if (!encontrado) {
@@ -2149,9 +2043,9 @@ delete pstmt;
 
 
 
+   
 
-
-}
+   }
 
 } //CIERRA EL CASE 9   
 
@@ -2163,12 +2057,12 @@ default:
 
     } // <--- ¡ESTA ES LA QUE TE FALTA! Cierra el bucle WHILE (opcionPrincipal != 11)
 
-    delete con;  // Se borra la conexión SOLO cuando el usuario decide salir (opción 11)
-    
-    } // <--- AQUÍ CIERRA EL if (con != nullptr) de la línea 41
-    else {
-        cout << "No se pudo conectar a BALBU_TECH." << endl;
-    } 
+    //delete con;  // Se borra la conexión SOLO cuando el usuario decide salir (opción 11)
+
+     
+   // else {
+      //  cout << "No se pudo conectar a BALBU_TECH." << endl;
+   // } 
 
     return 0;
 }
