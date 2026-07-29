@@ -1,4 +1,6 @@
+#include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <mysql_connection.h>
 #include <cppconn/driver.h>
@@ -1839,16 +1841,13 @@ case 9: { //MODULO USUARIOS
    cout << "==================================="<< endl;
    cout << " (Escriba 'xxx' en cualquier campo para cancelar)" << endl;
    cout << "Seleccione: ";
-
+// Limpia el bullfer del while
    if (!(cin >> subOpcion9)) {
    cin.clear();
    cin.ignore(1000, '\n');
    continue;
    }
 
-// =========================================================================
-// 1. AGREGAR EMPLEADO
-// =========================================================================
 
 // =========================================================================
 // 1. INSERTAR USUARIO
@@ -1859,7 +1858,10 @@ if (subOpcion9 == 1) {
 
     try {
         string nombre = leerDatoSeguro("Nombre del Usuario (Se creara automaticamente): ");
-        string clave  = leerDatoSeguro("Clave: ");
+        string clavePlana  = leerDatoSeguro("Clave: ");
+
+        // 1. APLICAR HASH A LA CONTRASEÑA AQUÍ
+        string claveHash = aplicarHash(clavePlana); // Asegúrate de usar el nombre de tu función de seguridad
 
         string idRolStr = leerDatoSeguro("ID del rol (Numero): ");
         int id_rol = stoi(idRolStr);
@@ -1873,7 +1875,7 @@ if (subOpcion9 == 1) {
         pstmt->setInt(1, id_empleado);
         pstmt->setInt(2, id_rol);
         pstmt->setString(3, nombre);
-        pstmt->setString(4, clave);
+        pstmt->setString(4, claveHash); // 2. ENVIAR LA CLAVE HASHEADA EN VEZ DE LA PLANA
 
         // Recogermensaje procesa el SELECT que devuelve el SP
         string respuesta = Recogermensaje(pstmt);
@@ -1896,7 +1898,6 @@ if (subOpcion9 == 1) {
     cin.ignore();
     cin.get();
 }
-
 // =========================================================================
 // 2. ACTUALIZAR DATOS
 // =========================================================================
@@ -1908,37 +1909,45 @@ else if (subOpcion9 == 2) {
 
         cout << "\nNota: Presione Enter sin escribir nada para conservar el valor actual." << endl;
         string nuevo_usuario = leerDatoSeguro("Nuevo nombre de Usuario (Enter para omitir): ");
-        string nueva_clave   = leerDatoSeguro("Nueva Clave (Enter para omitir): ");
         string id_rol_str    = leerDatoSeguro("Nuevo ID Rol (Enter para omitir): ");
         string id_emp_str    = leerDatoSeguro("Nuevo ID Empleado (Enter para omitir): ");
 
-        // Ajustado a 5 parámetros para coincidir con tu SP
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_USUARIO(?, ?, ?, ?, ?)");
+        // Ajustado a 4 parámetros: P_ID_USUARIO, P_USUARIO, P_ID_ROL, P_ID_EMPLEADO
+        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_USUARIO(?, ?, ?, ?)");
         
+        // 1. ID de usuario (Obligatorio)
         pstmt->setInt(1, id_usuario);
 
-        if (nueva_clave.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
-        else pstmt->setString(2, nueva_clave);
+        // 2. Nuevo nombre de usuario
+        if (nuevo_usuario.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
+        else pstmt->setString(2, nuevo_usuario);
 
-        if (nuevo_usuario.empty()) pstmt->setNull(3, sql::DataType::VARCHAR);
-        else pstmt->setString(3, nuevo_usuario);
+        // 3. Nuevo ID de rol
+        if (id_rol_str.empty()) pstmt->setNull(3, sql::DataType::INTEGER);
+        else pstmt->setInt(3, stoi(id_rol_str));
 
-        if (id_rol_str.empty()) pstmt->setNull(4, sql::DataType::INTEGER);
-        else pstmt->setInt(4, stoi(id_rol_str));
-
-        if (id_emp_str.empty()) pstmt->setNull(5, sql::DataType::INTEGER);
-        else pstmt->setInt(5, stoi(id_emp_str));
+        // 4. Nuevo ID de empleado
+        if (id_emp_str.empty()) pstmt->setNull(4, sql::DataType::INTEGER);
+        else pstmt->setInt(4, stoi(id_emp_str));
 
         string respuesta = Recogermensaje(pstmt);
-        cout << "\n>>> " << respuesta << " <<<" << endl;
+        cout << "\n--------------------------------------------";
+        cout << "\n>>> " << respuesta << " <<<";
+        cout << "\n--------------------------------------------" << endl;
 
         delete pstmt;
     } 
-    catch (const exception &e) {
+    catch (const CancelarOperacionException &e) {
+        cout << "\n [!]" << e.what() << endl;
+    } catch (const invalid_argument &e) {
+        cout << "\n [!] Error: Formato numerico invalido en los campos ID." << endl; 
+    } catch (const exception &e) {
         cout << "\n[!] ERROR: " << e.what() << endl;
     }
+
     cout << "\nPresione Enter para continuar...";
-    cin.ignore(); cin.get();
+    cin.ignore(); 
+    cin.get();
 }
 // =========================================================================
 // 3. CAMBIAR ESTADO
@@ -2038,13 +2047,59 @@ delete pstmt;
                 cin.get();
  } // CIERRA OPCION 4
 
+//===================================================================
+//5. CAMBIAR CLAVE
+//===================================================================
 
+else if (subOpcion9 == 5) {
 
+   cout << "\n--- CAMBIAR CLAVE DEL USUARIO ---" << endl;
+ 
+   try {
+       string idStr = leerDatoSeguro("ID del Usuario a Modificar la clave (NUMERO): ");
+       int id_usuario = stoi(idStr);
+     
+       string clave_actual_plana = leerDatoSeguro("Ingrese su clave actual: ");
+       cout << "Espere......" << endl;
+       string clave_nueva_plana = leerDatoSeguro("Ingrese Su nueva clave: ");
 
+       // APLICAR HASH A AMBAS CLAVES ANTES DE ENVIARLAS AL SP
+       string clave_actual_hash = aplicarHash(clave_actual_plana);
+       string clave_nueva_hash  = aplicarHash(clave_nueva_plana);
 
+       // LLAMADA A SQL PARA USAR EL PROCEDURE (Asegúrate de que tu SP reciba los hashes)
+       sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_CAMBIAR_CONTRASENA(?, ?, ?)");
 
-   
+       // 1. ID del usuario (OBLIGATORIO)
+       pstmt->setInt(1, id_usuario);
 
+       // 2. LA CLAVE ACTUAL (YA HASHEADA)
+       pstmt->setString(2, clave_actual_hash);
+
+       // 3. NUEVA CLAVE (YA HASHEADA)
+       pstmt->setString(3, clave_nueva_hash);
+
+       string respuesta = Recogermensaje(pstmt);
+       cout << "\n-----------------------------------------";
+       cout << "\n>>> " << respuesta << " <<<";
+       cout << "\n-----------------------------------------" << endl;
+
+       delete pstmt;
+   } 
+   catch (const CancelarOperacionException &e) {
+       cout << "\n [!] " << e.what() << endl;
+   }
+   catch (const invalid_argument &e){
+       cout << "\n [!] Error: Formato numerico invalido en los campos ID." << endl;
+   }
+   catch (const exception &e){
+       cout << "\n [!] ERROR: " << e.what() << endl;
+   }
+ 
+   cout << "\n Presione ENTER para continuar....";
+   cin.ignore();
+   cin.get();      
+}
    }
 
 } //CIERRA EL CASE 9   
