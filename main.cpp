@@ -12,6 +12,7 @@
 // Tus archivos de cabecera personalizados
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -22,7 +23,7 @@ using namespace std;
 int main() {
     inicializarConexion();
 if (globalCon != nullptr) {
-    cout << "¡Conexión exitosa a BALBU_TECH!" << endl;
+    cout << MAGENTA<<  "¡Conexión exitosa a BALBU_TECH!"<<  RESET <<   endl;
 }
         
        sql::Statement *stmt = globalCon->createStatement();
@@ -32,10 +33,10 @@ if (globalCon != nullptr) {
         while (opcionPrincipal != 11) { 
             // system("clear"); // Opcional: para que el menú siempre salga arriba
             
-            cout << "\n-------------------------------------" << endl;
-            cout << " Selecione la opcion a realizar: " << endl;
-            cout << "----------------------------------------" << endl;
-            cout << "1. --- EMPLEADOS ---" << endl;
+            cout <<  VERDE<<"\n----------------------------------------" << RESET << endl;
+            cout << VERDE << "     Selecione la opcion a realizar: " << RESET << endl;
+            cout << VERDE << "----------------------------------------"<< RESET<< endl;
+            cout <<AZUL << "1. --- EMPLEADOS ---" << RESET <<endl;
             cout << "2. --- CATEGORIA ---" << endl;
             cout << "3. --- MARCA ---" << endl;
             cout << "4. --- CLIENTE ---" << endl;
@@ -2104,10 +2105,29 @@ else if (subOpcion9 == 5) {
 
 } //CIERRA EL CASE 9   
 
-default: 
-            cout << "Opción no válida." << endl;
-            break;
 
+case 10: { // MODULO
+
+} //CIERRA EL CASE 10
+
+
+
+
+
+
+
+
+
+
+/* PARA Salir del programa hcrear una opcion de salida llamada case como mi proyecto en (C)
+case 5:
+                printf("\nGuardando datos y saliendo del programa...\n");
+                guardarEnArchivo(lista, total);
+                break;*/
+
+default: 
+            cout << ROJO << "Opción no válida." << RESET<< endl;
+            break;
         } // <--- AQUÍ CIERRA EL SWITCH PRINCIPAL
 
     } // <--- ¡ESTA ES LA QUE TE FALTA! Cierra el bucle WHILE (opcionPrincipal != 11)
