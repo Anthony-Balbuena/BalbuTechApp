@@ -1577,6 +1577,36 @@ case 8: { // MODULO PRODUCTOS
             else if (subOpcion8 == 2) {
                 cout << "\n--- ACTUALIZAR DATOS DE PRODUCTO ---" << endl;
 
+            try {
+    // 1. Preparar y ejecutar la llamada del procedimiento
+    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL PARA_ACTUALIZARDATOS()");
+    bool results = pstmt->execute();
+
+    // 2. Procesar el único conjunto de resultados devuelto por el JOIN
+    if (results) {
+        sql::ResultSet *res = pstmt->getResultSet();
+        
+        cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORÍAS Y MARCAS ---\n" << RESET;
+        
+        while (res->next()) {
+            cout << CIAN << "\n | ID Prod: " << RESET << VERDE << res->getInt("ID_PRODUCTO") 
+                 << CIAN << "\n | Producto: " << RESET << VERDE <<res->getString("PRODUCTO") 
+                 << CIAN << "\n | Precio: " << RESET <<"$"<< res->getDouble("PRECIO")
+                 << CIAN << "\n | ID CATEGORIA: " << RESET << res->getInt("ID_CATEGORIA")
+                 << CIAN << "\n | Categoría: " << RESET << res->getString("CATEGORIA")
+                 << CIAN << "\n | ID Marca : " << RESET << res->getInt("ID_MARCA")
+                 << CIAN << "\n | Marca: " << RESET << res->getString("MARCA") << endl;
+        } 
+        delete res; // Liberar memoria del resultado
+    }
+
+    // 3. Limpiar el puntero del PreparedStatement
+    delete pstmt;
+
+} catch (sql::SQLException &e) {
+    cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
+}
+
                 try {
                     string idStr = leerDatoSeguro("ID del producto a modificar (NUMERO): ");
                     int ID_PRODUCTO = stoi(idStr);
