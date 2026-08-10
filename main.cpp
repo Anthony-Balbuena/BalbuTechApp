@@ -8,6 +8,8 @@
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 #include <cppconn/prepared_statement.h>
+#include <iomanip>
+#include <vector>
 
 // Tus archivos de cabecera personalizados
 #include "database.h"
@@ -1490,18 +1492,53 @@ case 8: { // MODULO PRODUCTOS
             if (subOpcion8 == 1) { 
                 cout << "\n---- REGISTRO DE PRODUCTO ---" << endl;
 
+         try {
+    // 1. Preparar y ejecutar la llamada al procedimiento almacenado
+    sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL PARA_INSERTAR_PRODUCTO()");
+    bool results = pstmt->execute();
+
+    // 2. Procesar el primer conjunto de resultados (Las Categorías)
+    if (results) {
+        sql::ResultSet *res = pstmt->getResultSet();
+        cout << CIAN << "\n--- CATEGORIAS DISPONIBLES ---\n" << RESET;
+        while (res->next()) {
+            cout << CIAN << "ID: " << RESET << res->getInt("ID_CATEGORIA") 
+                 << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
+        }
+        delete res; // Liberar memoria del resultado actual
+    }
+            
+    // 3. Procesar el segundo conjunto de resultados (Las Marcas) usando getMoreResults()
+    if (pstmt->getMoreResults()) {
+        sql::ResultSet *res = pstmt->getResultSet();
+
+        cout << CIAN << "\n--- MARCAS DISPONIBLES ---\n" << RESET;
+        while (res->next()) {
+            cout << CIAN << "ID: " << RESET << res->getInt("ID_MARCA") 
+                 << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
+        } 
+        delete res; // Liberar memoria del segundo resultado
+    }
+
+    // 4. Limpiar el puntero del PreparedStatement
+    delete pstmt;
+
+} catch (sql::SQLException &e) {
+    cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
+}
+
                 try {
-                    string NOMBRE      = leerDatoSeguro("Nombre del Producto: ");
-                    string CODIGO      = leerDatoSeguro("Codigo del producto (Ej: CPU-001): ");
-                    string DESCRIPCION = leerDatoSeguro("Descripcion del Producto: ");
+                    string NOMBRE      = leerDatoSeguro("\nNombre del Producto: ");
+                    string CODIGO      = leerDatoSeguro("\nCodigo del producto (Ej: CPU-001): ");
+                    string DESCRIPCION = leerDatoSeguro("\nDescripcion del Producto: ");
                     
-                    string marcaStr     = leerDatoSeguro("Marca del producto (ID-NUMERO): ");
+                    string marcaStr     = leerDatoSeguro("\nMarca del producto (ID-NUMERO): ");
                     int ID_MARCA        = stoi(marcaStr);
 
-                    string categoriaStr = leerDatoSeguro("Categoria del Producto (ID-NUMERO): ");
+                    string categoriaStr = leerDatoSeguro("\nCategoria del Producto (ID-NUMERO): ");
                     int ID_CATEGORIA    = stoi(categoriaStr);
 
-                    string precioStr    = leerDatoSeguro("Precio del Producto $: ");
+                    string precioStr    = leerDatoSeguro("\nPrecio del Producto $: ");
                     double PRECIO       = stod(precioStr);
 
                     sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?)");
