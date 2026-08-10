@@ -1,0 +1,109 @@
+CREATE TABLE ROLES (
+    ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
+    NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
+) ENGINE = InnoDB;
+
+-- Creando el índice para acelerar las búsquedas por nombre de rol
+CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
+
+
+----------------------------------------------------------------------------------------------------
+-----------------------------------------[Store procedure}------------------------------------------
+----------------------------------------------------------------------------------------------------
+
+
+--INSERTAR
+DELIMITER//
+
+drop PROCEDURE IF EXISTS SP_INSERTAR_ROL;
+
+CREATE PROCEDURE SP_INSERTAR_ROL(
+    IN P_NOMBRE_ROL VARCHAR(50)
+)
+proc_label: BEGIN
+    DECLARE v_nombre_limpio VARCHAR(50);
+
+    SET v_nombre_limpio = REGEXP_REPLACE(TRIM(P_NOMBRE_ROL), '[[:space:]]+', ' ');
+
+    IF v_nombre_limpio = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE DEL ROL ES OBLIGATORIO.';
+        LEAVE proc_label;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM ROLES WHERE NOMBRE_ROL = v_nombre_limpio) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE ROL YA EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    INSERT INTO ROLES (NOMBRE_ROL) VALUES (v_nombre_limpio);
+
+    SELECT CONCAT('EXITO: ROL "', v_nombre_limpio, '" INSERTADO. ID: ', LAST_INSERT_ID()) AS MENSAJE;
+END ;
+DELIMITER ;
+
+
+CALL `3_SP_INSERTAR_ROL` ('ROLE_ADMIN');
+CALL `3_SP_INSERTAR_ROL` ('ROLE_VENDEDOR');
+CALL `3_SP_INSERTAR_ROL`('ROLE_GERENTE');
+CALL `3_SP_INSERTAR_ROL` ('ROLE_INV_AUDITOR');
+
+
+SELECT * FROM `ROLES`
+
+
+--ACTUALIZAR 
+DELIMITER //
+ DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_ROL ;
+CREATE PROCEDURE SP_ACTUALIZAR_ROL(
+    IN P_ID_ROL INT,
+    IN P_NOMBRE_ROL VARCHAR(50)
+)
+proc_label: BEGIN
+    DECLARE v_nombre_limpio VARCHAR(50);
+
+    IF NOT EXISTS (SELECT 1 FROM ROLES WHERE ID_ROL = P_ID_ROL) THEN 
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL ROL NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    IF P_NOMBRE_ROL IS NOT NULL THEN
+        SET v_nombre_limpio = REGEXP_REPLACE(TRIM(P_NOMBRE_ROL), '[[:space:]]+', ' ');
+        IF v_nombre_limpio = '' THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE DEL ROL NO PUEDE ESTAR VACÍO.';
+            LEAVE proc_label;
+        ELSEIF EXISTS (SELECT 1 FROM ROLES WHERE NOMBRE_ROL = v_nombre_limpio AND ID_ROL <> P_ID_ROL) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE ROL YA EXISTE.';
+            LEAVE proc_label;
+        END IF;
+    END IF;
+
+    UPDATE ROLES SET NOMBRE_ROL = COALESCE(v_nombre_limpio, NOMBRE_ROL) WHERE ID_ROL = P_ID_ROL;
+
+    SELECT CONCAT('EXITO: ROL ID ', P_ID_ROL, ' ACTUALIZADO.') AS MENSAJE;
+END ;
+DELIMITER ;
+
+
+
+--BUSCAR 
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_BUSCAR_ROLES ; 
+CREATE PROCEDURE SP_BUSCAR_ROLES(
+    IN P_BUSQUEDA VARCHAR(50)
+)
+BEGIN
+    SELECT * FROM ROLES 
+    WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = '') 
+       OR (NOMBRE_ROL LIKE CONCAT('%', P_BUSQUEDA, '%'));
+END ;
+DELIMITER ; 
+
+--LISTAR ROLES
+DELIMITER //
+DROP PROCEDURE IF EXISTS  SP_LISTAR_ROLES ;
+CREATE PROCEDURE SP_LISTAR_ROLES()
+BEGIN
+    SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY NOMBRE_ROL ASC;
+END ;
+DELIMITER ;
