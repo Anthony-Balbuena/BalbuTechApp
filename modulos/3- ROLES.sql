@@ -1,8 +1,7 @@
 CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
-) ENGINE = InnoDB;
-
+) ENGINE = InnoDB; 
 -- Creando el índice para acelerar las búsquedas por nombre de rol
 CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
 

@@ -1,5 +1,6 @@
 #include <exception>
 #include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <mysql_connection.h>
@@ -8,8 +9,8 @@
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 #include <cppconn/prepared_statement.h>
-#include <iomanip>
-#include <vector>
+//#include <iomanip>
+//#include <vector>
 
 // Tus archivos de cabecera personalizados
 #include "database.h"
@@ -1486,9 +1487,9 @@ case 8: { // MODULO PRODUCTOS
                 continue;
             }
 
-            // =========================================================================
-            // 1. AGREGAR PRODUCTOS
-            // =========================================================================
+// =========================================================================
+// 1. AGREGAR PRODUCTOS
+// =========================================================================
             if (subOpcion8 == 1) { 
                 cout << "\n---- REGISTRO DE PRODUCTO ---" << endl;
 
@@ -1502,7 +1503,7 @@ case 8: { // MODULO PRODUCTOS
         sql::ResultSet *res = pstmt->getResultSet();
         cout << CIAN << "\n--- CATEGORIAS DISPONIBLES ---\n" << RESET;
         while (res->next()) {
-            cout << CIAN << "ID: " << RESET << res->getInt("ID_CATEGORIA") 
+            cout << CIAN << " | ID: " << RESET << res->getInt("ID_CATEGORIA") 
                  << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
         }
         delete res; // Liberar memoria del resultado actual
@@ -1518,13 +1519,13 @@ case 8: { // MODULO PRODUCTOS
                  << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
         } 
         delete res; // Liberar memoria del segundo resultado
-    }
+        }
 
     // 4. Limpiar el puntero del PreparedStatement
     delete pstmt;
 
 } catch (sql::SQLException &e) {
-    cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
+    cerr << ROJO << "Error al mostrar las listas: " << RESET << e.what() << endl;
 }
 
                 try {
@@ -1571,9 +1572,9 @@ case 8: { // MODULO PRODUCTOS
                 cin.get();
             }
 
-            // =========================================================================
-            // 2. ACTUALIZAR DATOS
-            // =========================================================================
+// =========================================================================
+// 2. ACTUALIZAR DATOS
+// =========================================================================
             else if (subOpcion8 == 2) {
                 cout << "\n--- ACTUALIZAR DATOS DE PRODUCTO ---" << endl;
 
@@ -1674,9 +1675,9 @@ case 8: { // MODULO PRODUCTOS
                 cin.get();
             }
 
-            // =========================================================================
-            // 3. CAMBIAR ESTADO
-            // =========================================================================
+// =========================================================================
+// 3. CAMBIAR ESTADO
+// =========================================================================
             else if (subOpcion8 == 3) {
 
                //1.Preparar y ejecutar la llamada del sp para ver el estado de los productos
@@ -1744,9 +1745,9 @@ case 8: { // MODULO PRODUCTOS
                 cin.get(); 
             }
 
-            // =========================================================================
-            // 4. BUSCAR PRODUCTO
-            // =========================================================================
+// =========================================================================
+// 4. BUSCAR PRODUCTO
+// =========================================================================
             else if (subOpcion8 == 4) {
                 cout << "\n--- BUSCAR PRODUCTOS ---" << endl;
 
@@ -1797,9 +1798,9 @@ case 8: { // MODULO PRODUCTOS
                 cin.get();
             }
 
-            // =========================================================================
-            // 5. CONSULTAR INVENTARIO
-            // =========================================================================
+// =========================================================================
+// 5. CONSULTAR INVENTARIO
+// =========================================================================
             else if (subOpcion8 == 5) {
                 cout << "\n============================================\n";
                 cout << "        CONSULTA DE INVENTARIO BALBU_TECH     \n";
@@ -1960,8 +1961,41 @@ case 9: { //MODULO USUARIOS
 if (subOpcion9 == 1) {
     cout << "\n --- REGISTRO DE USUARIO ---" << endl;
 
+try {
+ //1. Preparar y ejecutar la lalmada del (SP)   
+sql:: PreparedStatement *pstmt = globalCon ->prepareStatement("CALL PARA_INSERTAR_USUARIOS()");
+bool results = pstmt ->execute();
+// Resultaods del primer select los roles
+if (results) {
+    sql:: ResultSet *res = pstmt ->getResultSet();
+
+    cout << CIAN << "\n--- ROLES DISPONIBLES ---\n" << RESET;
+    while (res -> next()) {
+        cout << CIAN << "| ID: " << RESET << res -> getInt("ID_ROL") 
+             << CIAN <<" | Nombre_rol" << RESET << res ->getInt ("NOMBRE_ROL") << endl;
+    }
+    delete res;
+}
+//Resultados del segundo select 
+if (pstmt -> getMoreResults()) {
+
+    sql :: ResultSet *res = pstmt ->getResultSet();
+
+    cout << CIAN << "\n--- EMPLEADOS DISPONIBLES ---\n" << RESET;
+    while (res -> next()) {
+    cout << CIAN << "| ID_EMPLEADO: " << RESET << res ->getInt("ID_EMPLEADO")
+         << CIAN << "| NOMBRE_EMPLEADO: " << RESET << res -> getString("NOMBRE") << endl;
+    }
+    delete res; // LIBERAR MEMORIA DEL SEGUNDO RESULTADO
+}
+ // LIMPIAR EL PUNTERO DEL PreparedStatement
+ delete  pstmt;
+} catch (sql::SQLException &e) {
+    cerr << ROJO << "Error al mostrar las listas: " << RESET << e.what() << endl;
+}
+
     try {
-        string nombre = leerDatoSeguro("Nombre del Usuario (Se creara automaticamente): ");
+        string nombre = leerDatoSeguro("\nNombre del Usuario (Se creara automaticamente): ");
         string clavePlana  = leerDatoSeguro("Clave: ");
 
         // 1. APLICAR HASH A LA CONTRASEÑA AQUÍ
@@ -2007,6 +2041,10 @@ if (subOpcion9 == 1) {
 // =========================================================================
 else if (subOpcion9 == 2) {
     cout << "\n--- ACTUALIZAR DATOS DE USUARIO ---" << endl;
+
+
+
+    
     try {
         string idStr = leerDatoSeguro("ID del Usuario a Modificar (NUMERO): ");
         int id_usuario = stoi(idStr);
