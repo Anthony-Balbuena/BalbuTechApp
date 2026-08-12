@@ -1586,10 +1586,11 @@ case 8: { // MODULO PRODUCTOS
     if (results) {
         sql::ResultSet *res = pstmt->getResultSet();
         
+        
         cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORÍAS Y MARCAS ---\n" << RESET;
         
         while (res->next()) {
-            cout << CIAN << "\n | ID Prod: " << RESET << VERDE << res->getInt("ID_PRODUCTO") 
+            cout << CIAN << "\n | ID Producto: " << RESET << VERDE << res->getInt("ID_PRODUCTO") 
                  << CIAN << "\n | Producto: " << RESET << VERDE <<res->getString("PRODUCTO") 
                  << CIAN << "\n | Precio: " << RESET <<"$"<< res->getDouble("PRECIO")
                  << CIAN << "\n | ID CATEGORIA: " << RESET << res->getInt("ID_CATEGORIA")
@@ -1677,6 +1678,41 @@ case 8: { // MODULO PRODUCTOS
             // 3. CAMBIAR ESTADO
             // =========================================================================
             else if (subOpcion8 == 3) {
+
+               //1.Preparar y ejecutar la llamada del sp para ver el estado de los productos
+
+               try {
+               sql::PreparedStatement *pstmt = globalCon -> prepareStatement("CALL PARA_ACTIVARODESACTIVAR_PROC()");
+               bool results = pstmt -> execute();
+
+               //2. Procesar el conjunto de resultados que devuelve el select
+
+               if (results) {
+               sql ::ResultSet *res= pstmt -> getResultSet();
+
+               cout << CIAN << "\n--- LISTADO DE LOS PRODUCTOS Y SU ESTADO ---\n" << RESET << endl;
+               // el while maneja la captura de los datos
+               while (res -> next()) {
+                   
+                cout << CIAN << "\n | ID Producto: " << RESET << res -> getInt("ID_PRODUCTO")
+                     << CIAN << "\n | Nombre: "      << RESET << res -> getString("Nombre")              
+                     << CIAN << "\n | Estado: " << RESET << res -> getString("ESTADO") << endl;
+
+               }
+               // libera memoria del resultado
+               delete res;
+               }
+               // limpia el puntero del preparestatement
+               delete pstmt;
+
+
+
+               } catch (sql:: SQLException &e) {
+                  cerr << ROJO << "Error al mostrar la lista: " << RESET << e.what() << endl;
+               }
+
+
+
                 cout << "\n --- DESACTIVAR/ACTIVAR ESTADO DEL PRODUCTO ---" << endl;
 
                 try {
