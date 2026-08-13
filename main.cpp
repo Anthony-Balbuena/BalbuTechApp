@@ -1591,8 +1591,8 @@ case 8: { // MODULO PRODUCTOS
         cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORÍAS Y MARCAS ---\n" << RESET;
         
         while (res->next()) {
-            cout << CIAN << "\n | ID Producto: " << RESET << VERDE << res->getInt("ID_PRODUCTO") 
-                 << CIAN << "\n | Producto: " << RESET << VERDE <<res->getString("PRODUCTO") 
+            cout << CIAN << "\n | ID Producto: " << RESET << res->getInt("ID_PRODUCTO") 
+                 << CIAN << "\n | Producto: " << RESET << res->getString("PRODUCTO") 
                  << CIAN << "\n | Precio: " << RESET <<"$"<< res->getDouble("PRECIO")
                  << CIAN << "\n | ID CATEGORIA: " << RESET << res->getInt("ID_CATEGORIA")
                  << CIAN << "\n | Categoría: " << RESET << res->getString("CATEGORIA")
@@ -2042,11 +2042,37 @@ if (pstmt -> getMoreResults()) {
 else if (subOpcion9 == 2) {
     cout << "\n--- ACTUALIZAR DATOS DE USUARIO ---" << endl;
 
+    try {
+    // Preparar y ejecutar la llamada del procedimiento
+    sql::PreparedStatement *pstmt = globalCon ->prepareStatement("CALL PARA_ACTUALIZAR_USUARIOS()");
+    bool results = pstmt ->execute();
 
+    //Procesar los datos del SP DEL JOIN
+    if (results) {
+    
+        //Llamada al sql
+        sql::ResultSet *res= pstmt ->getResultSet();
+        cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, ROLES Y EMPLEADOS\n" << RESET;
+
+        while (res->next()) {
+        cout << CIAN <<"\n| ID USUARIO: " << RESET << res -> getInt("ID_USUARIO")
+             << CIAN <<"\n| NOMBRE DEL USUARIO: " << RESET << res -> getString("NOMBRE_USUARIO")
+             << CIAN <<"\n| ID ROL: " << RESET << res-> getInt("ID_ROL")
+             << CIAN <<"\n| NOMBRE ROL: " << RESET << res -> getString("NOMBRE_ROL")
+             << CIAN <<"\n| ID EMPLEADO: " << RESET << res-> getInt("ID_EMPLEADO")
+             << CIAN <<"\n| Nombre EMPLEADO: " << RESET << res -> getString("NOMBRE_EMPLEADO") << endl;
+        } 
+        delete res; // Liberar memoria del resultado 
+    }
+      delete pstmt; // Limpiar el puntero del PreparedStatement
+
+    } catch (sql::SQLException &e)  {
+       cerr << ROJO << "Error al mostrar las listas: " << RESET << e.what() << endl;   
+    }
 
     
     try {
-        string idStr = leerDatoSeguro("ID del Usuario a Modificar (NUMERO): ");
+        string idStr = leerDatoSeguro("\nID del Usuario a Modificar (NUMERO): ");
         int id_usuario = stoi(idStr);
 
         cout << "\nNota: Presione Enter sin escribir nada para conservar el valor actual." << endl;
