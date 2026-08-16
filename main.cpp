@@ -1972,7 +1972,7 @@ if (results) {
     cout << CIAN << "\n--- ROLES DISPONIBLES ---\n" << RESET;
     while (res -> next()) {
         cout << CIAN << "| ID: " << RESET << res -> getInt("ID_ROL") 
-             << CIAN <<" | Nombre_rol" << RESET << res ->getInt ("NOMBRE_ROL") << endl;
+             << CIAN <<" | Nombre_rol: " << RESET << res ->getString ("NOMBRE_ROL") << endl;
     }
     delete res;
 }
@@ -2033,7 +2033,7 @@ if (pstmt -> getMoreResults()) {
     }
 
     cout << "\n Presione Enter para volver al menu....";
-    cin.ignore();
+    //cin.ignore();
     cin.get();
 }
 // =========================================================================
@@ -2114,7 +2114,7 @@ else if (subOpcion9 == 2) {
     }
 
     cout << "\nPresione Enter para continuar...";
-    cin.ignore(); 
+    //cin.ignore(); 
     cin.get();
 }
 // =========================================================================
@@ -2127,7 +2127,37 @@ else if (subOpcion9 == 3) {
  cout << "--- DESACTIVAR/ACTIVAR ESTADO DEL  USUARIO --- "  << endl;
 
 try {
-string idStr = leerDatoSeguro("Ingrese el ID del usuario (NUMERO): ");
+
+//1. Preparar y ejecutar la llamada del sp para ver el estado de los usuarios
+sql :: PreparedStatement *pstmt = globalCon -> prepareStatement("CALL PARA_ACT_DESAC_USUARIOS()");
+
+bool results = pstmt -> execute();
+
+//2. Procesar el conjunto de resultados que devuelve el join
+
+if (results) {
+    sql :: ResultSet *res= pstmt -> getResultSet();
+
+    cout << CIAN << "\n--- LISTADO DE LOS USUARIOS, SU ESTADO Y EL NOBRE DE SU EMPLEADO ---\n" << RESET << endl;
+    // el while maneja la captura de los datos
+    while (res -> next()) {
+        
+     cout << CIAN << "\n| ID Usuario: " << RESET << res -> getInt("ID_USUARIO")
+          << CIAN << "\n| Nombre: "      << RESET << res -> getString("USUARIO")              
+          << CIAN << "\n| Estado: " << RESET << res -> getString("ESTADO") 
+          << CIAN << "\n| Empleado: " << RESET << res -> getString("EMPLEADO") << endl;
+    }
+    // libera memoria del resultado
+    delete res;
+}
+delete pstmt; // limpia el puntero del preparestatement
+} catch (sql:: SQLException &e) {
+   cerr << ROJO << "Error al mostrar la lista: " << RESET << e.what() << endl;
+
+}
+
+try {
+string idStr = leerDatoSeguro("\nIngrese el ID del usuario (NUMERO): ");
 int id_usuario = stoi(idStr);
 
 sql:: PreparedStatement *pstmt = globalCon -> prepareStatement(" CALL SP_TOGGLE_ESTADO_USUARIO (?)");
