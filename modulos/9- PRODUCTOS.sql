@@ -5,35 +5,43 @@ CREATE TABLE PRODUCTOS (
     DESCRIPCION VARCHAR(255) NOT NULL,
     PRECIO DECIMAL(10, 2) NOT NULL CHECK (PRECIO > 0),
     CODIGO VARCHAR(20) NOT NULL UNIQUE,
+    IMAGEN VARCHAR(255) NULL,
     ESTADO ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     FECHA_CREACION TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ID_MARCA INT NOT NULL,
     ID_CATEGORIA INT NOT NULL,
-    PRIMARY KEY (ID_PRODUCTO),
+    ID_PROVEEDOR INT NOT NULL,
     CONSTRAINT UQ_PRODUCTO_NOMBRE_MARCA UNIQUE (NOMBRE, ID_MARCA),
     CONSTRAINT FK_PRODUCTO_MARCA FOREIGN KEY (ID_MARCA) REFERENCES MARCAS (ID_MARCA),
-    CONSTRAINT FK_PRODUCTO_CATEGORIA FOREIGN KEY (ID_CATEGORIA) REFERENCES CATEGORIAS (ID_CATEGORIA)
+    CONSTRAINT FK_PRODUCTO_CATEGORIA FOREIGN KEY (ID_CATEGORIA) REFERENCES CATEGORIAS (ID_CATEGORIA),
+    CONSTRAINT FK_PRODUCTO_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
 ) ENGINE = InnoDB;
 
-SELECT * FROM `MARCAS`; 
+-- 1) Migración segura: añadir ID_PROVEEDOR si falta, establecer proveedores válidos
+ALTER TABLE PRODUCTOS
+ADD COLUMN IF NOT EXISTS ID_PROVEEDOR INT DEFAULT 1 AFTER ID_CATEGORIA;
 
-SELECT * from `CATEGORIAS`;
+UPDATE PRODUCTOS
+SET ID_PROVEEDOR = 1
+WHERE ID_PROVEEDOR IS NULL OR ID_PROVEEDOR = 0;
 
-CREATE INDEX IX_PRODUCTOS_MARCA ON PRODUCTOS (ID_MARCA);
+ALTER TABLE PRODUCTOS
+MODIFY COLUMN ID_PROVEEDOR INT NOT NULL DEFAULT 1;
 
-CREATE INDEX IX_PRODUCTOS_CATEGORIA ON PRODUCTOS (ID_CATEGORIA);
+-- Índices útiles
+CREATE INDEX IF NOT EXISTS IX_PRODUCTOS_MARCA ON PRODUCTOS (ID_MARCA);
+CREATE INDEX IF NOT EXISTS IX_PRODUCTOS_CATEGORIA ON PRODUCTOS (ID_CATEGORIA);
 
+-- Asegurar columna IMAGEN (si no existe)
+ALTER TABLE PRODUCTOS ADD COLUMN IF NOT EXISTS IMAGEN VARCHAR(255) NULL;
 
 -----------------------------------------------------------------------------------------------------------------------------
------------------------------------------[Store procedure}-------------------------------------------------------------------
------------------------------------------------------------------------------------------------------------------------------                
-DESCRIBE PRODUCTOS;
+-----------------------------------------[Store procedures]-------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------
 
---1. INSERTAR
-
+-- 1. INSERTAR
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_PRODUCTO ;
-
 
 CREATE PROCEDURE SP_INSERTAR_PRODUCTO(
     IN P_NOMBRE        VARCHAR(100),
@@ -42,17 +50,30 @@ CREATE PROCEDURE SP_INSERTAR_PRODUCTO(
     IN P_CODIGO        VARCHAR(20),
     IN P_ID_MARCA      INT,
     IN P_ID_CATEGORIA  INT,
-    IN P_ID_PROVEEDOR  INT
+    IN P_ID_PROVEEDOR  INT,
+    IN P_IMAGEN        VARCHAR(255)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(100);
     DECLARE v_desc_limpia   VARCHAR(255);
     DECLARE v_codigo_limpio VARCHAR(20);
+    DECLARE v_imagen_limpia VARCHAR(255);
 
     -- 1) Limpieza
     SET v_nombre_limpio = REGEXP_REPLACE(TRIM(P_NOMBRE), '[[:space:]]+', ' ');
     SET v_desc_limpia   = REGEXP_REPLACE(TRIM(P_DESCRIPCION), '[[:space:]]+', ' ');
     SET v_codigo_limpio = UPPER(TRIM(P_CODIGO));
+
+    -- Procesar imagen (opcional)
+    IF P_IMAGEN IS NULL OR TRIM(P_IMAGEN) = '' THEN
+        SET v_imagen_limpia = NULL;
+    ELSE
+        SET v_imagen_limpia = TRIM(P_IMAGEN);
+        IF LENGTH(v_imagen_limpia) > 255 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA RUTA/URL DE LA IMAGEN ES DEMASIADO LARGA (MAX 255).';
+            LEAVE proc_label;
+        END IF;
+    END IF;
 
     -- 2) Validaciones obligatorias
     IF P_ID_PROVEEDOR IS NULL THEN
@@ -92,17 +113,15 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 3) Inserción (requiere proveedor explícito)
-    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR)
-    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR);
+    -- 3) Inserción (requiere proveedor explícito). IMAGEN es opcional.
+    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR, IMAGEN)
+    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR, v_imagen_limpia);
 
     SELECT CONCAT('EXITO: PRODUCTO "', v_nombre_limpio, '" REGISTRADO CORRECTAMENTE.') AS MENSAJE;
 
 END ;
 
 DELIMITER ;
-
-DESCRIBE PRODUCTOS;
 
 --2. ACTUALIZAR
 
@@ -117,12 +136,16 @@ CREATE PROCEDURE SP_ACTUALIZAR_PRODUCTOS(
     IN P_PRECIO       DECIMAL(10, 2),
     IN P_CODIGO       VARCHAR(20),
     IN P_ID_MARCA     INT,
-    IN P_ID_CATEGORIA INT
+    IN P_ID_CATEGORIA INT,
+    IN P_ID_PROVEEDOR INT,
+    IN P_IMAGEN       VARCHAR(255)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(100); 
     DECLARE v_desc_limpia   VARCHAR(255);
     DECLARE v_codigo_limpio VARCHAR(20);
+    DECLARE v_imagen_limpia VARCHAR(255);
+    DECLARE v_imagen_flag INT DEFAULT 0; -- 0=no cambiar, 1=cambiar (incluye NULL para borrar)
 
     -- 1. VALIDAR EXISTENCIA
     IF NOT EXISTS (SELECT 1 FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN 
@@ -147,6 +170,29 @@ proc_label: BEGIN
         SET v_codigo_limpio = UPPER(TRIM(P_CODIGO));
         IF EXISTS (SELECT 1 FROM PRODUCTOS WHERE CODIGO = v_codigo_limpio AND ID_PRODUCTO <> P_ID_PRODUCTO) THEN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE CÓDIGO YA PERTENECE A OTRO PRODUCTO.';
+            LEAVE proc_label;
+        END IF;
+    END IF;
+
+    -- Procesar imagen (si se envía): NULL = no modificar; cadena vacía (o espacios) también se trata como "no modificar".
+    IF P_IMAGEN IS NOT NULL THEN
+        SET v_imagen_limpia = TRIM(P_IMAGEN);
+        IF v_imagen_limpia = '' THEN
+            -- usuario envió cadena vacía o solo espacios: lo interpretamos como "no modificar"
+            SET v_imagen_flag = 0;
+        ELSE
+            SET v_imagen_flag = 1;
+            IF LENGTH(v_imagen_limpia) > 255 THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA RUTA/URL DE LA IMAGEN ES DEMASIADO LARGA (MAX 255).';
+                LEAVE proc_label;
+            END IF;
+        END IF;
+    END IF;
+
+    -- Validar proveedor si se intentó cambiar
+    IF P_ID_PROVEEDOR IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM PROVEEDORES WHERE ID_PROVEEDOR = P_ID_PROVEEDOR) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PROVEEDOR NO EXISTE.';
             LEAVE proc_label;
         END IF;
     END IF;
@@ -178,7 +224,9 @@ proc_label: BEGIN
         PRECIO       = COALESCE(P_PRECIO, PRECIO), -- Ya validado arriba
         CODIGO       = COALESCE(v_codigo_limpio, CODIGO),
         ID_MARCA     = COALESCE(P_ID_MARCA, ID_MARCA),
-        ID_CATEGORIA = COALESCE(P_ID_CATEGORIA, ID_CATEGORIA)
+        ID_CATEGORIA = COALESCE(P_ID_CATEGORIA, ID_CATEGORIA),
+        ID_PROVEEDOR = COALESCE(P_ID_PROVEEDOR, ID_PROVEEDOR),
+        IMAGEN       = CASE WHEN v_imagen_flag = 1 THEN v_imagen_limpia ELSE IMAGEN END
     WHERE ID_PRODUCTO = P_ID_PRODUCTO;
 
     -- 4. MENSAJE DE RETORNO (Estilo BALBU_TECH)
@@ -196,7 +244,7 @@ END ;
 DELIMITER ;
 
 
---3. Activar/Decastivar
+--3. Activar/Desactivar
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_PRODUCTOS;
 CREATE PROCEDURE SP_TOGGLE_ESTADO_PRODUCTOS(
@@ -207,6 +255,7 @@ proc_label: BEGIN
     DECLARE v_NOMBRE VARCHAR(100);
     DECLARE v_ESTADO_ACTUAL VARCHAR(20);
     DECLARE v_NUEVO_ESTADO VARCHAR(20);
+    DECLARE v_IMAGEN VARCHAR(255);
 
   IF NOT EXISTS (SELECT 1 FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO EXISTE.';
@@ -214,7 +263,7 @@ proc_label: BEGIN
 END IF;
 
     -- 3. Obtener el nombre y el estado actual
-    SELECT `NOMBRE`, `ESTADO` INTO v_NOMBRE, v_ESTADO_ACTUAL 
+    SELECT `NOMBRE`, `ESTADO`, `IMAGEN` INTO v_NOMBRE, v_ESTADO_ACTUAL, v_IMAGEN
     FROM `PRODUCTOS` 
     WHERE `ID_PRODUCTO` = P_ID_PRODUCTO;
 
@@ -230,12 +279,12 @@ END IF;
     SET `ESTADO` = v_NUEVO_ESTADO 
     WHERE `ID_PRODUCTO` = P_ID_PRODUCTO;
 
-    -- 6. Mensaje de confirmación final
-    SELECT CONCAT(
-        'PRODUCTO: "', v_NOMBRE, 
-        '" - CAMBIO DE: ', v_ESTADO_ACTUAL, 
-        ' A: ', v_NUEVO_ESTADO
-    ) AS MENSAJE;
+    -- 6. Resultado: devolver columnas separadas para la UI
+    SELECT
+        v_NOMBRE           AS PRODUCTO,
+        v_ESTADO_ACTUAL    AS ESTADO_ANTERIOR,
+        v_NUEVO_ESTADO     AS ESTADO_NUEVO,
+        v_IMAGEN           AS IMAGEN;
 
 END ;
 DELIMITER ;
@@ -253,6 +302,7 @@ BEGIN
         P.ID_PRODUCTO,
         P.CODIGO,
         P.NOMBRE,
+        P.IMAGEN AS IMAGEN,
         M.NOMBRE AS MARCA,
         C.NOMBRE AS CATEGORIA,
         P.PRECIO,
@@ -264,7 +314,7 @@ BEGIN
            OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%') 
            OR P.CODIGO = P_BUSQUEDA)
     ORDER BY P.ID_PRODUCTO ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
-END //
+END ;
 
 DELIMITER ;  
 
@@ -279,6 +329,9 @@ BEGIN
         P.ID_PRODUCTO, -- Agregado para consistencia visual
         P.CODIGO,
         P.NOMBRE,
+        P.IMAGEN AS IMAGEN,
+        P.ID_PROVEEDOR,
+        PR.NOMBRE AS PROVEEDOR,
         C.NOMBRE AS CATEGORIA,
         M.NOMBRE AS MARCA,
         I.STOCK_ACTUAL,
@@ -296,37 +349,40 @@ BEGIN
     LEFT JOIN INVENTARIO I ON P.ID_PRODUCTO = I.ID_PRODUCTO
     LEFT JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
     LEFT JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
+    LEFT JOIN PROVEEDORES PR ON P.ID_PROVEEDOR = PR.ID_PROVEEDOR
     WHERE (P_FILTRO IS NULL OR P_FILTRO = '' 
            OR P.NOMBRE LIKE CONCAT('%', P_FILTRO, '%') 
            OR P.CODIGO LIKE CONCAT('%', P_FILTRO, '%')
            OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%'))
       AND P.ESTADO = 'ACTIVO'
     ORDER BY P.ID_PRODUCTO ASC; -- Ordenado numéricamente por ID de producto
-END //
+END ;
 DELIMITER ;
 --6. REPORTE STOCK 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_REPORTE_STOCK_CRITICO ;
 CREATE PROCEDURE SP_REPORTE_STOCK_CRITICO()
 BEGIN
-    SELECT 
-        P.NOMBRE,
+    SELECT
+        P.ID_PRODUCTO,
+        P.NOMBRE        AS PRODUCTO,
+        P.IMAGEN        AS IMAGEN,
+        P.ID_PROVEEDOR  AS ID_PROVEEDOR,
+        PR.NOMBRE       AS PROVEEDOR,
         I.STOCK_ACTUAL,
         I.STOCK_MINIMO,
         (I.STOCK_MINIMO - I.STOCK_ACTUAL) AS CANTIDAD_FALTANTE
     FROM INVENTARIO I
     JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
+    LEFT JOIN PROVEEDORES PR ON P.ID_PROVEEDOR = PR.ID_PROVEEDOR
     WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO
     ORDER BY CANTIDAD_FALTANTE DESC;
 END ;
 
+DELIMITER ;
 
 
-
-
- 
 DELIMITER //
-
 
 DROP PROCEDURE IF EXISTS PARA_INSERTAR_PRODUCTO;
 
@@ -351,25 +407,27 @@ BEGIN
 END;
 
 CALL PARA_INSERTAR_PRODUCTO();
-DELIMITER;
-
+DELIMITER ;
 
 
 --PARA LA ACTUALIZACION DE LOS DATOS 
 DELIMITER//
+
 DROP PROCEDURE IF EXISTS PARA_ACTUALIZARDATOS;
 
 CREATE PROCEDURE PARA_ACTUALIZARDATOS()
 BEGIN
-
 SELECT 
     P.ID_PRODUCTO,
-    P.NOMBRE AS PRODUCTO,
+    P.NOMBRE        AS PRODUCTO,
+    P.IMAGEN        AS IMAGEN,
     P.PRECIO,
+    P.ID_PROVEEDOR  AS ID_PROVEEDOR,
+    PR.NOMBRE       AS PROVEEDOR,
     C.ID_CATEGORIA,
-    C.NOMBRE AS CATEGORIA,
+    C.NOMBRE        AS CATEGORIA,
     M.ID_MARCA,
-    M.NOMBRE AS MARCA
+    M.NOMBRE        AS MARCA
 FROM 
     PRODUCTOS AS P
 LEFT JOIN 
@@ -378,10 +436,14 @@ LEFT JOIN
 LEFT JOIN 
     MARCAS AS M 
     ON P.ID_MARCA = M.ID_MARCA
+LEFT JOIN
+    PROVEEDORES PR
+    ON P.ID_PROVEEDOR = PR.ID_PROVEEDOR
 ORDER BY 
-P.ID_PRODUCTO ASC,
+    P.ID_PRODUCTO ASC,
     C.ID_CATEGORIA ASC, 
-    M.ID_MARCA ASC;
+    M.ID_MARCA ASC,
+    PR.ID_PROVEEDOR ASC;
 
 END;
 
@@ -406,41 +468,7 @@ DELIMITER;
 
 CALL PARA_ACTIVARODESACTIVAR_PROC();
 
-SELECT * FROM PRODUCTOS; 
-ON UPDATE CASCADE
-ON DELETE RESTRICT;
-
--- 6) Verificación final: listar productos y su proveedor
-SELECT ID_PRODUCTO, NOMBRE, ID_PROVEEDOR FROM PRODUCTOS ORDER BY ID_PRODUCTO;
-
--- Verificar existencia del proveedor 1
-SELECT * FROM PROVEEDORES WHERE ID_PROVEEDOR = 1;
-
--- 1) Añadir columna (permitir NULL temporalmente)
-ALTER TABLE PRODUCTOS
-ADD COLUMN IF NOT EXISTS ID_PROVEEDOR INT DEFAULT 1 AFTER ID_CATEGORIA;
-
--- 2) Asignar proveedor 1 a productos existentes que no tengan proveedor válido
-UPDATE PRODUCTOS
-SET ID_PROVEEDOR = 1
-WHERE ID_PROVEEDOR IS NULL OR ID_PROVEEDOR = 0;
-
--- 3) Forzar NOT NULL y DEFAULT 1
-ALTER TABLE PRODUCTOS
-MODIFY COLUMN ID_PROVEEDOR INT NOT NULL DEFAULT 1;
-
--- 4) Añadir FK (si no existe)
-
--- Verificación: listar productos con su proveedor
-SELECT ID_PRODUCTO, NOMBRE, ID_PROVEEDOR FROM PRODUCTOS ORDER BY ID_PRODUCTO;
+SELECT * FROM PRODUCTOS;
 
 
-SELECT * from PRODUCTOS
 
-ALTER TABLE PRODUCTOS 
-ALTER COLUMN ID_PROVEEDOR DROP DEFAULT;
-
-DESCRIBE PRODUCTOS;
-
-ALTER TABLE PRODUCTOS 
-MODIFY COLUMN ID_PROVEEDOR INT NOT NULL;
