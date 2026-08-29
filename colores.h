@@ -3,7 +3,6 @@
 
 #include <string>
 
-// Declaración de constantes de colores ANSI para que estén disponibles donde incluyas este archivo
 extern const std::string RESET;
 extern const std::string NEGRITA;
 extern const std::string ROJO;
@@ -14,4 +13,4 @@ extern const std::string MAGENTA;
 extern const std::string CIAN;
 extern const std::string BLANCO;
 
-#endif // COLORES_H
+#endif
