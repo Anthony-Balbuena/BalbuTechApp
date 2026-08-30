@@ -20,7 +20,7 @@ CREATE INDEX IX_PROVEEDOR_ESTADO ON PROVEEDORES (ESTADO);
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-
+SELECT * FROM ROLES;
 
 --1. INSERTAR 
 DELIMITER //
