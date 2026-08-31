@@ -22,7 +22,8 @@
 
 using namespace std;
 
-std::vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
+// Obtiene la lista de permisos que tiene un rol concreto dentro del sistema.
+vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
     std::vector<std::string> permisos;
 
     if (rol == "ADMIN") {
@@ -60,6 +61,7 @@ std::vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
     return permisos;
 }
 
+// Verifica si el usuario autenticado tiene permiso para ejecutar una acción concreta.
 bool tienePermiso(const string& accion) {
     if (!sesionActiva()) {
         return false;
@@ -98,6 +100,7 @@ bool tienePermiso(const string& accion) {
     return false;
 }
 
+// Muestra todos los permisos disponibles para el rol actual de la sesión activa.
 void mostrarPermisosActuales() {
     if (!sesionActiva()) {
         cout << ROJO << "No hay sesión activa." << RESET << endl;
@@ -111,6 +114,7 @@ void mostrarPermisosActuales() {
     }
 }
 
+// Genera el menú principal según el rol activo del usuario autenticado.
 void mostrarMenuSegunRol() {
     cout << MAGENTA << "\n=== MENU PRINCIPAL BALBU_TECH ===" << RESET << endl;
     cout << AZUL << "Usuario activo: " << sesionActual.username << RESET << endl;
@@ -145,6 +149,7 @@ void mostrarMenuSegunRol() {
     cout << "----------------------------------------" << endl;
 }
 
+// Ejecuta la navegación del sistema, validando permisos antes de abrir cada módulo.
 void ejecutarMenuSegunRol() {
     int opcion = 0;
 
@@ -299,6 +304,7 @@ void ejecutarMenuSegunRol() {
     } while (opcion != 0);
 }
 
+// Muestra las opciones del módulo de roles para administración del sistema.
 void mostrarMenuRoles() {
     cout << "\n=== MODULO DE ROLES ===" << endl;
     cout << "1. Agregar Rol" << endl;
@@ -309,6 +315,7 @@ void mostrarMenuRoles() {
     cout << "=======================" << endl;
 }
 
+// Registra un nuevo rol en la base de datos con validación básica de entrada.
 void registrarRol() {
     cout << "\n--- REGISTRO DE ROL ---" << endl;
     try {
@@ -330,6 +337,7 @@ void registrarRol() {
     }
 }
 
+// Actualiza el nombre de un rol existente verificando que el ID sea válido.
 void actualizarRol() {
     cout << "\n--- ACTUALIZAR ROL ---" << endl;
     try {
@@ -359,6 +367,7 @@ void actualizarRol() {
     }
 }
 
+// Busca roles por coincidencia de nombre y muestra los resultados encontrados.
 void buscarRol() {
     cout << "\n--- BUSCAR ROLES ---" << endl;
     try {
@@ -395,6 +404,7 @@ void buscarRol() {
     }
 }
 
+// Lista todos los roles registrados en el sistema para consulta rápida.
 void listarRoles() {
     cout << "\n--- LISTADO DE ROLES ---" << endl;
     try {
