@@ -1,8 +1,8 @@
 -- ================================================================
 -- BALBU_TECH - PERMISOS POR ROL
 -- ================================================================
--- Este módulo define permisos del sistema y los asocia a cada rol.
--- Así el menú y las acciones quedan protegidos por autenticación real.
+-- Este módulo define los permisos del sistema y los asocia a cada rol.
+-- La idea es proteger el menú y las acciones con autenticación real y control por roles.
 
 CREATE TABLE IF NOT EXISTS PERMISOS (
     ID_PERMISO INT PRIMARY KEY AUTO_INCREMENT,
@@ -80,6 +80,7 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 -- ================================================================
 -- PROCEDIMIENTOS DE GESTION
 -- ================================================================
+-- Asigna un permiso concreto a un rol del sistema para ampliar o restringir acceso.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ASIGNAR_PERMISO_A_ROL;//
 CREATE PROCEDURE SP_ASIGNAR_PERMISO_A_ROL(
@@ -109,6 +110,7 @@ BEGIN
 END;//
 DELIMITER ;
 
+-- Muestra todos los permisos asociados a un rol específico para consulta y auditoría.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LISTAR_PERMISOS_POR_ROL;//
 CREATE PROCEDURE SP_LISTAR_PERMISOS_POR_ROL(
@@ -126,6 +128,7 @@ DELIMITER ;
 -- ================================================================
 -- FUNCION ESTANDAR DE VALIDACION
 -- ================================================================
+-- Evalúa si un usuario específico tiene acceso a una acción del sistema según su rol.
 DELIMITER //
 DROP FUNCTION IF EXISTS FN_TIENE_PERMISO;//
 CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(20))

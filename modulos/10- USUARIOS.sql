@@ -16,6 +16,7 @@ CREATE INDEX IX_USER ON USUARIOS (USUARIO);
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------    
+use BALBU_TECH;
 SELECT * FROM `USUARIOS`;
 --INSERTAR
 
@@ -52,7 +53,7 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: USUARIO "', v_usuario_limpio, '" CREADO.') AS MENSAJE;
 END ;
 
-DELIMITER ;
+DELIMITER ; 
 use BALBU_TECH;
 
 --ACTUALIZAR

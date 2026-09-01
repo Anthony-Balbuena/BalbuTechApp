@@ -13,8 +13,9 @@ CREATE TABLE USUARIOS_SISTEMA (
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------   
-
+select * from USUARIOS_SISTEMA;
 --CREAR
+-- Crea un usuario del sistema para un empleado, validando que no tenga ya una cuenta.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_CREAR_USUARIO;
 CREATE PROCEDURE SP_CREAR_USUARIO(
@@ -36,8 +37,7 @@ END ;
 DELIMITER ;
 
 
----VALIDAR 
-
+-- Valida las credenciales del usuario y devuelve si el acceso es correcto, activo y autorizado.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO ;
 CREATE PROCEDURE SP_LOGIN_USUARIO(
@@ -65,6 +65,7 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+-- Bloquea automáticamente la cuenta del sistema cuando un empleado queda inactivo por liquidación.
 DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_DESACTIVAR_USUARIO_POST_LIQUIDACION ;
@@ -107,6 +108,7 @@ DELIMITER ;
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 
+-- Evalúa si un usuario específico tiene acceso a una acción del sistema según su rol.
 DELIMITER //
 
 DROP FUNCTION IF EXISTS FN_TIENE_PERMISO ;
