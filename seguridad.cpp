@@ -2,7 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 using namespace std;
 
@@ -24,16 +24,34 @@ string leerDatoSeguro(const string& mensaje) {
 }
 
 string aplicarHash(const string& input) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input.c_str(), input.size());
-    SHA256_Final(hash, &sha256);
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int length = 0;
+
+    if (mdctx == nullptr) {
+        return "";
+    }
+
+    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(mdctx);
+        return "";
+    }
+
+    if (EVP_DigestUpdate(mdctx, input.c_str(), input.size()) != 1) {
+        EVP_MD_CTX_free(mdctx);
+        return "";
+    }
+
+    if (EVP_DigestFinal_ex(mdctx, hash, &length) != 1) {
+        EVP_MD_CTX_free(mdctx);
+        return "";
+    }
+
+    EVP_MD_CTX_free(mdctx);
 
     stringstream ss;
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    for (unsigned int i = 0; i < length; ++i) {
+        ss << hex << setw(2) << setfill('0') << static_cast<int>(hash[i]);
     }
     return ss.str();
 }

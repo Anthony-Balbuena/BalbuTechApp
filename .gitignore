@@ -1,0 +1,7 @@
+*.o
+main
+prueba_seguridad
+*.exe
+# IDE / OS
+.vscode/
+.DS_Store
