@@ -1,3 +1,4 @@
+-- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 -- ================================================================
 -- BALBU_TECH - PERMISOS POR ROL
 -- ================================================================
@@ -107,7 +108,7 @@ BEGIN
     ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
     SELECT CONCAT('EXITO: PERMISO ', P_NOMBRE_PERMISO, ' ASIGNADO A ', P_ROL_NOMBRE) AS MENSAJE;
-END;//
+END;
 DELIMITER ;
 
 -- Muestra todos los permisos asociados a un rol específico para consulta y auditoría.
@@ -122,7 +123,7 @@ BEGIN
     INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO
     WHERE RP.ROL_NOMBRE = P_ROL_NOMBRE
     ORDER BY P.NOMBRE_PERMISO;
-END;//
+END;
 DELIMITER ;
 
 -- ================================================================
@@ -130,7 +131,7 @@ DELIMITER ;
 -- ================================================================
 -- Evalúa si un usuario específico tiene acceso a una acción del sistema según su rol.
 DELIMITER //
-DROP FUNCTION IF EXISTS FN_TIENE_PERMISO;//
+DROP FUNCTION IF EXISTS FN_TIENE_PERMISO;
 CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(20))
 RETURNS BOOLEAN
 DETERMINISTIC
@@ -155,7 +156,7 @@ BEGIN
       AND P.NOMBRE_PERMISO = P_ACCION;
 
     RETURN v_existe > 0;
-END;//
+END;
 DELIMITER ;
 
 SELECT 'PERMISOS POR ROL CREADOS CORRECTAMENTE.' AS RESULTADO;
