@@ -16,4 +16,13 @@ public:
 string leerDatoSeguro(const std::string& mensaje);
 string aplicarHash(const std::string& input);
 
+// PBKDF2 helpers
+// Genera un hash serializado con formato: pbkdf2$<iter>$<salt_b64>$<hash_b64>
+bool generar_hash_pbkdf2(const std::string &password, std::string &out_serializado);
+
+// Verifica la contraseña contra el valor almacenado. Si el valor almacenado
+// es un hash legacy (SHA256 hex) y coincide, genera un nuevo hash PBKDF2 y 
+// lo devuelve en `out_rehash` (si no es nullptr) para actualizar la BD.
+bool verificarPassword(const std::string &password, const std::string &stored, std::string *out_rehash = nullptr);
+
 #endif
