@@ -17,8 +17,6 @@ bool intentarLogin(const string& usuario, const string& password) {
     }
 
     try {
-        string passwordHash = aplicarHash(password);
-
         // 1) Intentar autenticación en la tabla USUARIOS (esquema unificado)
         sql::PreparedStatement *pSelect = globalCon->prepareStatement(
             "SELECT U.ID_USUARIO, U.USUARIO, U.CONTRASENA, U.ESTADO, R.NOMBRE_ROL "
@@ -31,9 +29,28 @@ bool intentarLogin(const string& usuario, const string& password) {
         if (rsel->next()) {
             string storedHash = rsel->getString("CONTRASENA");
             string estadoCuenta = rsel->getString("ESTADO");
-            if (storedHash == passwordHash && estadoCuenta == "ACTIVO") {
+
+            string rehash;
+            bool ok = verificarPassword(password, storedHash, &rehash);
+            if (ok && estadoCuenta == "ACTIVO") {
                 int idUsuario = rsel->getInt("ID_USUARIO");
                 string rol = rsel->getString("NOMBRE_ROL");
+
+                // Si hubo rehash, actualizamos la BD al formato PBKDF2
+                if (!rehash.empty()) {
+                    try {
+                        sql::PreparedStatement *pUpd = globalCon->prepareStatement(
+                            "UPDATE USUARIOS SET CONTRASENA = ? WHERE ID_USUARIO = ?"
+                        );
+                        pUpd->setString(1, rehash);
+                        pUpd->setInt(2, idUsuario);
+                        pUpd->executeUpdate();
+                        delete pUpd;
+                    } catch (...) {
+                        // no fatales: continuamos con la sesión aun si no se pudo actualizar
+                    }
+                }
+
                 guardarSesion(idUsuario, usuario, rol, estadoCuenta);
                 delete rsel;
                 delete pSelect;
@@ -44,32 +61,9 @@ bool intentarLogin(const string& usuario, const string& password) {
         delete rsel;
         delete pSelect;
 
-        // 2) Fallback: llamar al SP antiguo (por compatibilidad)
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement(
-            "CALL SP_LOGIN_USUARIO(?, ?)"
-        );
-        pstmt->setString(1, usuario);
-        pstmt->setString(2, passwordHash);
-
-        sql::ResultSet *res = pstmt->executeQuery();
-
-        if (res->next()) {
-            string estado = res->getString("ESTADO");
-            if (estado == "EXITO") {
-                int idUsuario = res->getInt("ID_USUARIO");
-                string rol = res->getString("ROL");
-                string estadoCuenta = "ACTIVO";
-
-                guardarSesion(idUsuario, usuario, rol, estadoCuenta);
-
-                delete res;
-                delete pstmt;
-                return true;
-            }
-        }
-
-        delete res;
-        delete pstmt;
+        // No fallback SP: autenticación manejada por PBKDF2/legacy rehash arriba
+        delete rsel;
+        delete pSelect;
         return false;
 
     } catch (const exception &e) {

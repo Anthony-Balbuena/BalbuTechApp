@@ -98,6 +98,20 @@ static vector<unsigned char> base64_decode(const string &input) {
     return out;
 }
 
+// split helper
+static vector<string> split_impl(const string& s, char delimiter) {
+    vector<string> parts;
+    string token;
+    istringstream iss(s);
+    while (getline(iss, token, delimiter)) parts.push_back(token);
+    return parts;
+}
+
+// wrapper expected name
+bool verificar_password_pbkdf2(const std::string &password, const std::string &stored) {
+    return verificarPassword(password, stored, nullptr);
+}
+
 bool generar_hash_pbkdf2(const std::string &password, std::string &out_serializado) {
     const int SALT_LEN = 16;
     const int ITER = 100000;
