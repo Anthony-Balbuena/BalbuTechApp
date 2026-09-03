@@ -5,6 +5,8 @@
 #include <cppconn/exception.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
+#include <cppconn/driver.h>
+#include <mysql_driver.h>
 
 using namespace std;
 
