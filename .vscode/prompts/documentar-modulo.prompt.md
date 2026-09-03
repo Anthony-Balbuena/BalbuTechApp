@@ -1,49 +1,46 @@
----
-description: Genera comentarios con guiones (--) detallando uso, descripción numerada y parámetros encima de cada objeto SQL.
----
+Vas a revisar el módulo en el cual te ejecute. que  vas  a hacer  verificar todo lo que tiene tabla,  store procedure, trigger, view, index, function y todo lo que tenga el modulo.
 
-Tu tarea es analizar el archivo SQL activo e INSERTAR COMENTARIOS DE LÍNEA (`--`) justo encima de CADA objeto (Procedimientos Almacenados, Triggers, Funciones, Tablas e Índices).
+Luego le haras una descripcion de cada cosa que tengo (tabla,  store procedure, trigger, view, index, function) todo lo vas a escribir en el mismo modulo. 
 
-Manten el código SQL intacto y aplica estrictamente estas plantillas de comentarios:
+Ejemplo: /*
+ESTRUCTURA DE LA TABLA ASISTENCIA_EMPLEADOS
 
-1. Encima de PROCEDIMIENTOS ALMACENADOS (`CREATE PROCEDURE`):
--- uso de [Propósito en lenguaje natural, ej: agregar un usuario]
--- Descripción:
---   [Explicación concisa de lo que realiza el procedimiento]
---   1) [Primera validación o comprobación inicial]
---   2) [Segunda validación o regla de negocio]
---   3) [Paso de limpieza, transformación o normalización de datos]
---   4) [Verificación de duplicados o disponibilidad]
---   5) [Operación principal: INSERT / UPDATE / DELETE]
---   6) [Respuesta esperada o manejo de excepciones con SIGNAL]
--- Parámetros:
---   [Lista de parámetros con sus tipos, ej: P_ID_EMPLEADO INT, P_USUARIO VARCHAR(50)]
+Esta tabla almacena la asistencia diaria de los empleados.
 
-2. Encima de TRIGGERS (`CREATE TRIGGER`):
--- uso de [Disparador automático al realizar X acción]
--- Descripción:
---   Se ejecuta [BEFORE/AFTER] de un [INSERT/UPDATE/DELETE] en la tabla [NOMBRE_TABLA]:
---   1) [Comprobación automática que realiza]
---   2) [Cálculo o actualización secundaria en otra tabla]
---   3) [Validación final o lanzamiento de error SIGNAL si no cumple la regla]
+- ID_ASISTENCIA: identificador único y autoincremental de cada registro.
+- ID_EMPLEADO: empleado al que pertenece la asistencia.
+- FECHA: día en que se registra la asistencia.
+- HORA_ENTRADA: hora de entrada del empleado.
+- HORA_SALIDA: hora de salida; puede quedar NULL mientras no se registre.
+- HORAS_TRABAJADAS: columna calculada automáticamente con la diferencia entre
+    la hora de entrada y la hora de salida, expresada en horas decimales.
+- ESTADO: estado de la asistencia: PRESENTE, AUSENTE, TARDE o PERMISO.
+- OBSERVACION: comentario o justificación de hasta 200 caracteres.
 
-3. Encima de TABLAS (`CREATE TABLE`):
--- uso de [Propósito de la tabla, ej: Almacenar la asistencia diaria de los empleados]
--- Descripción:
---   Almacena los registros de [Nombre Entidad] en el sistema.
---   Campos principales:
---     - [COLUMNA_1]: [Para qué sirve]
---     - [COLUMNA_2]: [Para qué sirve]
---   Reglas y Restricciones:
---     - Clave primaria ([PRIMARY KEY])
---     - Llave foránea hacia [TABLA_PADRE]
---     - [Validación UNIQUE / CHECK de la tabla]
+Restricciones:
+- La clave primaria identifica cada asistencia.
+- Un empleado solo puede tener un registro por fecha.
+- ID_EMPLEADO debe existir previamente en la tabla EMPLEADOS.
 
-4. Encima de ÍNDICES Y FUNCIONES (`CREATE INDEX` / `CREATE FUNCTION`):
--- uso de [Optimizar búsquedas por X campo / Función para calcular Y]
--- Descripción:
---   1) [Propósito y detalle de la operación o aceleración en la base de datos]
--- Parámetros / Retorno:
---   [Detalle de entrada/salida si aplica]
+La tabla utiliza InnoDB para permitir claves foráneas y transacciones.
+*/ ese el el ejemplo de una tabla.
 
-Devuelve el código SQL completo preservando todas las sentencias originales e insertando los comentarios `--` arriba de cada objeto.
+y ahora un ejemplo de un store procedure: ---ENTRADE DE EMPLEADO 
+
+/*
+DESCRIPCION DE SP_REGISTRAR_ASISTENCIA
+
+Registra la entrada o salida de un empleado mediante los siguientes parametros:
+- P_ID_EMPLEADO: identificador del empleado.
+- P_TIPO_MOVIMIENTO: tipo de movimiento, ENTRADA o SALIDA.
+
+Antes de registrar la asistencia, valida que el empleado no tenga un permiso
+aprobado ni se encuentre en vacaciones durante el dia actual. Si supera ambas
+validaciones, guarda la fecha y hora actuales y muestra un mensaje de exito.
+Si alguna validacion falla, detiene la operacion y muestra un mensaje de error.
+*/ 
+
+
+Nota final: Vas a escribir la descripcion de cada tabla, store procedure, trigger, view, index y function que tenga el modulo, lo vas a escribir en el mismo modulo, y vas a seguir el ejemplo que te di. lo vas a escribir arriba del delimiter de cada store procedure, trigger, view, index y function. 
+
+En el caso de las tablas, vas a escribir la descripcion arriba de la creacion de la tabla.
