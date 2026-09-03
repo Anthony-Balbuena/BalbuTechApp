@@ -1,4 +1,4 @@
--- Active: 1788274174973@@127.0.0.1@3306
+-- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
@@ -15,8 +15,8 @@ CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-SELECT * FROM `USUARIOS`;
-use
+SELECT * FROM CATEGORIAS;
+use BALBU_TECH;
 -- 1. INSERTAR
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CATEGORIA ;

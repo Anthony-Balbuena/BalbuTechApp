@@ -1,4 +1,4 @@
--- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
+-- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 USE BALBU_TECH;
 
 DROP TABLE IF EXISTS USUARIOS;
@@ -104,7 +104,6 @@ DELIMITER ;
 --   CALL SP_ACTUALIZAR_USUARIO(123, 'nuevo.usuario', 2, NULL);
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_USUARIO ;
-
 CREATE OR REPLACE PROCEDURE SP_ACTUALIZAR_USUARIO(
     IN P_ID_USUARIO   INT,
     IN P_USUARIO      VARCHAR(50),
@@ -134,16 +133,7 @@ proc_label: BEGIN
 
     SELECT 'EXITO: DATOS ACTUALIZADOS.' AS MENSAJE;
 END;
-
-
--- SP_LOGIN_USUARIO
--- Descripción:
---  Valida credenciales contra la tabla `USUARIOS` (usuario + hash) y devuelve
---  el resultado ('EXITO'/'ERROR'), el nombre del rol y el `ID_USUARIO` si procede.
--- Uso: CALL SP_LOGIN_USUARIO(P_USUARIO, P_PASSWORD_HASH);
--- Parámetros: P_USUARIO VARCHAR(50), P_PASSWORD_HASH VARCHAR(255)
-
-
+DELIMITER ;
 ---TOGGLER PARA ESTADO
 DELIMITER //
 
@@ -153,7 +143,6 @@ DELIMITER //
 --  Uso: Llamar con el `P_ID_USUARIO` objetivo desde la UI o backend para invertir su estado.
 -- Parámetros: P_ID_USUARIO INT
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_USUARIO;
-
 CREATE PROCEDURE SP_TOGGLE_ESTADO_USUARIO(
     IN P_ID_USUARIO INT
 )
@@ -194,21 +183,16 @@ proc_label: BEGIN
     ) AS MENSAJE;
 
 END ;
-
 DELIMITER ;
 
 
---BUSCAR CON FILTRO
-DELIMITER //
 -- SP_BUSCAR_USUARIOS_FILTRADO
 -- Descripción:
 --  Busca y lista usuarios aplicando un filtro opcional sobre el nombre de usuario
 --  o el nombre del empleado. Devuelve usuario, empleado, rol y estado.
 -- Parámetro: P_BUSQUEDA VARCHAR(100) (opcional, admite NULL o cadena vacía).
 DELIMITER //
-
 DROP PROCEDURE IF EXISTS SP_BUSCAR_USUARIOS_FILTRADO ;
-
 CREATE PROCEDURE SP_BUSCAR_USUARIOS_FILTRADO(
     IN P_BUSQUEDA VARCHAR(100)
 )
@@ -278,9 +262,6 @@ DELIMITER ;
 
 
 
-
-DELIMITER //
-
 -- LOGIN ADAPTADO AL NUEVO ESQUEMA
 
 -- SP_LOGIN_USUARIO
@@ -289,6 +270,7 @@ DELIMITER //
 --  el resultado ('EXITO'/'ERROR'), el nombre del rol y el `ID_USUARIO` si procede.
 -- Uso: CALL SP_LOGIN_USUARIO(P_USUARIO, P_PASSWORD_HASH);
 -- Parámetros: P_USUARIO VARCHAR(50), P_PASSWORD_HASH VARCHAR(255)
+DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO ;
 CREATE PROCEDURE SP_LOGIN_USUARIO(
     IN P_USUARIO VARCHAR(50),
@@ -320,18 +302,20 @@ END ;
 -- Descripción:
 --  Devuelve listas necesarias para poblar formularios de inserción: roles y empleados.
 --  Uso: CALL PARA_INSERTAR_USUARIOS();
+DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_INSERTAR_USUARIOS ;
 CREATE PROCEDURE PARA_INSERTAR_USUARIOS()
 BEGIN
     SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL ASC;
     SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS ORDER BY ID_EMPLEADO ASC;
 END ;
-
+DELIMITER ;
 
 -- PARA_ACTUALIZAR_USUARIOS
 -- Descripción:
 --  Devuelve una vista combinada de usuarios con su rol y empleado asociado,
 --  útil para poblar formularios de edición/actualización. Uso: CALL PARA_ACTUALIZAR_USUARIOS();
+DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_ACTUALIZAR_USUARIOS ;
 CREATE PROCEDURE PARA_ACTUALIZAR_USUARIOS()
 BEGIN
@@ -341,14 +325,14 @@ BEGIN
     LEFT JOIN EMPLEADOS AS E ON U.ID_EMPLEADO = E.ID_EMPLEADO
     ORDER BY U.ID_USUARIO ASC, E.ID_EMPLEADO ASC, R.ID_ROL ASC;
 END ;
-
-
+DELIMITER ;
 
 
 -- PARA_ACT_DESAC_USUARIOS
 -- Descripción:
 --  Lista usuarios y su estado para permitir activar o desactivar cuentas desde la UI.
 --  Uso: CALL PARA_ACT_DESAC_USUARIOS();
+DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_ACT_DESAC_USUARIOS ;
 CREATE PROCEDURE PARA_ACT_DESAC_USUARIOS ()
 BEGIN
@@ -373,6 +357,7 @@ DELIMITER ;
 --  `P_USERNAME` VARCHAR(50)  - nombre de usuario a consultar
 --  `P_ACCION`   VARCHAR(50)  - acción a validar (ej: 'REGISTRAR_BONO')
 -- Uso: SELECT FN_TIENE_PERMISO('juan.perez', 'REGISTRAR_BONO');
+DELIMITER //
 DROP FUNCTION IF EXISTS FN_TIENE_PERMISO ;
 CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(50))
 RETURNS BOOLEAN
@@ -399,10 +384,6 @@ DELIMITER ;
 
 
 
-
-DELIMITER //
-DELIMITER //
-
 -- TR_DESACTIVAR_USUARIO_POST_LIQUIDACION
 -- Descripción:
 --  Trigger que se ejecuta AFTER UPDATE sobre `EMPLEADOS`. Si un empleado pasa
@@ -410,6 +391,7 @@ DELIMITER //
 --  (pone `ESTADO = 'INACTIVO'`) y registra el cambio en `LOG_USUARIOS`.
 --  Nota: Asegúrate de que `LOG_USUARIOS` exista y acepte los campos usados.
 -- Uso/efecto: automático al actualizar la columna `ESTADO` en `EMPLEADOS`.
+DELIMITER //
 DROP TRIGGER IF EXISTS TR_DESACTIVAR_USUARIO_POST_LIQUIDACION ;
 CREATE TRIGGER TR_DESACTIVAR_USUARIO_POST_LIQUIDACION
 AFTER UPDATE ON EMPLEADOS

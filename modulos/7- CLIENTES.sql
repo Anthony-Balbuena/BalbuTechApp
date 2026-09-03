@@ -1,3 +1,4 @@
+-- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 CREATE TABLE CLIENTES (
     ID_CLIENTE INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(100) NOT NULL,
@@ -15,7 +16,7 @@ CREATE TABLE CLIENTES (
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
 --1. INSERTAR
-DELIMITER //     
+DELIMITER //      
  DROP PROCEDURE IF EXISTS SP_INSERTAR_CLIENTES ; 
 CREATE PROCEDURE SP_INSERTAR_CLIENTES(
     IN P_NOMBRE    VARCHAR(100),
