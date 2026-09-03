@@ -1,4 +1,20 @@
--- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
+-- Active: 1788274174973@@127.0.0.1@3306
+/*
+ MÓDULO: CATEGORÍAS
+ ------------------
+ Administra el catálogo de categorías de productos y expone procedimientos
+ almacenados para crear, editar, activar/desactivar, consultar y validar
+ categorías.
+
+ Reglas principales:
+ - NOMBRE es obligatorio, único y se almacena sin espacios redundantes.
+ - ESTADO se controla mediante un cambio entre ACTIVO e INACTIVO.
+ - Las búsquedas admiten coincidencias en NOMBRE y DESCRIPCION.
+*/
+
+-- ================================================================
+-- ESTRUCTURA DEL CATÁLOGO
+-- ================================================================
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
@@ -15,9 +31,12 @@ CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-SELECT * FROM CATEGORIAS;
-use BALBU_TECH;
--- 1. INSERTAR
+-- ================================================================
+-- 1. INSERTAR CATEGORÍA
+-- Limpia los textos, valida el nombre y evita duplicados.
+-- ================================================================
+SELECT * FROM `USUARIOS`;
+-- TODO: indicar aquí el esquema activo si la conexión no lo establece.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CATEGORIA ;
 CREATE PROCEDURE SP_INSERTAR_CATEGORIA(
@@ -52,6 +71,7 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: CATEGORÍA "', v_nombre_limpio, '" INSERTADA. ID: ', LAST_INSERT_ID()) AS MENSAJE;
 END ;
 DELIMITER ;
+-- Ejemplos de inserción:
 CALL `1_SP_INSERTAR_CATEGORIA`('COMPUTADORAS PORTATILES O LAPTOPS', 'EQUIPOS DE COMPUTO MOVILES', 'ICON-LAPTOP');
 
 CALL `1_SP_INSERTAR_CATEGORIA`('TARJETA DE VIDEO', 'COMPONENTE DE PROCESAMIENDO GRAFICO', 'ICON-GPU');
@@ -63,7 +83,10 @@ CALL `1_SP_INSERTAR_CATEGORIA`('CPU', 'UNIDAD DE PROCESAMIENTO', 'ICON CPU');
 
 
 
--- 2. ACTUALIZAR
+-- ================================================================
+-- 2. ACTUALIZAR CATEGORÍA
+-- Permite actualizar parcialmente nombre, descripción e icono.
+-- ================================================================
 DELIMITER //
 
 DROP PROCEDURE if EXISTS SP_ACTUALIZAR_CATEGORIA ;
@@ -108,12 +131,12 @@ proc_label: BEGIN
 END ;
 DELIMITER ;
 
-CALL `1_SP_ACTUALIZAR_CATEGORIA`(2,'ALMACENAMIENTO','UNIDAD DE ALMACENAMIENTO','ICON-SSD')
 
 
-
-
--- 3. DESACTIVAR  o activar CATEGORIA  
+-- ================================================================
+-- 3. ACTIVAR / DESACTIVAR CATEGORÍA
+-- Alterna ESTADO sin eliminar físicamente el registro.
+-- ================================================================
 DELIMITER //
 DROP PROCEDURE IF EXISTS `SP_TOGGLE_ESTADO_CATEGORIA` ;
 CREATE PROCEDURE SP_TOGGLE_ESTADO_CATEGORIA(
@@ -142,7 +165,10 @@ proc_label: BEGIN
 END ;
 DELIMITER ;
 
---4. BUSCAR CATEGORIAS 
+-- ================================================================
+-- 4. BUSCAR CATEGORÍAS
+-- Sin término devuelve todas; con término busca en nombre o descripción.
+-- ================================================================
 drop PROCEDURE if EXISTS SP_BUSCAR_CATEGORIAS ;
 CREATE PROCEDURE SP_BUSCAR_CATEGORIAS(
     IN P_BUSQUEDA VARCHAR(50)
@@ -158,7 +184,10 @@ END ;
 DELIMITER ;
 
 
---5. BUSQUEDA DE FECHAS 
+-- ================================================================
+-- 5. CONSULTAR CATEGORÍAS POR FECHA DE REGISTRO
+-- Devuelve las categorías cuyo registro está dentro del intervalo indicado.
+-- ================================================================
 DELIMITER //
 CREATE PROCEDURE 1_SP_CATEGORIAS_POR_FECHA(
     IN P_FECHA_INICIO DATETIME,
@@ -170,7 +199,10 @@ BEGIN
 END ;
 DELIMITER ;
 
---6. VERIFICAR SI LA CATEGORIA EXISTE
+-- ================================================================
+-- 6. VERIFICAR EXISTENCIA DE CATEGORÍA
+-- Retorna 1 si el nombre ya existe; P_ID_EXCLUIR permite editar un registro.
+-- ================================================================
 DELIMITER //
 CREATE PROCEDURE 1_SP_VERIFICAR_CATEGORIA_EXISTE(
     IN P_NOMBRE VARCHAR(50),

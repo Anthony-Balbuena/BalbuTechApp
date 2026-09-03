@@ -266,6 +266,8 @@ DELIMITER ;
 
 
 ----------------------------------------------------------------------------------------------------
+-----------------------------------------[TRIGERR}--------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 /*
 DESCRIPCION DE TR_BLOQUEAR_ASISTENCIA_INAPROPIADA
@@ -278,7 +280,6 @@ para la fecha actual. Si alguna condicion se cumple, bloquea la insercion con
 SIGNAL y muestra un mensaje de error. Si no se cumple ninguna condicion, permite
 que el registro se inserte normalmente.
 */
-
 
 
 DELIMITER //
