@@ -1,4 +1,3 @@
--- Active: 1788274174973@@127.0.0.1@3306
 /*
 DESCRIPCION DEL MODULO DE CATEGORIAS
 
@@ -19,27 +18,23 @@ RESTRICCIONES
 
 La tabla utiliza el motor InnoDB.
 */
+
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
     DESCRIPCION VARCHAR(100),
     ICONO_URL VARCHAR(255),
-    ESTADO ENUM('ACTIVO', 'INACTIVO') DEFAULT 'ACTIVO', 
+    ESTADO ENUM('ACTIVO', 'INACTIVO') DEFAULT 'ACTIVO',
     FECHA_REGISTRO DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_CATEGORIA)
 ) ENGINE = InnoDB;
-
-/*
-INDICE IX_NOMBRE_CATEGORIA
-
-Optimiza las busquedas y validaciones realizadas sobre la columna NOMBRE.
-*/
 CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
 
 
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
+
 
 -- 1. INSERTAR
 /*
@@ -88,15 +83,6 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: CATEGORÍA "', v_nombre_limpio, '" INSERTADA. ID: ', LAST_INSERT_ID()) AS MENSAJE;
 END ;
 DELIMITER ;
-CALL `1_SP_INSERTAR_CATEGORIA`('COMPUTADORAS PORTATILES O LAPTOPS', 'EQUIPOS DE COMPUTO MOVILES', 'ICON-LAPTOP');
-
-CALL `1_SP_INSERTAR_CATEGORIA`('TARJETA DE VIDEO', 'COMPONENTE DE PROCESAMIENDO GRAFICO', 'ICON-GPU');
- CALL `1_SP_INSERTAR_CATEGORIA` ('RAM', 'MEMORIA DE ACCESO ALEATORIO', 'ICON-RAM');
-CALL `1_SP_INSERTAR_CATEGORIA`('CPU', 'UNIDAD DE PROCESAMIENTO', 'ICON CPU');
-
-
-
-
 
 
 -- 2. ACTUALIZAR
@@ -114,9 +100,7 @@ duplicados. Luego actualiza los valores proporcionados y devuelve un mensaje
 de confirmacion.
 */
 DELIMITER //
-
 DROP PROCEDURE if EXISTS SP_ACTUALIZAR_CATEGORIA ;
-
 CREATE PROCEDURE SP_ACTUALIZAR_CATEGORIA(
     IN P_ID_CATEGORIA INT,
     IN P_NOMBRE       VARCHAR(50),
