@@ -17,9 +17,48 @@ CREATE TABLE USUARIOS (
 
 CREATE INDEX IX_USER ON USUARIOS (USUARIO);
 
+
+
+
+-- Migration: Aumentar tamaño de la columna CONTRASENA para almacenar hashes PBKDF2.
+-- IMPORTANTE: HAZ BACKUP ANTES DE EJECUTAR.
+USE BALBU_TECH;
+
+-- Ver estado actual (opcional):
+-- SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+--  WHERE TABLE_SCHEMA='BALBU_TECH' AND TABLE_NAME='USUARIOS' AND COLUMN_NAME='CONTRASENA';
+
+ALTER TABLE `USUARIOS`
+  MODIFY COLUMN `CONTRASENA` VARCHAR(512) NOT NULL;  
+
+-- Después de ejecutar esta migración, las nuevas contraseñas se almacenarán
+-- en formato `pbkdf2$<iter>$<salt_b64>$<hash_b64>` generado por la aplicación.
+
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------    
+
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_GET_USUARIO_LOGIN //
+CREATE PROCEDURE SP_GET_USUARIO_LOGIN(
+    IN P_USUARIO VARCHAR(50)
+)
+BEGIN
+    SELECT U.ID_USUARIO, U.CONTRASENA, R.NOMBRE_ROL 
+    FROM USUARIOS U
+    INNER JOIN ROLES R ON U.ID_ROL = R.ID_ROL
+    WHERE U.USUARIO = P_USUARIO 
+      AND U.ESTADO = 'ACTIVO';
+END //
+DELIMITER ;
+
+
+
+
+
+
+
 
 --Sp para mostrar antes de hacer ciertas acciones. Van en el modulo de  usuarios
 
