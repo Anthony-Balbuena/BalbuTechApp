@@ -2,6 +2,7 @@
 #define SEGURIDAD_H
 using namespace std;
 #include <string>
+#include <vector>
 #include <exception>
 
 // Excepción global para cancelar operaciones con 'xxx'

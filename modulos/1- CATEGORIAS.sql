@@ -1,3 +1,24 @@
+-- Active: 1788274174973@@127.0.0.1@3306
+/*
+DESCRIPCION DEL MODULO DE CATEGORIAS
+
+Este modulo administra las categorias de productos de la base de datos
+BALBU_TECH.
+
+TABLA CATEGORIAS
+- ID_CATEGORIA: identificador unico, clave primaria y autoincremental.
+- NOMBRE: nombre obligatorio y unico de la categoria.
+- DESCRIPCION: detalle informativo de la categoria.
+- ICONO_URL: referencia o nombre del icono asociado.
+- ESTADO: indica si la categoria esta ACTIVO o INACTIVO. Por defecto es ACTIVO.
+- FECHA_REGISTRO: fecha y hora de registro, generada automaticamente.
+
+RESTRICCIONES
+- La clave primaria identifica cada categoria.
+- NOMBRE UNIQUE impide registrar categorias con el mismo nombre.
+
+La tabla utiliza el motor InnoDB.
+*/
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
@@ -7,6 +28,12 @@ CREATE TABLE CATEGORIAS (
     FECHA_REGISTRO DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_CATEGORIA)
 ) ENGINE = InnoDB;
+
+/*
+INDICE IX_NOMBRE_CATEGORIA
+
+Optimiza las busquedas y validaciones realizadas sobre la columna NOMBRE.
+*/
 CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
 
 
@@ -14,9 +41,19 @@ CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-SELECT * FROM `USUARIOS`;
-use
 -- 1. INSERTAR
+/*
+DESCRIPCION DE SP_INSERTAR_CATEGORIA
+
+Inserta una nueva categoria.
+- P_NOMBRE: nombre de la categoria.
+- P_DESCRIPCION: descripcion de la categoria.
+- P_ICONO: icono asociado.
+
+Limpia los espacios de los textos, valida que el nombre sea obligatorio y
+comprueba que no exista otra categoria con el mismo nombre. Si las validaciones
+son correctas, inserta el registro y devuelve su identificador.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CATEGORIA ;
 CREATE PROCEDURE SP_INSERTAR_CATEGORIA(
@@ -63,6 +100,19 @@ CALL `1_SP_INSERTAR_CATEGORIA`('CPU', 'UNIDAD DE PROCESAMIENTO', 'ICON CPU');
 
 
 -- 2. ACTUALIZAR
+/*
+DESCRIPCION DE SP_ACTUALIZAR_CATEGORIA
+
+Actualiza los datos de una categoria existente.
+- P_ID_CATEGORIA: identificador de la categoria.
+- P_NOMBRE: nuevo nombre.
+- P_DESCRIPCION: nueva descripcion.
+- P_ICONO: nuevo icono.
+
+Verifica que la categoria exista, valida el nombre cuando se recibe y evita
+duplicados. Luego actualiza los valores proporcionados y devuelve un mensaje
+de confirmacion.
+*/
 DELIMITER //
 
 DROP PROCEDURE if EXISTS SP_ACTUALIZAR_CATEGORIA ;
@@ -107,12 +157,18 @@ proc_label: BEGIN
 END ;
 DELIMITER ;
 
-CALL `1_SP_ACTUALIZAR_CATEGORIA`(2,'ALMACENAMIENTO','UNIDAD DE ALMACENAMIENTO','ICON-SSD')
-
-
 
 
 -- 3. DESACTIVAR  o activar CATEGORIA  
+/*
+DESCRIPCION DE SP_TOGGLE_ESTADO_CATEGORIA
+
+Cambia el estado de una categoria entre ACTIVO e INACTIVO.
+- P_ID_CATEGORIA: identificador de la categoria.
+
+Verifica que la categoria exista, invierte su estado y devuelve un mensaje con
+el nombre, identificador y nuevo estado de la categoria.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS `SP_TOGGLE_ESTADO_CATEGORIA` ;
 CREATE PROCEDURE SP_TOGGLE_ESTADO_CATEGORIA(
@@ -142,6 +198,15 @@ END ;
 DELIMITER ;
 
 --4. BUSCAR CATEGORIAS 
+/*
+DESCRIPCION DE SP_BUSCAR_CATEGORIAS
+
+Busca categorias por nombre o descripcion.
+- P_BUSQUEDA: texto utilizado para realizar la busqueda.
+
+Si el parametro es NULL o esta vacio, devuelve todas las categorias. Si tiene
+un valor, busca coincidencias parciales en NOMBRE y DESCRIPCION.
+*/
 drop PROCEDURE if EXISTS SP_BUSCAR_CATEGORIAS ;
 CREATE PROCEDURE SP_BUSCAR_CATEGORIAS(
     IN P_BUSQUEDA VARCHAR(50)
@@ -158,6 +223,16 @@ DELIMITER ;
 
 
 --5. BUSQUEDA DE FECHAS 
+/*
+DESCRIPCION DE 1_SP_CATEGORIAS_POR_FECHA
+
+Consulta las categorias registradas dentro de un periodo.
+- P_FECHA_INICIO: fecha y hora inicial.
+- P_FECHA_FIN: fecha y hora final.
+
+Devuelve las categorias cuya FECHA_REGISTRO se encuentra entre las dos fechas
+recibidas.
+*/
 DELIMITER //
 CREATE PROCEDURE 1_SP_CATEGORIAS_POR_FECHA(
     IN P_FECHA_INICIO DATETIME,
@@ -170,6 +245,16 @@ END ;
 DELIMITER ;
 
 --6. VERIFICAR SI LA CATEGORIA EXISTE
+/*
+DESCRIPCION DE 1_SP_VERIFICAR_CATEGORIA_EXISTE
+
+Verifica si ya existe una categoria con un nombre determinado.
+- P_NOMBRE: nombre que se desea comprobar.
+- P_ID_EXCLUIR: identificador que se excluye de la busqueda, util al editar.
+
+Devuelve el resultado en la columna EXISTE. El identificador excluido permite
+validar un nombre sin marcar como duplicado la misma categoria que se edita.
+*/
 DELIMITER //
 CREATE PROCEDURE 1_SP_VERIFICAR_CATEGORIA_EXISTE(
     IN P_NOMBRE VARCHAR(50),

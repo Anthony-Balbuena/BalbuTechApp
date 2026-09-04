@@ -1,3 +1,25 @@
+/*
+ESTRUCTURA DE LA TABLA ASISTENCIA_EMPLEADOS
+
+Esta tabla almacena la asistencia diaria de los empleados.
+
+- ID_ASISTENCIA: identificador único y autoincremental de cada registro.
+- ID_EMPLEADO: empleado al que pertenece la asistencia.
+- FECHA: día en que se registra la asistencia.
+- HORA_ENTRADA: hora de entrada del empleado.
+- HORA_SALIDA: hora de salida; puede quedar NULL mientras no se registre.
+- HORAS_TRABAJADAS: columna calculada automáticamente con la diferencia entre
+    la hora de entrada y la hora de salida, expresada en horas decimales.
+- ESTADO: estado de la asistencia: PRESENTE, AUSENTE, TARDE o PERMISO.
+- OBSERVACION: comentario o justificación de hasta 200 caracteres.
+
+Restricciones:
+- La clave primaria identifica cada asistencia.
+- Un empleado solo puede tener un registro por fecha.
+- ID_EMPLEADO debe existir previamente en la tabla EMPLEADOS.
+
+La tabla utiliza InnoDB para permitir claves foráneas y transacciones.
+*/
 CREATE TABLE ASISTENCIA_EMPLEADOS (
     ID_ASISTENCIA INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
@@ -27,13 +49,25 @@ CREATE TABLE ASISTENCIA_EMPLEADOS (
     CONSTRAINT FK_ASISTENCIA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
 ) ENGINE = InnoDB;
 
--- 1. Para ver la asistencia de hoy o de un mes específico rápido
+/*
+ÍNDICE IX_ASISTENCIA_FECHA
+Facilita las búsquedas de asistencia por fecha, por ejemplo, para consultar
+la asistencia del día actual o de un mes específico.
+*/
 CREATE INDEX IX_ASISTENCIA_FECHA ON ASISTENCIA_EMPLEADOS (FECHA);
 
--- 2. Para ver el historial de puntualidad de un empleado
+/*
+ÍNDICE IX_ASISTENCIA_EMPLEADO
+Facilita la consulta del historial de asistencia y puntualidad de un empleado
+a partir de su ID_EMPLEADO.
+*/
 CREATE INDEX IX_ASISTENCIA_EMPLEADO ON ASISTENCIA_EMPLEADOS (ID_EMPLEADO);
 
--- 3. Para reportes de tardanzas y ausencias
+/*
+ÍNDICE IX_ASISTENCIA_ESTADO
+Facilita la búsqueda y generación de reportes agrupados por estado de
+asistencia, como PRESENTE, AUSENTE, TARDE o PERMISO.
+*/
 CREATE INDEX IX_ASISTENCIA_ESTADO ON ASISTENCIA_EMPLEADOS (ESTADO);
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -43,8 +77,20 @@ CREATE INDEX IX_ASISTENCIA_ESTADO ON ASISTENCIA_EMPLEADOS (ESTADO);
 
 ---ENTRADE DE EMPLEADO 
 
+/*
+DESCRIPCION DE SP_REGISTRAR_ASISTENCIA
+
+Registra la entrada o salida de un empleado mediante los siguientes parametros:
+- P_ID_EMPLEADO: identificador del empleado.
+- P_TIPO_MOVIMIENTO: tipo de movimiento, ENTRADA o SALIDA.
+
+Antes de registrar la asistencia, valida que el empleado no tenga un permiso
+aprobado ni se encuentre en vacaciones durante el dia actual. Si supera ambas
+validaciones, guarda la fecha y hora actuales y muestra un mensaje de exito.
+Si alguna validacion falla, detiene la operacion y muestra un mensaje de error.
+*/
 DELIMITER //
-DROP PROCEDURE IF EXISTS SP_REGISTRAR_ASISTENCIA //
+DROP PROCEDURE IF EXISTS SP_REGISTRAR_ASISTENCIA ;
 CREATE PROCEDURE SP_REGISTRAR_ASISTENCIA(
     IN P_ID_EMPLEADO INT,
     IN P_TIPO_MOVIMIENTO ENUM('ENTRADA', 'SALIDA')
@@ -76,13 +122,23 @@ proc_label: BEGIN
     VALUES (P_ID_EMPLEADO, CURDATE(), CURTIME(), P_TIPO_MOVIMIENTO);
 
     SELECT 'EXITO: ASISTENCIA REGISTRADA.' AS MENSAJE;
-END //
+END ;
 DELIMITER ;
 
 
 
 ---Salida
 
+/*
+DESCRIPCION DE SP_REGISTRAR_SALIDA
+
+Registra la hora de salida del empleado indicado.
+- P_ID_EMPLEADO: identificador del empleado.
+
+El procedimiento actualiza HORA_SALIDA con la hora actual del servidor y solo
+modifica el registro de asistencia correspondiente al empleado y a la fecha
+actual.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_REGISTRAR_SALIDA;
 CREATE PROCEDURE 11_SP_REGISTRAR_SALIDA(
@@ -96,10 +152,23 @@ BEGIN
 END ;
 DELIMITER ;
 
+
 ---TARDANZA JUSTIFICADA 
 
-DELIMITER //
+/*
+DESCRIPCION DE SP_JUSTIFICAR_ASISTENCIA
 
+Permite justificar o modificar el estado de la asistencia de un empleado.
+- P_ID_EMPLEADO: identificador del empleado.
+- P_FECHA: fecha del registro que se desea justificar.
+- P_NUEVO_ESTADO: nuevo estado de la asistencia.
+- P_JUSTIFICACION: motivo de la justificacion, con un maximo de 200 caracteres.
+
+Primero verifica que exista un registro para el empleado y la fecha indicada.
+Si existe, actualiza el estado y guarda la justificacion en OBSERVACION.
+Finalmente devuelve un mensaje confirmando la operacion.
+*/
+DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_JUSTIFICAR_ASISTENCIA ;
 CREATE PROCEDURE 11_SP_JUSTIFICAR_ASISTENCIA(
     IN P_ID_EMPLEADO INT,
@@ -124,11 +193,22 @@ proc_label: BEGIN
     -- 3. Mensaje de éxito
     SELECT CONCAT('EXITO: ASISTENCIA DE ID ', P_ID_EMPLEADO, ' JUSTIFICADA COMO ', P_NUEVO_ESTADO) AS MENSAJE;
 END ;
-
 DELIMITER ;
 
 ---REPORTE DE AISTENCIA POR EMPLEADO 
 
+/*
+DESCRIPCION DE SP_REPORTE_ASISTENCIA_INDIVIDUAL
+
+Genera el reporte de asistencia de un empleado durante un periodo determinado.
+- P_ID_EMPLEADO: identificador del empleado.
+- P_FECHA_INICIO: fecha inicial del periodo que se desea consultar.
+- P_FECHA_FIN: fecha final del periodo que se desea consultar.
+
+Devuelve la fecha, las horas de entrada y salida, las horas trabajadas y el
+estado de cada asistencia encontrada. Los resultados se muestran desde la
+fecha mas reciente hasta la mas antigua.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL ;
 CREATE PROCEDURE 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL(
@@ -152,6 +232,19 @@ DELIMITER ;
 
 
 ---BLOQUEAR
+
+/*
+DESCRIPCION DE SP_BLOQUEAR_EDICION_ANTIGUA
+
+Controla si se permite editar la asistencia de un empleado en una fecha
+determinada.
+- P_ID_EMPLEADO: identificador del empleado.
+- P_FECHA: fecha del registro que se desea editar.
+
+Si la fecha tiene mas de siete dias de antiguedad, bloquea la operacion y
+devuelve un mensaje de error mediante SIGNAL. Si la fecha esta dentro del
+periodo permitido, devuelve el mensaje ACCESO PERMITIDO.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_BLOQUEAR_EDICION_ANTIGUA //
 CREATE PROCEDURE 11_SP_BLOQUEAR_EDICION_ANTIGUA(
@@ -176,7 +269,17 @@ DELIMITER ;
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
+/*
+DESCRIPCION DE TR_BLOQUEAR_ASISTENCIA_INAPROPIADA
 
+Trigger que se ejecuta automaticamente antes de insertar un registro en
+ASISTENCIA_EMPLEADOS.
+
+Verifica si el empleado esta de vacaciones o tiene un permiso aprobado vigente
+para la fecha actual. Si alguna condicion se cumple, bloquea la insercion con
+SIGNAL y muestra un mensaje de error. Si no se cumple ninguna condicion, permite
+que el registro se inserte normalmente.
+*/
 
 
 DELIMITER //

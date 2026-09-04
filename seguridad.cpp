@@ -81,7 +81,7 @@ static string base64_encode(const unsigned char* input, int length) {
     return out;
 }
 
-static vector<unsigned char> base64_decode(const string &input) {
+ vector<unsigned char> base64_decode(const string &input) {
     BIO *b64 = BIO_new(BIO_f_base64());
     BIO *bmem = BIO_new_mem_buf(input.data(), input.size());
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);

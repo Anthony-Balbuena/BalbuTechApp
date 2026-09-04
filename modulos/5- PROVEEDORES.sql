@@ -1,3 +1,4 @@
+-- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 CREATE TABLE PROVEEDORES (
     ID_PROVEEDOR INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(100) NOT NULL,
@@ -19,9 +20,6 @@ CREATE INDEX IX_PROVEEDOR_ESTADO ON PROVEEDORES (ESTADO);
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
-
-SELECT * FROM ROLES;
-
 --1. INSERTAR 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_PROVEEDOR;
@@ -186,7 +184,7 @@ END ;
 DELIMITER ;
 
 --4. LISTAR 
-SELECT * FROM `PRODUCTOS`;
+
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LISTAR_PROVEEDORES;
 CREATE PROCEDURE SP_LISTAR_PROVEEDORES(
@@ -205,5 +203,5 @@ BEGIN
            OR NOMBRE LIKE CONCAT('%', P_FILTRO, '%') 
            OR TELEFONO LIKE CONCAT('%', P_FILTRO, '%'))
     ORDER BY ID_PROVEEDOR ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
-END //
+END ;
 DELIMITER ;
