@@ -1,7 +1,35 @@
--- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
-USE BALBU_TECH;
+-- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 
-DROP TABLE IF EXISTS USUARIOS;
+
+/*
+TABLA: USUARIOS — Descripción detallada
+
+Propósito: almacena las credenciales y asignaciones de rol para los
+usuarios del sistema. Cada usuario se asocia a un empleado y a un rol;
+la separación entre `EMPLEADOS` y `USUARIOS` permite gestionar acceso
+independiente del registro laboral.
+
+Columnas clave:
+- ID_USUARIO: PK autoincremental que identifica la cuenta.
+- ID_EMPLEADO: FK a `EMPLEADOS(ID_EMPLEADO)`. Un empleado puede tener
+    como máximo una cuenta (único en esta columna).
+- ID_ROL: FK a `ROLES(ID_ROL)` que determina permisos y alcance.
+- USUARIO: identificador público usado para login (único).
+- CONTRASENA: hash de la contraseña; usar formatos seguros (pbkdf2, bcrypt).
+- ESTADO: control lógico ('ACTIVO'/'INACTIVO') para habilitar/deshabilitar cuentas.
+- FECHA_CREACION: timestamp de creación de la cuenta.
+
+Consideraciones de seguridad:
+- Las contraseñas deben almacenarse en formato hash; el cambio a
+    `VARCHAR(512)` permite almacenar formatos PBKDF2 con salt e iteraciones.
+- Operaciones que modifican contraseñas deben realizarse mediante
+    procedimientos específicos que verifiquen hash actual y registren
+    auditoría cuando aplique.
+
+Integridad referencial y restricciones:
+- FK a `EMPLEADOS` y `ROLES` garantizan referencias válidas.
+- `ID_EMPLEADO` declarado `UNIQUE` obliga a 1:1 entre empleado y usuario.
+*/
 
 CREATE TABLE USUARIOS (
   ID_USUARIO INT PRIMARY KEY AUTO_INCREMENT,

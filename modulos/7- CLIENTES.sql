@@ -1,4 +1,22 @@
 -- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
+/*
+MODULO: CLIENTES — Descripción general
+
+Este módulo define la tabla `CLIENTES` y procedimientos para gestionar
+clientes en el sistema: inserción, actualización, búsqueda, toggle de
+estado y triggers de auditoría. Las rutinas normalizan entradas,
+validan unicidades y devuelven mensajes amigables para la capa C++.
+
+Estructura clave de la tabla:
+- ID_CLIENTE: PK autoincremental.
+- NOMBRE, TELEFONO, EMAIL: datos principales (tel y email únicos).
+- DIRECCION: texto libre.
+- ESTADO: enum ACTIVO/INACTIVO para control lógico.
+- FECHA_REGISTRO: timestamp de creación.
+
+Restricciones importantes:
+- CHECK para formato de email y nombre no vacío.
+*/
 CREATE TABLE CLIENTES (
     ID_CLIENTE INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(100) NOT NULL,
@@ -12,11 +30,30 @@ CREATE TABLE CLIENTES (
     CONSTRAINT CK_CLIENTE_NOMBRE CHECK (CHAR_LENGTH(TRIM(NOMBRE)) > 0)
 ) ENGINE = InnoDB;
 
-----------------------------------------------------------------------------------------------------
------------------------------------------[Store procedure}------------------------------------------
-----------------------------------------------------------------------------------------------------
+/*
+SECCIÓN: PROCEDIMIENTOS ALMACENADOS (CLIENTES)
+
+Comentarios generales: los procedimientos usan limpieza de datos
+(REGEXP_REPLACE, TRIM), validaciones y `SIGNAL SQLSTATE '45000'` para
+reportar errores controlados. Los mensajes de éxito se retornan mediante
+SELECT para integrarse fácilmente con el cliente C++.
+
+Procedimientos incluidos:
+- SP_INSERTAR_CLIENTES: inserta cliente validando duplicados.
+- SP_ACTUALIZAR_CLIENTES: actualiza campos de forma parcial.
+- SP_LISTAR_CLIENTES: filtra/lista clientes.
+- SP_TOGGLE_ESTADO_CLIENTES: alterna estado ACTIVO/INACTIVO.
+*/
+
 --1. INSERTAR
 DELIMITER //      
+/*
+SP: SP_INSERTAR_CLIENTES
+
+Propósito: insertar un cliente validando nombre, teléfono y email;
+evita duplicados y normaliza valores. Devuelve mensaje estandarizado
+con `LAST_INSERT_ID()` para la capa C++.
+*/
  DROP PROCEDURE IF EXISTS SP_INSERTAR_CLIENTES ; 
 CREATE PROCEDURE SP_INSERTAR_CLIENTES(
     IN P_NOMBRE    VARCHAR(100),
@@ -66,6 +103,13 @@ DELIMITER ;
 
 DELIMITER //
 
+/*
+SP: SP_ACTUALIZAR_CLIENTES
+
+Propósito: actualizar datos de cliente de forma parcial; valida
+existencia y evita duplicados en teléfono/email. Usa `COALESCE` para
+mantener valores no enviados.
+*/
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_CLIENTES ;
 CREATE PROCEDURE SP_ACTUALIZAR_CLIENTES( 
     IN P_ID_CLIENTE INT,
@@ -150,6 +194,12 @@ DELIMITER ;
 
 DELIMITER //
 
+/*
+SP: SP_LISTAR_CLIENTES
+
+Propósito: listar o filtrar clientes por texto (nombre/teléfono/email).
+Devuelve columnas clave y ordena por nombre.
+*/
 DROP PROCEDURE IF EXISTS SP_LISTAR_CLIENTES ;
 CREATE PROCEDURE SP_LISTAR_CLIENTES(
     IN P_FILTRO VARCHAR(100)
@@ -183,6 +233,12 @@ DELIMITER ;
 
 --TOGLER CAMBIAR ESTADO 
 
+/*
+SP: SP_TOGGLE_ESTADO_CLIENTES
+
+Propósito: alternar el estado de un cliente entre 'ACTIVO' e 'INACTIVO'
+con una única llamada, devolviendo mensaje de resultado.
+*/
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_CLIENTES;
 DELIMITER //
 CREATE PROCEDURE SP_TOGGLE_ESTADO_CLIENTES(IN P_ID_CLIENTE INT)
@@ -213,6 +269,12 @@ DELIMITER ;
 DELIMITER //
 
 -- 1. Trigger para registrar nuevos clientes
+/*
+TRIGGER: TR_AUDIT_CLIENTES_INSERT
+
+Propósito: trigger AFTER INSERT que registra en `AUDITORIA_SISTEMA`
+la creación de nuevos clientes (tabla, id, acción, usuario y valor nuevo).
+*/
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_INSERT ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_INSERT
 AFTER INSERT ON CLIENTES
@@ -224,6 +286,12 @@ BEGIN
 END ;
 
 -- 2. Trigger para registrar cambios en clientes existentes
+/*
+TRIGGER: TR_AUDIT_CLIENTES_UPDATE
+
+Propósito: trigger AFTER UPDATE que registra el valor anterior y el
+valor nuevo en `AUDITORIA_SISTEMA` cuando se modifica un cliente.
+*/
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_UPDATE ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_UPDATE
 AFTER UPDATE ON CLIENTES

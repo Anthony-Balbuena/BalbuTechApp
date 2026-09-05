@@ -1,9 +1,27 @@
--- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
+-- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
+/*
+DESCRIPCION DEL MODULO ROLES
+
+Este módulo contiene la definición de la tabla `ROLES` y procedimientos
+relacionados para gestionar los roles del sistema (crear, actualizar,
+buscar y listar).
+
+TABLA ROLES
+- ID_ROL: identificador único autoincremental.
+- NOMBRE_ROL: nombre del rol (único), usado para permisos y asignaciones.
+
+Restricciones:
+- La tabla utiliza InnoDB para permitir transacciones y claves foráneas.
+*/
 CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
 ) ENGINE = InnoDB; 
--- Creando el índice para acelerar las búsquedas por nombre de rol
+/*
+DESCRIPCION DEL INDICE IX_ROLES_NOMBRE
+
+Índice no único sobre `NOMBRE_ROL` que acelera búsquedas y listados.
+*/
 CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
 
 
@@ -13,6 +31,19 @@ CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
 
 
 --INSERTAR
+/*
+DESCRIPCION DE SP_INSERTAR_ROL
+
+Inserta un nuevo rol en la tabla `ROLES`.
+
+- Parámetros:
+  - P_NOMBRE_ROL: nombre del rol a insertar.
+
+Comportamiento:
+- Normaliza espacios y comprueba que el nombre no sea vacío.
+- Verifica duplicados; si existe, lanza un error.
+- Inserta la nueva fila y devuelve un mensaje con el ID.
+*/
 DELIMITER//
 
 drop PROCEDURE IF EXISTS SP_INSERTAR_ROL;
@@ -42,16 +73,21 @@ END ;
 DELIMITER ;
 
 
-CALL `3_SP_INSERTAR_ROL` ('ROLE_ADMIN');
-CALL `3_SP_INSERTAR_ROL` ('ROLE_VENDEDOR');
-CALL `3_SP_INSERTAR_ROL`('ROLE_GERENTE');
-CALL `3_SP_INSERTAR_ROL` ('ROLE_INV_AUDITOR');
-
-
-SELECT * FROM `ROLES`
 
 
 --ACTUALIZAR 
+/*
+DESCRIPCION DE SP_ACTUALIZAR_ROL
+
+Actualiza el nombre de un rol existente.
+
+- Parámetros:
+    - P_ID_ROL: id del rol a actualizar.
+    - P_NOMBRE_ROL: nuevo nombre del rol.
+
+Comportamiento:
+- Verifica existencia y evita duplicados. Retorna mensaje de éxito.
+*/
 DELIMITER //
  DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_ROL ;
 CREATE PROCEDURE SP_ACTUALIZAR_ROL(
@@ -85,8 +121,16 @@ DELIMITER ;
 
 
 
---BUSCAR 
 
+--BUSCAR 
+/*
+DESCRIPCION DE SP_BUSCAR_ROLES
+
+Busca roles por nombre parcial. Si `P_BUSQUEDA` es NULL o vacío, devuelve todos.
+
+- Parámetros:
+  - P_BUSQUEDA: texto para buscar en `NOMBRE_ROL`.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_BUSCAR_ROLES ; 
 CREATE PROCEDURE SP_BUSCAR_ROLES(
@@ -100,6 +144,11 @@ END ;
 DELIMITER ; 
 
 --LISTAR ROLES
+/*
+DESCRIPCION DE SP_LISTAR_ROLES
+
+Retorna la lista de roles con su id y nombre, ordenada alfabéticamente.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS  SP_LISTAR_ROLES ;
 CREATE PROCEDURE SP_LISTAR_ROLES()
