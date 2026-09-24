@@ -1,0 +1,40 @@
+Descripcion de base de datos 
+DEscipcion para la tabla 
+Quiero que redactes el bloque de comentarios descriptivos para la tabla que te diga  o te indique  siguiendo exactamente la misma estructura, 
+formato y estilo de documentación que el ejemplo de CATEGORIAS.
+Ejemplo:/*
+DESCRIPCION DEL MODULO DE CATEGORIAS
+
+Este modulo administra las categorias de productos de la base de datos
+BALBU_TECH.
+
+TABLA CATEGORIAS
+- ID_CATEGORIA: identificador unico, clave primaria y autoincremental.
+- NOMBRE: nombre obligatorio y unico de la categoria.
+- DESCRIPCION: detalle informativo de la categoria.
+- ICONO_URL: referencia o nombre del icono asociado.
+- ESTADO: indica si la categoria esta ACTIVO o INACTIVO. Por defecto es ACTIVO.
+- FECHA_REGISTRO: fecha y hora de registro, generada automaticamente.
+
+RESTRICCIONES
+- La clave primaria identifica cada categoria.
+- NOMBRE UNIQUE impide registrar categorias con el mismo nombre.
+
+La tabla utiliza el motor InnoDB.
+*/
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Descripcion de los INDEX
+
+Te lo a indicar los index y vas a explicar por que esta  y que hace el index.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+DEscripcion de sp 
+prompt 
+Por favor, analiza el siguiente código SQL de un procedimiento almacenado y explícamelo paso a paso en un bloque de código SQL con comentarios (`/* ... */`). Usa un lenguaje muy coloquial, sencillo y fácil de entender para una persona que no sabe de programación ni de bases de datos. Detalla qué comprueba, qué reglas de seguridad tiene y qué hace al finalizar.
+
+
+
+
+
