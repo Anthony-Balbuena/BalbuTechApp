@@ -1,3 +1,4 @@
+-- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 /*
 DESCRIPCION DEL MODULO DE BONOS DE EMPLEADOS
 
@@ -357,23 +358,40 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
+/*
+El trigger TR_VALIDAR_FECHA_BONO se ejecuta antes de insertar una nueva fila en la tabla BONOS_EMPLEADOS. Este trigger valida si la fecha (FECHA) de la nueva fila es más reciente que la fecha de hace 60 días (30 días antes de la fecha actual). Si es así, se lanza un error con el mensaje "ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 30 DÍAS.".
+*/
 DELIMITER //
-CREATE TRIGGER 14_TR_VALIDAR_FECHA_BONO
+DROP TRIGGER IF EXISTS TR_VALIDAR_FECHA_BONO;
+CREATE TRIGGER TR_VALIDAR_FECHA_BONO
 BEFORE INSERT ON BONOS_EMPLEADOS
 FOR EACH ROW
 BEGIN 
     -- No permitir bonos con fechas de más de 30 días atrás
-    IF NEW.FECHA < DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN
+    IF NEW.FECHA < DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 30 DÍAS.';
     END IF;
-END //
+END;
 DELIMITER ;
 
-----BONO POR VENTA 
-DELIMITER //
+/*
+El trigger TR_CALCULAR_BONO_VENTA se ejecuta después de que se inserta una fila en la tabla DETALLES_VENTA. Este trigger obtiene el ID del empleado de la tabla VENTAS que corresponde con el ID de venta en la tabla DETALLES_VENTA. Luego, inserta los datos necesarios en la tabla BONOS_EMPLEADOS con la siguiente información:
 
-DROP TRIGGER IF EXISTS TR_CALCULAR_BONO_VENTA ;
+ID_EMPLEADO: El ID del empleado obtenido de la tabla VENTAS.
 
+FECHA: La fecha actual (CURRENT_DATE()).
+
+TIPO_BONO: Tipo de bono, en este caso "BONIFICACION".
+
+MONTO: El monto del bono calculado como el 1% del subtotal de la venta (NEW.SUBTOTAL * 0.01).
+
+DESCRIPCION: La descripción del bono, que es "Comisión automática por venta".
+
+ESTADO: Estado del bono, que es "PENDIENTE".
+*/
+
+DELIMITER // 
+DROP TRIGGER IF EXISTS TR_CALCULAR_BONO_VENTA;
 CREATE TRIGGER TR_CALCULAR_BONO_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
@@ -385,11 +403,17 @@ BEGIN
     FROM VENTAS 
     WHERE ID_VENTA = NEW.ID_VENTA;
 
-    -- Usamos la tabla BONOS_EMPLEADOS según tu estructura
-    INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, MONTO, MOTIVO, FECHA_BONO)
-    VALUES (V_ID_EMPLEADO, (NEW.SUBTOTAL * 0.01), 'Comisión por venta', CURRENT_DATE);
-END ;
-
+    -- Insertamos adaptado a las columnas reales de nuestra tabla BONOS_EMPLEADOS
+    INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION, ESTADO)
+    VALUES (
+        V_ID_EMPLEADO, 
+        CURRENT_DATE(), 
+        'BONIFICACION', 
+        (NEW.SUBTOTAL * 0.01), 
+        'Comisión automática por venta', 
+        'PENDIENTE'
+    );
+END;
 DELIMITER ;
 
 
@@ -397,7 +421,9 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
-
+/*
+El CREATE OR REPLACE VIEW VISTA_TOTAL_BONOS_POR_EMPLEADO crea una vista que selecciona los datos necesarios para obtener el total de bonificaciones por empleado. La vista combina los datos de las tablas EMPLEADOS y BONOS_EMPLEADOS, agrupando por ID_EMPLEADO para calcular el total de bonificaciones (TOTAL_BONIFICADO) y la cantidad de bonificaciones (CANTIDAD_BONOS).
+*/
 
 CREATE OR REPLACE VIEW VISTA_TOTAL_BONOS_POR_EMPLEADO AS
 SELECT 
