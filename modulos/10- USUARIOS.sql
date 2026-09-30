@@ -47,7 +47,6 @@ CREATE INDEX IX_USER ON USUARIOS (USUARIO);
 
 
 
-
 -- Migration: Aumentar tamaño de la columna CONTRASENA para almacenar hashes PBKDF2.
 -- IMPORTANTE: HAZ BACKUP ANTES DE EJECUTAR.
 USE BALBU_TECH;
@@ -80,12 +79,6 @@ BEGIN
       AND U.ESTADO = 'ACTIVO';
 END //
 DELIMITER ;
-
-
-
-
-
-
 
 
 --Sp para mostrar antes de hacer ciertas acciones. Van en el modulo de  usuarios
@@ -149,6 +142,7 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: USUARIO "', v_usuario_limpio, '" CREADO.') AS MENSAJE;
 END;
 
+CALL `SP_INSERTAR_USUARIO` (1, 1, 'abalbuena', 'Pedro0110');
 DELIMITER ;
 
 --ACTUALIZAR

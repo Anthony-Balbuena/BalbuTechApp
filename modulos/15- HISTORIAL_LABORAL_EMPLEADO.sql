@@ -1,3 +1,7 @@
+/*
+DESCRIPCION DEL MODULO DE HISTORIAL_LABORAL_EMPLEADO
+Registra automáticamente el historial laboral de los empleados cada vez que hay un cambio en su cargo, salario o estado.
+*/
 CREATE TABLE HISTORIAL_LABORAL_EMPLEADO (
     ID_HISTORIAL_EMPLEADO INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
@@ -19,18 +23,27 @@ CREATE TABLE HISTORIAL_LABORAL_EMPLEADO (
     CONSTRAINT FK_HISTORIAL_EMPLEADO_REF FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
--- 1. Para ver la evolución de un empleado específico rápido
+-- Índices para búsquedas rápidas por empleado, fecha o tipo de cambio
+
+
 CREATE INDEX IX_HISTORIAL_EMPLEADO_ID ON HISTORIAL_LABORAL_EMPLEADO (ID_EMPLEADO);
 
--- 2. Para reportes anuales o mensuales de gastos en sueldos
+
 CREATE INDEX IX_HISTORIAL_EMPLEADO_FECHA ON HISTORIAL_LABORAL_EMPLEADO (FECHA_CAMBIO);
 
--- 3. Para ver qué tanto estamos promoviendo vs solo ajustando sueldos
+
 CREATE INDEX IX_HISTORIAL_EMPLEADO_TIPO ON HISTORIAL_LABORAL_EMPLEADO (TIPO_CAMBIO);
 
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
+
+/*
+DESCRIPCION DEL TRIGGER TR_AUDITORIA_PERFIL_EMPLEADO
+Vigila la tabla EMPLEADOS. Cada vez que se actualiza el perfil de alguien (su salario, cargo o estado), 
+este trigger guarda una copia del "antes y después" en la tabla de historial de forma automática.
+*/
+
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_AUDITORIA_PERFIL_EMPLEADO ;
@@ -38,7 +51,7 @@ CREATE TRIGGER TR_AUDITORIA_PERFIL_EMPLEADO
 AFTER UPDATE ON EMPLEADOS
 FOR EACH ROW
 BEGIN
-    -- Comparamos si cambió cualquier campo relevante
+    -- Comparamos si cambió el salario, el cargo o el estado del empleado
     IF OLD.SALARIO <> NEW.SALARIO OR 
        OLD.CARGO <> NEW.CARGO OR 
        OLD.ESTADO <> NEW.ESTADO THEN
@@ -46,7 +59,7 @@ BEGIN
         INSERT INTO HISTORIAL_LABORAL_EMPLEADO (
             ID_EMPLEADO, 
             CARGO_ANTERIOR, CARGO_NUEVO, 
-            SALARIO_ANTERIOR, SALARIO_NEW, 
+            SALARIO_ANTERIOR, SALARIO_NUEVO, -- Corregido de SALARIO_NEW a SALARIO_NUEVO
             ESTADO_ANTERIOR, ESTADO_NUEVO,
             TIPO_CAMBIO, 
             OBSERVACION
@@ -59,7 +72,7 @@ BEGIN
             CASE 
                 WHEN NEW.CARGO <> OLD.CARGO THEN 'PROMOCION'
                 WHEN NEW.SALARIO > OLD.SALARIO THEN 'AUMENTO'
-                WHEN NEW.ESTADO <> OLD.ESTADO THEN 'CAMBIO_PUESTO' -- O 'AJUSTE' según prefieras
+                WHEN NEW.ESTADO <> OLD.ESTADO THEN 'CAMBIO_PUESTO'
                 ELSE 'AJUSTE'
             END,
             CONCAT('Cambio automático: Cargo(', OLD.CARGO, '->', NEW.CARGO, ') Estado(', OLD.ESTADO, '->', NEW.ESTADO, ')')

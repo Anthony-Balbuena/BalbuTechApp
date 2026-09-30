@@ -34,6 +34,7 @@ DEscripcion de sp
 prompt 
 Por favor, analiza el siguiente código SQL de un procedimiento almacenado y explícamelo paso a paso en un bloque de código SQL con comentarios (`/* ... */`). Usa un lenguaje muy coloquial, sencillo y fácil de entender para una persona que no sabe de programación ni de bases de datos. Detalla qué comprueba, qué reglas de seguridad tiene y qué hace al finalizar.
 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 

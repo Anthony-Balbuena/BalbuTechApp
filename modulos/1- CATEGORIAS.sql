@@ -20,6 +20,12 @@ RESTRICCIONES
 La tabla utiliza el motor InnoDB.
 */
 
+/*
+DESCRIPCION DEL MODULO DE CATEGORIAS
+Administra las categorías de productos de la base de datos BALBU_TECH.
+*/
+
+
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
