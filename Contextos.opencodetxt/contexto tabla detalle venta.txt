@@ -1,0 +1,74 @@
+CONTEXTO DE DOCUMENTACION - TABLA DETALLES_VENTA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/23- DETALLE_VENTA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 23- DETALLE_VENTA.sql (7 bloques)
+================================================================================
+TABLA
+  - DETALLES_VENTA ........ productos de cada venta con subtotal automatico
+
+INDICES (2)
+  - IX_CLIENTE_NOMBRE ..... busqueda de clientes por nombre (sobre CLIENTES)
+  - IX_VENTAS_FECHA ....... ventas por fecha (sobre VENTAS)
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - 23_SP_AGREGAR_DETALLE_VENTA .. version completa: valida empleado,
+                                    venta y stock
+  - SP_AGREGAR_DETALLE_VENTA ..... version corta sin validar empleado
+
+TRIGGERS (2)
+  - TR_ACTUALIZAR_TOTAL_VENTA .... suma subtotales al TOTAL de la venta
+  - TR_BLOQUEAR_VENTA_FINALIZADA . no deja agregar productos a una venta
+                                    ya realizada
+
+VISTAS (0)
+  - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * Existen 2 procedimientos casi iguales: 23_SP_AGREGAR_DETALLE_VENTA y
+    SP_AGREGAR_DETALLE_VENTA (este ultimo sin validar el empleado).
+  * Los indices IX_CLIENTE_NOMBRE e IX_VENTAS_FECHA estan definidos sobre
+    CLIENTES y VENTAS, no sobre DETALLES_VENTA.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 18 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~14 archivos con indices sin documentar.
+- ~67 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/23- DETALLE_VENTA.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

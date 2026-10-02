@@ -1,4 +1,10 @@
 -- Active: 1775068811273@@127.0.0.1@3306@BALBU_TECH
+/*
+TABLA ASIGNACIONES_RECLAMOS
+Guarda a que tecnico se le asigno cada reclamo de garantia, con su
+prioridad, estado de la asignacion y fechas. Un reclamo puede tener
+varias asignaciones a lo largo del tiempo.
+*/
 CREATE TABLE ASIGNACIONES_RECLAMOS (
     ID_ASIGNACION INT NOT NULL AUTO_INCREMENT,
     ID_RECLAMO_GARAN INT NOT NULL,
@@ -22,6 +28,11 @@ CHECK (FECHA_FINALIZACION >= FECHA_ASIGNACION);
 
 
 
+/*
+INDICE IDX_ASIGNACIONES_EMPLEADO_FECHA
+Busca las asignaciones de un empleado por fecha, util para ver la carga
+de trabajo de cada tecnico.
+*/
 CREATE INDEX IDX_ASIGNACIONES_EMPLEADO_FECHA 
 ON ASIGNACIONES_RECLAMOS (ID_EMPLEADO, FECHA_ASIGNACION);
 
@@ -35,6 +46,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_ASIGNAR_TECNICO_RECLAMO; 
 
+/*
+SP_ASIGNAR_TECNICO_RECLAMO
+Asigna un tecnico a un reclamo que este PENDIENTE.
+Revisa que el reclamo exista y no este ya tomado, crea la asignacion en
+EN_PROCESO y deja el reclamo en EN_PROCESO.
+*/
 CREATE PROCEDURE SP_ASIGNAR_TECNICO_RECLAMO(
     IN P_ID_RECLAMO INT,
     IN P_ID_EMPLEADO INT,
@@ -91,6 +108,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_FINALIZAR_RECLAMO;
 
+/*
+SP_FINALIZAR_RECLAMO
+Cierra la asignacion y el reclamo al mismo tiempo.
+Marca la asignacion como COMPLETADO con su fecha final, agrega la nota
+final y deja el reclamo en CERRADO.
+*/
 CREATE PROCEDURE SP_FINALIZAR_RECLAMO(
     IN P_ID_ASIGNACION INT,
     IN P_OBSERVACIONES_FINALES VARCHAR(255)

@@ -1,21 +1,11 @@
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 
 /*
-MODULO: PRODUCTOS — Descripción general
-
-Contiene la tabla `PRODUCTOS`, índices, y procedimientos para gestionar
-catálogo e inventario. Incluye validaciones de negocio (precio > 0,
-unicidad de código), relaciones con `MARCAS`, `CATEGORIAS` y `PROVEEDORES`.
-
-Columnas clave:
-- ID_PRODUCTO: PK autoincremental.
-- NOMBRE, DESCRIPCION, PRECIO, CODIGO: datos del producto.
-- ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR: FKs a sus tablas respectivas.
-- IMAGEN_URL: ruta/URL de la imagen (puede ser NULL).
-
-Notas de integridad:
-- Añadir FK a `PROVEEDORES` si no existe en el esquema de producción.
-- Validar datos existentes antes de aplicar NOT NULL estrictos.
+TABLA PRODUCTOS
+Catalogo de productos de la tienda: nombre, descripcion, precio, codigo
+unico, marca, categoria y proveedor. El precio tiene que ser mayor a cero
+y el nombre no se puede repetir dentro de la misma marca. Puede traer
+imagen y arranca ACTIVO.
 */
 
 CREATE TABLE PRODUCTOS (
@@ -41,16 +31,16 @@ SELECT * FROM `MARCAS`;
 SELECT * from PRODUCTOS;
 
 /*
-ÍNDICE: IX_PRODUCTOS_MARCA
-
-Propósito: acelerar consultas y joins por `ID_MARCA` en listados y filtros.
+INDICE IX_PRODUCTOS_MARCA
+Acelera los listados y filtros que cruzan productos con su marca,
+evitando recorrer toda la tabla cuando se arma un reporte.
 */
 CREATE INDEX IX_PRODUCTOS_MARCA ON PRODUCTOS (ID_MARCA);
 
 /*
-ÍNDICE: IX_PRODUCTOS_CATEGORIA
-
-Propósito: optimizar búsquedas por `ID_CATEGORIA` y generar reportes por categoría.
+INDICE IX_PRODUCTOS_CATEGORIA
+Acelera las busquedas por categoria y la generacion de reportes
+agrupados por categoria de producto.
 */
 CREATE INDEX IX_PRODUCTOS_CATEGORIA ON PRODUCTOS (ID_CATEGORIA);
 
@@ -58,13 +48,6 @@ CREATE INDEX IX_PRODUCTOS_CATEGORIA ON PRODUCTOS (ID_CATEGORIA);
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------                
-/*
-SECCIÓN: PROCEDIMIENTOS ALMACENADOS (PRODUCTOS)
-
-Los procedimientos normalizan entradas, verifican existencia de claves
-foráneas (`MARCAS`, `CATEGORIAS`, `PROVEEDORES`) y usan `SIGNAL` para
-errores controlados. Mensajes de éxito se retornan como SELECT para la UI.
-*/
 
 DESCRIBE PRODUCTOS;
 
@@ -72,14 +55,11 @@ DESCRIBE PRODUCTOS;
 
 DELIMITER //
 /*
-SP: SP_INSERTAR_PRODUCTO
-
-Propósito: insertar un producto verificando:
-- `P_ID_PROVEEDOR` es obligatorio y existe en `PROVEEDORES`.
-- `ID_MARCA` y `ID_CATEGORIA` existen.
-- `CODIGO` es único; `PRECIO` > 0; `DESCRIPCION` mínimo 10 chars.
-
-Devuelve: mensaje con resultado para la UI.
+SP_INSERTAR_PRODUCTO
+Da de alta un producto nuevo validando todo antes de guardar: que el
+proveedor, la marca y la categoria existan, que el codigo sea unico, que
+el precio sea mayor a cero y que la descripcion tenga al menos 10
+caracteres. Si algo falla no guarda nada.
 */
 DROP PROCEDURE IF EXISTS SP_INSERTAR_PRODUCTO ;
 
@@ -158,11 +138,11 @@ DESCRIBE PRODUCTOS;
 DELIMITER //
  
 /*
-SP: SP_ACTUALIZAR_PRODUCTOS
-
-Propósito: actualizar un producto de forma parcial. Valida existencia,
-unicidad de `CODIGO`, `PRECIO` positivo y existencia de FKs cuando se
-intentan cambiar (`ID_MARCA`, `ID_CATEGORIA`). Retorna mensaje estandarizado.
+SP_ACTUALIZAR_PRODUCTOS
+Actualiza los datos que se le envien de un producto existente.
+Comprueba que el producto exista, que el codigo no le pertenezca a otro,
+que el precio sea positivo y que marca y categoria existan si se cambian;
+lo que llegue en NULL se queda como estaba.
 */
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_PRODUCTOS ;
 
@@ -255,10 +235,10 @@ DELIMITER ;
 --3. Activar/Decastivar
 DELIMITER //
 /*
-SP: SP_TOGGLE_ESTADO_PRODUCTOS
-
-Propósito: alternar el `ESTADO` de un producto entre 'ACTIVO' e 'INACTIVO'.
-Recupera nombre y estado actual para devolver un mensaje descriptivo.
+SP_TOGGLE_ESTADO_PRODUCTOS
+Le da la vuelta al estado del producto: de ACTIVO a INACTIVO y viceversa.
+Si el ID no existe manda un error; si existe responde con un mensaje que
+dice de que estado paso al nuevo.
 */
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_PRODUCTOS;
 CREATE PROCEDURE SP_TOGGLE_ESTADO_PRODUCTOS(
@@ -305,10 +285,10 @@ DELIMITER ;
 ---4. CONSULTAR PRODUCTO FILTRADO
 DELIMITER //
 /*
-SP: SP_CONSULTAR_PRODUCTOS_FILTRADO
-
-Propósito: buscar productos por nombre o código y devolver información
-relacionada (marca, categoría, precio, estado).
+SP_CONSULTAR_PRODUCTOS_FILTRADO
+Busca productos por nombre o por codigo y los devuelve con su marca,
+categoria, precio y estado. Si la busqueda viene vacia o NULL trae todos,
+ordenados por ID.
 */
 DROP PROCEDURE IF EXISTS SP_CONSULTAR_PRODUCTOS_FILTRADO  ;
 
@@ -339,10 +319,10 @@ DELIMITER ;
 --5. consultar inventario
 DELIMITER //
 /*
-SP: SP_CONSULTAR_INVENTARIO
-
-Propósito: obtener inventario por producto con cálculo de estado de stock
-(AGOTADO, CRÍTICO, STOCK BAJO, OK) y columnas relevantes para reportes.
+SP_CONSULTAR_INVENTARIO
+Muestra el inventario de los productos activos con su stock y marca la
+situacion de cada uno: AGOTADO, CRITICO, STOCK BAJO u OK segun lo que
+haya contra el minimo. Se puede filtrar por nombre, codigo o categoria.
 */
 DROP PROCEDURE IF EXISTS SP_CONSULTAR_INVENTARIO ;
 CREATE PROCEDURE SP_CONSULTAR_INVENTARIO(
@@ -381,10 +361,9 @@ DELIMITER ;
 --6. REPORTE STOCK 
 DELIMITER //
 /*
-SP: SP_REPORTE_STOCK_CRITICO
-
-Propósito: listar productos cuyo stock actual es menor o igual al mínimo,
-ordenando por cantidad faltante para priorizar reposición.
+SP_REPORTE_STOCK_CRITICO
+Lista los productos que estan por debajo del stock minimo con su cantidad
+faltante, del mas urgente al menos, para priorizar la reposicion.
 */
 DROP PROCEDURE IF EXISTS SP_REPORTE_STOCK_CRITICO ;
 CREATE PROCEDURE SP_REPORTE_STOCK_CRITICO()
@@ -409,11 +388,10 @@ DELIMITER //
 
 
 /*
-SP: PARA_INSERTAR_PRODUCTO
-
-Propósito: generar los conjuntos de datos necesarios para el formulario
-de inserción del frontend: categorías, marcas y proveedores (cada uno
-como un result set separado). Utilizado por el cliente para popular selects.
+PARA_INSERTAR_PRODUCTO
+Prepara los datos del formulario de alta de producto: devuelve en tres
+result sets las categorias, las marcas y los proveedores, para que el
+cliente llene los selects.
 */
 DROP PROCEDURE IF EXISTS PARA_INSERTAR_PRODUCTO;
 
@@ -445,11 +423,10 @@ DELIMITER;
 --PARA LA ACTUALIZACION DE LOS DATOS 
 DELIMITER//
 /*
-SP: PARA_ACTUALIZARDATOS
-
-Propósito: proporcionar un conjunto con los datos necesarios para el
-formulario de edición/actualización de productos (producto, categoría, marca).
-Devuelve un result set con campos claves para popular controles en UI.
+PARA_ACTUALIZARDATOS
+Prepara los datos del formulario de edicion de producto: devuelve el
+producto junto con su categoria y su marca para popular los controles de
+la pantalla.
 */
 DROP PROCEDURE IF EXISTS PARA_ACTUALIZARDATOS;
 
@@ -487,11 +464,9 @@ DELIMITER;
 DELIMITER //
 
 /*
-SP: PARA_ACTIVARODESACTIVAR_PROC
-
-Propósito: proporciona la lista de productos con `ID_PRODUCTO`, `NOMBRE`
-y `ESTADO` usada por el backend C++ para activar/desactivar productos en
-bloque. Devuelve un result set simple ordenado por ID_PRODUCTO.
+PARA_ACTIVARODESACTIVAR_PROC
+Devuelve la lista simple de productos con ID, nombre y estado, que el
+backend C++ usa para activar o desactivar productos en bloque.
 */
 DROP PROCEDURE IF EXISTS PARA_ACTIVARODESACTIVAR_PROC;
 

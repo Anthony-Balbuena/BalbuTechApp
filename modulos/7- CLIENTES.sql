@@ -1,21 +1,10 @@
 -- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 /*
-MODULO: CLIENTES — Descripción general
-
-Este módulo define la tabla `CLIENTES` y procedimientos para gestionar
-clientes en el sistema: inserción, actualización, búsqueda, toggle de
-estado y triggers de auditoría. Las rutinas normalizan entradas,
-validan unicidades y devuelven mensajes amigables para la capa C++.
-
-Estructura clave de la tabla:
-- ID_CLIENTE: PK autoincremental.
-- NOMBRE, TELEFONO, EMAIL: datos principales (tel y email únicos).
-- DIRECCION: texto libre.
-- ESTADO: enum ACTIVO/INACTIVO para control lógico.
-- FECHA_REGISTRO: timestamp de creación.
-
-Restricciones importantes:
-- CHECK para formato de email y nombre no vacío.
+TABLA CLIENTES
+Guarda los clientes de la tienda: nombre, telefono, email y direccion.
+Nombre, telefono y email son obligatorios, unicos y con formato valido
+(el email debe llevar @). Todo cliente arranca ACTIVO y cada uno tiene su
+fecha de registro.
 */
 CREATE TABLE CLIENTES (
     ID_CLIENTE INT NOT NULL AUTO_INCREMENT,
@@ -30,29 +19,14 @@ CREATE TABLE CLIENTES (
     CONSTRAINT CK_CLIENTE_NOMBRE CHECK (CHAR_LENGTH(TRIM(NOMBRE)) > 0)
 ) ENGINE = InnoDB;
 
-/*
-SECCIÓN: PROCEDIMIENTOS ALMACENADOS (CLIENTES)
-
-Comentarios generales: los procedimientos usan limpieza de datos
-(REGEXP_REPLACE, TRIM), validaciones y `SIGNAL SQLSTATE '45000'` para
-reportar errores controlados. Los mensajes de éxito se retornan mediante
-SELECT para integrarse fácilmente con el cliente C++.
-
-Procedimientos incluidos:
-- SP_INSERTAR_CLIENTES: inserta cliente validando duplicados.
-- SP_ACTUALIZAR_CLIENTES: actualiza campos de forma parcial.
-- SP_LISTAR_CLIENTES: filtra/lista clientes.
-- SP_TOGGLE_ESTADO_CLIENTES: alterna estado ACTIVO/INACTIVO.
-*/
-
 --1. INSERTAR
 DELIMITER //      
 /*
-SP: SP_INSERTAR_CLIENTES
-
-Propósito: insertar un cliente validando nombre, teléfono y email;
-evita duplicados y normaliza valores. Devuelve mensaje estandarizado
-con `LAST_INSERT_ID()` para la capa C++.
+SP_INSERTAR_CLIENTES
+Da de alta un cliente nuevo limpiando nombre, telefono, email y
+direccion. Obliga a que nombre, telefono y email vengan completos, revisa
+que el telefono y el email no existan en otro cliente y si todo esta bien
+responde con un mensaje y el ID creado.
 */
  DROP PROCEDURE IF EXISTS SP_INSERTAR_CLIENTES ; 
 CREATE PROCEDURE SP_INSERTAR_CLIENTES(
@@ -104,11 +78,11 @@ DELIMITER ;
 DELIMITER //
 
 /*
-SP: SP_ACTUALIZAR_CLIENTES
-
-Propósito: actualizar datos de cliente de forma parcial; valida
-existencia y evita duplicados en teléfono/email. Usa `COALESCE` para
-mantener valores no enviados.
+SP_ACTUALIZAR_CLIENTES
+Actualiza los datos que se le envien de un cliente existente.
+Comprueba que el cliente exista, limpia los valores nuevos y revisa que
+telefono y email no le pertenezcan a otro; lo que llegue en NULL se queda
+como estaba.
 */
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_CLIENTES ;
 CREATE PROCEDURE SP_ACTUALIZAR_CLIENTES( 
@@ -195,10 +169,10 @@ DELIMITER ;
 DELIMITER //
 
 /*
-SP: SP_LISTAR_CLIENTES
-
-Propósito: listar o filtrar clientes por texto (nombre/teléfono/email).
-Devuelve columnas clave y ordena por nombre.
+SP_LISTAR_CLIENTES
+Lista o busca clientes por texto libre: coincide con nombre, telefono o
+email. Si el filtro viene vacio o NULL devuelve todos, siempre ordenados
+por nombre.
 */
 DROP PROCEDURE IF EXISTS SP_LISTAR_CLIENTES ;
 CREATE PROCEDURE SP_LISTAR_CLIENTES(
@@ -234,10 +208,10 @@ DELIMITER ;
 --TOGLER CAMBIAR ESTADO 
 
 /*
-SP: SP_TOGGLE_ESTADO_CLIENTES
-
-Propósito: alternar el estado de un cliente entre 'ACTIVO' e 'INACTIVO'
-con una única llamada, devolviendo mensaje de resultado.
+SP_TOGGLE_ESTADO_CLIENTES
+Le da la vuelta al estado del cliente: de ACTIVO a INACTIVO y viceversa.
+Si el ID no existe manda un error; si existe responde con un mensaje
+diciendo si quedo activado o desactivado.
 */
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_CLIENTES;
 DELIMITER //
@@ -270,10 +244,9 @@ DELIMITER //
 
 -- 1. Trigger para registrar nuevos clientes
 /*
-TRIGGER: TR_AUDIT_CLIENTES_INSERT
-
-Propósito: trigger AFTER INSERT que registra en `AUDITORIA_SISTEMA`
-la creación de nuevos clientes (tabla, id, acción, usuario y valor nuevo).
+TR_AUDIT_CLIENTES_INSERT
+Se dispara solo al insertar un cliente y anota en la bitacora la tabla,
+el ID, la accion, el usuario y los datos nuevos. Trabaja en automatico.
 */
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_INSERT ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_INSERT
@@ -287,10 +260,10 @@ END ;
 
 -- 2. Trigger para registrar cambios en clientes existentes
 /*
-TRIGGER: TR_AUDIT_CLIENTES_UPDATE
-
-Propósito: trigger AFTER UPDATE que registra el valor anterior y el
-valor nuevo en `AUDITORIA_SISTEMA` cuando se modifica un cliente.
+TR_AUDIT_CLIENTES_UPDATE
+Se dispara al actualizar un cliente y guarda en la bitacora los valores
+antes y despues del cambio junto con el usuario. Trabaja en automatico,
+sin tener que llamarlo.
 */
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_UPDATE ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_UPDATE

@@ -1,3 +1,9 @@
+/*
+TABLA DEVOLUCIONES
+Guarda cada producto que un cliente devuelve: porque lo devuelve, en que
+condicion llega cuanto se le reembolsa y en que estado esta la solicitud.
+Puede ligarse a una garantia si el reclamo viene por ella.
+*/
 CREATE TABLE DEVOLUCIONES (
     ID_DEVOLUCION INT NOT NULL AUTO_INCREMENT,
     ID_DETALLE_VENTA INT NOT NULL,
@@ -18,12 +24,25 @@ CREATE TABLE DEVOLUCIONES (
     CONSTRAINT FK_DEVOLUCION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
 ) ENGINE = InnoDB;
 -- 1. Para rastrear devoluciones de una venta específica
+/*
+INDICE IX_DEVOLUCION_VENTA
+Busca todas las devoluciones que vienen de una venta en concreto.
+*/
 CREATE INDEX IX_DEVOLUCION_VENTA ON DEVOLUCIONES (ID_DETALLE_VENTA);
 
 -- 2. Para ver qué devoluciones están ligadas a un reclamo de garantía
+/*
+INDICE IX_DEVOLUCION_GARANTIA
+Trae las devoluciones que estan ligadas a un reclamo de garantia.
+*/
 CREATE INDEX IX_DEVOLUCION_GARANTIA ON DEVOLUCIONES (ID_GARANTIA);
 
 -- 3. Para el reporte de "Devoluciones Pendientes" del día
+/*
+INDICE IX_DEVOLUCION_ESTADO_FECHA
+Busca devoluciones por estado y fecha, ideal para el reporte de
+pendientes del dia.
+*/
 CREATE INDEX IX_DEVOLUCION_ESTADO_FECHA ON DEVOLUCIONES (ESTADO, FECHA);
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -33,6 +52,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_REGISTRAR_DEVOLUCION ;
 
+/*
+SP_REGISTRAR_DEVOLUCION
+Registra una devolucion nueva en estado PENDIENTE.
+Valida que la cantidad sea posible (sin pasarse de lo ya devuelto), que la
+garantia corresponda a esa venta y calcula el monto a reembolsar.
+*/
 CREATE PROCEDURE SP_REGISTRAR_DEVOLUCION(
     IN P_ID_DETALLE_VENTA INT,
     IN P_ID_GARANTIA INT, -- Puede ser NULL
@@ -133,6 +158,12 @@ DELIMITER ;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 25_SP_PROCESAR_DEVOLUCION ;
+/*
+25_SP_PROCESAR_DEVOLUCION
+Aprueba, rechaza o marca como reembolsada una devolucion.
+Solo deja cambiar devoluciones que esten en PENDIENTE; si ya fue procesada
+corta con error. Al cambiar el estado, el trigger devuelve el stock solo.
+*/
 CREATE PROCEDURE 25_SP_PROCESAR_DEVOLUCION(
     IN P_ID_DEVOLUCION INT,
     IN P_NUEVO_ESTADO ENUM('APROBADA', 'RECHAZADA', 'REEMBOLSADA')
@@ -168,6 +199,12 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_REINTEGRAR_STOCK_DEVOLUCION;
+/*
+TR_REINTEGRAR_STOCK_DEVOLUCION
+Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA,
+regresa la cantidad al stock del producto y anota la ENTRADA en la
+auditoria de movimientos. Si se rechaza, no toca el inventario.
+*/
 CREATE TRIGGER TR_REINTEGRAR_STOCK_DEVOLUCION
 AFTER UPDATE ON DEVOLUCIONES
 FOR EACH ROW
@@ -200,6 +237,11 @@ DELIMITER ;
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 
+/*
+VISTA_REPORTES_DEVOLUCIONES
+Agrupa las devoluciones por producto, motivo y condicion.
+Muestra cuantas veces se devolvio cada producto y porque, para reportes.
+*/
 CREATE OR REPLACE VIEW VISTA_REPORTES_DEVOLUCIONES AS
 SELECT 
     P.NOMBRE AS PRODUCTO,

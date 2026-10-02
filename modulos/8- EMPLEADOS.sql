@@ -1,20 +1,10 @@
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 /*
-MODULO: EMPLEADOS — Descripción general
-
-Este módulo contiene la definición de la tabla `EMPLEADOS` y múltiples
-procedimientos para el ciclo de vida del empleado: inserción, actualización,
-despido/reactivación, reportes y utilidades de nómina. Las rutinas realizan
-limpieza de entradas, validaciones de unicidad y comprobaciones de negocio
-(por ejemplo: salario > 0).
-
-Estructura clave:
-- ID_EMPLEADO: PK autoincremental.
-- NOMBRE, CEDULA: datos principales; cédula única y obligatoria.
-- CARGO, SALARIO: información laboral.
-- TELEFONO, EMAIL: contactos únicos.
-- FECHA_INGRESO / FECHA_DESPIDO: control de historial laboral.
-- ESTADO: ACTIVO/INACTIVO.
+TABLA EMPLEADOS
+Guarda la informacion de cada empleado: nombre, cedula, cargo, salario,
+telefono, email y fechas de ingreso y despido. La cedula, el telefono y
+el email son obligatorios y unicos, el salario tiene que ser mayor a cero
+y todo empleado arranca ACTIVO.
 */
 CREATE TABLE EMPLEADOS (
     ID_EMPLEADO INT NOT NULL AUTO_INCREMENT,
@@ -34,32 +24,15 @@ CREATE TABLE EMPLEADOS (
 
  SELECT * FROM EMPLEADOS;
 
-/*
-SECCIÓN: PROCEDIMIENTOS ALMACENADOS (EMPLEADOS)
-
-Comentarios generales: los procedimientos aplican limpieza y validación
-estricta, usan transacciones cuando es necesario y devuelven mensajes
-formateados para la UI. Se incluyen procedimientos para nómina,
-aumentos por cargo y reportes de aniversarios.
-
-Procedimientos principales:
-- SP_INSERTAR_EMPLEADO
-- SP_ACTUALIZAR_EMPLEADO
-- SP_DESPEDIR_EMPLEADO
-- SP_REACTIVAR_EMPLEADO
-- SP_REPORTE_NOMINA_TOTAL
-- SP_CONSULTAR_EMPLEADOS, SP_AUMENTO_POR_CARGO, SP_ANIVERSARIOS_MES
-*/
-
 --1. INSERTAR EMPLEADOS 
 DELIMITER //
 
 /*
-SP: SP_INSERTAR_EMPLEADO
-
-Propósito: insertar un empleado validando datos obligatorios (nombre, cédula),
-evitar duplicados (cédula, email, teléfono) y asegurar salario positivo.
-Devuelve mensaje estandarizado con `LAST_INSERT_ID()`.
+SP_INSERTAR_EMPLEADO
+Da de alta un empleado nuevo limpiando nombre, cedula, telefono y email.
+Valida que nombre y cedula vengan completos, que cedula, email y telefono
+no se repitan y que el salario sea mayor a cero; si todo esta bien guarda
+y responde con un mensaje y el ID creado.
 */
 DROP PROCEDURE IF EXISTS SP_INSERTAR_EMPLEADO ;
 CREATE OR REPLACE PROCEDURE SP_INSERTAR_EMPLEADO(
@@ -130,11 +103,11 @@ DELIMITER ;
 DELIMITER //
 
 /*
-SP: SP_ACTUALIZAR_EMPLEADO
-
-Propósito: actualizar datos de un empleado de forma parcial; valida
-unicidad de cédula, email y teléfono cuando se intentan cambiar y asegura
-que salario sea positivo si se proporciona.
+SP_ACTUALIZAR_EMPLEADO
+Cambia los datos que se le envien de un empleado existente.
+Comprueba que exista, limpia los valores nuevos y revisa que cedula,
+telefono y email no le pertenezcan a otro; lo que llegue en NULL se queda
+como estaba y el salario solo se acepta si es mayor a cero.
 */
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_EMPLEADO ;
 CREATE OR REPLACE PROCEDURE SP_ACTUALIZAR_EMPLEADO(
@@ -218,11 +191,10 @@ DELIMITER ;
 --3. DESPECIR EMPLEADO
 DELIMITER //
 /*
-SP: SP_DESPEDIR_EMPLEADO
-
-Propósito: marcar a un empleado como inactivo, asignar fecha de despido
-y prevenir despidos con fecha futura o doble despido. Si no se pasa fecha,
-usa la fecha actual.
+SP_DESPEDIR_EMPLEADO
+Da de baja a un empleado: lo marca INACTIVO y le pone la fecha de despido.
+No permite despedir a alguien que ya esta inactivo ni usar una fecha
+futura; si no llega fecha, asume la de hoy.
 */
 DROP PROCEDURE IF EXISTS SP_DESPEDIR_EMPLEADO;
 CREATE PROCEDURE SP_DESPEDIR_EMPLEADO(
@@ -271,10 +243,10 @@ DELIMITER ;
 --4. REACTIVAR ENPLEADO 
 DELIMITER //
 /*
-SP: SP_REACTIVAR_EMPLEADO
-
-Propósito: reactivar a un empleado previamente inactivo y opcionalmente
-actualizar su salario; valida existencia y estado actual.
+SP_REACTIVAR_EMPLEADO
+Reactiva a un empleado que estaba inactivo: lo marca ACTIVO, borra la
+fecha de despido y anota el dia de reingreso. Si se manda un nuevo
+salario se aplica, pero tiene que ser mayor a cero.
 */
 DROP PROCEDURE IF EXISTS  SP_REACTIVAR_EMPLEADO;
 CREATE PROCEDURE SP_REACTIVAR_EMPLEADO(
@@ -322,10 +294,10 @@ DELIMITER ;
 
 DELIMITER //
 /*
-SP: SP_REPORTE_NOMINA_TOTAL
-
-Propósito: generar un resumen de la nómina (total empleados activos,
-gasto mensual, sueldo mínimo/máximo/promedio) y desglose por cargo.
+SP_REPORTE_NOMINA_TOTAL
+Resumen de la nomina de los empleados activos: total de personal, gasto
+mensual, sueldos minimo, maximo y promedio, mas el desglose por cargo.
+Si no hay nadie activo avisa en vez de devolver una tabla vacia.
 */
 DROP PROCEDURE IF EXISTS SP_REPORTE_NOMINA_TOTAL;
 CREATE PROCEDURE SP_REPORTE_NOMINA_TOTAL()
@@ -366,10 +338,10 @@ DELIMITER ;
 
 DELIMITER //
 /*
-SP: SP_CONSULTAR_EMPLEADOS
-
-Propósito: búsqueda dinámica de empleados por ID o por filtro de nombre;
-prioriza ID si se proporciona, de lo contrario usa búsqueda parcial por nombre.
+SP_CONSULTAR_EMPLEADOS
+Busqueda de empleados por ID o por nombre.
+Si llega el ID prioriza ese; si no, busca por nombre con coincidencia
+parcial; si ambos vienen vacios trae la lista completa.
 */
 DROP PROCEDURE IF EXISTS  SP_CONSULTAR_EMPLEADOS ;
 CREATE PROCEDURE SP_CONSULTAR_EMPLEADOS(
@@ -409,11 +381,11 @@ DELIMITER ;
 DELIMITER //
 
 /*
-SP: SP_AUMENTO_POR_CARGO
-
-Propósito: aplicar aumentos por porcentaje a uno o varios empleados, por
-ID o por cargo; usa transacción para asegurar atomicidad y revierte si no
-se afectan filas.
+SP_AUMENTO_POR_CARGO
+Aplica un aumento por porcentaje a los empleados activos, ya sea a uno
+por ID o a todos los de un cargo. Trabaja en transaccion: si no encuentra
+a nadie revierte todo y avisa; si no, guarda y dice cuantos empleados se
+actualizaron.
 */
 DROP PROCEDURE IF EXISTS SP_AUMENTO_POR_CARGO ;
 CREATE PROCEDURE SP_AUMENTO_POR_CARGO(
@@ -461,10 +433,10 @@ DELIMITER ;
 --- 7. ANIVERSARIO DE EMPLEADO EN LA EMPRESA 
 DELIMITER //
 /*
-SP: SP_ANIVERSARIOS_MES
-
-Propósito: listar empleados que cumplen aniversario en el mes actual,
-previniendo ejecución cuando no hay empleados activos.
+SP_ANIVERSARIOS_MES
+Lista los empleados activos que cumplen aniversario de ingreso en el mes
+actual, con los anos que llevan en la empresa. Si no hay empleados activos
+manda error y si nadie cumple este mes avisa con un mensaje.
 */
 drop PROCEDURE if EXISTS SP_ANIVERSARIOS_MES;
 CREATE PROCEDURE SP_ANIVERSARIOS_MES()
@@ -506,6 +478,12 @@ DELIMITER ;
 
 ---8. BUSCAR ENPLEADO
 DELIMITER //
+/*
+SP_BUSQUEDA_RAPIDA_EMPLEADOS
+Busqueda rapida de empleados por un solo termino: coincide con ID,
+cedula, nombre o cargo. El termino es obligatorio; si no se encuentra
+nada no devuelve filas y los activos salen primero.
+*/
 DROP PROCEDURE IF EXISTS SP_BUSQUEDA_RAPIDA_EMPLEADOS;
 CREATE PROCEDURE SP_BUSQUEDA_RAPIDA_EMPLEADOS(
     IN P_TERMINO VARCHAR(100)
@@ -545,6 +523,12 @@ DELIMITER ;
 
 ---9. VOLANTE DE PAGO
 DELIMITER //
+/*
+SP_GENERAR_RECIBO_EMPLEADO
+Genera el volante de pago de un empleado activo: sueldo bruto, los
+descuentos de SFS y AFP y el sueldo neto con la fecha de emision.
+Si el ID no existe o el empleado no esta activo manda un error.
+*/
 drop PROCEDURE IF EXISTS  SP_GENERAR_RECIBO_EMPLEADO ;
 CREATE PROCEDURE SP_GENERAR_RECIBO_EMPLEADO  (
     IN P_ID_EMPLEADO INT
@@ -594,6 +578,11 @@ DELIMITER ;
 
 
 DELIMITER //
+/*
+TRG_CARGO_UPPER
+Se dispara antes de insertar un empleado y deja el cargo en mayusculas,
+asi los nombres de cargo se guardan siempre igual. Trabaja en automatico.
+*/
 DROP TRIGGER IF EXISTS TRG_CARGO_UPPER;
 CREATE TRIGGER TRG_CARGO_UPPER BEFORE INSERT ON EMPLEADOS
 FOR EACH ROW
@@ -601,6 +590,11 @@ BEGIN
     SET NEW.CARGO = UPPER(NEW.CARGO);
 END;
 
+/*
+TRG_CARGO_UPPER_UPDATE
+Se dispara antes de actualizar un empleado y deja el cargo nuevo en
+mayusculas, igual que en la insercion. Trabaja en automatico.
+*/
 CREATE TRIGGER TRG_CARGO_UPPER_UPDATE BEFORE UPDATE ON EMPLEADOS
 FOR EACH ROW
 BEGIN

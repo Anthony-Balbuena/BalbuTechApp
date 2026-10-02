@@ -1,0 +1,74 @@
+CONTEXTO DE DOCUMENTACION - TABLA RECLAMOS_GARANTIAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/27- RECLAMOS_GARANTIAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 27- RECLAMOS_GARANTIAS.sql (5 bloques)
+================================================================================
+TABLA
+  - RECLAMOS_GARANTIAS .... reclamos sobre una garantia con descripcion
+                             y estado
+
+INDICE (1)
+  - IX_RECLAMO_GARANTIA_FECHA .. reclamos por fecha
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - 27_SP_REGISTRAR_RECLAMO_GARANTIA .. registra reclamo solo si la
+                                         garantia esta ACTIVA
+  - 27_SP_FINALIZAR_RECLAMO_TOTAL ..... cierra reclamo en transaccion
+                                          con auditoria
+
+TRIGGER (1)
+  - TR_FINALIZAR_RECLAMO_APROBADO .. al aprobar reclamo, cancela la
+                                      garantia
+
+VISTAS (0)
+  - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * 27_SP_FINALIZAR_RECLAMO_TOTAL esta declarado dentro de la seccion
+    [TRIGERR}, despues del trigger.
+  * La linea 54 "USE BALBU_TECH;" se conservo tal cual.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT, START TRANSACTION
+  ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 14 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~10 archivos con indices sin documentar.
+- ~60 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/27- RECLAMOS_GARANTIAS.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

@@ -1,13 +1,7 @@
 /*
-ESTRUCTURA DE LA TABLA METODOS_PAGO
-
-Esta tabla contiene los métodos de pago disponibles en el sistema.
-
-- ID_METODO_PAGO: identificador único autoincremental.
-- NOMBRE: nombre del método (único), por ejemplo 'EFECTIVO', 'TARJETA'.
-
-Restricciones:
-- `NOMBRE` es obligatorio y no puede ser una cadena vacía (validación CHECK).
+TABLA METODOS_PAGO
+Contiene los métodos de pago disponibles en el sistema (EFECTIVO,
+TARJETA, TRANSFERENCIA, etc). El nombre es unico y no puede quedar vacio.
 La tabla usa InnoDB para transacciones y restricciones.
 */
 CREATE TABLE METODOS_PAGO (
@@ -23,16 +17,10 @@ CREATE TABLE METODOS_PAGO (
 
 -- 1. INSERTAR 
 /*
-DESCRIPCION DE SP_INSERTAR_METODO_PAGO
-
-Inserta un nuevo método de pago.
-
-- Parámetros:
-  - P_NOMBRE: nombre del método de pago.
-
-Comportamiento:
-- Normaliza y valida el nombre; evita duplicados.
-- Inserta y retorna un mensaje con el ID.
+SP_INSERTAR_METODO_PAGO
+Agrega un metodo de pago nuevo.
+Normaliza el nombre, valida que no este vacio ni repetido y si todo esta
+bien lo guarda y devuelve un mensaje con el ID.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_METODO_PAGO;
@@ -68,16 +56,10 @@ DELIMITER ;
 
 -- 2. ACTUALIZAR 
 /*
-DESCRIPCION DE SP_ACTUALIZAR_METODO_PAGO
-
-Actualiza el nombre de un método de pago existente.
-
-- Parámetros:
-  - P_ID_METODO: id del método a actualizar.
-  - P_NOMBRE: nuevo nombre.
-
-Comportamiento:
-- Valida existencia y evita duplicados; actualiza y retorna mensaje.
+SP_ACTUALIZAR_METODO_PAGO
+Cambia el nombre de un metodo de pago existente.
+Verifica que el metodo exista y que el nuevo nombre no este repetido, y si
+todo esta bien lo actualiza y confirma con un mensaje.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_METODO_PAGO;
@@ -112,9 +94,9 @@ DELIMITER ;
 
 --LISTAR 
 /*
-DESCRIPCION DE SP_LISTAR_METODOS_PAGO
-
-Retorna el listado de métodos de pago ordenados por nombre.
+SP_LISTAR_METODOS_PAGO
+Devuelve todos los metodos de pago ordenados por nombre.
+Sirve para llenar los selects de la caja.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LISTAR_METODOS_PAGO;
@@ -126,12 +108,9 @@ DELIMITER ;
 
 --BUSCAR
 /*
-DESCRIPCION DE SP_BUSCAR_METODOS_PAGO
-
-Busca métodos por nombre parcial; si `P_BUSQUEDA` es NULL o vacío, devuelve todos.
-
-- Parámetros:
-  - P_BUSQUEDA: texto para buscar en `NOMBRE`.
+SP_BUSCAR_METODOS_PAGO
+Busca metodos de pago por nombre parcial.
+Si la busqueda viene vacia o nula, devuelve todos ordenados por ID.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS  SP_BUSCAR_METODOS_PAGO ;
@@ -155,12 +134,10 @@ DELIMITER ;
 DELIMITER //
 
 /*
-DESCRIPCION DE SP_TOGGLE_ESTADO_METODO_PAGO
-
-Realiza toggle del estado de un método de pago (ACTIVO <-> INACTIVO).
-
-- Parámetros:
-  - P_ID_METODO: id del método a alternar.
+SP_TOGGLE_ESTADO_METODO_PAGO
+Activa o desactiva un metodo de pago.
+Verifica que exista, le da la vuelta al estado y confirma con un mensaje
+que trae el nombre y el nuevo estado.
 */
 CREATE PROCEDURE SP_TOGGLE_ESTADO_METODO_PAGO(
     IN P_ID_METODO INT

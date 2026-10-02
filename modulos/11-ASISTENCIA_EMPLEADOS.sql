@@ -1,24 +1,9 @@
 /*
-ESTRUCTURA DE LA TABLA ASISTENCIA_EMPLEADOS
-
-Esta tabla almacena la asistencia diaria de los empleados.
-
-- ID_ASISTENCIA: identificador único y autoincremental de cada registro.
-- ID_EMPLEADO: empleado al que pertenece la asistencia.
-- FECHA: día en que se registra la asistencia.
-- HORA_ENTRADA: hora de entrada del empleado.
-- HORA_SALIDA: hora de salida; puede quedar NULL mientras no se registre.
-- HORAS_TRABAJADAS: columna calculada automáticamente con la diferencia entre
-    la hora de entrada y la hora de salida, expresada en horas decimales.
-- ESTADO: estado de la asistencia: PRESENTE, AUSENTE, TARDE o PERMISO.
-- OBSERVACION: comentario o justificación de hasta 200 caracteres.
-
-Restricciones:
-- La clave primaria identifica cada asistencia.
-- Un empleado solo puede tener un registro por fecha.
-- ID_EMPLEADO debe existir previamente en la tabla EMPLEADOS.
-
-La tabla utiliza InnoDB para permitir claves foráneas y transacciones.
+TABLA ASISTENCIA_EMPLEADOS
+Guarda la asistencia diaria de cada empleado: fecha, hora de entrada, hora
+de salida y las horas trabajadas (que se calculan solas al cerrar el dia).
+Un empleado solo puede tener un registro por dia y el estado sale como
+PRESENTE, AUSENTE, TARDE o PERMISO.
 */
 CREATE TABLE ASISTENCIA_EMPLEADOS (
     ID_ASISTENCIA INT NOT NULL AUTO_INCREMENT,
@@ -78,16 +63,10 @@ CREATE INDEX IX_ASISTENCIA_ESTADO ON ASISTENCIA_EMPLEADOS (ESTADO);
 ---ENTRADE DE EMPLEADO 
 
 /*
-DESCRIPCION DE SP_REGISTRAR_ASISTENCIA
-
-Registra la entrada o salida de un empleado mediante los siguientes parametros:
-- P_ID_EMPLEADO: identificador del empleado.
-- P_TIPO_MOVIMIENTO: tipo de movimiento, ENTRADA o SALIDA.
-
-Antes de registrar la asistencia, valida que el empleado no tenga un permiso
-aprobado ni se encuentre en vacaciones durante el dia actual. Si supera ambas
-validaciones, guarda la fecha y hora actuales y muestra un mensaje de exito.
-Si alguna validacion falla, detiene la operacion y muestra un mensaje de error.
+SP_REGISTRAR_ASISTENCIA
+Registra la entrada o la salida del empleado con la fecha y hora actuales.
+Antes revisa que el empleado no tenga vacaciones ni un permiso aprobado
+para hoy; si tiene alguno de los dos no deja registrar y manda error.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_REGISTRAR_ASISTENCIA ;
@@ -130,14 +109,10 @@ DELIMITER ;
 ---Salida
 
 /*
-DESCRIPCION DE SP_REGISTRAR_SALIDA
-
-Registra la hora de salida del empleado indicado.
-- P_ID_EMPLEADO: identificador del empleado.
-
-El procedimiento actualiza HORA_SALIDA con la hora actual del servidor y solo
-modifica el registro de asistencia correspondiente al empleado y a la fecha
-actual.
+11_SP_REGISTRAR_SALIDA
+Cierra la jornada del empleado: le pone la hora de salida actual al
+registro de asistencia de hoy. Si el empleado hoy no tiene registro, no
+se modifica nada.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_REGISTRAR_SALIDA;
@@ -156,17 +131,10 @@ DELIMITER ;
 ---TARDANZA JUSTIFICADA 
 
 /*
-DESCRIPCION DE SP_JUSTIFICAR_ASISTENCIA
-
-Permite justificar o modificar el estado de la asistencia de un empleado.
-- P_ID_EMPLEADO: identificador del empleado.
-- P_FECHA: fecha del registro que se desea justificar.
-- P_NUEVO_ESTADO: nuevo estado de la asistencia.
-- P_JUSTIFICACION: motivo de la justificacion, con un maximo de 200 caracteres.
-
-Primero verifica que exista un registro para el empleado y la fecha indicada.
-Si existe, actualiza el estado y guarda la justificacion en OBSERVACION.
-Finalmente devuelve un mensaje confirmando la operacion.
+11_SP_JUSTIFICAR_ASISTENCIA
+Justifica o corrige la asistencia de un empleado en una fecha: cambia el
+estado (PRESENTE, AUSENTE, TARDE o PERMISO) y guarda el motivo en la
+observacion. Si para ese dia no hay registro, manda error.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_JUSTIFICAR_ASISTENCIA ;
@@ -198,16 +166,10 @@ DELIMITER ;
 ---REPORTE DE AISTENCIA POR EMPLEADO 
 
 /*
-DESCRIPCION DE SP_REPORTE_ASISTENCIA_INDIVIDUAL
-
-Genera el reporte de asistencia de un empleado durante un periodo determinado.
-- P_ID_EMPLEADO: identificador del empleado.
-- P_FECHA_INICIO: fecha inicial del periodo que se desea consultar.
-- P_FECHA_FIN: fecha final del periodo que se desea consultar.
-
-Devuelve la fecha, las horas de entrada y salida, las horas trabajadas y el
-estado de cada asistencia encontrada. Los resultados se muestran desde la
-fecha mas reciente hasta la mas antigua.
+11_SP_REPORTE_ASISTENCIA_INDIVIDUAL
+Reporte de asistencia de un empleado en un periodo: fecha, entradas,
+salidas, horas trabajadas y estado de cada dia, del dia mas reciente al
+mas antiguo.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL ;
@@ -234,16 +196,10 @@ DELIMITER ;
 ---BLOQUEAR
 
 /*
-DESCRIPCION DE SP_BLOQUEAR_EDICION_ANTIGUA
-
-Controla si se permite editar la asistencia de un empleado en una fecha
-determinada.
-- P_ID_EMPLEADO: identificador del empleado.
-- P_FECHA: fecha del registro que se desea editar.
-
-Si la fecha tiene mas de siete dias de antiguedad, bloquea la operacion y
-devuelve un mensaje de error mediante SIGNAL. Si la fecha esta dentro del
-periodo permitido, devuelve el mensaje ACCESO PERMITIDO.
+11_SP_BLOQUEAR_EDICION_ANTIGUA
+Control de seguridad para editar asistencia: si la fecha tiene mas de siete
+dias de antiguedad bloquea la operacion con un error; si esta dentro del
+periodo permitido responde ACCESO PERMITIDO.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_BLOQUEAR_EDICION_ANTIGUA //
@@ -270,15 +226,10 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------
 
 /*
-DESCRIPCION DE TR_BLOQUEAR_ASISTENCIA_INAPROPIADA
-
-Trigger que se ejecuta automaticamente antes de insertar un registro en
-ASISTENCIA_EMPLEADOS.
-
-Verifica si el empleado esta de vacaciones o tiene un permiso aprobado vigente
-para la fecha actual. Si alguna condicion se cumple, bloquea la insercion con
-SIGNAL y muestra un mensaje de error. Si no se cumple ninguna condicion, permite
-que el registro se inserte normalmente.
+TR_BLOQUEAR_ASISTENCIA_INAPROPIADA
+Antes de insertar una asistencia revisa que el empleado no este de
+vacaciones ni con permiso aprobado para hoy; si esta en una de esas dos
+situaciones bloquea el registro con un error. Trabaja en automatico.
 */
 
 

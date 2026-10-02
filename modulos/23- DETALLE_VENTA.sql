@@ -1,3 +1,9 @@
+/*
+TABLA DETALLES_VENTA
+Guarda que productos forman parte de cada venta, con su cantidad y precio.
+El subtotal se calcula solo al multiplicar cantidad por precio.
+No se puede repetir el mismo producto dentro de la misma venta.
+*/
 CREATE TABLE DETALLES_VENTA (
     ID_DETALLE_VENTA INT NOT NULL AUTO_INCREMENT,
     ID_VENTA INT NOT NULL,
@@ -11,8 +17,16 @@ CREATE TABLE DETALLES_VENTA (
     CONSTRAINT FK_DETALLE_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO)
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_CLIENTE_NOMBRE
+Busca clientes por su nombre, util para localizarlos rapido en el sistema.
+*/
 CREATE INDEX IX_CLIENTE_NOMBRE ON CLIENTES (NOMBRE);
 
+/*
+INDICE IX_VENTAS_FECHA
+Ordena las ventas por fecha, util para reportes por dia, mes o cierre de caja.
+*/
 CREATE INDEX IX_VENTAS_FECHA ON VENTAS (FECHA);
 
 
@@ -23,6 +37,12 @@ CREATE INDEX IX_VENTAS_FECHA ON VENTAS (FECHA);
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS 23_SP_AGREGAR_DETALLE_VENTA ;
+/*
+23_SP_AGREGAR_DETALLE_VENTA
+Agrega un producto a una venta validando todo antes de guardar.
+Revisa que la venta exista, que el empleado sea el dueño de la venta y que
+haya stock suficiente; luego toma el precio actual y agrega la linea.
+*/
 CREATE PROCEDURE 23_SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_VENTA INT,
     IN P_ID_PRODUCTO INT,
@@ -73,6 +93,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_AGREGAR_DETALLE_VENTA ;
+/*
+SP_AGREGAR_DETALLE_VENTA
+Version corta de agregar producto a la venta, sin validar el empleado.
+Revisa que haya stock, toma el precio actual y agrega la linea del detalle.
+*/
 CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_VENTA INT,
     IN P_ID_PRODUCTO INT,
@@ -105,6 +130,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_ACTUALIZAR_TOTAL_VENTA ;
+/*
+TR_ACTUALIZAR_TOTAL_VENTA
+Le va sumando el subtotal de cada producto al TOTAL de la venta.
+Asi el total queda actualizado sin calcularlo a mano.
+*/
 CREATE TRIGGER TR_ACTUALIZAR_TOTAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
@@ -120,6 +150,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_VENTA_FINALIZADA ;
+/*
+TR_BLOQUEAR_VENTA_FINALIZADA
+No deja agregar productos a una venta que ya esta realizada.
+Si alguien lo intenta, corta la operacion con un mensaje de error.
+*/
 CREATE TRIGGER TR_BLOQUEAR_VENTA_FINALIZADA
 BEFORE INSERT ON DETALLES_VENTA
 FOR EACH ROW

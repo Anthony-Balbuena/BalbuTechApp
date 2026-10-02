@@ -1,0 +1,65 @@
+CONTEXTO DE DOCUMENTACION - TABLA LOG_USUARIOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/29- LOG_USUARIOS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 29- LOG_USUARIOS.sql (4 bloques)
+================================================================================
+TABLA
+  - LOG_USUARIOS .......... bitacora de cambios de usuarios (rol, estado,
+                             usuario) con valor anterior y nuevo
+
+PROCEDIMIENTO ALMACENADO (1)
+  - SP_OBTENER_LOG_USUARIOS .. trae los ultimos 100 cambios desde la vista
+
+TRIGGER (1)
+  - TRG_AUDITORIA_USUARIOS .. registra cambios de rol y estado en la bitacora
+
+VISTA (1)
+  - VIEW_HISTORIAL_CAMBIOS_USUARIOS .. cambios con el nombre del usuario
+
+INDICES (0), FUNCIONES (0)
+  - El archivo no tiene CREATE INDEX; la seccion [FUNTION} esta vacia.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los comentarios originales "-- Active:", "-- 'CAMBIO_ROL'..."
+  y "-- Aqui estaba el error" de la vista.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT, DESCRIBE ni ninguna
+  sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 12 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~10 archivos con indices sin documentar.
+- ~56 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/29- LOG_USUARIOS.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

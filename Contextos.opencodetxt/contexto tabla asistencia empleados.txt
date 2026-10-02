@@ -1,0 +1,54 @@
+CONTEXTO DE DOCUMENTACION - TABLA ASISTENCIA_EMPLEADOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/11-ASISTENCIA_EMPLEADOS.sql
+LOTE C (archivos 9 a 12) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo: "ESTRUCTURA DE LA TABLA..." y "DESCRIPCION DE SP..." con
+listados de parametros y de columnas.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 11-ASISTENCIA_EMPLEADOS.sql (10 bloques)
+================================================================================
+TABLA
+  - ASISTENCIA_EMPLEADOS .... asistencia diaria (entrada/salida, horas
+    trabajadas calculadas, un registro por empleado por dia)
+
+INDICES (3) - ya estaban en el estilo nuevo, NO se tocaron:
+  - IX_ASISTENCIA_FECHA ..... busquedas por fecha
+  - IX_ASISTENCIA_EMPLEADO .. historial por empleado
+  - IX_ASISTENCIA_ESTADO .... reportes por estado
+
+PROCEDIMIENTOS ALMACENADOS (5)
+  - SP_REGISTRAR_ASISTENCIA ....... entrada/salida validando permisos
+  - 11_SP_REGISTRAR_SALIDA ....... cierra la jornada
+  - 11_SP_JUSTIFICAR_ASISTENCIA .. justifica o corrige un dia
+  - 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL . reporte por periodo
+  - 11_SP_BLOQUEAR_EDICION_ANTIGUA . no editar mas de 7 dias atras
+
+TRIGGER (1)
+  - TR_BLOQUEAR_ASISTENCIA_INAPROPIADA . bloquea registro si hay
+    vacaciones o permiso aprobado
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Los 3 bloques de indices ya estaban en el estilo objetivo (4 lineas sin
+  parametros): se conservaron tal cual.
+- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 10 objetos CREATE / 10 bloques con bloque previo.
+- /* balanceados: 10/10.
+- Estilo viejo restante: 0.
+- SQL identico al original al quitar los comentarios (sin diferencias).

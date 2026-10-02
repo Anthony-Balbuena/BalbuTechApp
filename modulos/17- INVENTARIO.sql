@@ -1,4 +1,11 @@
 
+/*
+TABLA INVENTARIO
+Guarda cuanto stock tiene cada producto y en que parte de la tienda.
+Cada fila es un producto: su cantidad actual, el minimo que debe haber
+y el lugar donde esta guardado. Si el stock baja del minimo, el sistema
+avisa automaticamente. Solo puede haber un registro por producto.
+*/
 
 CREATE TABLE INVENTARIO (
     ID_INVENTARIO INT NOT NULL AUTO_INCREMENT, 
@@ -12,6 +19,11 @@ CREATE TABLE INVENTARIO (
     CONSTRAINT FK_INVENTARIO_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_INVENTARIO_FECHA
+Sirve para ordenar y buscar el inventario por su ultima fecha de cambio,
+asi los reportes salen rapidos sin recorrer toda la tabla.
+*/
 CREATE INDEX IX_INVENTARIO_FECHA ON INVENTARIO (FECHA_ACTUALIZACION);
 
 
@@ -26,6 +38,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_INSERTAR_INVENTARIO;
 
+/*
+SP_INSERTAR_INVENTARIO
+Da de alta un producto en el inventario con stock en 0.
+Antes de insertar revisa que el producto exista y que no este ya registrado;
+si algo esta mal, devuelve un error y no guarda nada.
+*/
 CREATE PROCEDURE SP_INSERTAR_INVENTARIO(
     IN P_ID_PRODUCTO INT,
     IN P_STOCK_MINIMO INT,
@@ -72,6 +90,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS 17_SP_INCREMENTAR_STOCK ;
 
+/*
+17_SP_INCREMENTAR_STOCK
+Suma unidades al stock cuando llega mercancia nueva.
+Valida que la cantidad sea mayor a cero y que el producto este en inventario,
+luego aumenta el stock y anota el movimiento en el log de entradas.
+*/
 CREATE PROCEDURE 17_SP_INCREMENTAR_STOCK(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD_ENTRADA INT,
@@ -111,6 +135,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_RECIBIR_MERCANCIA;
 
+/*
+SP_RECIBIR_MERCANCIA
+Recibe mercancia de un producto y la refleja en el stock.
+Si el producto aun no tiene registro en inventario, lo crea primero en el
+ALMACEN_PRINCIPAL y enseguida le suma la cantidad recibida.
+*/
 CREATE PROCEDURE SP_RECIBIR_MERCANCIA(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD INT
@@ -132,6 +162,13 @@ DELIMITER ;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_AJUSTE_INVENTARIO;
+
+/*
+SP_AJUSTE_INVENTARIO
+Corrige el stock a mano por un motivo (faltante, sobrante, error de conteo).
+Suma si la cantidad es positiva y resta si es negativa; el historial lo
+guarda solo el trigger, sin tener que escribir nada extra.
+*/
 CREATE PROCEDURE SP_AJUSTE_INVENTARIO(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD_AJUSTE INT, -- Positivo para sumar, negativo para restar
@@ -156,6 +193,11 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 
 DELIMITER //
+/*
+17_TR_VALIDAR_STOCK_MINIMO
+Cada vez que cambia el stock, revisa si quedo en o bajo el minimo.
+Si es asi, escribe una alerta en LOG_USUARIOS para que alguien compre mas.
+*/
 CREATE TRIGGER 17_TR_VALIDAR_STOCK_MINIMO
 AFTER UPDATE ON INVENTARIO
 FOR EACH ROW
@@ -175,6 +217,12 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS 17_TR_REGISTRAR_HISTORIAL_INVENTARIO ;
 
+/*
+17_TR_REGISTRAR_HISTORIAL_INVENTARIO
+Vigila cada cambio de stock y lo anota en HISTORIAL_MOVIMIENTOS_PRODUCTO.
+Guarda cuanto habia antes, cuanto hay ahora y si fue entrada o salida,
+asi siempre se puede rastrear quien movio que y cuando.
+*/
 CREATE TRIGGER 17_TR_REGISTRAR_HISTORIAL_INVENTARIO
 AFTER UPDATE ON INVENTARIO
 FOR EACH ROW
@@ -203,6 +251,11 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------------------------------- 
 
 
+/*
+VISTA_PRODUCTOS_CRITICOS
+Lista los productos que se estan quedando sin stock.
+Muestra el nombre, lo que queda, lo minimo y cuanto falta para llegar al minimo.
+*/
 CREATE OR REPLACE VIEW VISTA_PRODUCTOS_CRITICOS AS
 SELECT 
     I.ID_PRODUCTO,
@@ -219,6 +272,11 @@ WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO;
 
 
 
+/*
+VISTA_VALOR_PRODUCTOS
+Muestra cuanta dinero representa cada producto en bodega.
+Multiplica el stock por su precio de compra y ordena de mayor a menor valor.
+*/
 CREATE OR REPLACE VIEW VISTA_VALOR_PRODUCTOS AS
 SELECT 
     P.NOMBRE,
@@ -238,6 +296,11 @@ ORDER BY VALOR_TOTAL_ITEM DESC;
 
 DELIMITER //
 
+/*
+FN_VALOR_TOTAL_INVENTARIO
+Suma el valor de todo el inventario: stock multiplicado por precio de compra.
+Se usa en reportes para saber cuanto dinero hay en bodega; devuelve 0 si no hay nada.
+*/
 CREATE FUNCTION FN_VALOR_TOTAL_INVENTARIO() 
 RETURNS DECIMAL(15,2)
 DETERMINISTIC

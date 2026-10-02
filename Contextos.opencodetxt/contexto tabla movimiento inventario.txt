@@ -1,0 +1,74 @@
+CONTEXTO DE DOCUMENTACION - TABLA MOVIMIENTOS_INVENTARIO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/20- MOVIMIENTOS_INVENTARIO.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 20- MOVIMIENTOS_INVENTARIO.sql (6 bloques)
+================================================================================
+TABLA
+  - MOVIMIENTOS_INVENTARIO . bitacora de entradas, salidas, ajustes y
+                              devoluciones de stock
+
+INDICES (2)
+  - IX_MOVIMIENTO_PRODUCTO .. movimientos de un producto en concreto
+  - IX_CANTIDAD_MOVIINVENTORIO .. busqueda de movimientos por cantidad
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 20_SP_REGISTRAR_AJUSTE_INVENTARIO .. registra el movimiento y
+                                          suma/resta stock segun el tipo
+
+TRIGGERS (2)
+  - TR_AUDITORIA_MOVIMIENTO_COMPRA .. anota la ENTRADA al comprar
+  - TR_AUDITORIA_MOVIMIENTO_VENTA ... descuenta stock y anota la SALIDA
+
+VISTAS (0)
+  - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservo el comentario original "-- Tu indice para rastrear que paso con
+  cada producto" y el "-- <--- AQUI ESTABA EL ERROR" de la linea 89.
+- Secciones [VIEW} (linea 119) y [FUNTION} (linea 124) vacias: no se invento
+  ningun objeto.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * Linea 119: una "V" suelta antes del separador de seccion [VIEW}.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 26 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~19 archivos con CREATE INDEX sin documentar (~43 indices en total).
+- ~84 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/20- MOVIMIENTOS_INVENTARIO.sql" -> solo debe mostrar
+  lineas agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

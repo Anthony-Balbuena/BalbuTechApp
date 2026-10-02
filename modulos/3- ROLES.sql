@@ -1,26 +1,18 @@
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 /*
-DESCRIPCION DEL MODULO ROLES
-
-Este módulo contiene la definición de la tabla `ROLES` y procedimientos
-relacionados para gestionar los roles del sistema (crear, actualizar,
-buscar y listar).
-
 TABLA ROLES
-- ID_ROL: identificador único autoincremental.
-- NOMBRE_ROL: nombre del rol (único), usado para permisos y asignaciones.
-
-Restricciones:
-- La tabla utiliza InnoDB para permitir transacciones y claves foráneas.
+Lista los roles del sistema (ADMIN, GERENTE, VENDEDOR, etc) que despues
+se asignan a los usuarios. El nombre del rol tiene que ser unico.
+La tabla usa InnoDB para permitir transacciones y claves foraneas.
 */
 CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
 ) ENGINE = InnoDB; 
 /*
-DESCRIPCION DEL INDICE IX_ROLES_NOMBRE
-
-Índice no único sobre `NOMBRE_ROL` que acelera búsquedas y listados.
+INDICE IX_ROLES_NOMBRE
+Indice no unico sobre NOMBRE_ROL que acelera las busquedas y listados
+de roles por su nombre.
 */
 CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
 
@@ -32,17 +24,10 @@ SELECT * FROM ROLES;
 
 --INSERTAR
 /*
-DESCRIPCION DE SP_INSERTAR_ROL
-
-Inserta un nuevo rol en la tabla `ROLES`.
-
-- Parámetros:
-  - P_NOMBRE_ROL: nombre del rol a insertar.
-
-Comportamiento:
-- Normaliza espacios y comprueba que el nombre no sea vacío.
-- Verifica duplicados; si existe, lanza un error.
-- Inserta la nueva fila y devuelve un mensaje con el ID.
+SP_INSERTAR_ROL
+Crea un rol nuevo en el sistema.
+Limpia el nombre, valida que no este vacio ni repetido y si todo esta bien
+lo guarda y devuelve un mensaje con el ID.
 */
 DELIMITER//
 
@@ -77,16 +62,10 @@ DELIMITER ;
 
 --ACTUALIZAR 
 /*
-DESCRIPCION DE SP_ACTUALIZAR_ROL
-
-Actualiza el nombre de un rol existente.
-
-- Parámetros:
-    - P_ID_ROL: id del rol a actualizar.
-    - P_NOMBRE_ROL: nuevo nombre del rol.
-
-Comportamiento:
-- Verifica existencia y evita duplicados. Retorna mensaje de éxito.
+SP_ACTUALIZAR_ROL
+Cambia el nombre de un rol existente.
+Verifica que el rol exista y que el nuevo nombre no este repetido, y si
+todo esta bien lo actualiza y confirma con un mensaje.
 */
 DELIMITER //
  DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_ROL ;
@@ -124,12 +103,9 @@ DELIMITER ;
 
 --BUSCAR 
 /*
-DESCRIPCION DE SP_BUSCAR_ROLES
-
-Busca roles por nombre parcial. Si `P_BUSQUEDA` es NULL o vacío, devuelve todos.
-
-- Parámetros:
-  - P_BUSQUEDA: texto para buscar en `NOMBRE_ROL`.
+SP_BUSCAR_ROLES
+Busca roles por nombre parcial.
+Si la busqueda viene vacia o nula, devuelve todos los roles.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_BUSCAR_ROLES ; 
@@ -145,9 +121,9 @@ DELIMITER ;
 
 --LISTAR ROLES
 /*
-DESCRIPCION DE SP_LISTAR_ROLES
-
-Retorna la lista de roles con su id y nombre, ordenada alfabéticamente.
+SP_LISTAR_ROLES
+Devuelve todos los roles con su ID y nombre, ordenados alfabeticamente.
+Sirve para llenar los menu y selects del sistema.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS  SP_LISTAR_ROLES ;

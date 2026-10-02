@@ -1,3 +1,8 @@
+/*
+TABLA PAGOS
+Guarda cada pago que se recibe por una venta: cuanto, cuando y con que
+metodo de pago. Puede haber varios pagos por venta (parciales o completos).
+*/
 CREATE TABLE PAGOS (
     ID_PAGO INT NOT NULL AUTO_INCREMENT,
     ID_VENTA INT NOT NULL,
@@ -9,6 +14,11 @@ CREATE TABLE PAGOS (
     CONSTRAINT FK_PAGO_METODO FOREIGN KEY (ID_METODO_PAGO) REFERENCES METODOS_PAGO (ID_METODO_PAGO)
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_PAGOS_FECHA
+Busca y ordena los pagos por fecha, util para los reportes de caja
+y el cierre del dia.
+*/
 CREATE INDEX IX_PAGOS_FECHA ON PAGOS (FECHA);
 
 
@@ -18,6 +28,12 @@ CREATE INDEX IX_PAGOS_FECHA ON PAGOS (FECHA);
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 24_SP_REGISTRAR_PAGO;
+/*
+24_SP_REGISTRAR_PAGO
+Registra un pago de una venta con su metodo de pago.
+Revisa que la venta exista, guarda el pago y devuelve un mensaje
+confirmando el monto con el nombre del empleado que lo proceso.
+*/
 CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
     IN P_ID_VENTA INT,
     IN P_ID_METODO_PAGO INT,
@@ -64,6 +80,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_VALIDAR_MONTO_PAGO ;
+/*
+TR_VALIDAR_MONTO_PAGO
+No deja que se pague mas de lo que vale la venta.
+Antes de guardar, suma lo ya pagado y corta con error si se pasa del total.
+*/
 CREATE TRIGGER TR_VALIDAR_MONTO_PAGO
 BEFORE INSERT ON PAGOS
 FOR EACH ROW
@@ -84,6 +105,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_AUTO_FINALIZAR_VENTA;
+/*
+TR_AUTO_FINALIZAR_VENTA
+Cuando entra un pago, revisa si ya se cubrio el total de la venta.
+Si ya se pago todo, cambia el estado de la venta a REALIZADA sola.
+*/
 CREATE TRIGGER TR_AUTO_FINALIZAR_VENTA
 AFTER INSERT ON PAGOS
 FOR EACH ROW
@@ -110,6 +136,11 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
+/*
+VISTA_RESUMEN_PAGOS
+Muestra los pagos con el nombre de su metodo de pago, monto y fecha.
+Sirve como resumen de cobros para revisar en pantalla o en reportes.
+*/
 CREATE OR REPLACE VIEW VISTA_RESUMEN_PAGOS AS
 SELECT 
     P.ID_PAGO,

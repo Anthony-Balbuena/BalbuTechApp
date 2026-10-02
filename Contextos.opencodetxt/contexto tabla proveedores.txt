@@ -1,0 +1,62 @@
+CONTEXTO DE DOCUMENTACION - TABLA PROVEEDORES
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/5- PROVEEDORES.sql
+LOTE B (archivos 5 a 8) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Reglas aplicadas (iguales que en Lote A):
+- Se ELIMINO el texto viejo y se puso el bloque nuevo.
+- Se CONSERVARON: separadores ----[Store procedure}----, comentarios cortos
+  ("--1. INSERTAR", "-- Para buscar...") y todo el SQL.
+- El SQL operativo NO se modifico: solo cambiaron comentarios.
+
+================================================================================
+2. ESTILO VIEJO ENCONTRADO EN ESTE LOTE (distinto al de los archivos 1-4)
+================================================================================
+Los archivos 5-10 usan otro formato antiguo:
+- Bloque "MODULO: X — Descripcion general" con listado de campos.
+- Bloque "SECCION: PROCEDIMIENTOS ALMACENADOS" (encabezado de seccion).
+- Bloques "SP: NOMBRE / Proposito: / Parametros: ... Comportamiento:".
+En los archivos 1-4 era "DESCRIPCION DEL MODULO / DESCRIPCION DE SP".
+Ambos se sustituyen por el mismo estilo nuevo.
+
+================================================================================
+3. OBJETOS DOCUMENTADOS EN 5- PROVEEDORES.sql (7 bloques)
+================================================================================
+TABLA
+  - PROVEEDORES ............ proveedores (telefono y email unicos)
+
+INDICES (2)
+  - IX_PROVEEDOR_NOMBRE .... busquedas por nombre con LIKE
+  - IX_PROVEEDOR_ESTADO .... filtros por ACTIVO/INACTIVO
+
+PROCEDIMIENTOS ALMACENADOS (4)
+  - SP_INSERTAR_PROVEEDOR ....... da de alta validando duplicados
+  - SP_ACTUALIZAR_PROVEEDOR ..... actualizacion parcial con COALESCE
+  - SP_TOGGLE_ESTADO_PROVEEDOR .. activa o desactiva
+  - SP_LISTAR_PROVEEDORES ....... lista con filtro opcional
+
+================================================================================
+4. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se ELIMINO el bloque "SECCION: PROCEDIMIENTOS ALMACENADOS" (encabezado
+  general sin objeto asociado): el estilo nuevo no usa ese tipo de bloques.
+- Quedaron 7 bloques = 7 objetos (1 tabla + 2 indices + 4 SPs).
+- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
+
+================================================================================
+5. VERIFICACION
+================================================================================
+- 7 objetos CREATE / 7 bloques con bloque previo.
+- /* balanceados: 7 / 7.
+- Estilo viejo restante: 0.
+- SQL identico al original al quitar los comentarios (solo difiere una
+  linea en blanco por el bloque de seccion eliminado).

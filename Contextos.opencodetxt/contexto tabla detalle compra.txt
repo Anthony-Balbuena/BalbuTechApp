@@ -1,0 +1,73 @@
+CONTEXTO DE DOCUMENTACION - TABLA DETALLE_COMPRA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/22-DETALLE_COMPRA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 22-DETALLE_COMPRA.sql (8 bloques)
+================================================================================
+TABLA
+  - DETALLE_COMPRA ........ productos de cada compra con cantidad y precio
+
+INDICES (3)
+  - IX_COMPRA_PROVEEDOR .... compras por proveedor (creado sobre COMPRAS)
+  - IX_DETALLE_COMPRA_COMPRA .... productos de una factura de compra
+  - IX_DETALLE_COMPRA_PRODUCTO .. historial de precios de un producto
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 22_SP_AGREGAR_DETALLE_COMPRA .. agrega producto validando todo antes
+                                     de guardar
+
+TRIGGERS (2)
+  - TR_CALCULAR_TOTAL_COMPRA .. suma subtotales al TOTAL de la compra
+  - TR_PROCESAR_COMPRA ........ suma stock y registra la ENTRADA
+
+VISTA (1)
+  - VISTA_DETALLE_COMPRA .... productos de la compra con nombre y subtotal
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los comentarios originales "-- 1.", "-- 2." y "-- 3." de los
+  indices; solo se agregaron bloques.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * El indice IX_COMPRA_PROVEEDOR esta definido sobre la tabla COMPRAS.
+  * TR_CALCULAR_TOTAL_COMPRA esta duplicada: tambien existe en 19- COMPRAS.sql.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 19 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~15 archivos con indices sin documentar.
+- ~69 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/22-DETALLE_COMPRA.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

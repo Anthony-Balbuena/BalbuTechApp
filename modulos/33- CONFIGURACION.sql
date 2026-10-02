@@ -1,4 +1,10 @@
 -- Active: 1775068811273@@127.0.0.1@3306@BALBU_TECH
+/*
+TABLA CONFIGURACION
+Guarda los ajustes del sistema como pares de clave y valor: porcentaje de
+impuesto, dias de garantia, nombre de la tienda, etc.
+Asi se cambian los ajustes sin tocar el codigo.
+*/
 CREATE TABLE CONFIGURACION (
     ID_CONFIG INT NOT NULL AUTO_INCREMENT,
     CLAVE VARCHAR(50) NOT NULL UNIQUE, -- Ej: 'PORCENTAJE_IMPUESTO', 'DIAS_GARANTIA_DEFECTO'

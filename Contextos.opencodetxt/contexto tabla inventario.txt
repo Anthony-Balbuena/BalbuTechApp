@@ -1,0 +1,73 @@
+CONTEXTO DE DOCUMENTACION - TABLA INVENTARIO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/17- INVENTARIO.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 17- INVENTARIO.sql (11 bloques agregados)
+================================================================================
+TABLA
+  - INVENTARIO ............ bloque agregado antes de CREATE TABLE INVENTARIO
+
+INDICE
+  - IX_INVENTARIO_FECHA ... bloque agregado antes de CREATE INDEX
+
+PROCEDIMIENTOS ALMACENADOS (4)
+  - SP_INSERTAR_INVENTARIO ..... da de alta un producto con stock en 0
+  - 17_SP_INCREMENTAR_STOCK .... suma unidades cuando entra mercancia
+  - SP_RECIBIR_MERCANCIA ....... recibe mercancia y la refleja en el stock
+  - SP_AJUSTE_INVENTARIO ....... correccion manual de stock (+ / -)
+
+TRIGGERS (2)
+  - 17_TR_VALIDAR_STOCK_MINIMO ............ alerta cuando el stock baja del minimo
+  - 17_TR_REGISTRAR_HISTORIAL_INVENTARIO .. anota cada cambio en el historial
+
+VISTAS (2)
+  - VISTA_PRODUCTOS_CRITICOS ... productos que se estan quedando sin stock
+  - VISTA_VALOR_PRODUCTOS ...... valor en dinero de cada producto en bodega
+
+FUNCION (1)
+  - FN_VALOR_TOTAL_INVENTARIO .. suma el valor de todo el inventario
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido (tablas minimalistas, no campo por campo).
+- Si se documentan triggers, vistas y funciones (el usuario lo pidio para
+  el archivo de inventario).
+- NO se modifica modulos/todo_modulos.sql (queda pendiente de aprobacion).
+- NO se corrigen errores de logica: el comentario "-- POSIBLE ERROR AQUÍ" en
+  la vista VISTA_PRODUCTOS_CRITICOS (columna P.NOMBRE) se dejo intacto.
+- No se tocaron: DELIMITER, CALL, DESCRIBE ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 29 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~22 archivos con CREATE INDEX sin documentar (~47 indices en total).
+- ~88 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/17- INVENTARIO.sql"  -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

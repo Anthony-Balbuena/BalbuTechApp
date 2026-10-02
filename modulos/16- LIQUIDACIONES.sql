@@ -1,3 +1,10 @@
+/*
+TABLA LIQUIDACIONES
+Guarda las liquidaciones de los empleados que salen: fecha, anos
+trabajados, salario base, monto total y motivo (RENUNCIA, DESPIDO,
+FIN_CONTRATO o DESAHUCIO). Si se borra el empleado se borran tambien sus
+liquidaciones.
+*/
 CREATE TABLE LIQUIDACIONES (
     ID_LIQUIDACION INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
@@ -17,12 +24,27 @@ CREATE TABLE LIQUIDACIONES (
 ) ENGINE = InnoDB;
 
 -- 1. Para buscar liquidaciones por empleado al instante
+/*
+INDICE IX_LIQUIDACION_EMPLEADO
+Busca al instante todas las liquidaciones de un empleado en especifico,
+por ejemplo para revisar su expediente de salida.
+*/
 CREATE INDEX IX_LIQUIDACION_EMPLEADO ON LIQUIDACIONES (ID_EMPLEADO);
 
 -- 2. Para reportes de gastos por prestaciones laborales en un rango de tiempo
+/*
+INDICE IX_LIQUIDACION_FECHA
+Acelera los reportes de gastos por prestaciones en un rango de tiempo,
+que filtran por la fecha de la liquidacion.
+*/
 CREATE INDEX IX_LIQUIDACION_FECHA ON LIQUIDACIONES (FECHA_LIQUIDACION);
 
 -- 3. Para estadísticas de rotación (Ej: "¿Cuántos se fueron por Renuncia?")
+/*
+INDICE IX_LIQUIDACION_MOTIVO
+Permite contar rapido cuanto se fue por renuncia, despido, fin de
+contrato o desahucio, para las estadisticas de rotacion.
+*/
 CREATE INDEX IX_LIQUIDACION_MOTIVO ON LIQUIDACIONES (MOTIVO);
 
 
@@ -32,6 +54,13 @@ CREATE INDEX IX_LIQUIDACION_MOTIVO ON LIQUIDACIONES (MOTIVO);
 
 
 
+/*
+SP_REGISTRAR_LIQUIDACION
+Registra la liquidacion de un empleado y lo deja INACTIVO.
+Valida que el empleado este ACTIVO, calcula el monto (salario por anos
+trabajados), guarda la liquidacion, apaga al empleado y responde con el
+monto procesado.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_REGISTRAR_LIQUIDACION ;
 CREATE PROCEDURE SP_REGISTRAR_LIQUIDACION(
@@ -72,6 +101,12 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------
 
 
+/*
+16_TR_BLOQUEAR_BORRADO_LIQUIDACION
+No deja borrar liquidaciones: antes de eliminar cualquier fila manda un
+error explicando que por auditoria legal solo se pueden anular o
+modificar. Trabaja en automatico.
+*/
 DELIMITER //
 
 CREATE TRIGGER 16_TR_BLOQUEAR_BORRADO_LIQUIDACION
@@ -92,6 +127,11 @@ DELIMITER ;
 
 
 
+/*
+VISTA_ESTADISTICAS_SALIDAS
+Agrupa las liquidaciones por motivo y muestra cuantas salidas hubo de
+cada tipo y cuanto costaron en prestaciones.
+*/
 CREATE OR REPLACE VIEW VISTA_ESTADISTICAS_SALIDAS AS
 SELECT 
     MOTIVO, 
@@ -103,6 +143,11 @@ GROUP BY MOTIVO;
 
 
 
+/*
+VISTA_LIQUIDACIONES_RECIENTES
+Lista las liquidaciones de los ultimos 30 dias con el nombre del
+empleado, el monto, el motivo y cuantos dias han pasado desde la salida.
+*/
 CREATE OR REPLACE VIEW VISTA_LIQUIDACIONES_RECIENTES AS
 SELECT 
     L.ID_LIQUIDACION,
