@@ -2,33 +2,11 @@
 
 
 /*
-TABLA: USUARIOS — Descripción detallada
-
-Propósito: almacena las credenciales y asignaciones de rol para los
-usuarios del sistema. Cada usuario se asocia a un empleado y a un rol;
-la separación entre `EMPLEADOS` y `USUARIOS` permite gestionar acceso
-independiente del registro laboral.
-
-Columnas clave:
-- ID_USUARIO: PK autoincremental que identifica la cuenta.
-- ID_EMPLEADO: FK a `EMPLEADOS(ID_EMPLEADO)`. Un empleado puede tener
-    como máximo una cuenta (único en esta columna).
-- ID_ROL: FK a `ROLES(ID_ROL)` que determina permisos y alcance.
-- USUARIO: identificador público usado para login (único).
-- CONTRASENA: hash de la contraseña; usar formatos seguros (pbkdf2, bcrypt).
-- ESTADO: control lógico ('ACTIVO'/'INACTIVO') para habilitar/deshabilitar cuentas.
-- FECHA_CREACION: timestamp de creación de la cuenta.
-
-Consideraciones de seguridad:
-- Las contraseñas deben almacenarse en formato hash; el cambio a
-    `VARCHAR(512)` permite almacenar formatos PBKDF2 con salt e iteraciones.
-- Operaciones que modifican contraseñas deben realizarse mediante
-    procedimientos específicos que verifiquen hash actual y registren
-    auditoría cuando aplique.
-
-Integridad referencial y restricciones:
-- FK a `EMPLEADOS` y `ROLES` garantizan referencias válidas.
-- `ID_EMPLEADO` declarado `UNIQUE` obliga a 1:1 entre empleado y usuario.
+TABLA USUARIOS
+Cuentas de acceso del sistema: usuario, contrasena en hash y el rol que
+le da sus permisos. Cada empleado puede tener una sola cuenta y el nombre
+de usuario es unico. La contrasena se guarda en formato hash y la cuenta
+arranca ACTIVA.
 */
 
 CREATE TABLE USUARIOS (
@@ -43,6 +21,11 @@ CREATE TABLE USUARIOS (
   CONSTRAINT FK_USUARIO_ROL FOREIGN KEY (ID_ROL) REFERENCES ROLES(ID_ROL)
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_USER
+Acelera el login y las busquedas por nombre de usuario, que es el dato
+que mas se consulta en esta tabla.
+*/
 CREATE INDEX IX_USER ON USUARIOS (USUARIO);
 
 
@@ -67,6 +50,12 @@ ALTER TABLE `USUARIOS`
 
 
 DELIMITER //
+/*
+SP_GET_USUARIO_LOGIN
+Busca la cuenta por su nombre de usuario (solo si esta ACTIVA) y devuelve
+el hash de la contrasena junto con el rol, para que la aplicacion compare
+la clave y deje entrar.
+*/
 DROP PROCEDURE IF EXISTS SP_GET_USUARIO_LOGIN //
 CREATE PROCEDURE SP_GET_USUARIO_LOGIN(
     IN P_USUARIO VARCHAR(50)
@@ -84,16 +73,13 @@ DELIMITER ;
 --Sp para mostrar antes de hacer ciertas acciones. Van en el modulo de  usuarios
 
 -- uso de agregar un usuario
--- Descripción:
---  Inserta un nuevo usuario en la tabla `USUARIOS` aplicando las siguientes reglas:
---   1) Valida que el empleado indicado exista en `EMPLEADOS`.
---   2) Verifica que ese empleado no tenga ya una cuenta (regla 1 cuenta por empleado).
---   3) Normaliza el valor de `P_USUARIO` (minusculas, trim, espacios->puntos) como `v_usuario_limpio`.
---   4) Comprueba que `v_usuario_limpio` no esté en uso por otro usuario.
---   5) Si todo es válido, inserta la fila en `USUARIOS` con el hash recibido en `P_HASH_CLAVE`.
---   6) Devuelve un mensaje de éxito o lanza una excepción (`SIGNAL`) en caso de error.
--- Parámetros:
---   P_ID_EMPLEADO INT, P_ID_ROL INT, P_USUARIO VARCHAR(50), P_HASH_CLAVE VARCHAR(255)
+/*
+SP_INSERTAR_USUARIO
+Crea la cuenta de un usuario nuevo.
+Valida que el empleado exista y que aun no tenga cuenta, limpia el nombre
+de usuario (minusculas y espacios a puntos) para que no se repita y guarda
+el hash de la contrasena recibido.
+*/
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_INSERTAR_USUARIO ;
@@ -131,14 +117,6 @@ proc_label: BEGIN
     INSERT INTO USUARIOS (ID_EMPLEADO, ID_ROL, USUARIO, CONTRASENA)
     VALUES (P_ID_EMPLEADO, P_ID_ROL, v_usuario_limpio, P_HASH_CLAVE);
 
--- SP_TOGGLE_ESTADO_USUARIO
--- Descripción:
---  Alterna el estado (`ESTADO`) de un usuario entre 'ACTIVO' e 'INACTIVO'.
---  Pasos:
---   1) Verifica existencia de `ID_USUARIO`.
---   2) Lee el estado actual y calcula el nuevo estado.
---   3) Actualiza la fila y retorna un mensaje con el cambio.
-
     SELECT CONCAT('EXITO: USUARIO "', v_usuario_limpio, '" CREADO.') AS MENSAJE;
 END;
 
@@ -147,22 +125,12 @@ DELIMITER ;
 
 --ACTUALIZAR
 
--- SP_ACTUALIZAR_USUARIO
--- Descripción:
---  Actualiza los datos de un usuario existente en la tabla `USUARIOS`.
---  Pasos y reglas:
---   1) Verifica que `P_ID_USUARIO` exista en `USUARIOS`. Si no existe, lanza un error.
---   2) Si se proporciona `P_USUARIO`, lo normaliza (minúsculas, trim) y lo usa para actualizar.
---   3) Para `P_ID_ROL` y `P_ID_EMPLEADO`, si se envía NULL se mantienen los valores actuales (se usa COALESCE).
---   4) No altera la contraseña; la actualización de contraseñas debe hacerse con el procedimiento específico.
---   5) Devuelve un mensaje 'EXITO: DATOS ACTUALIZADOS.' al finalizar correctamente.
--- Parámetros:
---   P_ID_USUARIO INT: id del usuario a actualizar.
---   P_USUARIO VARCHAR(50): nuevo nombre de usuario (opcional).
---   P_ID_ROL INT: nuevo id de rol (opcional).
---   P_ID_EMPLEADO INT: nuevo id de empleado (opcional).
--- Uso:
---   CALL SP_ACTUALIZAR_USUARIO(123, 'nuevo.usuario', 2, NULL);
+/*
+SP_ACTUALIZAR_USUARIO
+Cambia el nombre de usuario, el rol o el empleado de una cuenta existente.
+Si alguno llega en NULL se queda como estaba. No toca la contrasena: ese
+cambio se hace con su procedimiento aparte.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_USUARIO ;
 CREATE OR REPLACE PROCEDURE SP_ACTUALIZAR_USUARIO(
@@ -198,11 +166,12 @@ DELIMITER ;
 ---TOGGLER PARA ESTADO
 DELIMITER //
 
--- SP_TOGGLE_ESTADO_USUARIO
--- Descripción:
---  Alterna el valor de la columna `ESTADO` para un usuario ('ACTIVO' <-> 'INACTIVO').
---  Uso: Llamar con el `P_ID_USUARIO` objetivo desde la UI o backend para invertir su estado.
--- Parámetros: P_ID_USUARIO INT
+/*
+SP_TOGGLE_ESTADO_USUARIO
+Le da la vuelta al estado de la cuenta: de ACTIVO a INACTIVO y viceversa.
+Si el ID no existe manda un error; si existe responde con un mensaje que
+dice de que estado paso al nuevo.
+*/
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_USUARIO;
 CREATE PROCEDURE SP_TOGGLE_ESTADO_USUARIO(
     IN P_ID_USUARIO INT
@@ -247,11 +216,12 @@ END ;
 DELIMITER ;
 
 
--- SP_BUSCAR_USUARIOS_FILTRADO
--- Descripción:
---  Busca y lista usuarios aplicando un filtro opcional sobre el nombre de usuario
---  o el nombre del empleado. Devuelve usuario, empleado, rol y estado.
--- Parámetro: P_BUSQUEDA VARCHAR(100) (opcional, admite NULL o cadena vacía).
+/*
+SP_BUSCAR_USUARIOS_FILTRADO
+Lista los usuarios con su empleado, rol y estado, buscando por el nombre
+de usuario o por el nombre del empleado. Si la busqueda viene vacia o NULL
+trae todos, ordenados por usuario.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_BUSCAR_USUARIOS_FILTRADO ;
 CREATE PROCEDURE SP_BUSCAR_USUARIOS_FILTRADO(
@@ -277,14 +247,12 @@ DELIMITER ;
 
 
 ---CAMBIAR CONTRASENA
--- SP_CAMBIAR_CONTRASENA
--- Descripción:
---  Cambia la contraseña (hash) de un usuario verificando que la contraseña actual coincida.
---  Pasos:
---   1) Valida que el `ID_USUARIO` exista y que `P_CLAVE_ACTUAL_HASH` coincida con la almacenada.
---   2) Si la validación pasa, actualiza `CONTRASENA` con `P_CLAVE_NUEVA_HASH`.
---   3) Devuelve un mensaje de éxito o lanza `SIGNAL` en caso de error.
--- Parámetros: P_ID_USUARIO INT, P_CLAVE_ACTUAL_HASH VARCHAR(255), P_CLAVE_NUEVA_HASH VARCHAR(255)
+/*
+SP_CAMBIAR_CONTRASENA
+Cambia la contrasena de un usuario pero solo si la clave actual que manda
+coincide con la guardada. Si el ID no existe o la clave actual esta mal,
+manda un error y no cambia nada.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA ;
 CREATE PROCEDURE SP_CAMBIAR_CONTRASENA(
@@ -325,12 +293,12 @@ DELIMITER ;
 
 -- LOGIN ADAPTADO AL NUEVO ESQUEMA
 
--- SP_LOGIN_USUARIO
--- Descripción:
---  Valida credenciales contra la tabla `USUARIOS` (usuario + hash) y devuelve
---  el resultado ('EXITO'/'ERROR'), el nombre del rol y el `ID_USUARIO` si procede.
--- Uso: CALL SP_LOGIN_USUARIO(P_USUARIO, P_PASSWORD_HASH);
--- Parámetros: P_USUARIO VARCHAR(50), P_PASSWORD_HASH VARCHAR(255)
+/*
+SP_LOGIN_USUARIO
+Valida el login cruzando usuario, contrasena hash y estado ACTIVO, y
+devuelve EXITO con el rol y el ID de la cuenta, o ERROR si las
+credenciales no coinciden.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO ;
 CREATE PROCEDURE SP_LOGIN_USUARIO(
@@ -359,10 +327,11 @@ END ;
 
 
 -- PROCEDIMIENTOS DE APOYO PARA C++ (Se mantienen iguales)
--- PARA_INSERTAR_USUARIOS
--- Descripción:
---  Devuelve listas necesarias para poblar formularios de inserción: roles y empleados.
---  Uso: CALL PARA_INSERTAR_USUARIOS();
+/*
+PARA_INSERTAR_USUARIOS
+Prepara los datos del formulario de alta de usuario: devuelve en dos
+result sets los roles y los empleados disponibles para llenar los selects.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_INSERTAR_USUARIOS ;
 CREATE PROCEDURE PARA_INSERTAR_USUARIOS()
@@ -372,10 +341,11 @@ BEGIN
 END ;
 DELIMITER ;
 
--- PARA_ACTUALIZAR_USUARIOS
--- Descripción:
---  Devuelve una vista combinada de usuarios con su rol y empleado asociado,
---  útil para poblar formularios de edición/actualización. Uso: CALL PARA_ACTUALIZAR_USUARIOS();
+/*
+PARA_ACTUALIZAR_USUARIOS
+Prepara los datos del formulario de edicion de usuario: devuelve cada
+cuenta con su rol y su empleado asociados para popular los controles.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_ACTUALIZAR_USUARIOS ;
 CREATE PROCEDURE PARA_ACTUALIZAR_USUARIOS()
@@ -389,10 +359,11 @@ END ;
 DELIMITER ;
 
 
--- PARA_ACT_DESAC_USUARIOS
--- Descripción:
---  Lista usuarios y su estado para permitir activar o desactivar cuentas desde la UI.
---  Uso: CALL PARA_ACT_DESAC_USUARIOS();
+/*
+PARA_ACT_DESAC_USUARIOS
+Lista los usuarios con su estado y el nombre del empleado, que es lo que
+la pantalla usa para activar o desactivar cuentas.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_ACT_DESAC_USUARIOS ;
 CREATE PROCEDURE PARA_ACT_DESAC_USUARIOS ()
@@ -410,14 +381,12 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 
 -- FUNCIÓN DE PERMISOS ADAPTADA AL NUEVO ESQUEMA
--- FN_TIENE_PERMISO
--- Descripción:
---  Evalúa si un usuario (por su `USUARIO`) tiene permitido ejecutar una acción
---  concreta según el rol asociado. Retorna TRUE/FALSE.
--- Parámetros:
---  `P_USERNAME` VARCHAR(50)  - nombre de usuario a consultar
---  `P_ACCION`   VARCHAR(50)  - acción a validar (ej: 'REGISTRAR_BONO')
--- Uso: SELECT FN_TIENE_PERMISO('juan.perez', 'REGISTRAR_BONO');
+/*
+FN_TIENE_PERMISO
+Devuelve TRUE o FALSE segun el rol del usuario permita o no la accion
+pedida (por ejemplo REGISTRAR_BONO). Solo la aprueban ROLE_ADMIN y
+ROLE_GERENTE; cualquier otro caso devuelve FALSE.
+*/
 DELIMITER //
 DROP FUNCTION IF EXISTS FN_TIENE_PERMISO ;
 CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(50))
@@ -445,13 +414,12 @@ DELIMITER ;
 
 
 
--- TR_DESACTIVAR_USUARIO_POST_LIQUIDACION
--- Descripción:
---  Trigger que se ejecuta AFTER UPDATE sobre `EMPLEADOS`. Si un empleado pasa
---  de `ACTIVO` a `INACTIVO`, desactiva automáticamente la cuenta en `USUARIOS`
---  (pone `ESTADO = 'INACTIVO'`) y registra el cambio en `LOG_USUARIOS`.
---  Nota: Asegúrate de que `LOG_USUARIOS` exista y acepte los campos usados.
--- Uso/efecto: automático al actualizar la columna `ESTADO` en `EMPLEADOS`.
+/*
+TR_DESACTIVAR_USUARIO_POST_LIQUIDACION
+Cuando un empleado pasa de ACTIVO a INACTIVO, este trigger desactiva solo
+su cuenta de usuario y deja el cambio anotado en LOG_USUARIOS. Trabaja en
+automatico al actualizar EMPLEADOS.
+*/
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_DESACTIVAR_USUARIO_POST_LIQUIDACION ;
 CREATE TRIGGER TR_DESACTIVAR_USUARIO_POST_LIQUIDACION

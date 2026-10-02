@@ -1,4 +1,10 @@
 -- 1. Estructura de la Tabla
+/*
+TABLA HISTORIAL_ESTADOS_PRODUCTO
+Guarda cada vez que un producto cambia de ACTIVO a INACTIVO o viceversa.
+Anota quien hizo el cambio, el estado nuevo y el anterior, el motivo y la fecha.
+Sirve como bitacora de auditoria: ningun cambio de estado queda sin rastro.
+*/
 CREATE TABLE HISTORIAL_ESTADOS_PRODUCTO (
     ID_HISTORIAL INT NOT NULL AUTO_INCREMENT,
     ID_PRODUCTO INT NOT NULL,
@@ -13,8 +19,22 @@ CREATE TABLE HISTORIAL_ESTADOS_PRODUCTO (
 ) ENGINE = InnoDB;
 
 -- 2. Índices para optimizar consultas de auditoría
+/*
+INDICE HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO
+Ordena el historial por fecha de cambio, asi los ultimos movimientos
+salen primero sin recorrer toda la tabla.
+*/
 CREATE INDEX HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO ON HISTORIAL_ESTADOS_PRODUCTO (FECHA_CAMBIO);
+/*
+INDICE IX_HISTORIAL_ESTADO_ACTUAL
+Busca rapido todos los cambios que quedaron con cierto estado actual.
+*/
 CREATE INDEX IX_HISTORIAL_ESTADO_ACTUAL ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO);
+/*
+INDICE IX_HISTORIAL_ESTADO_ANTERIOR
+Busca rapido en que estado estaba un producto antes de cambiar,
+util para auditoria y reportes de modificaciones.
+*/
 CREATE INDEX IX_HISTORIAL_ESTADO_ANTERIOR ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO_ANTERIOR);
 
 
@@ -25,6 +45,12 @@ CREATE INDEX IX_HISTORIAL_ESTADO_ANTERIOR ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO_
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 18_SP_CAMBIAR_ESTADO_PRODUCTO //
+/*
+18_SP_CAMBIAR_ESTADO_PRODUCTO
+Cambia el estado de un producto (ACTIVO / INACTIVO) y deja constancia del hecho.
+Guarda quien lo hizo y el motivo en variables de sesion para que el trigger los
+utilice, actualiza PRODUCTOS y al final limpia esas variables.
+*/
 CREATE PROCEDURE 18_SP_CAMBIAR_ESTADO_PRODUCTO(
     IN P_ID_PRODUCTO INT,
     IN P_ID_EMPLEADO INT,
@@ -54,6 +80,12 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_LOG_CAMBIO_ESTADO_PRODUCTO //
+/*
+TR_LOG_CAMBIO_ESTADO_PRODUCTO
+Se dispara solo cada vez que cambia el estado de un producto.
+Si el estado cambio de verdad, escribe una fila en HISTORIAL_ESTADOS_PRODUCTO
+con el producto, el empleado, el estado nuevo, el anterior y el motivo.
+*/
 CREATE TRIGGER TR_LOG_CAMBIO_ESTADO_PRODUCTO
 AFTER UPDATE ON PRODUCTOS
 FOR EACH ROW
@@ -89,6 +121,11 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------------------------------- 
 
 
+/*
+VISTA_ULTIMOS_MOVIMIENTOS
+Muestra los 10 cambios de estado mas recientes, del mas nuevo al mas viejo.
+Trae la fecha, el nombre del producto y el motivo del cambio.
+*/
 CREATE OR REPLACE VIEW VISTA_ULTIMOS_MOVIMIENTOS AS
 SELECT 
     H.FECHA_CAMBIO,

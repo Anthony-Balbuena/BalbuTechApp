@@ -1,18 +1,9 @@
 
 /*
-ESTRUCTURA DE LA TABLA MARCAS
-
-Esta tabla almacena las marcas de productos disponibles en el sistema.
-
-- ID_MARCA: identificador único autoincremental de la marca.
-- NOMBRE: nombre de la marca (único), usado para búsquedas y visualización.
-- ESTADO: indica si la marca está 'ACTIVA' o 'INACTIVA'.
-- FECHA_REGISTRO: timestamp de creación.
-
-Restricciones:
-- La clave primaria es ID_MARCA.
-- NOMBRE es único para evitar duplicados.
-La tabla utiliza InnoDB para permitir claves foráneas y transacciones.
+TABLA MARCAS
+Almacena las marcas de productos disponibles en el sistema.
+Solo puede haber una marca con cada nombre y todas arrancan ACTIVAS.
+La tabla usa InnoDB para permitir claves foraneas y transacciones.
 */
 CREATE TABLE MARCAS (
     ID_MARCA INT NOT NULL AUTO_INCREMENT,
@@ -29,17 +20,10 @@ CREATE TABLE MARCAS (
 
 -- 1.INSERT
 /*
-DESCRIPCION DE SP_INSERTAR_MARCA
-
-Registra una nueva marca validando y limpiando el nombre recibido.
-
-- Parámetros:
-    - P_NOMBRE: nombre de la marca a insertar.
-
-Comportamiento:
-- Normaliza espacios y trim del nombre.
-- Verifica que el nombre no esté vacío y que no exista otra marca con el mismo nombre.
-- Inserta la marca y retorna un mensaje con el ID creado.
+SP_INSERTAR_MARCA
+Registra una marca nueva.
+Limpia el nombre, valida que no este vacio ni repetido y si todo esta bien
+la guarda y devuelve un mensaje con el ID creado.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_MARCA;
@@ -70,18 +54,10 @@ DELIMITER ;
 
 --2. ACTUALIZAR
 /*
-DESCRIPCION DE SP_ACTUALIZAR_MARCA
-
-Actualiza el nombre de una marca existente.
-
-- Parámetros:
-    - P_ID_MARCA: id de la marca a actualizar.
-    - P_NOMBRE: nuevo nombre (opcional).
-
-Comportamiento:
-- Verifica que la marca exista.
-- Si se proporciona nombre, lo normaliza, valida que no esté vacío y que no exista otra marca con ese nombre.
-- Actualiza la marca y devuelve mensaje de éxito.
+SP_ACTUALIZAR_MARCA
+Cambia el nombre de una marca existente.
+Verifica que la marca exista y que el nuevo nombre no este repetido; si no
+se manda nombre, se queda el que tenia.
 */
 DELIMITER //
 DROP PROCEDURE if EXISTS SP_ACTUALIZAR_MARCA ;
@@ -116,12 +92,9 @@ DELIMITER ;
 
 --3. BUSCAR 
 /*
-DESCRIPCION DE SP_BUSCAR_MARCAS
-
-Busca marcas por nombre parcial. Si `P_BUSQUEDA` está vacío o NULL, retorna todas las marcas.
-
-- Parámetros:
-    - P_BUSQUEDA: cadena parcial a buscar en el nombre.
+SP_BUSCAR_MARCAS
+Busca marcas por nombre parcial.
+Si la busqueda viene vacia o nula, devuelve todas las marcas.
 */
 DELIMITER //
 drop PROCEDURE if EXISTS SP_BUSCAR_MARCAS; 
@@ -140,16 +113,10 @@ DELIMITER ;
 --4. TOGLER ACTUALIZAR ESTADO 
 
 /*
-DESCRIPCION DE SP_TOGGLE_ESTADO_MARCA
-
-Activa o desactiva una marca (toggle) verificando su existencia.
-
-- Parámetros:
-    - P_ID_MARCA: id de la marca a cambiar de estado.
-
-Comportamiento:
-- Valida existencia y cambia el campo ESTADO entre 'ACTIVA' y 'INACTIVA'.
-- Retorna un mensaje con el estado actualizado.
+SP_TOGGLE_ESTADO_MARCA
+Activa o desactiva una marca.
+Verifica que exista, le da la vuelta al estado y confirma con un mensaje
+que trae el nombre y el nuevo estado.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_MARCA;
@@ -181,12 +148,9 @@ DELIMITER ;
 
 --5. BUSCAR TODAS LAS MARCAS 
 /*
-DESCRIPCION DE 2_SP_OBTENER_MARCA
-
-Retorna la marca cuyo ID se indique.
-
-- Parámetros:
-    - P_ID: id de la marca a consultar.
+2_SP_OBTENER_MARCA
+Devuelve la marca con el ID que se le pida.
+Sirve para cargar una marca en concreto para verla o editarla.
 */
 DELIMITER //
 CREATE PROCEDURE 2_SP_OBTENER_MARCA(IN P_ID INT)
@@ -197,12 +161,9 @@ DELIMITER ;
 
 --6. BUSCAR MARCAS ACTIVAS
 /*
-DESCRIPCION DE 2_SP_LISTAR_MARCAS
-
-Lista las marcas; opcionalmente solo las activas.
-
-- Parámetros:
-  - P_SOLO_ACTIVAS: si es 1 retorna solo las marcas con ESTADO = 'ACTIVA', si no retorna todas.
+2_SP_LISTAR_MARCAS
+Lista las marcas, con la opcion de traer solo las activas.
+Si el parametro viene en 1 muestra solo ACTIVAS, si no muestra todas.
 */
 DELIMITER //
 CREATE PROCEDURE 2_SP_LISTAR_MARCAS(IN P_SOLO_ACTIVAS BIT)

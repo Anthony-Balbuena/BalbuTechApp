@@ -1,4 +1,9 @@
 -- Active: 1775068811273@@127.0.0.1@3306@BALBU_TECH
+/*
+TABLA LOG_USUARIOS
+Bitacora de los cambios que se hacen a los usuarios: cambio de rol, de
+estado o de usuario, con el valor anterior, el nuevo, quien lo hizo y cuando.
+*/
 CREATE TABLE LOG_USUARIOS (
     ID_LOG INT PRIMARY KEY AUTO_INCREMENT,
     ID_USUARIO INT,
@@ -15,6 +20,11 @@ DESCRIBE USUARIOS;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_OBTENER_LOG_USUARIOS;
+/*
+SP_OBTENER_LOG_USUARIOS
+Trae los ultimos 100 cambios de usuarios desde la vista de historial,
+del cambio mas reciente al mas viejo.
+*/
 CREATE PROCEDURE SP_OBTENER_LOG_USUARIOS()
 BEGIN
     SELECT * FROM VIEW_HISTORIAL_CAMBIOS_USUARIOS LIMIT 100;
@@ -28,6 +38,12 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TRG_AUDITORIA_USUARIOS ;
+/*
+TRG_AUDITORIA_USUARIOS
+Cada vez que se modifica un usuario, revisa si cambio el rol o el estado.
+Si cambio alguno de los dos, guarda el valor anterior y el nuevo en
+LOG_USUARIOS para dejar constancia.
+*/
 CREATE TRIGGER TRG_AUDITORIA_USUARIOS
 AFTER UPDATE ON USUARIOS
 FOR EACH ROW
@@ -53,6 +69,11 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
+/*
+VIEW_HISTORIAL_CAMBIOS_USUARIOS
+Muestra los cambios de usuarios con el nombre de quien los sufrio.
+Ordena los cambios del mas reciente al mas viejo.
+*/
 CREATE OR REPLACE VIEW VIEW_HISTORIAL_CAMBIOS_USUARIOS AS
 SELECT 
     L.ID_LOG,

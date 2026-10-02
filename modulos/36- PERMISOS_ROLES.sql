@@ -5,12 +5,22 @@
 -- Este módulo define los permisos del sistema y los asocia a cada rol.
 -- La idea es proteger el menú y las acciones con autenticación real y control por roles.
 
+/*
+TABLA PERMISOS
+Lista las acciones que se pueden permitir en el sistema (gestionar usuarios,
+ver reportes, etc). Cada permiso tiene un nombre unico y una descripcion.
+*/
 CREATE TABLE IF NOT EXISTS PERMISOS (
     ID_PERMISO INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_PERMISO VARCHAR(80) NOT NULL UNIQUE,
     DESCRIPCION VARCHAR(200) NULL
 ) ENGINE = InnoDB;
 
+/*
+TABLA ROL_PERMISO
+Une cada rol con los permisos que tiene. La clave compuesta evita repetir
+permisos, y el rol tiene que ser ADMIN, RRHH o EMPLEADO.
+*/
 CREATE TABLE IF NOT EXISTS ROL_PERMISO (
     ROL_NOMBRE VARCHAR(30) NOT NULL,
     ID_PERMISO INT NOT NULL,
@@ -84,6 +94,12 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 -- Asigna un permiso concreto a un rol del sistema para ampliar o restringir acceso.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ASIGNAR_PERMISO_A_ROL;//
+/*
+SP_ASIGNAR_PERMISO_A_ROL
+Da de alta un permiso concreto para un rol.
+Revisa que el rol y el permiso existan; si estan bien, los une y si ya
+estaba unido no duplica nada.
+*/
 CREATE PROCEDURE SP_ASIGNAR_PERMISO_A_ROL(
     IN P_ROL_NOMBRE VARCHAR(30),
     IN P_NOMBRE_PERMISO VARCHAR(80)
@@ -114,6 +130,11 @@ DELIMITER ;
 -- Muestra todos los permisos asociados a un rol específico para consulta y auditoría.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LISTAR_PERMISOS_POR_ROL;//
+/*
+SP_LISTAR_PERMISOS_POR_ROL
+Lista los permisos que tiene un rol, ordenados por nombre.
+Sirve para consultar y auditar el acceso de cada rol.
+*/
 CREATE PROCEDURE SP_LISTAR_PERMISOS_POR_ROL(
     IN P_ROL_NOMBRE VARCHAR(30)
 )
@@ -132,6 +153,12 @@ DELIMITER ;
 -- Evalúa si un usuario específico tiene acceso a una acción del sistema según su rol.
 DELIMITER //
 DROP FUNCTION IF EXISTS FN_TIENE_PERMISO;
+/*
+FN_TIENE_PERMISO
+Dice si un usuario tiene permitida una accion segun su rol.
+Devuelve verdadero si el rol tiene ese permiso, y falso en cualquier
+otro caso (usuario inexistente o sin permiso).
+*/
 CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(20))
 RETURNS BOOLEAN
 DETERMINISTIC

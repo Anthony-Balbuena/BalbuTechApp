@@ -1,3 +1,8 @@
+/*
+TABLA LOG_AUDITORIA_PERMISOS
+Guarda cada cambio de estado de un permiso: el anterior, el nuevo y cuando
+paso. Sirve como bitacora de auditoria sobre los permisos de empleados.
+*/
 CREATE TABLE LOG_AUDITORIA_PERMISOS (
     ID_LOG INT AUTO_INCREMENT PRIMARY KEY,
     ID_PERMISO INT,
@@ -9,6 +14,11 @@ CREATE TABLE LOG_AUDITORIA_PERMISOS (
 ) ENGINE = InnoDB;
 
 -- Trigger que registra cada vez que se gestiona un permiso
+/*
+TR_LOG_GESTION_PERMISO
+Cada vez que cambia el estado de un permiso, lo anota en la bitacora.
+Si el estado no cambio, no registra nada.
+*/
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_LOG_GESTION_PERMISO ;
 CREATE TRIGGER TR_LOG_GESTION_PERMISO

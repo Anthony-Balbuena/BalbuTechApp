@@ -1,19 +1,9 @@
 -- Active: 1788274174973@@127.0.0.1@3306@BALBU_TECH
 /*
-MODULO: PROVEEDORES — Descripción general y propósito
-
-Este archivo contiene la definición de la tabla `PROVEEDORES` y los
-procedimientos almacenados relacionados. El módulo gestiona el CRUD de
-proveedores, índices para búsquedas frecuentes y utilidades para cambiar
-el estado de un proveedor. Los procedimientos normalizan entradas,
-validan unicidades y retornan mensajes amigables para la capa C++.
-
-Secciones principales:
-- Definición de la tabla `PROVEEDORES` (estructura de columnas y
-    restricciones).
-- Índices para búsquedas rápidas.
-- Procedimientos almacenados: insertar, actualizar, toggle de estado
-    y listar.
+TABLA PROVEEDORES
+Guarda los proveedores de la tienda con su nombre, telefono, email y
+direccion. El nombre es obligatorio, mientras que telefono y email son
+opcionales pero unicos si se usan. Todo proveedor arranca ACTIVO.
 */
 CREATE TABLE PROVEEDORES (
     ID_PROVEEDOR INT NOT NULL AUTO_INCREMENT,
@@ -30,54 +20,30 @@ CREATE TABLE PROVEEDORES (
 
 -- Para buscar proveedores por nombre (muy común)
 /*
-ÍNDICE: IX_PROVEEDOR_NOMBRE
-
-Propósito: acelerar búsquedas por el campo `NOMBRE`, usado en ayudas
-de UI y búsquedas parciales. No es único; soporta consultas `LIKE`.
+INDICE IX_PROVEEDOR_NOMBRE
+Acelera las busquedas de proveedores por nombre, que es lo que mas se usa
+en las ayudas de la interfaz y en las busquedas parciales con LIKE.
 */
 CREATE INDEX IX_PROVEEDOR_NOMBRE ON PROVEEDORES (NOMBRE);
 
 -- Para filtrar proveedores activos rápidamente
 /*
-ÍNDICE: IX_PROVEEDOR_ESTADO
-
-Propósito: optimizar filtros por `ESTADO` ('ACTIVO'/'INACTIVO') en
-listados administrativos y reportes.
+INDICE IX_PROVEEDOR_ESTADO
+Permite filtrar rapidamente los proveedores activos o inactivos en los
+listados administrativos y reportes, sin tener que revisar la tabla.
 */
 CREATE INDEX IX_PROVEEDOR_ESTADO ON PROVEEDORES (ESTADO);
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
-/*
-SECCIÓN: PROCEDIMIENTOS ALMACENADOS
-
-Comentarios generales: los procedimientos usan limpieza de datos
-(REGEXP_REPLACE, TRIM), validaciones y `SIGNAL SQLSTATE '45000'` para
-reportar errores controlados. Las respuestas de éxito se retornan como
-SELECT con mensajes amigables para integrarse con el cliente C++.
-
-A continuación: `SP_INSERTAR_PROVEEDOR`, `SP_ACTUALIZAR_PROVEEDOR`,
-`SP_TOGGLE_ESTADO_PROVEEDOR` y `SP_LISTAR_PROVEEDORES`.
-*/
 
 --1. INSERTAR 
 /*
-SP: SP_INSERTAR_PROVEEDOR
-
-Propósito: insertar un nuevo proveedor.
-
-Parámetros:
-- P_NOMBRE (VARCHAR(100)): obligatorio; se normaliza espacios.
-- P_TELEFONO (VARCHAR(15)): opcional; se limpia de caracteres no numéricos
-    y se valida unicidad si se proporciona.
-- P_EMAIL (VARCHAR(100)): opcional; normalizado a minúsculas y sin espacios;
-    se valida unicidad si se proporciona.
-- P_DIRECCION (VARCHAR(120)): opcional; se normaliza espacios internos.
-
-Comportamiento:
-- Valida obligatoriedad de `P_NOMBRE`.
-- Si `P_TELEFONO` o `P_EMAIL` se pasan, valida que no existan duplicados.
-- Inserta el registro y devuelve un mensaje con `LAST_INSERT_ID()`.
+SP_INSERTAR_PROVEEDOR
+Da de alta un proveedor nuevo limpiando nombre, telefono, email y
+direccion. El nombre es obligatorio y el telefono y el email se revisan
+para que no existan duplicados; si todo esta bien responde con un mensaje
+y el ID creado.
 */
 
 DELIMITER //
@@ -141,20 +107,11 @@ DELIMITER ;
 
 --2. ACTUALIZAR
 /*
-SP: SP_ACTUALIZAR_PROVEEDOR
-
-Propósito: actualizar campos de un proveedor existente de forma parcial.
-
-Parámetros:
-- P_ID_PROVEEDOR (INT): id del proveedor a actualizar (obligatorio).
-- P_NOMBRE, P_TELEFONO, P_EMAIL, P_DIRECCION: valores opcionales; si son
-    NULL no se modifican.
-
-Comportamiento:
-- Verifica existencia del proveedor.
-- Normaliza y valida unicidad de teléfono/email cuando se proporcionan.
-- Actualiza solo los campos enviados usando `COALESCE`.
-- Retorna mensaje de éxito estandarizado.
+SP_ACTUALIZAR_PROVEEDOR
+Cambia solo los datos que se le envien de un proveedor existente.
+Primero comprueba que el proveedor exista, limpia los valores nuevos y
+revisa que telefono y email no le pertenezcan a otro; lo que llegue en
+NULL se queda como estaba.
 */
 
 DELIMITER //
@@ -231,17 +188,10 @@ DELIMITER ;
 
 --3. togler cambiar estado 
 /*
-SP: SP_TOGGLE_ESTADO_PROVEEDOR
-
-Propósito: alternar el campo `ESTADO` entre 'ACTIVO' e 'INACTIVO'.
-
-Parámetros:
-- P_ID_PROVEEDOR (INT): id del proveedor cuyo estado se alternará.
-
-Comportamiento:
-- Valida que el proveedor exista.
-- Actualiza `ESTADO` con la lógica IF(ESTADO='ACTIVO','INACTIVO','ACTIVO').
-- Retorna un mensaje con el nombre y el nuevo estado.
+SP_TOGGLE_ESTADO_PROVEEDOR
+Le da la vuelta al estado del proveedor: de ACTIVO a INACTIVO y viceversa.
+Si el ID no existe manda un error; si existe responde con un mensaje que
+trae el nombre y el nuevo estado.
 */
 
 DELIMITER //
@@ -274,20 +224,10 @@ DELIMITER ;
 
 --4. LISTAR 
 /*
-SP: SP_LISTAR_PROVEEDORES
-
-Propósito: listar proveedores aplicando un filtro opcional por nombre o
-teléfono.
-
-Parámetros:
-- P_FILTRO (VARCHAR(100)): texto opcional; si es NULL o vacío devuelve
-    todos los proveedores. Cuando se proporciona, se usa para buscar en
-    `NOMBRE` y `TELEFONO` con `LIKE`.
-
-Comportamiento:
-- Devuelve columnas clave: ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL,
-    DIRECCION, ESTADO.
-- Ordena los resultados por `ID_PROVEEDOR`.
+SP_LISTAR_PROVEEDORES
+Lista los proveedores para la pantalla de gestion.
+Si recibe un filtro busca por nombre o telefono con LIKE; si viene vacio
+o NULL devuelve todos ordenados por ID.
 */
 
 DELIMITER //

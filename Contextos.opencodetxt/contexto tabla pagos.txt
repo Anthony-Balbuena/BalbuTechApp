@@ -1,0 +1,66 @@
+CONTEXTO DE DOCUMENTACION - TABLA PAGOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/24- PAGOS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 24- PAGOS.sql (6 bloques)
+================================================================================
+TABLA
+  - PAGOS ................. pagos de cada venta con metodo, monto y fecha
+
+INDICE (1)
+  - IX_PAGOS_FECHA ........ pagos por fecha (reportes de caja)
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 24_SP_REGISTRAR_PAGO .. registra un pago y confirma con el empleado
+
+TRIGGERS (2)
+  - TR_VALIDAR_MONTO_PAGO .. no deja pagar mas del total de la venta
+  - TR_AUTO_FINALIZAR_VENTA .. si ya se pago todo, marca la venta REALIZADA
+
+VISTA (1)
+  - VISTA_RESUMEN_PAGOS .... pagos con nombre del metodo de pago
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- La seccion [FUNTION} vacia (linea 133) se dejo intacta, sin inventar nada.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 17 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~13 archivos con indices sin documentar.
+- ~66 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/24- PAGOS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

@@ -1,25 +1,11 @@
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 
 /*
-MODULO: PERMISOS_EMPLEADOS — Descripción general
-
-Este módulo contiene la definición de la tabla PERMISOS_EMPLEADOS y los
-procedimientos almacenados necesarios para la gestión del ciclo de vida de los
-permisos laborales (médicos, personales, estudio, licencia, sin sueldo).
-Incluye validaciones de solapamiento de fechas, prohibición de solicitudes
-retroactivas y control de estados (PENDIENTE, APROBADO, RECHAZADO).
-
-Estructura clave:
-
-ID_PERMISO: PK autoincremental.
-
-ID_EMPLEADO: FK hacia la tabla EMPLEADOS.
-
-TIPO_PERMISO: ENUM con las categorías permitidas.
-
-FECHA_INICIO / FECHA_FIN: Rango de fechas del permiso (con validación de coherencia).
-
-ESTADO: Control de aprobación (PENDIENTE por defecto).
+TABLA PERMISOS_EMPLEADOS
+Guarda los permisos que pide cada empleado: tipo (medico, personal,
+estudio, licencia o sin sueldo), rango de fechas y estado (PENDIENTE,
+APROBADO o RECHAZADO). No permite fechas invertidas ni permisos que se
+cruzen con otro que no este rechazado.
 */
 CREATE TABLE PERMISOS_EMPLEADOS (
     ID_PERMISO INT NOT NULL AUTO_INCREMENT,
@@ -47,39 +33,41 @@ CREATE TABLE PERMISOS_EMPLEADOS (
 
 
 
-/*ÍNDICES DE RENDIMIENTO (PERMISOS_EMPLEADOS)
-X_PERMISO_EMPLEADO: Optimiza la búsqueda de historiales por empleado.  
-IX_PERMISO_ESTADO: Facilita el filtrado por solicitudes pendientes.  
-IX_PERMISO_FECHAS: Acelera las consultas para calendarios de ausencias.
-*/
 -- 1. Para ver todos los permisos de un empleado (Ej: "¿Cuántas veces ha pedido médico?")
+/*
+INDICE IX_PERMISO_EMPLEADO
+Acelera el historial de permisos de un empleado, que es la consulta que
+mas se usa para ver cuantas veces ha pedido permiso y de que tipo.
+*/
 CREATE INDEX IX_PERMISO_EMPLEADO ON PERMISOS_EMPLEADOS (ID_EMPLEADO);
 
 -- 2. Para ver qué permisos están PENDIENTES de aprobar hoy
+/*
+INDICE IX_PERMISO_ESTADO
+Permite filtrar rapidamente los permisos pendientes de aprobar, que es lo
+que ve la pantalla del dia a dia.
+*/
 CREATE INDEX IX_PERMISO_ESTADO ON PERMISOS_EMPLEADOS (ESTADO);
 
 -- 3. Para calendarios de ausencias (Ej: "¿Quiénes no vienen la próxima semana?")
+/*
+INDICE IX_PERMISO_FECHAS
+Acelera los calendarios de ausencias, que buscan por rango de fechas para
+saber quien no viene en un periodo.
+*/
 CREATE INDEX IX_PERMISO_FECHAS ON PERMISOS_EMPLEADOS (FECHA_INICIO, FECHA_FIN);
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 
-/* SP_SOLICITAR_PERMISO:
-
-Propósito: Este SP se utiliza para solicitar un permiso para un empleado. Los permisos pueden ser de tipo médico, personal, estudio, licencia o sin sueldo.
-Datos utilizados:
-P_ID_EMPLEADO: Identificador único del empleado que solicita el permiso.
-P_TIPO_PERMISO: Tipo de permiso solicitado (por ejemplo, médico, personal, etc.).
-P_FECHA_INICIO: Fecha de inicio de la solicitud del permiso.
-P_FECHA_FIN: Fecha de fin de la solicitud del permiso.
-P_DESCRIPCION: Descripción adicional del permiso (como código de procedimiento, etc.).
-
-Operaciones realizadas:
-Verifica que el empleado exista en la base de datos.
-Verifica que las fechas ingresadas sean correctas (no retroactivas y sin solapamiento con otros permisos no rechazados).
-Inserta el permiso solicitado en la base de datos.
-Devuelve un mensaje de éxito.  */
+/*
+SP_SOLICITAR_PERMISO
+Pide un permiso nuevo para un empleado.
+Valida que el empleado exista, que las fechas no sean retroactivas ni
+invertidas y que no se cruce con otro permiso pendiente o aprobado; si
+todo esta bien lo guarda y responde con un mensaje de exito.
+*/
 DELIMITER // 
 DROP PROCEDURE IF EXISTS SP_SOLICITAR_PERMISO ;
 CREATE PROCEDURE SP_SOLICITAR_PERMISO(
@@ -123,17 +111,12 @@ proc_label: BEGIN
 END ;
 DELIMITER ;
 
-/*  SP_GESTIONAR_PERMISO:
-
-Propósito: Este SP se utiliza para actualizar el estado de un permiso existente. Puede ser actualizado a un nuevo estado (por ejemplo, de "pendiente" a "aprobado").
-Datos utilizados:
-P_ID_PERMISO: Identificador único del permiso que se desea actualizar.
-P_NUEVO_ESTADO: Nuevamente, este es un valor en una lista de estados posibles (por ejemplo, "pendiente", "aprobado", "rechazado").
-
-Operaciones realizadas:
-Verifica si el permiso existe antes de realizar cualquier actualización.
-Actualiza el estado del permiso con el nuevo estado proporcionado.
-Devuelve un mensaje de éxito que incluye el ID del permiso y su nuevo estado. */
+/*
+SP_GESTIONAR_PERMISO
+Aprueba, rechaza o deja pendiente un permiso existente.
+Si el ID no existe manda un error; si existe cambia el estado y confirma
+con un mensaje que trae el ID y el nuevo estado.
+*/
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_GESTIONAR_PERMISO ;
 CREATE PROCEDURE SP_GESTIONAR_PERMISO(
@@ -159,13 +142,11 @@ DELIMITER ;
 
 
 
-/*  SP_HISTORIAL_PERMISOS_EMPLEADO:
-Propósito: Este SP se utiliza para recuperar un historial de permisos de un empleado. La información incluye el tipo de permiso, la fecha de inicio, la fecha de fin, el estado y la descripción del permiso.
-Datos utilizados:
-P_ID_EMPLEADO: Identificador único del empleado cuyo historial de permisos se desea recuperar.
-
-Operaciones realizadas:
-Selecciona los registros de la tabla PERMISOS_EMPLEADOS donde el ID_EMPLEADO coincide con el valor de P_ID_EMPLEADO. Luego, ordena los resultados por FECHA_INICIO en orden descendente y devuelve la información solicitada.
+/*
+SP_HISTORIAL_PERMISOS_EMPLEADO
+Lista todos los permisos de un empleado (tipo, fechas, estado y
+descripcion) del mas reciente al mas antiguo, para ver su historial
+completo.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_HISTORIAL_PERMISOS_EMPLEADO //
@@ -190,6 +171,12 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------------------------------- 
 
 
+/*
+VISTA_PERMISOS_ACTIVOS
+Muestra solo los permisos aprobados que estan vigentes hoy, con el nombre
+del empleado, el tipo y el rango de fechas. Sirve para pintar quienes
+estan ausentes en este momento.
+*/
 CREATE OR REPLACE VIEW VISTA_PERMISOS_ACTIVOS AS
 SELECT 
     E.NOMBRE,

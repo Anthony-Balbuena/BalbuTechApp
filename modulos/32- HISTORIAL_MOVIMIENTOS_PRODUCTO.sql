@@ -1,3 +1,9 @@
+/*
+TABLA HISTORIAL_MOVIMIENTOS_PRODUCTO
+Guarda cada movimiento de stock con el tipo, la cantidad y el stock antes
+y despues del cambio. Sirve para reconstruir en que momento cambio el
+stock de cualquier producto.
+*/
 CREATE TABLE HISTORIAL_MOVIMIENTOS_PRODUCTO (
     ID_MOVIMIENTO INT NOT NULL AUTO_INCREMENT,
     ID_PRODUCTO INT NOT NULL,
@@ -20,6 +26,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_HISTORIAL_VENTA ;
 
+/*
+TR_HISTORIAL_VENTA
+Cuando se vende un producto, calcula el stock antes y despues de la venta
+y deja el movimiento registrado en el historial con tipo VENTA.
+*/
 CREATE TRIGGER TR_HISTORIAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
@@ -49,6 +60,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_HISTORIAL_COMPRA ;
 
+/*
+TR_HISTORIAL_COMPRA
+Al comprar, suma la cantidad al stock del producto y deja el movimiento
+en el historial con tipo ENTRADA y el stock antes y despues.
+*/
 CREATE TRIGGER TR_HISTORIAL_COMPRA
 AFTER INSERT ON DETALLE_COMPRA -- Ajusta aquí si tu tabla tiene otro nombre
 FOR EACH ROW
@@ -83,6 +99,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_HISTORIAL_DEVOLUCION //
 
+/*
+TR_HISTORIAL_DEVOLUCION (sobre DETALLES_DEVOLUCION)
+Al insertar una devolucion, suma la cantidad al stock del producto y
+registra el movimiento como AJUSTE en el historial.
+*/
 CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
 AFTER INSERT ON DETALLES_DEVOLUCION
 FOR EACH ROW
@@ -118,6 +139,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_HISTORIAL_DEVOLUCION;
 
+/*
+TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES)
+Al insertar una devolucion, suma la cantidad al stock solo si el producto
+esta en BUENO estado, y deja el movimiento en el historial.
+*/
 CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
 AFTER INSERT ON DEVOLUCIONES
 FOR EACH ROW
@@ -158,6 +184,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_HISTORIAL_AJUSTE;
 
+/*
+TR_HISTORIAL_AJUSTE
+Cada vez que cambia el stock en INVENTARIO, anota el movimiento en el
+historial con la cantidad y el stock antes y despues del cambio.
+*/
 CREATE TRIGGER TR_HISTORIAL_AJUSTE
 AFTER UPDATE ON INVENTARIO
 FOR EACH ROW

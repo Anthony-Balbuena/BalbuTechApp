@@ -1,3 +1,8 @@
+/*
+TABLA RECLAMOS_GARANTIAS
+Guarda los reclamos que se hacen sobre una garantia: que paso, cuando y
+en que estado esta el reclamo (pendiente, aprobado, rechazado o cerrado).
+*/
 CREATE TABLE RECLAMOS_GARANTIAS (
     ID_RECLAMO_GARAN INT NOT NULL AUTO_INCREMENT,
     ID_GARANTIA INT NOT NULL,
@@ -13,6 +18,11 @@ CREATE TABLE RECLAMOS_GARANTIAS (
     CONSTRAINT FK_RECLAMO_GARANTIA FOREIGN KEY (ID_GARANTIA) REFERENCES GARANTIAS (ID_GARANTIA) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_RECLAMO_GARANTIA_FECHA
+Ordena los reclamos por fecha, asi los mas recientes salen primero
+sin recorrer toda la tabla.
+*/
 CREATE INDEX IX_RECLAMO_GARANTIA_FECHA ON RECLAMOS_GARANTIAS (FECHA_RECLAMO);
 
 
@@ -23,6 +33,12 @@ CREATE INDEX IX_RECLAMO_GARANTIA_FECHA ON RECLAMOS_GARANTIAS (FECHA_RECLAMO);
 -----------------------------------------------------------------------------------------------------------------------------   
 DELIMITER //
 DROP PROCEDURE IF EXISTS 27_SP_REGISTRAR_RECLAMO_GARANTIA ;
+/*
+27_SP_REGISTRAR_RECLAMO_GARANTIA
+Registra un reclamo sobre una garantia.
+Revisa que la garantia exista y que este ACTIVA; si no, corta con error,
+y si esta bien, guarda el reclamo en estado PENDIENTE.
+*/
 CREATE PROCEDURE 27_SP_REGISTRAR_RECLAMO_GARANTIA(
     IN P_ID_GARANTIA INT,
     IN P_DESCRIPCION VARCHAR(255)
@@ -59,6 +75,11 @@ USE BALBU_TECH;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_FINALIZAR_RECLAMO_APROBADO;
+/*
+TR_FINALIZAR_RECLAMO_APROBADO
+Cuando un reclamo pasa de PENDIENTE a APROBADO, cancela la garantia.
+Sirve para marcar que la garantia ya se uso con ese reclamo.
+*/
 CREATE TRIGGER TR_FINALIZAR_RECLAMO_APROBADO
 AFTER UPDATE ON RECLAMOS_GARANTIAS
 FOR EACH ROW
@@ -74,6 +95,11 @@ DELIMITER ;
 
 DELIMITER //
 
+/*
+27_SP_FINALIZAR_RECLAMO_TOTAL
+Cierra un reclamo y deja constancia en la auditoria, todo en una transaccion.
+Si algo falla en el camino, deshace todo para no dejar datos a medias.
+*/
 CREATE PROCEDURE 27_SP_FINALIZAR_RECLAMO_TOTAL(IN P_ID_RECLAMO INT)
 BEGIN
     -- Declarar manejador de errores

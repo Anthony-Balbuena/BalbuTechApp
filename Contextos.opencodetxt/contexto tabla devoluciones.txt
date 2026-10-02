@@ -1,0 +1,75 @@
+CONTEXTO DE DOCUMENTACION - TABLA DEVOLUCIONES
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/25- DEVOLUCIONES.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 25- DEVOLUCIONES.sql (8 bloques)
+================================================================================
+TABLA
+  - DEVOLUCIONES .......... devoluciones con motivo, condicion, monto y estado
+
+INDICES (3)
+  - IX_DEVOLUCION_VENTA .... devoluciones de una venta
+  - IX_DEVOLUCION_GARANTIA . devoluciones ligadas a una garantia
+  - IX_DEVOLUCION_ESTADO_FECHA .. reporte de pendientes del dia
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - SP_REGISTRAR_DEVOLUCION ..... registra devolucion validando garantia
+                                  y tope de unidades
+  - 25_SP_PROCESAR_DEVOLUCION ... aprueba, rechaza o reembolsa lo pendiente
+
+TRIGGER (1)
+  - TR_REINTEGRAR_STOCK_DEVOLUCION .. al aprobar, devuelve stock y anota
+                                       la ENTRADA
+
+VISTA (1)
+  - VISTA_REPORTES_DEVOLUCIONES .. devoluciones agrupadas por producto
+                                     y motivo
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los comentarios originales "-- 1.", "-- 2." y "-- 3." de los
+  indices; solo se agregaron bloques.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * El trigger TR_REINTEGRAR_STOCK_DEVOLUCION inserta en
+    MOVIMIENTOS_INVENTARIO sin el campo ID_EMPLEADO (NOT NULL en esa tabla).
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 16 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~12 archivos con indices sin documentar.
+- ~64 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/25- DEVOLUCIONES.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

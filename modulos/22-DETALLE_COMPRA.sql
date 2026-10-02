@@ -1,3 +1,9 @@
+/*
+TABLA DETALLE_COMPRA
+Guarda que productos forman parte de cada compra, con su cantidad y precio.
+El subtotal se calcula solo al multiplicar cantidad por precio.
+No se puede repetir el mismo producto dentro de la misma compra.
+*/
 CREATE TABLE DETALLE_COMPRA (
     ID_DETALLE_COMPRA INT NOT NULL AUTO_INCREMENT,
     ID_COMPRA INT NOT NULL,
@@ -13,12 +19,25 @@ CREATE TABLE DETALLE_COMPRA (
 ) ENGINE = InnoDB;
 
 -- 1. Optimiza la búsqueda de compras por cada Proveedor
+/*
+INDICE IX_COMPRA_PROVEEDOR
+Busca todas las compras de un proveedor en concreto,
+util para ver el historial de compras hechas a cada proveedor.
+*/
 CREATE INDEX IX_COMPRA_PROVEEDOR ON COMPRAS (ID_PROVEEDOR);
 
 -- 2. Acelera la carga de los productos de una factura de compra específica
+/*
+INDICE IX_DETALLE_COMPRA_COMPRA
+Trae rapidamente todos los productos que trae una factura de compra.
+*/
 CREATE INDEX IX_DETALLE_COMPRA_COMPRA ON DETALLE_COMPRA (ID_COMPRA);
 
 -- 3. Permite rastrear el historial de precios y compras de un solo Producto
+/*
+INDICE IX_DETALLE_COMPRA_PRODUCTO
+Sirve para rastrear el historial de precios y compras de un solo producto.
+*/
 CREATE INDEX IX_DETALLE_COMPRA_PRODUCTO ON DETALLE_COMPRA (ID_PRODUCTO);
 
 
@@ -27,6 +46,12 @@ CREATE INDEX IX_DETALLE_COMPRA_PRODUCTO ON DETALLE_COMPRA (ID_PRODUCTO);
 -----------------------------------------------------------------------------------------------------------------------------   
 DELIMITER // 
 DROP PROCEDURE IF EXISTS 22_SP_AGREGAR_DETALLE_COMPRA ;
+/*
+22_SP_AGREGAR_DETALLE_COMPRA
+Agrega un producto a una compra que ya esta abierta.
+Revisa que la compra y el producto existan, que la cantidad y el precio sean
+positivos y que el producto no este repetido; si algo falla no guarda nada.
+*/
 CREATE PROCEDURE 22_SP_AGREGAR_DETALLE_COMPRA(
     IN P_ID_COMPRA INT,
     IN P_ID_PRODUCTO INT,
@@ -74,6 +99,11 @@ DELIMITER ;
 DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_CALCULAR_TOTAL_COMPRA ;
+/*
+TR_CALCULAR_TOTAL_COMPRA
+Le va sumando el subtotal de cada producto al TOTAL de la compra.
+Asi el total de la compra queda actualizado sin calcularlo a mano.
+*/
 CREATE TRIGGER TR_CALCULAR_TOTAL_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
@@ -88,6 +118,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_PROCESAR_COMPRA ;
+/*
+TR_PROCESAR_COMPRA
+Al agregar un producto a la compra, suma su cantidad al stock y deja la
+ENTRADA registrada en MOVIMIENTOS_INVENTARIO para la auditoria.
+*/
 CREATE TRIGGER TR_PROCESAR_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
@@ -121,6 +156,11 @@ DELIMITER ;
 ----------------------------------------------------[VIEW}--------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------
 
+/*
+VISTA_DETALLE_COMPRA
+Muestra los productos de cada compra con cantidad, precio y subtotal.
+Trae el nombre del producto en lugar de su ID, lista para ver en pantalla.
+*/
 CREATE OR REPLACE VIEW VISTA_DETALLE_COMPRA AS
 SELECT 
     DC.ID_COMPRA,

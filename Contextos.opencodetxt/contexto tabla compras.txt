@@ -1,0 +1,74 @@
+CONTEXTO DE DOCUMENTACION - TABLA COMPRAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/19- COMPRAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (8 bloques)
+================================================================================
+TABLA
+  - COMPRAS ................ cabecera de cada compra a proveedor
+
+INDICES (2)
+  - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
+  - IX_COMPRA_TOTAL ......... analisis de gastos por monto
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
+
+TRIGGERS (2)
+  - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
+  - TR_CALCULAR_TOTAL_COMPRA .... suma subtotales al TOTAL
+
+VISTA (1)
+  - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha y total
+
+FUNCION (1)
+  - FN_CONTAR_ITEMS_COMPRA .. cuenta los productos de una compra
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que INVENTARIO y
+  HISTORIAL_ESTADOS_PRODUCTO.
+- Se conservaron los comentarios originales "-- Para reportes de compras...",
+  "-- Para analisis de gastos...", "-- Trigger: Actualiza Inventario..." y
+  "-- Trigger: Actualiza Total..."; solo se agregaron bloques.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * Linea 95: una "V" suelta antes del separador de seccion [VIEW}.
+  * Los triggers usan "END //" pero el DELIMITER se cerro antes con ";",
+    el script tal como esta daria error al ejecutarse completo.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 27 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~20 archivos con CREATE INDEX sin documentar (~45 indices en total).
+- ~85 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/19- COMPRAS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

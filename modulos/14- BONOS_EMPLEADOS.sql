@@ -1,24 +1,10 @@
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
 /*
-DESCRIPCION DEL MODULO DE BONOS DE EMPLEADOS
-
-Este modulo administra los bonos, horas extra y bonificaciones otorgadas a los empleados en la base de datos BALBU_TECH.
-
 TABLA BONOS_EMPLEADOS
-- ID_BONO: identificador unico, clave primaria y autoincremental.
-- ID_EMPLEADO: identificador del empleado asociado, clave foranea obligatoria.
-- FECHA: fecha en que se otorga o corresponde el bono, de tipo obligatorio.
-- TIPO_BONO: tipo de incentivo, restringido a los valores DOBLE_SUELDO, HORAS_EXTRA o BONIFICACION.
-- MONTO: cantidad monetaria del bono, de tipo obligatorio y mayor a cero.
-- DESCRIPCION: detalle o motivo informativo del bono.
-- FECHA_REGISTRO: fecha y hora de registro en el sistema, generada automaticamente.
-
-RESTRICCIONES
-- La clave primaria identifica cada bono de forma unica.
-- La clave foranea FK_BONO_EMPLEADO asegura que el bono pertenezca a un empleado existente.
-- El campo MONTO incluye una validacion para evitar cantidades menores o iguales a cero.
-
-La tabla utiliza el motor InnoDB.
+Guarda los bonos, horas extra y bonificaciones de los empleados: fecha,
+tipo (DOBLE_SUELDO, HORAS_EXTRA o BONIFICACION), monto y estado
+(PENDIENTE, PAGADO o ANULADO). El monto tiene que ser mayor a cero y el
+bono siempre pertenece a un empleado existente.
 */
 CREATE TABLE BONOS_EMPLEADOS (
     ID_BONO INT NOT NULL AUTO_INCREMENT,
@@ -45,23 +31,32 @@ MODIFY COLUMN ESTADO ENUM('PENDIENTE', 'PAGADO', 'ANULADO') NOT NULL DEFAULT 'PE
 
 
 
---DESCRIPCION DE LOS INDICES DE LA TABLA BONOS_EMPLEADOS
-
---Este bloque describe los indices creados para que el sistema busque la informacion mas rapido en la tabla BONOS_EMPLEADOS de la base de datos BALBU_TECH.
-
-
-
---IX_BONO_EMPLEADO (ID_EMPLEADO): sirve para encontrar al instante todo el historial de bonos de un trabajador en especifico, sin tener que revisar todo el sistema paso a paso.
+/*
+INDICE IX_BONO_EMPLEADO
+Encuentra al instante todo el historial de bonos de un empleado en
+especifico, sin tener que revisar la tabla completa.
+*/
 CREATE INDEX IX_BONO_EMPLEADO ON BONOS_EMPLEADOS (ID_EMPLEADO);
 
---IX_BONO_FECHA (FECHA): ayuda a que los reportes de contabilidad y los totales por mes o año salgan de forma inmediata.
+/*
+INDICE IX_BONO_FECHA
+Acelera los reportes de contabilidad y los totales por mes o ano, que
+ordenan y filtran por la fecha del bono.
+*/
 CREATE INDEX IX_BONO_FECHA ON BONOS_EMPLEADOS (FECHA);
 
----IX_BONO_TIPO (TIPO_BONO): permite calcular con rapidez cuanto dinero se gasta en cada tipo de extra (como horas de mas o bonificaciones).
-
+/*
+INDICE IX_BONO_TIPO
+Permite calcular rapido cuanto dinero se gasta en cada tipo de bono
+(doble sueldo, horas extra o bonificacion).
+*/
 CREATE INDEX IX_BONO_TIPO ON BONOS_EMPLEADOS (TIPO_BONO);
 
-
+/*
+INDICE IX_BONO_ESTADO
+Filtra los bonos por su estado (PENDIENTE, PAGADO o ANULADO), que es lo
+que usa la pantalla para mostrar cada lista.
+*/
 CREATE INDEX IX_BONO_ESTADO ON BONOS_EMPLEADOS (ESTADO);
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -70,27 +65,11 @@ CREATE INDEX IX_BONO_ESTADO ON BONOS_EMPLEADOS (ESTADO);
 
 
 /*
-DESCRIPCION DEL PROCEDIMIENTO ALMACENADO: SP_REGISTRAR_BONO
-
-1- Validar existencia del empleado:
-
-Se declara una variable v_nombre_empleado de tipo VARCHAR(100) para almacenar el nombre del empleado.
-Se utiliza una sentencia SELECT NOMBRE INTO v_nombre_empleado FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO; para obtener el nombre del empleado con el ID proporcionado.
-Si v_nombre_empleado es NULL, significa que el empleado no se encuentra en la base de datos, por lo que se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EMPLEADO NO ENCONTRADO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el empleado no se encuentre.
-
-2- Validar el monto del bono:
-
-Se verifica si el monto P_MONTO es mayor a 100000. Si es así, se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO EXCEDE EL LÍMITE PERMITIDO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el monto no sea válido.
-
-3- Insertar el bono en la tabla BONOS_EMPLEADOS:
-
-Se inserta un registro en la tabla BONOS_EMPLEADOS con los valores proporcionados (P_ID_EMPLEADO, P_FECHA, P_TIPO_BONO, P_MONTO, P_DESCRIPCION).
-Se usa SELECT CONCAT('EXITO: BONO DE $', P_MONTO, ' REGISTRADO A: ', v_nombre_empleado, ' (ID: ', P_ID_EMPLEADO, ').') AS MENSAJE; para devolver un mensaje de éxito que incluye el monto del bono, el nombre del empleado y su ID.
-
-Este procedimiento asegura que se cumplan ciertas reglas antes de insertar un bono en la base de datos, evitando posibles errores o malas prácticas. Al finalizar, el procedimiento devuelve un mensaje de éxito que confirma el registro del bono.
-
+SP_REGISTRAR_BONO
+Registra un bono nuevo para un empleado.
+Valida que el empleado exista y que el monto no pase de 100000; si todo
+esta bien guarda el bono y responde con un mensaje que trae el monto, el
+nombre del empleado y su ID.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_REGISTRAR_BONO ;
@@ -130,29 +109,11 @@ DELIMITER ;
 
 
 
- /* ACTUALIZAR
-   
-1-- Validar si el bono existe:
-
-Se declara una variable v_bono_existente de tipo INT para almacenar el número de registros que coinciden con el ID del bono.
-Se utiliza una sentencia SELECT COUNT(*) INTO v_bono_existente FROM BONOS_EMPLEADOS WHERE ID_BONO = P_ID_BONO; para contar el número de registros que coinciden con el ID del bono.
-Si v_bono_existente es 0, significa que el bono no existe, por lo que se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: BONO NO ENCONTRADO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono no se encuentre.
-
-2- Validación de monto:
-
-Se verifica si el nuevo monto P_NUEVO_MONTO es mayor a 100000. Si es así, se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO EXCEDE EL LÍMITE PERMITIDO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el monto no sea válido.
-
-3- Actualización del bono en la base de datos:
-
-Se actualiza el registro del bono en la tabla BONOS_EMPLEADOS con los nuevos valores P_NUEVO_MONTO y P_NUEVA_DESCRIPCION.
-Se usa SELECT 'EXITO: BONO ACTUALIZADO CORRECTAMENTE.' AS MENSAJE; para devolver un mensaje de éxito que confirma que el bono se actualizó correctamente.
-
-Este procedimiento asegura que se cumplan ciertas reglas antes de actualizar un bono en la base de datos, evitando posibles errores o malas prácticas. Al finalizar, el procedimiento devuelve un mensaje de éxito que confirma la actualización del bono.
-
-
-
+/*
+SP_ACTUALIZAR_BONO
+Cambia el monto y la descripcion de un bono existente.
+Revisa que el bono exista y que el nuevo monto no pase de 100000; si todo
+esta bien lo actualiza y confirma con un mensaje.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_BONO //
@@ -178,33 +139,11 @@ proc_label: BEGIN
 END //
 DELIMITER ;
 
-/* PAGAR BONO 
-1- Verificar si el bono existe y obtener su estado actual:
-
-Se declara una variable v_estado_actual de tipo VARCHAR(20) para almacenar el estado actual del bono.
-Se utiliza una sentencia SELECT ESTADO INTO v_estado_actual FROM BONOS_EMPLEADOS WHERE ID_BONO = P_ID_BONO; para obtener el estado actual del bono con el ID proporcionado.
-Si v_estado_actual es NULL, significa que el bono no existe, por lo que se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL BONO NO EXISTE.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono no se encuentre.
-
-2- Validación de estado actual del bono:
-
-Se verifica si el estado actual del bono es PAGADO. Si es así, se lanza un mensaje de aviso SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AVISO: ESTE BONO YA HABIA SIDO PAGADO ANTERIORMENTE.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono ya se haya pagado anteriormente.
-
-3- Validación de estado actual del bono:
-
-Se verifica si el estado actual del bono es ANULADO. Si es así, se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDE PAGAR UN BONO QUE ESTA ANULADO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono esté anulado.
-
-4- Actualización del estado del bono a PAGADO:
-
-Se actualiza el registro del bono en la tabla BONOS_EMPLEADOS con el nuevo estado PAGADO utilizando UPDATE BONOS_EMPLEADOS SET ESTADO = 'PAGADO' WHERE ID_BONO = P_ID_BONO;.
-
-5- Confirmación:
-
-Se usa SELECT CONCAT('EXITO: EL BONO CON ID ', P_ID_BONO, ' HA SIDO MARCADO COMO PAGADO.') AS MENSAJE; para devolver un mensaje de éxito que confirma que el bono se pagó correctamente.
-
-Este procedimiento asegura que se cumplan ciertas reglas antes de marcar un bono como pagado, evitando posibles errores o malas prácticas. Al finalizar, el procedimiento devuelve un mensaje de éxito que confirma que el bono se pagó correctamente.
+/*
+SP_PAGAR_BONO
+Marca un bono como PAGADO.
+Si el bono no existe manda error, si ya estaba pagado avisa y si esta
+anulado no deja pagarlo; solo un bono pendiente se puede pagar.
 */
 
 DELIMITER //
@@ -244,32 +183,11 @@ proc_label: BEGIN
 END;
 DELIMITER ;
 
-/* ANULAR BONO
-1- Verificar existencia y estado:
-
-Se declara una variable v_estado_actual de tipo VARCHAR(20) para almacenar el estado actual del bono.
-Se utiliza una sentencia SELECT ESTADO INTO v_estado_actual FROM BONOS_EMPLEADOS WHERE ID_BONO = P_ID_BONO; para obtener el estado del bono con el ID proporcionado.
-Si v_estado_actual es NULL, significa que el bono no existe, por lo que se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL BONO NO EXISTE.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono no se encuentre.
-2- Validar el estado actual del bono:
-
-Se verifica si el estado actual del bono es 'PAGADO'. Si es así, se lanza un error SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDE ANULAR UN BONO QUE YA FUE PAGADO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono ya esté pagado.
-
-3- Verificar si el bono ya está anulado:
-
-Si el estado actual del bono es 'ANULADO', se lanza un mensaje de aviso SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AVISO: ESTE BONO YA ESTABA ANULADO.';.
-Se usa LEAVE proc_label para salir del procedimiento en caso de que el bono ya esté anulado.
-
-4- Cambiar estado a ANULADO:
-
-Se actualiza el estado del bono a 'ANULADO' utilizando la sentencia UPDATE BONOS_EMPLEADOS SET ESTADO = 'ANULADO' WHERE ID_BONO = P_ID_BONO;.
-
-5- Confirmación:
-
-Se usa SELECT CONCAT('EXITO: EL BONO CON ID ', P_ID_BONO, ' FUE ANULADO CORRECTAMENTE.') AS MENSAJE; para devolver un mensaje de éxito que confirma que el bono se anuló correctamente.
-Este procedimiento asegura que se cumplan ciertas reglas antes de anular un bono, incluyendo la validación de si el bono existe, si el bono ya está pagado o anulado, y luego cambia el estado del bono a 'ANULADO'. Al finalizar, el procedimiento devuelve un mensaje de éxito que confirma la anulación del bono.
-
+/*
+SP_ANULAR_BONO
+Anula un bono poniendolo en estado ANULADO.
+Si el bono no existe manda error, si ya fue pagado no deja anularlo y si
+ya estaba anulado solo avisa que no habia nada que hacer.
 */
 
 DELIMITER //
@@ -311,21 +229,10 @@ DELIMITER ;
 
 
 /*
-
-1- Validación del parámetro P_ESTADO:
-
-Se verifica si P_ESTADO es NULL o si tiene un valor válido ('PENDIENTE', 'PAGADO', o 'ANULADO'). Si no cumple con esto, se lanza un error con SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: P_ESTADO NO ES VALIDO. PUEDE SER "PENDIENTE", "PAGADO", O "ANULADO".';.
-Selección de los bonos con los detalles relacionados:
-
-2- Se seleccionan los campos relevantes de las tablas BONOS_EMPLEADOS (b) y EMPLEADOS (e).
-
-Se utiliza una consulta SELECT que incluye las columnas requeridas (ID_BONO, ID_EMPLEADO, NOMBRE_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION, ESTADO, FECHA_REGISTRO).
-Se realiza una INNER JOIN entre BONOS_EMPLEADOS y EMPLEADOS para obtener los nombres de los empleados.
-Se incluye una cláusula WHERE que filtra los bonos según el estado P_ESTADO si no es NULL. Si P_ESTADO es NULL, se incluyen todos los bonos.
-Se ordena el resultado por la fecha de creación del bono en orden descendente.
-
-Este procedimiento asegura que se cumplan ciertas reglas antes de seleccionar los bonos, evitando posibles errores o malas prácticas. Al finalizar, el procedimiento devuelve los bonos filtrados según el estado especificado.
-
+SP_LISTAR_BONOS
+Lista los bonos con el nombre del empleado, mas recientes primero.
+Si llega un estado (PENDIENTE, PAGADO o ANULADO) filtra por el; si viene
+NULL o vacio trae todos.
 */
 
 DELIMITER //
@@ -359,7 +266,10 @@ DELIMITER ;
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 /*
-El trigger TR_VALIDAR_FECHA_BONO se ejecuta antes de insertar una nueva fila en la tabla BONOS_EMPLEADOS. Este trigger valida si la fecha (FECHA) de la nueva fila es más reciente que la fecha de hace 60 días (30 días antes de la fecha actual). Si es así, se lanza un error con el mensaje "ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 30 DÍAS.".
+TR_VALIDAR_FECHA_BONO
+Antes de insertar un bono revisa que la fecha no sea vieja: no deja
+registrar bonos con mas de 60 dias de antiguedad y manda un error si es
+asi. Trabaja en automatico.
 */
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_VALIDAR_FECHA_BONO;
@@ -375,19 +285,10 @@ END;
 DELIMITER ;
 
 /*
-El trigger TR_CALCULAR_BONO_VENTA se ejecuta después de que se inserta una fila en la tabla DETALLES_VENTA. Este trigger obtiene el ID del empleado de la tabla VENTAS que corresponde con el ID de venta en la tabla DETALLES_VENTA. Luego, inserta los datos necesarios en la tabla BONOS_EMPLEADOS con la siguiente información:
-
-ID_EMPLEADO: El ID del empleado obtenido de la tabla VENTAS.
-
-FECHA: La fecha actual (CURRENT_DATE()).
-
-TIPO_BONO: Tipo de bono, en este caso "BONIFICACION".
-
-MONTO: El monto del bono calculado como el 1% del subtotal de la venta (NEW.SUBTOTAL * 0.01).
-
-DESCRIPCION: La descripción del bono, que es "Comisión automática por venta".
-
-ESTADO: Estado del bono, que es "PENDIENTE".
+TR_CALCULAR_BONO_VENTA
+Se dispara al insertar en DETALLES_VENTA y crea solo un bono de
+BONIFICACION al empleado de esa venta con el 1% del subtotal, estado
+PENDIENTE y la descripcion de comision automatica. Trabaja en automatico.
 */
 
 DELIMITER // 
@@ -422,7 +323,9 @@ DELIMITER ;
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 /*
-El CREATE OR REPLACE VIEW VISTA_TOTAL_BONOS_POR_EMPLEADO crea una vista que selecciona los datos necesarios para obtener el total de bonificaciones por empleado. La vista combina los datos de las tablas EMPLEADOS y BONOS_EMPLEADOS, agrupando por ID_EMPLEADO para calcular el total de bonificaciones (TOTAL_BONIFICADO) y la cantidad de bonificaciones (CANTIDAD_BONOS).
+VISTA_TOTAL_BONOS_POR_EMPLEADO
+Resume por empleado el total de dinero bonificado y cuantos bonos tiene,
+incluyendo tambien a los que no tienen ningun bono (en cero).
 */
 
 CREATE OR REPLACE VIEW VISTA_TOTAL_BONOS_POR_EMPLEADO AS

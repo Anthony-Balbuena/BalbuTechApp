@@ -1,0 +1,55 @@
+CONTEXTO DE DOCUMENTACION - TABLA PERMISOS_EMPLEADOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/13- PERMISOS_EMPLEADOS.sql
+LOTE D (archivos 13 a 16) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo: "MODULO: PERMISOS_EMPLEADOS — Descripcion general", un bloque
+combinado "INDICES DE RENDIMIENTO" y bloques "SP_X: / Proposito: / Datos
+utilizados: / Operaciones realizadas:".
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 13- PERMISOS_EMPLEADOS.sql (8 bloques)
+================================================================================
+TABLA
+  - PERMISOS_EMPLEADOS ...... permisos de los empleados (5 tipos de ENUM,
+    fechas con CHECK, estados PENDIENTE/APROBADO/RECHAZADO)
+
+INDICES (3) - antes eran UN solo bloque combinado; ahora uno por indice:
+  - IX_PERMISO_EMPLEADO ..... historial por empleado
+  - IX_PERMISO_ESTADO ....... pendientes de aprobar
+  - IX_PERMISO_FECHAS ....... calendarios de ausencias
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - SP_SOLICITAR_PERMISO ....... pide permiso validando retroactivos
+  - SP_GESTIONAR_PERMISO ...... aprueba/rechaza/pendiente
+  - SP_HISTORIAL_PERMISOS_EMPLEADO . historial por empleado
+
+VISTA (1)
+  - VISTA_PERMISOS_ACTIVOS ... permisos aprobados vigentes hoy
+    (BLOQUE AGREGADO: no tenia documentacion)
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- El bloque combinado de indices se DIVIDIO en 3 bloques (uno por indice),
+  conservando los comentarios cortos "-- 1. Para ver...", "-- 2. ...",
+  "-- 3. ...".
+- Se AGREGO el bloque de la vista VISTA_PERMISOS_ACTIVOS.
+- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 8 objetos CREATE / 8 bloques con bloque previo.
+- /* balanceados: 8/8.
+- Estilo viejo restante: 0.
+- SQL real identico al original (cero sentencias cambiadas).

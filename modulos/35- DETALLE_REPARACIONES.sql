@@ -1,3 +1,9 @@
+/*
+TABLA DETALLE_REPARACIONES
+Guarda cada paso o avance de una reparacion: que se hizo, el repuesto
+usado, el costo, el tiempo empleado, el estado y la evidencia.
+Es la bitacora del trabajo tecnico sobre una asignacion.
+*/
 CREATE TABLE DETALLE_REPARACIONES (
     ID_REPARACION INT NOT NULL AUTO_INCREMENT,
     ID_ASIGNACION INT NOT NULL,
@@ -26,6 +32,12 @@ DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_REGISTRAR_AVANCE_REPARACION;
 
+/*
+SP_REGISTRAR_AVANCE_REPARACION
+Anota un avance de la reparacion con su repuesto, costo y evidencia.
+Revisa que la asignacion exista y que no este completada; si esta bien,
+guarda el registro del avance.
+*/
 CREATE PROCEDURE SP_REGISTRAR_AVANCE_REPARACION(
     IN P_ID_ASIGNACION INT,
     IN P_ID_USUARIO INT,

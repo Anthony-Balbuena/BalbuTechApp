@@ -1,3 +1,9 @@
+/*
+TABLA MOVIMIENTOS_INVENTARIO
+Bitacora de todo lo que le pasa al stock: entradas, salidas, ajustes y
+devoluciones. Cada fila dice que producto, quien lo movio, cuanto, cuando
+y por que motivo. Sirve para rastrear cualquier cambio de inventario.
+*/
 CREATE TABLE MOVIMIENTOS_INVENTARIO (
     ID_MOVIMIENTO INT NOT NULL AUTO_INCREMENT,
     ID_PRODUCTO INT NOT NULL,
@@ -17,8 +23,18 @@ CREATE TABLE MOVIMIENTOS_INVENTARIO (
 ) ENGINE = InnoDB;
 
 -- Tu índice para rastrear qué pasó con cada producto
+/*
+INDICE IX_MOVIMIENTO_PRODUCTO
+Busca todos los movimientos de un producto en concreto, asi se rastrea
+rapido que le paso al stock sin leer toda la tabla.
+*/
 CREATE INDEX IX_MOVIMIENTO_PRODUCTO ON MOVIMIENTOS_INVENTARIO (ID_PRODUCTO);
 
+/*
+INDICE IX_CANTIDAD_MOVIINVENTORIO
+Busca movimientos por cantidad, util para revisar entradas o salidas
+grandes de mercancia.
+*/
 CREATE INDEX IX_CANTIDAD_MOVIINVENTORIO ON MOVIMIENTOS_INVENTARIO (CANTIDAD);
 
 
@@ -30,6 +46,12 @@ CREATE INDEX IX_CANTIDAD_MOVIINVENTORIO ON MOVIMIENTOS_INVENTARIO (CANTIDAD);
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS 20_SP_REGISTRAR_AJUSTE_INVENTARIO ;
+/*
+20_SP_REGISTRAR_AJUSTE_INVENTARIO
+Anota un movimiento de stock y lo refleja en el inventario.
+Primero revisa que el producto exista, luego guarda el movimiento y al final
+suma si es ENTRADA o DEVOLUCION, o resta si es SALIDA o AJUSTE.
+*/
 CREATE PROCEDURE 20_SP_REGISTRAR_AJUSTE_INVENTARIO(
     IN P_ID_PRODUCTO INT,
     IN P_ID_EMPLEADO INT,
@@ -68,6 +90,11 @@ DELIMITER ;
 --COMPRA
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_AUDITORIA_MOVIMIENTO_COMPRA ;
+/*
+TR_AUDITORIA_MOVIMIENTO_COMPRA
+Cuando se registra una compra, anota automaticamente la ENTRADA de mercancia.
+Toma el empleado de la compra y deja el movimiento con su observacion.
+*/
 CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
@@ -85,6 +112,11 @@ DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_AUDITORIA_MOVIMIENTO_VENTA ;
 
+/*
+TR_AUDITORIA_MOVIMIENTO_VENTA
+Cuando se registra una venta, descuenta el stock y anota la SALIDA.
+Deja el movimiento con el empleado de la venta para poder rastrearlo.
+*/
 CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_VENTA
 AFTER INSERT ON DETALLES_VENTA -- <--- AQUÍ ESTABA EL ERROR
 FOR EACH ROW

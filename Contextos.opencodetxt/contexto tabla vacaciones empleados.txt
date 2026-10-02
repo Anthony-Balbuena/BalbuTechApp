@@ -1,0 +1,60 @@
+CONTEXTO DE DOCUMENTACION - TABLA VACACIONES_EMPLEADOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/12- VACACIONES_EMPLEADOS.sql
+LOTE C (archivos 9 a 12) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo: bloques "MODULO: VACACIONES_EMPLEADOS" y "DESCRIPCION DE SP..."
+con listados de parametros y notas de despliegue.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 12- VACACIONES_EMPLEADOS.sql (10 bloques)
+================================================================================
+TABLA (2 bloques: original + copia duplicada)
+  - VACACIONES_EMPLEADOS .... vacaciones por empleado (fin >= inicio,
+    ON DELETE CASCADE)
+
+PROCEDIMIENTOS ALMACENADOS (7: los 5 reales + 2 de la copia)
+  - SP_INSERTAR_VACACIONES ....... alta validando fechas, cruces y cupo
+  - 12_SP_ACTUALIZAR_VACACIONES .. cambia fechas si no terminaron
+  - 12_SP_REPORTE_DIAS_CONSUMIDOS . saldo del ano (15 dias)
+  - 12_SP_VALIDAR_CUPO_VACACIONES . TRUE/FALSE segun quede personal
+  - 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES . quienes estan fuera hoy
+
+TRIGGER (1)
+  - TR_VALIDAR_LIMITE_VACACIONES . bloquea si se pasa de 15 dias al ano
+
+================================================================================
+3. ARCHIVO CORRUPTO - ANOMALIA PREEXISTE (NO SE TOCO EL SQL) MUY IMPORTANTE
+================================================================================
+Este archivo esta roto desde antes de la sesion:
+a) Arranca con un bloque de comentario truncado: "MODULO: VACACIONES_
+   EMPLEADOS / END // / DELIMITER ;" y un "/*" anidado; el primer "*/" cierra
+   antes de tiempo, por lo que "Notas de despliegue: ..." y el "*}" de la
+   linea ~27 quedan como TEXTO VIVO (eso romperia la ejecucion en MySQL).
+b) El procedure SP_INSERTAR_VACACIONES (linea ~63) se abre y NUNCA cierra sus
+   parametros: dentro de ese parentesis se pego una COPIA COMPLETA del
+   archivo (tabla, los 5 SPs y el trigger, indentados 4 espacios).
+c) Por eso la tabla y varios SPs aparecen DOS VECES en el archivo.
+
+Lo que se hizo: se reemplazaron SOLO los comentarios de documentacion (10
+bloques), cuidando que el texto vivo y los "// */" quedaran exactamente en
+el mismo lugar. NO se reparo la duplicacion ni el truncamiento: eso exige
+cambiar SQL y debe decidir el usuario aparte.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 10 bloques /* */ (9 reescritos + 1 de tabla nuevo), estilo viejo: 0.
+- La cuenta /* = 10 y */ = 11 se debe al "*}" HUERFANO preexistente de la
+  linea 27 (existia desde el original).
+- SQL: identico al original al quitar los comentarios, salvo UNA linea en
+  blanco agregada por el bloque nuevo de la tabla. Cero sentencias cambiadas.

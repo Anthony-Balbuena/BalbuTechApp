@@ -1,0 +1,69 @@
+CONTEXTO DE DOCUMENTACION - TABLA VENTAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/21- VENTAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (8 bloques)
+================================================================================
+TABLA
+  - VENTAS ................. cabecera de cada venta (cliente, empleado,
+                              estado, fecha y total)
+
+INDICES (2)
+  - IX_VENTAS_CLIENTE ....... historial de ventas por cliente
+  - IX_VENTAS_EMPLEADO ...... ventas atendidas por empleado
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
+  - 21_SP_AGREGAR_PRODUCTO_VENTA ... agrega producto validando stock y precio
+
+TRIGGERS (2)
+  - TR_CALCULAR_TOTAL_VENTA .. suma subtotales al TOTAL de la venta
+  - TR_PROCESAR_VENTA ........ descuenta stock y registra la SALIDA
+
+VISTA (1)
+  - VISTA_DETALLE_VENTA ...... productos de cada venta con subtotal
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- La seccion [FUNTION} vacia (linea 156) se dejo intacta, sin inventar nada.
+- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 25 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~18 archivos con CREATE INDEX sin documentar (~41 indices en total).
+- ~82 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+- Decidir si el criterio aplicado se replica en todo_modulos.sql.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/21- VENTAS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

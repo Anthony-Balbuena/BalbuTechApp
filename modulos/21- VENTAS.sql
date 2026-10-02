@@ -1,3 +1,9 @@
+/*
+TABLA VENTAS
+Cabecera de cada venta: quien la compro, quien la atendio, cuando y cuanto
+gasto. El estado indica si esta en proceso, realizada, cancelada o devuelta.
+Los productos vendidos van en DETALLES_VENTA.
+*/
 CREATE TABLE VENTAS (
     ID_VENTA INT NOT NULL AUTO_INCREMENT,
     FECHA TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -15,8 +21,18 @@ CREATE TABLE VENTAS (
     CONSTRAINT FK_VENTA_CLIENTE FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES (ID_CLIENTE)
 ) ENGINE = InnoDB;
 
+/*
+INDICE IX_VENTAS_CLIENTE
+Busca todas las ventas de un cliente en concreto,
+util para ver su historial de compras.
+*/
 CREATE INDEX IX_VENTAS_CLIENTE ON VENTAS (ID_CLIENTE);
 
+/*
+INDICE IX_VENTAS_EMPLEADO
+Busca todas las ventas atendidas por un empleado,
+util para reportes de desempeno.
+*/
 CREATE INDEX IX_VENTAS_EMPLEADO ON VENTAS (ID_EMPLEADO);
 
 
@@ -28,6 +44,12 @@ CREATE INDEX IX_VENTAS_EMPLEADO ON VENTAS (ID_EMPLEADO);
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 21_SP_INICIAR_VENTA ;
+/*
+21_SP_INICIAR_VENTA
+Abre una venta nueva en 0 antes de agregarle productos.
+Revisa que el empleado y el cliente existan; si algo falla no guarda nada,
+y si esta todo bien crea la venta y devuelve su numero de ID.
+*/
 CREATE PROCEDURE 21_SP_INICIAR_VENTA(
     IN P_ID_EMPLEADO INT,
     IN P_ID_CLIENTE INT,
@@ -60,6 +82,12 @@ DELIMITER ;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 21_SP_AGREGAR_PRODUCTO_VENTA ;
+/*
+21_SP_AGREGAR_PRODUCTO_VENTA
+Agrega un producto a la venta que ya esta abierta.
+Revisa que la venta exista y que haya stock suficiente; si todo esta bien
+toma el precio actual del producto y agrega la linea del detalle.
+*/
 CREATE PROCEDURE 21_SP_AGREGAR_PRODUCTO_VENTA(
     IN P_ID_VENTA INT,
     IN P_ID_PRODUCTO INT,
@@ -98,6 +126,11 @@ DELIMITER ;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_CALCULAR_TOTAL_VENTA ;
+/*
+TR_CALCULAR_TOTAL_VENTA
+Le va sumando el subtotal de cada producto al TOTAL de la venta.
+Asi el total siempre queda actualizado sin calcularlo a mano.
+*/
 CREATE TRIGGER TR_CALCULAR_TOTAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
@@ -115,6 +148,11 @@ DELIMITER ;
 DELIMITER //
 
 DROP TRIGGER IF EXISTS TR_PROCESAR_VENTA ;
+/*
+TR_PROCESAR_VENTA
+Al vender, descuenta el stock del producto y deja la SALIDA registrada.
+Anota el movimiento en la auditoria con el empleado de la venta.
+*/
 CREATE TRIGGER TR_PROCESAR_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
@@ -143,6 +181,11 @@ DELIMITER ;
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 
+/*
+VISTA_DETALLE_VENTA
+Muestra los productos de cada venta con su cantidad, precio y subtotal.
+Trae el nombre del producto en lugar de su ID, lista para ver en pantalla.
+*/
 CREATE OR REPLACE VIEW VISTA_DETALLE_VENTA AS
 SELECT 
     DV.ID_VENTA,

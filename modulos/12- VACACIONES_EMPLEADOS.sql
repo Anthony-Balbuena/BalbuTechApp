@@ -1,20 +1,8 @@
 /*
-MODULO: VACACIONES_EMPLEADOS
-END //
-DELIMITER ;
-
---CONSULTAR QUIENES ESTAS DE VACACIONES 
-/*
-DESCRIPCION DE 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
-
-Propósito: listar empleados que actualmente están de vacaciones (o en un
-rango), con nombre, cargo y días restantes hasta su retorno.
-
-Parametros:
- - (opc) P_FECHA_REFERENCIA DATE o ninguno para usar CURDATE().
-
-Retorno:
- - Filas con ID_EMPLEADO, NOMBRE, CARGO, FECHA_INICIO, FECHA_FIN, DIAS_PARA_RETORNAR.
+12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
+Lista los empleados que estan de vacaciones hoy, con su cargo y los dias
+que les quedan hasta volver. Si nadie esta fuera no devuelve filas y eso
+no es error.
 */
 DELIMITER //
 
@@ -26,6 +14,12 @@ Notas de despliegue:
 - Probar en staging con casos límite (cruce de años, concurrencia).
 */
 -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
+/*
+TABLA VACACIONES_EMPLEADOS
+Guarda las vacaciones de cada empleado: fecha de inicio y fin. No deja
+que la fecha de fin sea menor al inicio y si se borra el empleado se
+borran tambien sus vacaciones.
+*/
 CREATE TABLE VACACIONES_EMPLEADOS (
     ID_VACACION INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
@@ -42,19 +36,10 @@ CREATE TABLE VACACIONES_EMPLEADOS (
 -----------------------------------------------------------------------------------------------------------------------------
 
 /*
-DESCRIPCION DE SP_INSERTAR_VACACIONES
-
-Propósito: insertar una nueva solicitud de vacaciones validando existencia
-del empleado, fechas (no en pasado, fin >= inicio), solapamientos y cupo
-anual (15 días por defecto). Emite SIGNAL en caso de violación.
-
-Parametros:
- - P_ID_EMPLEADO INT
- - P_FECHA_INICIO DATE
- - P_FECHA_FIN DATE
-
-Retorno:
- - SELECT con mensaje de éxito y detalles (ID/empleado) o SIGNAL en error.
+SP_INSERTAR_VACACIONES
+Da de alta unas vacaciones nuevas validando que el empleado exista, que
+las fechas no vengan en pasado ni invertidas, que no se crucen con otras
+vacaciones y que no se pase de los 15 dias al ano.
 */
 
 -- INSERT
@@ -63,31 +48,10 @@ DROP PROCEDURE IF EXISTS SP_INSERTAR_VACACIONES ;
 CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     IN P_ID_EMPLEADO INT,
     /*
-    MODULO: VACACIONES_EMPLEADOS
-
-    Propósito: Gestiona las solicitudes de vacaciones de empleados. Centraliza
-    las reglas de negocio (validación de fechas, cupos anuales, solapamientos,
-    autorizaciones) mediante procedimientos almacenados y triggers. Está
-    diseñado para integrarse con la tabla `EMPLEADOS` y los módulos de usuario
-    y auditoría.
-
-    Artefactos incluidos en este archivo:
-    - Tabla: VACACIONES_EMPLEADOS
-    - Stored Procedures: SP_INSERTAR_VACACIONES, 12_SP_ACTUALIZAR_VACACIONES,
-      12_SP_REPORTE_DIAS_CONSUMIDOS, 12_SP_VALIDAR_CUPO_VACACIONES,
-      12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
-    - Triggers: TR_VALIDAR_LIMITE_VACACIONES
-
-    Reglas clave:
-    - Límite anual por defecto: 15 días (validado en SP y trigger).
-    - No se permiten solapamientos de periodos para un mismo empleado.
-    - FECHA_FIN debe ser >= FECHA_INICIO.
-    - Los errores se reportan vía SIGNAL SQLSTATE '45000' con mensajes claros
-      para que el backend los capture y muestre al usuario.
-
-    Notas de despliegue:
-    - Hacer backup antes de cambios: mysqldump de la tabla y de los SPs.
-    - Probar en staging con casos límite (cruce de años, concurrencia).
+    TABLA VACACIONES_EMPLEADOS
+    Guarda las vacaciones de cada empleado: fecha de inicio y fin. No deja
+    que la fecha de fin sea menor al inicio y si se borra el empleado se
+    borran tambien sus vacaciones.
     */
     -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
     CREATE TABLE VACACIONES_EMPLEADOS (
@@ -106,19 +70,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     -----------------------------------------------------------------------------------------------------------------------------
 
     /*
-    DESCRIPCION DE SP_INSERTAR_VACACIONES
-
-    Propósito: insertar una nueva solicitud de vacaciones validando existencia
-    del empleado, fechas (no en pasado, fin >= inicio), solapamientos y cupo
-    anual (15 días por defecto). Emite SIGNAL en caso de violación.
-
-    Parametros:
-     - P_ID_EMPLEADO INT
-     - P_FECHA_INICIO DATE
-     - P_FECHA_FIN DATE
-
-    Retorno:
-     - SELECT con mensaje de éxito y detalles (ID/empleado) o SIGNAL en error.
+    SP_INSERTAR_VACACIONES
+    Da de alta unas vacaciones nuevas validando que el empleado exista, que
+    las fechas no vengan en pasado ni invertidas, que no se crucen con otras
+    vacaciones y que no se pase de los 15 dias al ano.
     */
 
     -- INSERT
@@ -194,20 +149,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     DELIMITER ;
 
     /*
-    DESCRIPCION DE 12_SP_ACTUALIZAR_VACACIONES
-
-    Propósito: actualizar una solicitud de vacaciones (fechas o estado). Valida
-    que el registro exista, que no se modifiquen periodos ya finalizados y que
-    las nuevas fechas no incumplan reglas (fin >= inicio, sin solapamientos,
-    y dentro del cupo anual si aplica).
-
-    Parametros:
-     - P_ID_VACACION INT
-     - P_NUEVA_INICIO DATE (nullable)
-     - P_NUEVA_FIN DATE (nullable)
-
-    Retorno:
-     - Mensaje de éxito o SIGNAL en caso de violación.
+    12_SP_ACTUALIZAR_VACACIONES
+    Cambia las fechas de unas vacaciones. Revisa que el registro exista y
+    que no hayan terminado, y si vienen fechas nuevas valida que no esten
+    invertidas; lo que llegue en NULL se queda como estaba.
     */
     DELIMITER //
     DROP PROCEDURE IF EXISTS 12_SP_ACTUALIZAR_VACACIONES ;
@@ -258,17 +203,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
 
 
     /*
-    DESCRIPCION DE 12_SP_REPORTE_DIAS_CONSUMIDOS
-
-    Propósito: devolver el total de días consumidos por un empleado en el año
-    actual, mostrando nombre, total de días tomados y días restantes según el
-    cupo por defecto (15 días). Se usa para mostrar saldo al usuario.
-
-    Parametros:
-     - P_ID_EMPLEADO INT
-
-    Retorno:
-     - Registro con NOMBRE, TOTAL_DIAS_TOMADOS, DIAS_RESTANTES, ESTATUS_VACACIONES.
+    12_SP_REPORTE_DIAS_CONSUMIDOS
+    Devuelve el saldo de vacaciones del empleado en el ano: nombre, dias ya
+    tomados, dias que le quedan de los 15 y si esta DISPONIBLE o EXCEDE
+    LIMITE. Si el empleado no existe manda error.
     */
     DELIMITER //
     DROP PROCEDURE IF EXISTS 12_SP_REPORTE_DIAS_CONSUMIDOS //
@@ -311,19 +249,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
 
     --Este SP valida que siempre se quede alguien.
     /*
-    DESCRIPCION DE 12_SP_VALIDAR_CUPO_VACACIONES
-
-    Propósito: comprobar si, para un cargo dado, es posible otorgar nuevas
-    vacaciones sin que se exceda la proporción mínima de personal disponible.
-    Devuelve por OUT un booleano `P_DISPONIBLE`.
-
-    Parametros:
-     - P_CARGO VARCHAR(50)
-     - OUT P_DISPONIBLE BOOLEAN
-
-    Retorno:
-     - P_DISPONIBLE = TRUE/FALSE. En caso de error (cargo no encontrado), se
-       lanza SIGNAL.
+    12_SP_VALIDAR_CUPO_VACACIONES
+    Revisa si aun se pueden dar vacaciones en un cargo sin dejar menos de
+    la mitad del personal disponible: devuelve TRUE o FALSE segun convenga.
+    Si el cargo no existe o no tiene gente, manda error.
     */
     DELIMITER //
     DROP PROCEDURE IF EXISTS 12_SP_VALIDAR_CUPO_VACACIONES //
@@ -365,16 +294,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
 
     --CONSULTAR QUIENES ESTAS DE VACACIONES 
     /*
-    DESCRIPCION DE 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
-
-    Propósito: listar empleados que actualmente están de vacaciones (o en un
-    rango), con nombre, cargo y días restantes hasta su retorno.
-
-    Parametros:
-     - (opc) P_FECHA_REFERENCIA DATE o ninguno para usar CURDATE().
-
-    Retorno:
-     - Filas con ID_EMPLEADO, NOMBRE, CARGO, FECHA_INICIO, FECHA_FIN, DIAS_PARA_RETORNAR.
+    12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
+    Lista los empleados que estan de vacaciones hoy, con su cargo y los dias
+    que les quedan hasta volver. Si nadie esta fuera no devuelve filas y eso
+    no es error.
     */
     DELIMITER //
     DROP PROCEDURE IF EXISTS 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES //
@@ -408,17 +331,10 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
 
     --VALIDAR LIMITE DE VACACIONES
     /*
-    DESCRIPCION DE TR_VALIDAR_LIMITE_VACACIONES
-
-    Propósito: trigger BEFORE INSERT que valida que la suma de días ya
-    tomados en el año más los días solicitados no exceda el cupo anual
-    permitido (15 días). Si excede, lanza SIGNAL para bloquear la inserción.
-
-    Notas:
-     - Mantener el trigger ligero; la lógica de negocio más compleja debe
-       preferiblemente residir en procedures para facilitar pruebas.
-     - Revisar comportamiento si se crean registros históricos o migraciones
-       masivas (puede necesitar desactivación temporal).
+    TR_VALIDAR_LIMITE_VACACIONES
+    Antes de guardar unas vacaciones suma los dias que el empleado ya tomo
+    este ano con los nuevos; si pasan de 15 bloquea el registro con un error.
+    Trabaja en automatico, sin tener que llamarlo.
     */
     DELIMITER //
 
