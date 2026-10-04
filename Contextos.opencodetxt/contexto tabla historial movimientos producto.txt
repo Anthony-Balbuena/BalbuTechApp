@@ -27,7 +27,8 @@ TABLA
 
 TRIGGERS (5)
   - TR_HISTORIAL_VENTA ...... anota el movimiento al vender (tipo VENTA)
-  - TR_HISTORIAL_COMPRA ..... suma stock y anota la ENTRADA al comprar
+  - TR_HISTORIAL_COMPRA ..... solo anota la ENTRADA al comprar (el stock lo
+                               suma TR_ACTUALIZAR_STOCK_COMPRA del archivo 19)
   - TR_HISTORIAL_DEVOLUCION (sobre DETALLES_DEVOLUCION) .. suma stock y
                                anota AJUSTE
   - TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES) .. suma stock solo si el
@@ -67,3 +68,19 @@ PROCEDIMIENTOS (0), INDICES (0), VISTAS (0), FUNCIONES (0)
   mostrar lineas agregadas con /* ... */, cero lineas de SQL eliminadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_HISTORIAL_DEVOLUCION sobre DETALLES_DEVOLUCION: comentada con -- (la tabla
+  DETALLES_DEVOLUCION no existe); se conservo el DROP IF EXISTS.
+- TR_HISTORIAL_VENTA y TR_HISTORIAL_COMPRA reparados: leen STOCK_ACTUAL de
+  INVENTARIO (PRODUCTOS no tiene columna STOCK); solo registran el historial,
+  el descuento/suma lo hacen los triggers de los archivos 20 y 19.
+- TR_HISTORIAL_DEVOLUCION sobre DEVOLUCIONES reparada: AFTER UPDATE con la
+  condicion PENDIENTE -> APROBADA/REEMBOLSADA; calcula el stock anterior desde
+  INVENTARIO porque el reintegro del archivo 25 corre PRIMERO (los triggers se
+  ejecutan por ORDEN DE CREACION, verificado con prueba en PROBE_DB).
+- TR_HISTORIAL_AJUSTE intacto.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
