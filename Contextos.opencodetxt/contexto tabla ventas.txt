@@ -23,21 +23,26 @@ Estilo acordado (hibrido minimalista):
 ================================================================================
 TABLA (2)
   - VENTAS ................. cabecera de cada venta (cliente, empleado,
-                              estado, fecha y total)
+                              estado, fecha, total y FACTURA opcional)
   - HISTORIAL_ESTADOS_VENTA . un renglon por cada cambio de estado de una
                               venta (quien, cuando y hacia donde paso)
 
-INDICES (3)
+INDICES (4)
   - IX_VENTAS_CLIENTE ....... historial de ventas por cliente
   - IX_VENTAS_EMPLEADO ...... ventas atendidas por empleado
   - IX_HIST_ESTADO_VENTA_FECHA .. historial de estados por fecha
+  - UQ_VENTA_FACTURA ........ una factura no se repite en el mismo cliente
 
-PROCEDIMIENTOS ALMACENADOS (2)
+PROCEDIMIENTOS ALMACENADOS (3)
   - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
   - SP_CANCELAR_VENTA .............. cancela una venta EN_PROCESO y devuelve
                                      el stock con su movimiento y su fila en
                                      el historial del producto (valida empleado
                                      y pagos)
+  - SP_ASIGNAR_FACTURA_VENTA ...... le pone numero de factura (opcional,
+                                     unica por cliente; valida vacia,
+                                     inexistente, cancelada/devuelta y
+                                     duplicada)
   NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
   con SP_AGREGAR_DETALLE_VENTA (archivo 23).
 
@@ -52,7 +57,8 @@ TRIGGERS (3)
     TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
 
 VISTA (1)
-  - VISTA_DETALLE_VENTA ...... productos de cada venta con subtotal
+  - VISTA_DETALLE_VENTA ...... productos de cada venta con su FACTURA,
+                               cantidad, precio y subtotal
 
 FUNCIONES (0)
   - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
@@ -152,4 +158,18 @@ Verificacion:
   cambia el estado con un UPDATE directo (pago total, cancelacion,
   devolucion o mano pelada).
 - Verificado: /tmp/opencode/test_paquetito_j.sql (8/8 PASS con ROLLBACK y
+  residuos 0, 04/10/2026).
+================================================================================
+11. ACTUALIZACION 04/10/2026 - FACTURA DEL CLIENTE (paquetito K)
+================================================================================
+- VENTAS.FACTURA VARCHAR(30) NULL: numero de factura del cliente, opcional
+  (muchas ventas de mostrador no llevan).
+- Indice unico UQ_VENTA_FACTURA (ID_CLIENTE, FACTURA): la misma factura no se
+  repite dentro del mismo cliente; entre clientes distintos si se puede.
+  Tambien bloquea el UPDATE directo a pelo.
+- SP_ASIGNAR_FACTURA_VENTA(P_ID_VENTA, P_FACTURA): valida que no venga vacia,
+  que la venta exista, que no este CANCELADA ni DEVUELTA y que no este ya
+  usada por otra venta del mismo cliente.
+- VISTA_DETALLE_VENTA ahora trae tambien la FACTURA de la venta.
+- Verificado: /tmp/opencode/test_paquetito_k.sql (14/14 PASS con ROLLBACK y
   residuos 0, 04/10/2026).

@@ -103,3 +103,15 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   historial lee el stock antes del reintegro y anota mal antes/despues
   (el 04/10/2026 se recrearon mal y se corrigio con la prueba H4).
 - Verificado: /tmp/opencode/test_paquetito_a.sql H4/H5 PASS (04/10/2026).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - LA VENTA SE CIERRA AL 100% DEVUELTO (paquetito K)
+================================================================================
+- TR_MARCAR_VENTA_DEVUELTA corregido: antes marcaba la venta entera en
+  DEVUELTA con UNA sola devolucion aprobada aunque la venta tuviera 5 lineas.
+  Ahora solo la marca cuando NO queda ni una unidad por devolver en ninguna
+  linea (SUM de devoluciones APROBADA/REEMBOLSADA por linea >= CANTIDAD).
+- Una devolucion parcial deja la venta como estaba (REALIZADA): la mercancia
+  que no volvio sigue siendo venta buena. Las RECHAZADAS no cuentan.
+- Verificado: /tmp/opencode/test_paquetito_k.sql checks K9b/K10/K11 y
+  smoke_fase1.sql T7/T7b (141 PASS / 0 FAIL en la regresion, 04/10/2026).
