@@ -67,7 +67,9 @@ FUNCION (1)
 - NO se tocaron las anomalias existentes (solo informativas):
   * Linea 95: una "V" suelta antes del separador de seccion [VIEW}.
   * Los triggers usan "END //" pero el DELIMITER se cerro antes con ";",
-    el script tal como esta daria error al ejecutarse completo.
+    el script tal como esta daria error al ejecutarse completo
+    (resuelto: desde el 04/10/2026 todo el repo paso a "END ; /
+    DELIMITER ;", ver seccion 10).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -93,7 +95,8 @@ FUNCION (1)
   22-DETALLE_COMPRA.sql. Vive solo en el 22 (ya cargada en la BD).
 - DELIMITER reparado: tras el borrado quedaba un "DELIMITER //" sin cerrar
   despues del END // del trigger; ahora va "END // / DELIMITER ;" y la vista
-  se crea con normalidad.
+  se crea con normalidad. (04/10/2026: el repo unifico a "END ; /
+  DELIMITER ;", ver seccion 10.)
 - FN_CONTAR_ITEMS_COMPRA: se agrego DROP FUNCTION IF EXISTS antes del CREATE
   (antes el archivo daba ERROR 1304 al recargarse).
 - La anomalia "V" suelta de la seccion [VIEW} ya no existe (borrada junto con
@@ -156,3 +159,20 @@ FUNCION (1)
 - Carga: 19 -> 19.5 -> 20 (el loader ordena por numero). Sin cambios en la
   BD en vivo: mismo esquema, otro archivo. Verificado con arena + paridad
   y 63 checks en verde (04/10/2026).
+
+================================================================================
+10. ACTUALIZACION 04/10/2026 - ESTILO UNICO: END ; / DELIMITER ;
+================================================================================
+- Todo el repo paso de "END // / DELIMITER ;" a "END ; / DELIMITER ;": se
+  convirtieron los 18 bloques que quedaban en // (11 archivos) y ya era el
+  estilo de otros 93 bloques. Motivo: con "END //" VS Code no puede
+  ejecutar los SP; con "END ;" si.
+- Se cerraron de paso los huecos de lineas en blanco entre END y
+  DELIMITER ; que el loader no alcanzaba a normalizar (4 sitios en los
+  archivos 9, 17 y 19).
+- El loader (load_modules.py) convierte el "END ;" adyacente a
+  "DELIMITER ;" en "END //" al cargar, asi que la terminal mysql recibe
+  exactamente lo mismo de siempre y la BD en vivo no cambio nada.
+- Verificado: arena reconstruida con paridad (mismas 16 diferencias
+  legacy), misma cantidad de errores de carga que el baseline y 63 checks
+  en verde (04/10/2026).

@@ -312,8 +312,7 @@ BEGIN
            OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%') 
            OR P.CODIGO = P_BUSQUEDA)
     ORDER BY P.ID_PRODUCTO ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
-END //
-
+END ;
 DELIMITER ;  
 
 --5. consultar inventario
@@ -356,7 +355,7 @@ BEGIN
            OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%'))
       AND P.ESTADO = 'ACTIVO'
     ORDER BY P.ID_PRODUCTO ASC; -- Ordenado numéricamente por ID de producto
-END //
+END ;
 DELIMITER ;
 --6. REPORTE STOCK 
 DELIMITER //

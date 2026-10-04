@@ -141,7 +141,7 @@ proc_label: BEGIN
                   '). COBRADO DE LA VENTA #', V_ID_VENTA, ': ', V_TOTAL_PAGADO,
                   IF(V_BONOS_BORRADOS > 0, ' - SE RETIRO EL BONO DEL 1%', '')
                  ) AS MENSAJE;
-END //
+END ;
 DELIMITER ;
 
 
