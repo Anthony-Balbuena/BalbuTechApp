@@ -45,7 +45,6 @@ PROCEDIMIENTOS ALMACENADOS (9)
 - Se CONSERVO la nota inline "/*Este procedure loique para mejorarlo*/"
   del procedure PARA_INSERTAR_PRODUCTO (nota corta, no es estilo viejo).
 - Se conservaron los SELECT/DESCRIBE/ALTER de prueba del final del archivo.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

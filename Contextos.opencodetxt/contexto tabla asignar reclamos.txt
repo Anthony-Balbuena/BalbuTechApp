@@ -46,7 +46,6 @@ TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - NO se tocaron las anomalias existentes (solo informativas):
   * El index en linea IDX_EMPLEADO_FECHA (linea 13) y el CREATE INDEX
     IDX_ASIGNACIONES_EMPLEADO_FECHA (linea 25) cubren las mismas columnas.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT, ALTER TABLE ni ninguna
   sentencia SQL.
 
@@ -57,7 +56,6 @@ TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - ~9 archivos con indices sin documentar.
 - ~54 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

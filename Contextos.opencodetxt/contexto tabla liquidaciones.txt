@@ -44,7 +44,6 @@ VISTAS (2)
 ================================================================================
 - Se conservaron los comentarios cortos "-- 1. Para buscar...", "-- 2. ...",
   "-- 3. ..." de los indices y los separadores de secciones.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

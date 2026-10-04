@@ -57,7 +57,6 @@ TRIGGER (1)
 - 2 bloques se AGREGARON donde no habia documentacion (IX_USER y
   SP_GET_USUARIO_LOGIN).
 - Se conservo la migracion ALTER de CONTRASENA y los CALL de prueba.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

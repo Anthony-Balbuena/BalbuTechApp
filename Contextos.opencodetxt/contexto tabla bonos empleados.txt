@@ -54,7 +54,6 @@ VISTA (1)
 - Se conservaron los SELECT de prueba y el ALTER de ESTADO del inicio.
 - En TR_VALIDAR_FECHA_BONO la documentacion nueva refleja los 60 dias del
   codigo real (la vieja decia 30, que era incorrecta).
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

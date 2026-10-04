@@ -52,7 +52,6 @@ FUNCIONES (0)
 - Se dejo intacta la seccion [TRIGERR} con su procedimiento
   26_SP_RECHAZAR_DEVOLUCION (el SP esta declarado dentro de la seccion de
   triggers en el archivo original): solo se agrego el bloque de comentario.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -62,7 +61,6 @@ FUNCIONES (0)
 - ~11 archivos con indices sin documentar.
 - ~62 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

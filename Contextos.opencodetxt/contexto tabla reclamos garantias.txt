@@ -52,7 +52,6 @@ FUNCIONES (0)
   * 27_SP_FINALIZAR_RECLAMO_TOTAL esta declarado dentro de la seccion
     [TRIGERR}, despues del trigger.
   * La linea 54 "USE BALBU_TECH;" se conservo tal cual.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT, START TRANSACTION
   ni ninguna sentencia SQL.
 
@@ -63,7 +62,6 @@ FUNCIONES (0)
 - ~10 archivos con indices sin documentar.
 - ~60 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

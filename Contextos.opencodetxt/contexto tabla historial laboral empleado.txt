@@ -35,7 +35,6 @@ TRIGGER (1)
 ================================================================================
 - Se conservo el comentario corto "-- Indices para busquedas rapidas...".
 - Se conservo el SELECT final del archivo.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

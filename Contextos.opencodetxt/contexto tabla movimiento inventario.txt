@@ -53,7 +53,6 @@ FUNCIONES (0)
   ningun objeto.
 - NO se tocaron las anomalias existentes (solo informativas):
   * Linea 119: una "V" suelta antes del separador de seccion [VIEW}.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -63,7 +62,6 @@ FUNCIONES (0)
 - ~19 archivos con CREATE INDEX sin documentar (~43 indices en total).
 - ~84 procedimientos almacenados sin bloque de descripcion (112 en total).
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

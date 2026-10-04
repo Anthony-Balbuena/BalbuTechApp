@@ -51,7 +51,6 @@ TRIGGERS (2)
   triggers de mayusculas de CARGO).
 - Se conservo el "SELECT * FROM EMPLEADOS;" line 35 y todos los ---N. de
   comentarios.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION
