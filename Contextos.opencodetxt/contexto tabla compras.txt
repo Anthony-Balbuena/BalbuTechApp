@@ -33,12 +33,14 @@ INDICES (2)
   - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
   - IX_COMPRA_TOTAL ......... analisis de gastos por monto
 
-PROCEDIMIENTOS ALMACENADOS (2)
+PROCEDIMIENTOS ALMACENADOS (3)
   - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
   - SP_CANCELAR_COMPRA ...... cancela una compra ABIERTA y revierte el
                                stock (valida dueno, que no tenga pagos -
                                ver 19.5 - y que la mercancia siga en el
                                almacen)
+  - SP_ASIGNAR_FACTURA_COMPRA ..... le pone la factura del proveedor
+                                    (unica por proveedor; ver seccion 13)
 
 TRIGGERS (2)
   - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
@@ -209,3 +211,21 @@ FUNCION (1)
   VISTA_REPORTE_COMPRAS (la vista no recibe parametros).
 - Verificado en vivo: check E6 de test_paquetito_e.sql (7/7 PASS con
   ROLLBACK, 04/10/2026).
+
+================================================================================
+13. ACTUALIZACION 04/10/2026 - FACTURA + QUITAR LINEA (paquetito F)
+================================================================================
+- Nueva columna COMPRAS.FACTURA VARCHAR(30) NULL (opcional) con indice
+  unico UQ_COMPRA_FACTURA (ID_PROVEEDOR, FACTURA): el mismo numero solo
+  una vez por proveedor; distintos proveedores pueden repetir y las
+  compras sin factura (NULL) no chocan.
+- SP_ASIGNAR_FACTURA_COMPRA: valida vacia, compra existente, no CANCELADA
+  y repetida del mismo proveedor (el indice es la red de seguridad ante
+  UPDATE directo). VIVE en este archivo.
+- VISTA_REPORTE_COMPRAS ahora muestra FACTURA.
+- Triggers de DELETE sobre DETALLE_COMPRA en este archivo:
+  TR_BLOQUEAR_BORRADO_COMPRA_CERRADA (BEFORE: estado + stock) y
+  TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (AFTER: baja stock + historial).
+  Ver seccion 9 del contexto de detalle compra.
+- Verificado: checks F0-F12 de test_paquetito_f.sql (14/14 PASS con
+  ROLLBACK) + regresion 88 checks en verde (04/10/2026).

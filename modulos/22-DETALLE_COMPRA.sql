@@ -103,6 +103,60 @@ proc_label: BEGIN
     SELECT 'EXITO: PRODUCTO AGREGADO.' AS MENSAJE;
 END ;
 DELIMITER ;
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_QUITAR_DETALLE_COMPRA ;
+/*
+SP_QUITAR_DETALLE_COMPRA
+Quita un producto de una compra que sigue ABIERTA: regresa su stock,
+anota la SALIDA y recalcula el TOTAL. Revisa que el producto este en la
+compra y que el stock alcance; los efectos los hacen los triggers de
+DELETE, asi que tambien valen con un DELETE directo.
+*/
+CREATE PROCEDURE SP_QUITAR_DETALLE_COMPRA(
+    IN P_ID_COMPRA INT,
+    IN P_ID_PRODUCTO INT
+)
+proc_label: BEGIN
+    DECLARE V_ID_DETALLE INT;
+    DECLARE V_CANTIDAD INT;
+    DECLARE V_ESTADO VARCHAR(20);
+
+    -- 1. El producto debe estar en la compra
+    SELECT DC.ID_DETALLE_COMPRA, DC.CANTIDAD, C.ESTADO
+      INTO V_ID_DETALLE, V_CANTIDAD, V_ESTADO
+      FROM DETALLE_COMPRA DC
+      JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
+     WHERE DC.ID_COMPRA = P_ID_COMPRA
+       AND DC.ID_PRODUCTO = P_ID_PRODUCTO;
+
+    IF V_ID_DETALLE IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO ESTA EN ESTA COMPRA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. Solo de una compra ABIERTA (los triggers lo re-aplican)
+    IF V_ESTADO <> 'ABIERTA' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. Stock alcanzante: la linea se va del inventario
+    IF IFNULL((SELECT STOCK_ACTUAL FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO), 0) < V_CANTIDAD THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL STOCK ACTUAL NO ALCANZA PARA QUITAR ESTE PRODUCTO (YA HUBO VENTAS DE ESA MERCANCIA).';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. Borrar el detalle dispara los triggers de DELETE
+    DELETE FROM DETALLE_COMPRA
+     WHERE ID_DETALLE_COMPRA = V_ID_DETALLE;
+
+    SELECT CONCAT('EXITO: PRODUCTO #', P_ID_PRODUCTO,
+                  ' QUITADO DE LA COMPRA #', P_ID_COMPRA, '.') AS MENSAJE;
+END ;
+DELIMITER ;
+
 
 ------------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}----------------------------------------------------------------------------
@@ -114,6 +168,7 @@ DROP TRIGGER IF EXISTS TR_CALCULAR_TOTAL_COMPRA ;
 TR_CALCULAR_TOTAL_COMPRA
 Le va sumando el subtotal de cada producto al TOTAL de la compra.
 Asi el total de la compra queda actualizado sin calcularlo a mano.
+Si se quita una linea, el total lo recalcula TR_RECALCULAR_TOTAL_COMPRA.
 */
 CREATE TRIGGER TR_CALCULAR_TOTAL_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
@@ -122,6 +177,27 @@ BEGIN
     UPDATE COMPRAS 
     SET TOTAL = TOTAL + NEW.SUBTOTAL
     WHERE ID_COMPRA = NEW.ID_COMPRA;
+END ;
+DELIMITER ;
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_TOTAL_COMPRA ;
+/*
+TR_RECALCULAR_TOTAL_COMPRA
+Cuando se borra una linea de una compra, vuelve a sumar todo lo que
+quede en DETALLE_COMPRA y deja ese numero en el TOTAL. Como sale de la
+propia tabla el total queda exacto aunque se borren varias lineas.
+*/
+CREATE TRIGGER TR_RECALCULAR_TOTAL_COMPRA
+AFTER DELETE ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    UPDATE COMPRAS
+       SET TOTAL = (
+            SELECT IFNULL(SUM(SUBTOTAL), 0)
+              FROM DETALLE_COMPRA
+             WHERE ID_COMPRA = OLD.ID_COMPRA
+       )
+     WHERE ID_COMPRA = OLD.ID_COMPRA;
 END ;
 DELIMITER ;
 

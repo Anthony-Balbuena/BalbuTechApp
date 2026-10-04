@@ -1,7 +1,8 @@
 /*
 TABLA COMPRAS
 Guarda cada compra que hace la tienda a sus proveedores.
-Anota quien la hizo, cuando, a que proveedor y el dinero total gastado.
+Anota quien la hizo, cuando, a que proveedor, el dinero total gastado
+y la factura del proveedor si ya llego.
 Es la cabecera: los productos comprados van en DETALLE_COMPRA.
 */
 CREATE TABLE COMPRAS (
@@ -15,6 +16,7 @@ CREATE TABLE COMPRAS (
     -- CANCELADA = no recibe mas productos y su stock fue revertido;
     -- DEVUELTA = se devolvio toda la mercancia al proveedor (19.6)
     ESTADO ENUM('ABIERTA', 'RECIBIDA', 'CANCELADA', 'DEVUELTA') NOT NULL DEFAULT 'ABIERTA',
+    FACTURA VARCHAR(30) NULL, -- Factura del proveedor (opcional, unica por proveedor)
     PRIMARY KEY (ID_COMPRA),
     CONSTRAINT FK_COMPRA_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR),
     CONSTRAINT FK_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
@@ -35,6 +37,15 @@ Busca compras por su monto, util para analizar gastos y encontrar las
 compras mas grandes de un periodo.
 */
 CREATE INDEX IX_COMPRA_TOTAL ON COMPRAS (TOTAL);
+
+/*
+INDICE UQ_COMPRA_FACTURA
+Cada factura vale una sola vez por proveedor: dos compras del mismo
+proveedor no pueden repetir numero (distintos proveedores si pueden y
+las compras sin factura no chocan). Si alguien la fuerza con un UPDATE
+el indice la rechaza solo; el SP da el mensaje amable.
+*/
+CREATE UNIQUE INDEX UQ_COMPRA_FACTURA ON COMPRAS (ID_PROVEEDOR, FACTURA);
 
 
 
@@ -189,6 +200,66 @@ END ;
 DELIMITER ;
 
 DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ASIGNAR_FACTURA_COMPRA ;
+/*
+SP_ASIGNAR_FACTURA_COMPRA
+Le pone el numero de factura del proveedor a una compra. Revisa que no
+venga vacia, que la compra exista, que no este CANCELADA y que ese mismo
+numero no se le haya usado ya a otra compra del mismo proveedor (el
+indice UQ_COMPRA_FACTURA tambien lo bloquea solo).
+*/
+CREATE PROCEDURE SP_ASIGNAR_FACTURA_COMPRA(
+    IN P_ID_COMPRA INT,
+    IN P_FACTURA VARCHAR(30)
+)
+proc_label: BEGIN
+    DECLARE V_ID_PROVEEDOR INT;
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_FACTURA_LIMPIA VARCHAR(30);
+
+    -- 1. La factura no puede venir vacia
+    SET V_FACTURA_LIMPIA = TRIM(IFNULL(P_FACTURA, ''));
+    IF V_FACTURA_LIMPIA = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA FACTURA NO PUEDE ESTAR VACIA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. La compra debe existir
+    SELECT ID_PROVEEDOR, ESTADO INTO V_ID_PROVEEDOR, V_ESTADO
+      FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
+
+    IF V_ID_PROVEEDOR IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. Una compra cancelada ya no tiene factura que llevar
+    IF V_ESTADO = 'CANCELADA' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. Esa factura no puede repetirse en el mismo proveedor
+    IF EXISTS (
+        SELECT 1 FROM COMPRAS
+         WHERE ID_PROVEEDOR = V_ID_PROVEEDOR
+           AND FACTURA = V_FACTURA_LIMPIA
+           AND ID_COMPRA <> P_ID_COMPRA
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: ESA FACTURA YA EXISTE PARA ESTE PROVEEDOR.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 5. Asignar
+    UPDATE COMPRAS SET FACTURA = V_FACTURA_LIMPIA WHERE ID_COMPRA = P_ID_COMPRA;
+
+    SELECT CONCAT('EXITO: FACTURA ', V_FACTURA_LIMPIA,
+                  ' ASIGNADA A LA COMPRA #', P_ID_COMPRA, '.') AS MENSAJE;
+END ;
+DELIMITER ;
+
+DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_COMPRA_CERRADA ;
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_COMPRA_CANCELADA ;
 /*
@@ -241,6 +312,81 @@ BEGIN
 END ;
 DELIMITER ;
 
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_COMPRA_CERRADA ;
+/*
+TR_BLOQUEAR_BORRADO_COMPRA_CERRADA
+Lo mismo que TR_BLOQUEAR_COMPRA_CERRADA pero cuando se borra una linea:
+solo una compra ABIERTA deja quitarle productos y ademas el stock tiene
+que alcanzar (la mercancia se regresa del inventario). En RECIBIDA,
+CANCELADA o DEVUELTA el detalle queda como evidencia y nadie lo puede
+borrar, ni siquiera con un DELETE directo.
+*/
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_COMPRA_CERRADA
+BEFORE DELETE ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_STOCK INT;
+
+    SELECT ESTADO INTO V_ESTADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
+
+    IF V_ESTADO IS NOT NULL AND V_ESTADO <> 'ABIERTA' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).';
+    END IF;
+
+    -- El stock tiene que alcanzar para regresar la mercancia
+    SET V_STOCK = IFNULL((
+        SELECT STOCK_ACTUAL FROM INVENTARIO WHERE ID_PRODUCTO = OLD.ID_PRODUCTO
+    ), 0);
+
+    IF V_STOCK < OLD.CANTIDAD THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL STOCK ACTUAL NO ALCANZA PARA QUITAR ESTE PRODUCTO (YA HUBO VENTAS DE ESA MERCANCIA).';
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_ACTUALIZAR_STOCK_BORRADO_COMPRA ;
+/*
+TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
+Cuando se quita una linea de una compra, le resta la cantidad al stock
+(lo inverso de TR_ACTUALIZAR_STOCK_COMPRA) y en el MISMO trigger anota
+la SALIDA en el historial con el stock antes y despues. Van juntos a
+proposito: los triggers de DELETE no se pueden ordenar a gusto y asi el
+antes/despues sale bien sin importar en que orden disparen los demas.
+El guard de stock y de estado esta en el BEFORE, que corre primero.
+*/
+CREATE TRIGGER TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
+AFTER DELETE ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_STOCK_ANTES INT;
+    DECLARE V_STOCK_DESPUES INT;
+
+    -- 1. Stock antes de restar
+    SELECT STOCK_ACTUAL INTO V_STOCK_ANTES
+      FROM INVENTARIO WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
+
+    SET V_STOCK_DESPUES = V_STOCK_ANTES - OLD.CANTIDAD;
+
+    -- 2. Bajar el stock
+    UPDATE INVENTARIO
+       SET STOCK_ACTUAL = V_STOCK_DESPUES
+     WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
+
+    -- 3. UNA fila de historial con el antes y el despues
+    INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
+        ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
+    ) VALUES (
+        OLD.ID_PRODUCTO, 'SALIDA', OLD.CANTIDAD, V_STOCK_ANTES, V_STOCK_DESPUES,
+        'Producto quitado de la compra'
+    );
+END ;
+DELIMITER ;
+
 /*
 VISTA_REPORTE_COMPRAS
 Muestra las compras con el nombre de su proveedor, fecha y total.
@@ -252,6 +398,7 @@ SELECT
     P.NOMBRE AS PROVEEDOR,
     C.FECHA,
     C.TOTAL,
+    C.FACTURA,
     C.ESTADO
 FROM COMPRAS C
 JOIN PROVEEDORES P ON C.ID_PROVEEDOR = P.ID_PROVEEDOR
