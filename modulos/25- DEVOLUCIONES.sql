@@ -239,9 +239,12 @@ DELIMITER //
 DROP TRIGGER IF EXISTS TR_MARCAR_VENTA_DEVUELTA;
 /*
 TR_MARCAR_VENTA_DEVUELTA
-Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA, la venta
-queda marcada como DEVUELTA (solo si estaba REALIZADA). Asi deja de aparecer
-como venta buena cuando el cliente ya devolvio el producto.
+Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA revisa si
+con esa ya se devolvio TODO lo de la venta: solo si no queda ni una unidad
+por devolver marca la venta como DEVUELTA (si estaba REALIZADA). Una
+devolucion parcial deja la venta como esta, porque el resto de la mercancia
+sigue siendo buena. Cuentan solo las devoluciones ya procesadas (APROBADA o
+REEMBOLSADA); las RECHAZADA no suman.
 */
 CREATE TRIGGER TR_MARCAR_VENTA_DEVUELTA
 AFTER UPDATE ON DEVOLUCIONES
@@ -258,7 +261,19 @@ BEGIN
         WHERE DV.ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA;
 
         IF V_ESTADO = 'REALIZADA' THEN
-            UPDATE VENTAS SET ESTADO = 'DEVUELTA' WHERE ID_VENTA = V_ID_VENTA;
+            -- queda alguna linea con unidades sin devolver?
+            IF NOT EXISTS (
+                SELECT 1
+                FROM DETALLES_VENTA DV
+                WHERE DV.ID_VENTA = V_ID_VENTA
+                  AND DV.CANTIDAD > IFNULL(
+                        (SELECT SUM(D.CANTIDAD)
+                           FROM DEVOLUCIONES D
+                          WHERE D.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+                            AND D.ESTADO IN ('APROBADA', 'REEMBOLSADA')), 0)
+            ) THEN
+                UPDATE VENTAS SET ESTADO = 'DEVUELTA' WHERE ID_VENTA = V_ID_VENTA;
+            END IF;
         END IF;
     END IF;
 END ;

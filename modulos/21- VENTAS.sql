@@ -16,6 +16,7 @@ CREATE TABLE VENTAS (
     ID_EMPLEADO INT NOT NULL,
     ID_CLIENTE INT NOT NULL,
     TOTAL DECIMAL(12, 2) NOT NULL CHECK (TOTAL >= 0),
+    FACTURA VARCHAR(30) NULL, -- Factura del cliente (opcional, unica por cliente)
     PRIMARY KEY (ID_VENTA),
     CONSTRAINT FK_VENTA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
     CONSTRAINT FK_VENTA_CLIENTE FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES (ID_CLIENTE)
@@ -34,6 +35,15 @@ Busca todas las ventas atendidas por un empleado,
 util para reportes de desempeno.
 */
 CREATE INDEX IX_VENTAS_EMPLEADO ON VENTAS (ID_EMPLEADO);
+
+
+/*
+INDICE UQ_VENTA_FACTURA
+Una factura no se repite dentro del mismo cliente. Tambien lo bloquea el
+indice aunque alguien intente el UPDATE a pelo (mismo rol que
+UQ_COMPRA_FACTURA).
+*/
+CREATE UNIQUE INDEX UQ_VENTA_FACTURA ON VENTAS (ID_CLIENTE, FACTURA);
 
 
 
@@ -197,6 +207,67 @@ END ;
 DELIMITER ;
 
 DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ASIGNAR_FACTURA_VENTA ;
+/*
+SP_ASIGNAR_FACTURA_VENTA
+Le pone numero de factura a una venta (opcional, muchas ventas de
+mostrador no llevan). Valida que no venga vacia, que la venta exista y
+que no este cancelada ni devuelta, y que esa factura no este ya usada
+por otra venta del mismo cliente (el indice UQ_VENTA_FACTURA tambien la
+bloquea solo).
+*/
+CREATE PROCEDURE SP_ASIGNAR_FACTURA_VENTA(
+    IN P_ID_VENTA INT,
+    IN P_FACTURA VARCHAR(30)
+)
+proc_label: BEGIN
+    DECLARE V_ID_CLIENTE INT;
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_FACTURA_LIMPIA VARCHAR(30);
+
+    -- 1. La factura no puede venir vacia
+    SET V_FACTURA_LIMPIA = TRIM(IFNULL(P_FACTURA, ''));
+    IF V_FACTURA_LIMPIA = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA FACTURA NO PUEDE ESTAR VACIA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. La venta debe existir
+    SELECT ID_CLIENTE, ESTADO INTO V_ID_CLIENTE, V_ESTADO
+      FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
+
+    IF V_ID_CLIENTE IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. Una venta cancelada o devuelta ya no tiene factura que llevar
+    IF V_ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA ESTA CANCELADA O DEVUELTA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. Esa factura no puede repetirse en el mismo cliente
+    IF EXISTS (
+        SELECT 1 FROM VENTAS
+         WHERE ID_CLIENTE = V_ID_CLIENTE
+           AND FACTURA = V_FACTURA_LIMPIA
+           AND ID_VENTA <> P_ID_VENTA
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: ESA FACTURA YA EXISTE PARA ESTE CLIENTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 5. Asignar
+    UPDATE VENTAS SET FACTURA = V_FACTURA_LIMPIA WHERE ID_VENTA = P_ID_VENTA;
+
+    SELECT CONCAT('EXITO: FACTURA ', V_FACTURA_LIMPIA,
+                  ' ASIGNADA A LA VENTA #', P_ID_VENTA, '.') AS MENSAJE;
+END ;
+DELIMITER ;
+
+DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_VENTA ;
 /*
 TR_BLOQUEAR_BORRADO_VENTA
@@ -285,11 +356,13 @@ Trae el nombre del producto en lugar de su ID, lista para ver en pantalla.
 CREATE OR REPLACE VIEW VISTA_DETALLE_VENTA AS
 SELECT 
     DV.ID_VENTA,
+    V.FACTURA,
     P.NOMBRE AS PRODUCTO,
     DV.CANTIDAD,
     DV.PRECIO_UNITARIO,
     DV.SUBTOTAL
 FROM DETALLES_VENTA DV
+JOIN VENTAS V ON V.ID_VENTA = DV.ID_VENTA
 JOIN PRODUCTOS P ON DV.ID_PRODUCTO = P.ID_PRODUCTO;
 
 -----------------------------------------------------------------------------------------------------------------------
