@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 22-DETALLE_COMPRA.sql (8 bloques)
+2. OBJETOS DOCUMENTADOS EN 22-DETALLE_COMPRA.sql (7 bloques)
 ================================================================================
 TABLA
   - DETALLE_COMPRA ........ productos de cada compra con cantidad y precio
@@ -33,9 +33,9 @@ PROCEDIMIENTO ALMACENADO (1)
   - 22_SP_AGREGAR_DETALLE_COMPRA .. agrega producto validando todo antes
                                      de guardar
 
-TRIGGERS (2)
+TRIGGERS (1)
   - TR_CALCULAR_TOTAL_COMPRA .. suma subtotales al TOTAL de la compra
-  - TR_PROCESAR_COMPRA ........ suma stock y registra la ENTRADA
+  (TR_PROCESAR_COMPRA eliminado: era redundante, ver seccion 6)
 
 VISTA (1)
   - VISTA_DETALLE_COMPRA .... productos de la compra con nombre y subtotal
@@ -51,7 +51,8 @@ FUNCIONES (0)
   indices; solo se agregaron bloques.
 - NO se tocaron las anomalias existentes (solo informativas):
   * El indice IX_COMPRA_PROVEEDOR esta definido sobre la tabla COMPRAS.
-  * TR_CALCULAR_TOTAL_COMPRA esta duplicada: tambien existe en 19- COMPRAS.sql.
+  * TR_CALCULAR_TOTAL_COMPRA estaba duplicada tambien en 19- COMPRAS.sql
+    (resuelto el 03/10/2026, ver seccion 6; ahora vive solo aqui).
 - NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
@@ -71,3 +72,24 @@ FUNCIONES (0)
   agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 03/10/2026 - FASE A: BORRADO DE TR_PROCESAR_COMPRA
+================================================================================
+- TR_PROCESAR_COMPRA eliminado (DROP + comentario, CREATE borrado):
+  era redundante. Sumaba el stock DOS veces (lo mismo que
+  TR_ACTUALIZAR_STOCK_COMPRA del archivo 19) y registraba la ENTRADA en
+  MOVIMIENTOS_INVENTARIO DOS veces (lo mismo que
+  TR_AUDITORIA_MOVIMIENTO_COMPRA del archivo 20, pero con empleado fijo 1).
+  Causaba: stock inflado x2 por linea de compra, movimientos duplicados y
+  5 filas de historial por linea de compra.
+- En la BD real: DROP TRIGGER hecho directamente (03/10/2026); los 4
+  triggers restantes conservan el orden de creacion:
+  TR_ACTUALIZAR_STOCK_COMPRA(1), TR_AUDITORIA_MOVIMIENTO_COMPRA(2),
+  TR_CALCULAR_TOTAL_COMPRA(3), TR_HISTORIAL_COMPRA(4).
+- Reparado el bug de delimitadores preexistente: el bloque de
+  TR_CALCULAR_TOTAL_COMPRA usaba "END ;" adentro de un "DELIMITER //",
+  por lo que el DROP/CREATE nunca se ejecutaba limpio (ERROR 1064 al
+  recargar). Ahora usa "END // / DELIMITER ;" como el resto del repo.
+- Verificado: archivo recargado en la arena BALBU_TECH_TEST sin errores
+  de sintaxis y con paridad de cuerpos contra la BD real.

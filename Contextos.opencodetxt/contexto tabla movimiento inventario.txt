@@ -72,3 +72,14 @@ FUNCIONES (0)
   lineas agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_AUDITORIA_MOVIMIENTO_VENTA confirmado como UNICO descuento de stock de la
+  venta (ademas registra la SALIDA en MOVIMIENTOS_INVENTARIO). El duplicado
+  TR_PROCESAR_VENTA del archivo 21 fue eliminado hoy.
+- Limpiada la linea "V----..." del separador de secciones [VIEW] del archivo,
+  que rompia la carga del archivo completo.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
