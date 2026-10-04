@@ -80,101 +80,92 @@ DELIMITER ;
 
 
 
-DELIMITER //
-DROP PROCEDURE IF EXISTS 21_SP_AGREGAR_PRODUCTO_VENTA ;
 /*
-21_SP_AGREGAR_PRODUCTO_VENTA
-Agrega un producto a la venta que ya esta abierta.
-Revisa que la venta exista y que haya stock suficiente; si todo esta bien
-toma el precio actual del producto y agrega la linea del detalle.
+LIMPIEZA DE SP DUPLICADO
+21_SP_AGREGAR_PRODUCTO_VENTA hacia lo mismo que SP_AGREGAR_DETALLE_VENTA
+(archivo 23) pero sin validar que el empleado sea el dueño de la venta.
+Ahora la alta de detalle es solo por ese SP; aqui queda el DROP para
+limpiar bases viejas que lo tengan todavia.
 */
-CREATE PROCEDURE 21_SP_AGREGAR_PRODUCTO_VENTA(
+DROP PROCEDURE IF EXISTS 21_SP_AGREGAR_PRODUCTO_VENTA ;
+
+
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_CANCELAR_VENTA ;
+/*
+21_SP_CANCELAR_VENTA
+Cancela una venta que sigue en proceso y le regresa todo el stock.
+Valida que el empleado sea el dueño de la venta y que no tenga pagos;
+si todo esta bien devuelve las unidades al inventario con su movimiento
+de ENTRADA y deja la venta en estado CANCELADA.
+*/
+CREATE PROCEDURE SP_CANCELAR_VENTA(
     IN P_ID_VENTA INT,
-    IN P_ID_PRODUCTO INT,
-    IN P_CANTIDAD INT
+    IN P_ID_EMPLEADO INT
 )
 proc_label: BEGIN
-    DECLARE V_PRECIO DECIMAL(12, 2);
-    DECLARE V_STOCK_DISPONIBLE INT;
+    DECLARE V_ID_VENTA_EMPLEADO INT;
+    DECLARE V_ESTADO VARCHAR(20);
 
-    -- 1. Validar que la venta exista
-    IF NOT EXISTS (SELECT 1 FROM VENTAS WHERE ID_VENTA = P_ID_VENTA) THEN
+    -- 1. Validar que la venta exista y sea del empleado
+    SELECT ID_EMPLEADO, ESTADO INTO V_ID_VENTA_EMPLEADO, V_ESTADO
+    FROM VENTAS
+    WHERE ID_VENTA = P_ID_VENTA;
+
+    IF V_ID_VENTA_EMPLEADO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
         LEAVE proc_label;
     END IF;
 
-    -- 2. Validar stock disponible
-    SELECT STOCK_ACTUAL INTO V_STOCK_DISPONIBLE FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-    IF V_STOCK_DISPONIBLE < P_CANTIDAD THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE.';
+    IF V_ID_VENTA_EMPLEADO <> P_ID_EMPLEADO THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO COINCIDE CON EL DE LA VENTA.';
         LEAVE proc_label;
     END IF;
 
-    -- 3. Obtener precio actual del producto
-    SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+    -- 2. Solo se cancelan ventas abiertas
+    IF V_ESTADO <> 'EN_PROCESO' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: SOLO SE PUEDEN CANCELAR VENTAS EN PROCESO.';
+        LEAVE proc_label;
+    END IF;
 
-    -- 4. Insertar detalle
-    INSERT INTO DETALLES_VENTA (ID_VENTA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO)
-    VALUES (P_ID_VENTA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO);
+    -- 3. Si ya tiene pagos, primero hay que resolverlos afuera
+    IF EXISTS (SELECT 1 FROM PAGOS WHERE ID_VENTA = P_ID_VENTA) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA TIENE PAGOS REGISTRADOS, NO SE PUEDE CANCELAR.';
+        LEAVE proc_label;
+    END IF;
 
-    SELECT 'EXITO: PRODUCTO AGREGADO.' AS MENSAJE;
+    -- 4. Regresar el stock de cada producto
+    UPDATE INVENTARIO I
+    JOIN DETALLES_VENTA DV ON DV.ID_PRODUCTO = I.ID_PRODUCTO
+    SET I.STOCK_ACTUAL = I.STOCK_ACTUAL + DV.CANTIDAD
+    WHERE DV.ID_VENTA = P_ID_VENTA;
+
+    -- 5. Anotar las entradas en la bitacora
+    INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
+    SELECT DV.ID_PRODUCTO, P_ID_EMPLEADO, 'ENTRADA', DV.CANTIDAD, CONCAT('Venta cancelada ID: ', P_ID_VENTA)
+    FROM DETALLES_VENTA DV
+    WHERE DV.ID_VENTA = P_ID_VENTA;
+
+    -- 6. Cerrar la venta
+    UPDATE VENTAS SET ESTADO = 'CANCELADA' WHERE ID_VENTA = P_ID_VENTA;
+
+    SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA, ' CANCELADA Y STOCK RESTITUIDO.') AS MENSAJE;
 END ;
 DELIMITER ;
+
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 
-DELIMITER //
+/*
+LIMPIEZA DE TRIGGERS DUPLICADOS
+Estos dos triggers hacian lo mismo que TR_ACTUALIZAR_TOTAL_VENTA (23) y
+TR_AUDITORIA_MOVIMIENTO_VENTA (20), asi que el total y el stock se
+aplicaban dos veces. Solo queda el DROP para limpiar bases viejas.
+*/
 DROP TRIGGER IF EXISTS TR_CALCULAR_TOTAL_VENTA ;
-/*
-TR_CALCULAR_TOTAL_VENTA
-Le va sumando el subtotal de cada producto al TOTAL de la venta.
-Asi el total siempre queda actualizado sin calcularlo a mano.
-*/
-CREATE TRIGGER TR_CALCULAR_TOTAL_VENTA
-AFTER INSERT ON DETALLES_VENTA
-FOR EACH ROW
-BEGIN
-    UPDATE VENTAS 
-    SET TOTAL = TOTAL + NEW.SUBTOTAL
-    WHERE ID_VENTA = NEW.ID_VENTA;
-END ;
-DELIMITER ;
-
-
-
-
-
-DELIMITER //
-
 DROP TRIGGER IF EXISTS TR_PROCESAR_VENTA ;
-/*
-TR_PROCESAR_VENTA
-Al vender, descuenta el stock del producto y deja la SALIDA registrada.
-Anota el movimiento en la auditoria con el empleado de la venta.
-*/
-CREATE TRIGGER TR_PROCESAR_VENTA
-AFTER INSERT ON DETALLES_VENTA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ID_EMPLEADO INT;
-
-    -- 1. Descontar del inventario
-    UPDATE INVENTARIO 
-    SET STOCK_ACTUAL = STOCK_ACTUAL - NEW.CANTIDAD
-    WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-
-    -- 2. Obtener el empleado de la cabecera de la venta para la auditoría
-    SELECT ID_EMPLEADO INTO V_ID_EMPLEADO 
-    FROM VENTAS 
-    WHERE ID_VENTA = NEW.ID_VENTA;
-
-    -- 3. Registrar el movimiento en la auditoría
-    INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
-    VALUES (NEW.ID_PRODUCTO, V_ID_EMPLEADO, 'SALIDA', NEW.CANTIDAD, CONCAT('Venta realizada ID: ', NEW.ID_VENTA));
-
-END ;
-DELIMITER ;
 
 
 -----------------------------------------------------------------------------------------------------------------------------

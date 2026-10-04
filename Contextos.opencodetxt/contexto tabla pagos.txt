@@ -33,6 +33,7 @@ PROCEDIMIENTO ALMACENADO (1)
 TRIGGERS (2)
   - TR_VALIDAR_MONTO_PAGO .. no deja pagar mas del total de la venta
   - TR_AUTO_FINALIZAR_VENTA .. si ya se pago todo, marca la venta REALIZADA
+                                   y ahi crea el bono del 1% al empleado
 
 VISTA (1)
   - VISTA_RESUMEN_PAGOS .... pagos con nombre del metodo de pago
@@ -64,3 +65,26 @@ FUNCIONES (0)
   con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_VALIDAR_MONTO_PAGO ahora exige ademas que la venta este EN_PROCESO: ya no
+  acepta pagos sobre ventas REALIZADAS/CANCELADAS (ademas del tope del total).
+- VISTA_RESUMEN_PAGOS: la columna del metodo se llama NOMBRE_METODO (antes el
+  alias referenciaba un campo inexistente y la vista no se creaba).
+- Verificado: pruebas 29/29 en arena (pago parcial/total/excedido) y smoke en
+  vivo 8/8 PASS (02/10/2026).
+
+================================================================================
+7. ACTUALIZACION 02/10/2026 (2da parte) - EL BONO SE GANA AL COBRAR
+================================================================================
+- TR_AUTO_FINALIZAR_VENTA ahora ademas de marcar REALIZADA crea UN bono
+  BONIFICACION del 1% del TOTAL (ROUND a 2 decimales, descripcion
+  'Comisión por venta #<id>', estado PENDIENTE), solo la primera vez que la
+  venta pasa de EN_PROCESO a cubierta.
+- El bono dejo de crearse al AGREGAR productos: eso lo hacia
+  TR_CALCULAR_BONO_VENTA (archivo 14) y dejaba bonos fantasma en ventas
+  canceladas o nunca pagadas. Ese trigger fue eliminado (solo DROP de
+  limpieza en el 14).

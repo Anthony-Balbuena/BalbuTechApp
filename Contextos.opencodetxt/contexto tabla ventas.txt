@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (8 bloques)
+2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (6 bloques)
 ================================================================================
 TABLA
   - VENTAS ................. cabecera de cada venta (cliente, empleado,
@@ -31,11 +31,14 @@ INDICES (2)
 
 PROCEDIMIENTOS ALMACENADOS (2)
   - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
-  - 21_SP_AGREGAR_PRODUCTO_VENTA ... agrega producto validando stock y precio
+  - SP_CANCELAR_VENTA .............. cancela una venta EN_PROCESO y devuelve
+                                     el stock (valida empleado y pagos)
+  NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
+  con SP_AGREGAR_DETALLE_VENTA (archivo 23).
 
-TRIGGERS (2)
-  - TR_CALCULAR_TOTAL_VENTA .. suma subtotales al TOTAL de la venta
-  - TR_PROCESAR_VENTA ........ descuenta stock y registra la SALIDA
+TRIGGERS (0)
+  - El archivo ya no crea triggers; solo quedan DROP de limpieza de los
+    duplicados TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
 
 VISTA (1)
   - VISTA_DETALLE_VENTA ...... productos de cada venta con subtotal
@@ -67,3 +70,42 @@ FUNCIONES (0)
   con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- Eliminados TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (duplicaban el TOTAL y
+  descontaban stock dos veces). El TOTAL lo suma TR_ACTUALIZAR_TOTAL_VENTA (23) y
+  el stock lo descuenta TR_AUDITORIA_MOVIMIENTO_VENTA (20); en el archivo solo
+  quedan DROP IF EXISTS de limpieza para bases viejas.
+- Agregado 21_SP_CANCELAR_VENTA(P_ID_VENTA, P_ID_EMPLEADO): valida empleado,
+  estado EN_PROCESO y ausencia de pagos; devuelve el stock, registra la ENTRADA
+  en MOVIMIENTOS_INVENTARIO y deja la venta CANCELADA.
+- La seccion 2 de arriba (TRIGGERS 2) quedo obsoleta: hoy el archivo 21 ya no
+  crea triggers.
+- Orden real verificado: los triggers se ejecutan por ORDEN DE CREACION (no
+  alfabetico); los de venta viven en los archivos 20 y 23.
+
+Verificacion:
+- Prueba funcional en BALBU_TECH_TEST: 29/29 PASS (total unico, stock una vez,
+  pagos, cancelacion, devolucion, bloqueos).
+- Smoke en vivo con transaccion + ROLLBACK: 8/8 PASS, cero residuos.
+- Respaldos: /tmp/opencode/backup/ (pre_sync_live.sql).
+- Cargador: /tmp/opencode/loader.py (entiende DELIMITER, no fugas de base).
+
+================================================================================
+7. ACTUALIZACION 02/10/2026 (2da parte) - UNIFICACION DE SP Y LIMPIEZA
+================================================================================
+- Eliminado 21_SP_AGREGAR_PRODUCTO_VENTA: hacia lo mismo que
+  SP_AGREGAR_DETALLE_VENTA (archivo 23) pero SIN validar que el empleado sea
+  el dueño de la venta. En el archivo solo queda el DROP de limpieza y un
+  bloque /* */ que explica por qué se fue. La alta de detalle es una sola
+  via: SP_AGREGAR_DETALLE_VENTA(venta, producto, cantidad, empleado).
+- BORRADO modulos/todo_modulos.sql completo (aprobado por el usuario el
+  02/10/2026). Era un duplicado consolidado de todos los módulos que ya
+  quedó desfasado respecto de los archivos individuales; las referencias
+  históricas que quedan en otros contextos documentan sesiones anteriores.
+- Verificación: information_schema.ROUTINES con nombre
+  21_SP_AGREGAR_PRODUCTO_VENTA = 0 en BALBU_TECH; grep en el repo solo
+  muestra el DROP del archivo 21.
