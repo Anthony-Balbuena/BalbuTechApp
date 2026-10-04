@@ -164,6 +164,7 @@ SP_BUSCAR_CATEGORIAS
 Busca categorias por nombre o descripcion.
 Si la busqueda viene vacia o nula, devuelve todas las categorias sin filtrar.
 */
+DELIMITER //
 drop PROCEDURE if EXISTS SP_BUSCAR_CATEGORIAS ;
 CREATE PROCEDURE SP_BUSCAR_CATEGORIAS(
     IN P_BUSQUEDA VARCHAR(50)
@@ -218,6 +219,5 @@ END ;
 DELIMITER ;
 
 USE BALBU_TECH;
-SELECT * FROM `EMPLEADOS;
 
 

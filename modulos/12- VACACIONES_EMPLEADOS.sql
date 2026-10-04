@@ -1,20 +1,4 @@
 /*
-12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES
-Lista los empleados que estan de vacaciones hoy, con su cargo y los dias
-que les quedan hasta volver. Si nadie esta fuera no devuelve filas y eso
-no es error.
-*/
-DELIMITER //
-
-DROP PROCEDURE IF EXISTS 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES //
-CREATE PROCEDURE 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES()
-
-Notas de despliegue:
-- Hacer backup antes de cambios: mysqldump de la tabla y de los SPs.
-- Probar en staging con casos límite (cruce de años, concurrencia).
-*/
--- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
-/*
 TABLA VACACIONES_EMPLEADOS
 Guarda las vacaciones de cada empleado: fecha de inicio y fin. No deja
 que la fecha de fin sea menor al inicio y si se borra el empleado se
@@ -31,9 +15,6 @@ CREATE TABLE VACACIONES_EMPLEADOS (
     CONSTRAINT FK_VACACIONES_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
------------------------------------------------------------------------------------------------------------------------------
------------------------------------------[Store procedure]-------------------------------------------------------------------
------------------------------------------------------------------------------------------------------------------------------
 
 /*
 SP_INSERTAR_VACACIONES
@@ -45,40 +26,6 @@ vacaciones y que no se pase de los 15 dias al ano.
 -- INSERT
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_VACACIONES ;
-CREATE PROCEDURE SP_INSERTAR_VACACIONES(
-    IN P_ID_EMPLEADO INT,
-    /*
-    TABLA VACACIONES_EMPLEADOS
-    Guarda las vacaciones de cada empleado: fecha de inicio y fin. No deja
-    que la fecha de fin sea menor al inicio y si se borra el empleado se
-    borran tambien sus vacaciones.
-    */
-    -- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH
-    CREATE TABLE VACACIONES_EMPLEADOS (
-        ID_VACACION INT NOT NULL AUTO_INCREMENT,
-        ID_EMPLEADO INT NOT NULL,
-        FECHA_INICIO DATE NOT NULL,
-        FECHA_FIN DATE NOT NULL,
-        FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (ID_VACACION),
-        CONSTRAINT CK_FECHAS_VACACIONES CHECK (FECHA_FIN >= FECHA_INICIO),
-        CONSTRAINT FK_VACACIONES_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE
-    ) ENGINE = InnoDB;
-
-    -----------------------------------------------------------------------------------------------------------------------------
-    -----------------------------------------[Store procedure]-------------------------------------------------------------------
-    -----------------------------------------------------------------------------------------------------------------------------
-
-    /*
-    SP_INSERTAR_VACACIONES
-    Da de alta unas vacaciones nuevas validando que el empleado exista, que
-    las fechas no vengan en pasado ni invertidas, que no se crucen con otras
-    vacaciones y que no se pase de los 15 dias al ano.
-    */
-
-    -- INSERT
-    DELIMITER //
-    DROP PROCEDURE IF EXISTS SP_INSERTAR_VACACIONES ;
     CREATE PROCEDURE SP_INSERTAR_VACACIONES(
         IN P_ID_EMPLEADO INT,
         IN P_FECHA_INICIO DATE,
@@ -149,14 +96,14 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     DELIMITER ;
 
     /*
-    12_SP_ACTUALIZAR_VACACIONES
+SP_ACTUALIZAR_VACACIONES
     Cambia las fechas de unas vacaciones. Revisa que el registro exista y
     que no hayan terminado, y si vienen fechas nuevas valida que no esten
     invertidas; lo que llegue en NULL se queda como estaba.
     */
     DELIMITER //
-    DROP PROCEDURE IF EXISTS 12_SP_ACTUALIZAR_VACACIONES ;
-    CREATE PROCEDURE 12_SP_ACTUALIZAR_VACACIONES(
+    DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_VACACIONES ;
+    CREATE PROCEDURE SP_ACTUALIZAR_VACACIONES(
         IN P_ID_VACACION INT,
         IN P_NUEVA_INICIO DATE,
         IN P_NUEVA_FIN    DATE
@@ -209,8 +156,8 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     LIMITE. Si el empleado no existe manda error.
     */
     DELIMITER //
-    DROP PROCEDURE IF EXISTS 12_SP_REPORTE_DIAS_CONSUMIDOS //
-    CREATE PROCEDURE 12_SP_REPORTE_DIAS_CONSUMIDOS(
+    DROP PROCEDURE IF EXISTS SP_REPORTE_DIAS_CONSUMIDOS ;
+    CREATE PROCEDURE SP_REPORTE_DIAS_CONSUMIDOS(
         IN P_ID_EMPLEADO INT
     )
     proc_label: BEGIN
@@ -243,20 +190,20 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
             IF((15 - v_dias_tomados) < 0, 'EXCEDE LÍMITE', 'DISPONIBLE') AS ESTATUS_VACACIONES
         FROM DUAL; -- DUAL es una tabla virtual para mostrar cálculos sin necesidad de FROM tablas físicas
 
-    END //
+    END ;
     DELIMITER ;
 
 
     --Este SP valida que siempre se quede alguien.
     /*
-    12_SP_VALIDAR_CUPO_VACACIONES
+    SP_VALIDAR_CUPO_VACACIONES
     Revisa si aun se pueden dar vacaciones en un cargo sin dejar menos de
     la mitad del personal disponible: devuelve TRUE o FALSE segun convenga.
     Si el cargo no existe o no tiene gente, manda error.
     */
     DELIMITER //
-    DROP PROCEDURE IF EXISTS 12_SP_VALIDAR_CUPO_VACACIONES //
-    CREATE PROCEDURE 12_SP_VALIDAR_CUPO_VACACIONES(
+    DROP PROCEDURE IF EXISTS SP_VALIDAR_CUPO_VACACIONES ;
+    CREATE PROCEDURE SP_VALIDAR_CUPO_VACACIONES(
         IN P_CARGO VARCHAR(50),
         OUT P_DISPONIBLE BOOLEAN
     )
@@ -288,7 +235,7 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
         ELSE
             SET P_DISPONIBLE = FALSE;
         END IF;
-    END 
+    END ;
     DELIMITER ;
 
 
@@ -300,8 +247,8 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
     no es error.
     */
     DELIMITER //
-    DROP PROCEDURE IF EXISTS 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES //
-    CREATE PROCEDURE 12_SP_CONSULTAR_EMPLEADOS_DE_VACACIONES()
+    DROP PROCEDURE IF EXISTS SP_CONSULTAR_EMPLEADOS_DE_VACACIONES ;
+    CREATE PROCEDURE SP_CONSULTAR_EMPLEADOS_DE_VACACIONES()
     BEGIN
         -- 1. CONSULTA CON LOGICA DE NEGOCIO CLARA
         SELECT 
@@ -320,13 +267,8 @@ CREATE PROCEDURE SP_INSERTAR_VACACIONES(
         -- 2. NOTA: Si la consulta no devuelve filas, tu aplicación en C# 
         -- simplemente recibirá un "Data Table" vacío, lo cual es correcto.
         -- No requiere SIGNAL porque no es un error que no haya nadie de vacaciones.
-    END //
+    END ;
     DELIMITER ;
-
-
-    ----------------------------------------------------------------------------------------------------
-    -----------------------------------------[TRIGERR}--------------------------------------------------
-    ----------------------------------------------------------------------------------------------------
 
 
     --VALIDAR LIMITE DE VACACIONES

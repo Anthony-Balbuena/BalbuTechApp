@@ -29,7 +29,7 @@ Crea un rol nuevo en el sistema.
 Limpia el nombre, valida que no este vacio ni repetido y si todo esta bien
 lo guarda y devuelve un mensaje con el ID.
 */
-DELIMITER//
+DELIMITER //
 
 drop PROCEDURE IF EXISTS SP_INSERTAR_ROL;
 
