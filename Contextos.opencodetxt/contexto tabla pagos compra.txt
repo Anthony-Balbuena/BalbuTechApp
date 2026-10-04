@@ -149,3 +149,17 @@ FUNCIONES (0)
 - Ambas viven en este archivo porque son pura contabilidad de pagos.
 - Verificado en vivo: checks E0-E6 de /tmp/opencode/test_paquetito_e.sql
   (7/7 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+10. ACTUALIZACION 04/10/2026 - SEGUROS SOBRE EL BORRADO DE PAGOS (fase H)
+================================================================================
+- TR_VALIDAR_BORRADO_PAGO_COMPRA (BEFORE DELETE ON PAGOS_COMPRA): no deja
+  borrar un pago de una compra CANCELADA ni DEVUELTA (ahi la plata ya quedo
+  resuelta). Es la misma regla que aplica SP_ANULAR_PAGO_COMPRA, ahora
+  hecha valer tambien cuando el borrado viene a pelo.
+- TR_RECALCULAR_ESTADO_PAGO_COMPRA (AFTER DELETE ON PAGOS_COMPRA): al
+  desaparecer un pago vuelve a sumar lo pagado; si la compra dejo de estar
+  saldada le quita la RECIBIDA y la deja otra vez en ABIERTA. Hace el mismo
+  calculo que el paso 6 de SP_ANULAR_PAGO_COMPRA, pero sirve tambien si el
+  borrado no paso por el SP.
+- Verificado: checks H6 y H7 de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).

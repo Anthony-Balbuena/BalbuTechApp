@@ -98,3 +98,15 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
 - SP_AGREGAR_DETALLE_VENTA ahora usa IFNULL(V_STOCK,0) en la validacion de
   stock por la misma razon.
 - Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+================================================================================
+7. ACTUALIZACION 04/10/2026 - NO SE EDITAN NI SE BORRAN RENGLONES (fase H)
+================================================================================
+- TR_BLOQUEAR_UPDATE_DETALLE_VENTA (BEFORE UPDATE): un renglon de venta no se
+  edita a pelo, ni siquiera estando EN_PROCESO: el TOTAL y la cantidad que
+  salio del inventario quedan siempre igual a lo que se cobro.
+- TR_BLOQUEAR_BORRADO_DETALLE_VENTA (BEFORE DELETE): tampoco se borran
+  renglones. A diferencia de las compras aqui NO existe un SP que quite
+  lineas, y borrarla a pelo dejaria el TOTAL y el stock sin devolver. Si algo
+  salio mal se cancela la venta completa con SP_CANCELAR_VENTA.
+- Verificado: checks H8a y H8b de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).

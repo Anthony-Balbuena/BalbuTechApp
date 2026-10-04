@@ -60,6 +60,22 @@ CREATE PROCEDURE 22_SP_AGREGAR_DETALLE_COMPRA(
     IN P_PRECIO DECIMAL(10, 2)
 )
 proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
     -- 1. VALIDACIONES DE INTEGRIDAD
     IF NOT EXISTS (SELECT 1 FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO EXISTE.';
@@ -100,6 +116,11 @@ proc_label: BEGIN
     INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO)
     VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, P_PRECIO);
 
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     -- 3. Aviso de margen: si este precio de compra ya alcanza (o pasa)
     --    el precio de venta, se esta comprando a perdida o sin margen
     IF P_PRECIO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
@@ -123,9 +144,25 @@ CREATE PROCEDURE SP_QUITAR_DETALLE_COMPRA(
     IN P_ID_PRODUCTO INT
 )
 proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     DECLARE V_ID_DETALLE INT;
     DECLARE V_CANTIDAD INT;
     DECLARE V_ESTADO VARCHAR(20);
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. El producto debe estar en la compra
     SELECT DC.ID_DETALLE_COMPRA, DC.CANTIDAD, C.ESTADO
@@ -158,8 +195,108 @@ proc_label: BEGIN
     DELETE FROM DETALLE_COMPRA
      WHERE ID_DETALLE_COMPRA = V_ID_DETALLE;
 
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     SELECT CONCAT('EXITO: PRODUCTO #', P_ID_PRODUCTO,
                   ' QUITADO DE LA COMPRA #', P_ID_COMPRA, '.') AS MENSAJE;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_MODIFICAR_LINEA_COMPRA ;
+/*
+SP_MODIFICAR_LINEA_COMPRA
+Cambia la cantidad o el precio de un producto que ya esta dentro de una
+compra ABIERTA. Como las lineas no se pueden editar a pelo (esta el trigger
+TR_BLOQUEAR_UPDATE_DETALLE_COMPRA), aqui se borra la linea vieja y se escribe
+la nueva: el stock y el TOTAL los reajustan solos los mismos triggers del
+alta y de la baja, y ademas queda el movimiento en el historial.
+El stock tiene que alcanzar para devolver la linea vieja, igual que para
+quitarla con SP_QUITAR_DETALLE_COMPRA.
+*/
+CREATE PROCEDURE SP_MODIFICAR_LINEA_COMPRA(
+    IN P_ID_COMPRA INT,
+    IN P_ID_PRODUCTO INT,
+    IN P_CANTIDAD INT,
+    IN P_PRECIO DECIMAL(10, 2)
+)
+proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+    DECLARE V_ID_DETALLE INT;
+    DECLARE V_ESTADO VARCHAR(20);
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
+
+    -- 1. El producto debe estar en una compra que siga ABIERTA
+    SELECT DC.ID_DETALLE_COMPRA, C.ESTADO
+      INTO V_ID_DETALLE, V_ESTADO
+      FROM DETALLE_COMPRA DC
+      JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
+     WHERE DC.ID_COMPRA = P_ID_COMPRA
+       AND DC.ID_PRODUCTO = P_ID_PRODUCTO;
+
+    IF V_ID_DETALLE IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO ESTA EN ESTA COMPRA.';
+        LEAVE proc_label;
+    END IF;
+
+    IF V_ESTADO <> 'ABIERTA' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. Los valores nuevos tienen que ser validos
+    IF P_CANTIDAD <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: CANTIDAD INVALIDA.';
+        LEAVE proc_label;
+    END IF;
+
+    IF P_PRECIO <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: PRECIO INVALIDA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. El producto debe seguir ACTIVO
+    IF IFNULL((SELECT ESTADO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO), 'INACTIVO') <> 'ACTIVO' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO ESTA ACTIVO.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. Se va la linea vieja: regresa el stock y recalcula el TOTAL
+    DELETE FROM DETALLE_COMPRA WHERE ID_DETALLE_COMPRA = V_ID_DETALLE;
+
+    -- 5. Entra la linea nueva: vuelve a sumar stock y TOTAL
+    INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO)
+    VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, P_PRECIO);
+
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
+    -- 6. Aviso de margen, igual que al agregar
+    IF P_PRECIO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
+        SELECT 'EXITO: LINEA MODIFICADA (ADVERTENCIA: PRECIO DE COMPRA IGUAL O MAYOR AL DE VENTA).' AS MENSAJE;
+    ELSE
+        SELECT 'EXITO: LINEA MODIFICADA.' AS MENSAJE;
+    END IF;
 END ;
 DELIMITER ;
 

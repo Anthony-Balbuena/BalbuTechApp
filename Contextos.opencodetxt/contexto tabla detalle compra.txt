@@ -164,3 +164,20 @@ FUNCIONES (0)
   sigue diciendo 'EXITO: PRODUCTO AGREGADO.'. La comparacion usa
   PRODUCTOS.PRECIO (la BD no tiene PRECIO_VENTA).
 - Verificado: checks G7a/G7b de test_paquetito_g.sql (9/9 PASS, 04/10/2026).
+================================================================================
+11. ACTUALIZACION 04/10/2026 - NO SE EDITAN LAS LINEAS (fase H)
+================================================================================
+- TR_BLOQUEAR_UPDATE_DETALLE_COMPRA (19- COMPRAS.sql, BEFORE UPDATE): corta
+  cualquier UPDATE directo sobre DETALLE_COMPRA (cantidad o precio), sea
+  ABIERTA o no. Mensaje: 'ERROR: LA LINEA DE UNA COMPRA NO SE PUEDE EDITAR;
+  USE SP_MODIFICAR_LINEA_COMPRA.'
+- SP_MODIFICAR_LINEA_COMPRA (este archivo, despues de SP_QUITAR_DETALLE):
+  cambia la cantidad y/o el precio de un producto que ya esta en una compra
+  ABIERTA. Valida producto en la compra, compra ABIERTA, cantidad > 0,
+  precio > 0 y producto ACTIVO; luego borra la linea vieja y escribe la
+  nueva, asi que stock y TOTAL los reajustan solos los mismos triggers del
+  alta y de la baja y quedan 2 movimientos en la bitacora (SALIDA + ENTRADA).
+  El stock tiene que alcanzar para devolver la linea vieja, igual que para
+  quitarla con SP_QUITAR_DETALLE_COMPRA.
+- Verificado: checks H0-H9 de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).

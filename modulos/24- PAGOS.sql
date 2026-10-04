@@ -84,6 +84,7 @@ CREATE PROCEDURE SP_ANULAR_PAGO(
     IN P_ID_EMPLEADO INT
 )
 proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     DECLARE V_ID_VENTA INT;
     DECLARE V_MONTO DECIMAL(10, 2);
     DECLARE V_ESTADO VARCHAR(20);
@@ -91,6 +92,21 @@ proc_label: BEGIN
     DECLARE V_TOTAL_PAGADO DECIMAL(12, 2);
     DECLARE V_ID_EMPLEADO_VENTA INT;
     DECLARE V_BONOS_BORRADOS INT DEFAULT 0;
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. El empleado que anula debe existir
     IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
@@ -137,6 +153,11 @@ proc_label: BEGIN
     END IF;
 
     -- 7. Mensaje
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     SELECT CONCAT('EXITO: PAGO #', P_ID_PAGO, ' ANULADO (', V_MONTO,
                   '). COBRADO DE LA VENTA #', V_ID_VENTA, ': ', V_TOTAL_PAGADO,
                   IF(V_BONOS_BORRADOS > 0, ' - SE RETIRO EL BONO DEL 1%', '')
@@ -183,6 +204,30 @@ BEGIN
         SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.';
     END IF;
 END;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_BORRADO_PAGO ;
+/*
+TR_VALIDAR_BORRADO_PAGO
+Un pago de una venta CANCELADA o DEVUELTA no se borra, ni con DELETE directo:
+ahi la plata ya quedo resuelta y el cobro dejaria de cuadrar. Es la misma
+regla que aplica SP_ANULAR_PAGO (que ademas quita el bono del 1%) ahora
+hecha valer tambien cuando el borrado no pasa por el SP.
+*/
+CREATE TRIGGER TR_VALIDAR_BORRADO_PAGO
+BEFORE DELETE ON PAGOS
+FOR EACH ROW
+BEGIN
+    DECLARE V_ESTADO VARCHAR(20);
+
+    SELECT ESTADO INTO V_ESTADO FROM VENTAS WHERE ID_VENTA = OLD.ID_VENTA;
+
+    IF V_ESTADO IS NULL OR V_ESTADO NOT IN ('EN_PROCESO', 'REALIZADA') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA VENTA NO ADMITE CAMBIOS DE PAGO (ESTA CANCELADA O DEVUELTA).';
+    END IF;
+END ;
 DELIMITER ;
 
 

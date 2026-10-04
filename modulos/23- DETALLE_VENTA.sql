@@ -162,6 +162,43 @@ BEGIN
 END ;
 DELIMITER ;
 
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_UPDATE_DETALLE_VENTA ;
+/*
+TR_BLOQUEAR_UPDATE_DETALLE_VENTA
+Lo mismo que en las compras: la linea de una venta no se edita a pelo, ni
+siquiera estando abierta. Asi el TOTAL siempre cuadra con lo que se cobro
+y la cantidad que salio del inventario es la que dice el renglon. Si se
+equivoco el cajero, se cancela la venta y se vuelve a hacer.
+*/
+CREATE TRIGGER TR_BLOQUEAR_UPDATE_DETALLE_VENTA
+BEFORE UPDATE ON DETALLES_VENTA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA LINEA DE UNA VENTA NO SE PUEDE EDITAR.';
+END ;
+DELIMITER ;
+
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_DETALLE_VENTA ;
+/*
+TR_BLOQUEAR_BORRADO_DETALLE_VENTA
+Tampoco se borran renglones de una venta, ni estando EN_PROCESO: a diferencia
+de las compras aqui no hay un SP que quite lineas, y borrarla a pelo dejaria
+el TOTAL y el stock destruidos (nadie los devolveria). Si algo salio mal se
+cancela la venta completa con SP_CANCELAR_VENTA.
+*/
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_DETALLE_VENTA
+BEFORE DELETE ON DETALLES_VENTA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA LINEA DE UNA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA.';
+END ;
+DELIMITER ;
+
 
 
 -----------------------------------------------------------------------------------------------------------------------------
