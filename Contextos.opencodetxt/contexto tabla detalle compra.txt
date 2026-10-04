@@ -31,14 +31,16 @@ INDICES (3)
 
 PROCEDIMIENTO ALMACENADO (1)
   - 22_SP_AGREGAR_DETALLE_COMPRA .. agrega producto validando todo antes
-                                     de guardar (incluye que la compra no
-                                     este CANCELADA, desde 04/10/2026)
+                                     de guardar (exige compra ABIERTA:
+                                     rechaza RECIBIDA y CANCELADA desde
+                                     04/10/2026)
 
 TRIGGERS (1)
   - TR_CALCULAR_TOTAL_COMPRA .. suma subtotales al TOTAL de la compra
   (TR_PROCESAR_COMPRA eliminado: era redundante, ver seccion 6)
-  (TR_BLOQUEAR_COMPRA_CANCELADA, que también bloquea INSERTs directos en
-   esta tabla, vive en 19- COMPRAS.sql, ver seccion 7 de compras)
+  (TR_BLOQUEAR_COMPRA_CERRADA, que tambien bloquea INSERTs directos en
+   esta tabla, vive en 19- COMPRAS.sql, ver seccion 7 de compras; antes se
+   llamaba TR_BLOQUEAR_COMPRA_CANCELADA y solo cubria canceladas)
 
 VISTA (1)
   - VISTA_DETALLE_COMPRA .... productos de la compra con nombre y subtotal
@@ -105,3 +107,17 @@ FUNCIONES (0)
   que no pasan por el SP.
 - Verificado en vivo: checks B6 y B7 de /tmp/opencode/test_paquetito_b.sql
   (04/10/2026).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - SOLO COMPRAS ABIERTAS ACEPTAN PRODUCTOS
+================================================================================
+- 22_SP_AGREGAR_DETALLE_COMPRA: la validacion dejo de ser "= CANCELADA" y
+  passo a "<> ABIERTA" con mensaje 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE
+  RECIBIDA O CANCELADA).' - ahora tambien rechaza las RECIBIDAS (saldadas
+  al 100% con pagos, paquetito C).
+- El trigger que cubre los INSERT directos se renombro a
+  TR_BLOQUEAR_COMPRA_CERRADA (mismo cambio de logica; vive en 19- COMPRAS.sql).
+- Si hay que agregar productos a una compra ya saldada: primero se anula un
+  pago con SP_ANULAR_PAGO_COMPRA, la compra vuelve a ABIERTA y ahi si entra.
+- Verificado en vivo: checks C9 de /tmp/opencode/test_paquetito_c.sql
+  (19/19 PASS, 04/10/2026).

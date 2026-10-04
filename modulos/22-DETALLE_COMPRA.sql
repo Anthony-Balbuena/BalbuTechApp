@@ -49,7 +49,7 @@ DROP PROCEDURE IF EXISTS 22_SP_AGREGAR_DETALLE_COMPRA ;
 /*
 22_SP_AGREGAR_DETALLE_COMPRA
 Agrega un producto a una compra que ya esta abierta.
-Revisa que la compra exista y no este cancelada, que el producto exista,
+Revisa que la compra exista y este ABIERTA, que el producto exista,
 que la cantidad y el precio sean
 positivos y que el producto no este repetido; si algo falla no guarda nada.
 */
@@ -66,8 +66,8 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    IF (SELECT ESTADO FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA) = 'CANCELADA' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA.';
+    IF (SELECT ESTADO FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA) <> 'ABIERTA' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA O CANCELADA).';
         LEAVE proc_label;
     END IF;
 
