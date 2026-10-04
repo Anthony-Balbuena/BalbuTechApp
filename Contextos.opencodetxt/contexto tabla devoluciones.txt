@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 25- DEVOLUCIONES.sql (8 bloques)
+2. OBJETOS DOCUMENTADOS EN 25- DEVOLUCIONES.sql (9 bloques)
 ================================================================================
 TABLA
   - DEVOLUCIONES .......... devoluciones con motivo, condicion, monto y estado
@@ -34,9 +34,11 @@ PROCEDIMIENTOS ALMACENADOS (2)
                                   y tope de unidades
   - 25_SP_PROCESAR_DEVOLUCION ... aprueba, rechaza o reembolsa lo pendiente
 
-TRIGGER (1)
+TRIGGERS (2)
   - TR_REINTEGRAR_STOCK_DEVOLUCION .. al aprobar, devuelve stock y anota
-                                       la ENTRADA
+                                       la ENTRADA (se crea primero)
+  - TR_MARCAR_VENTA_DEVUELTA ..... al aprobar o reembolsar, deja la venta
+                                     en estado DEVUELTA
 
 VISTA (1)
   - VISTA_REPORTES_DEVOLUCIONES .. devoluciones agrupadas por producto
@@ -69,7 +71,22 @@ FUNCIONES (0)
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO
 ================================================================================
-- git diff "modulos/25- DEVOLUCIONES.sql" -> solo debe mostrar lineas
-  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- git diff "modulos/25- DEVOLUCIONES.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_REINTEGRAR_STOCK_DEVOLUCION ahora inserta NEW.ID_EMPLEADO en
+  MOVIMIENTOS_INVENTARIO al aprobar (antes omitia la columna y el registro de
+  la ENTRADA fallaba junto con el reintegro de stock).
+- Comportamiento verificado: PENDIENTE -> APROBADA reintegra stock una vez y
+  registra la entrada con el empleado; REEMBOLSADA no vuelve a reintegrar.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+- TR_MARCAR_VENTA_DEVUELTA (nuevo): hasta hoy NADA escribia el estado
+  DEVUELTA de VENTAS (grep = 0), asi que una venta devuelta quedaba
+  REALIZADA para siempre. Se crea DESPUES de TR_REINTEGRAR_STOCK_DEVOLUCION
+  para que el reintegro corra primero (orden de creacion = orden de ejecucion).

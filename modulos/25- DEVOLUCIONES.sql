@@ -217,10 +217,11 @@ BEGIN
         SET STOCK_ACTUAL = STOCK_ACTUAL + NEW.CANTIDAD
         WHERE ID_PRODUCTO = (SELECT ID_PRODUCTO FROM DETALLES_VENTA WHERE ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA);
         
-        -- 2. Registrar en auditoría
-        INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
+        -- 2. Registrar en auditoría (con el empleado de la devolución)
+        INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
         VALUES (
             (SELECT ID_PRODUCTO FROM DETALLES_VENTA WHERE ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA), 
+            NEW.ID_EMPLEADO,
             'ENTRADA', 
             NEW.CANTIDAD, 
             CONCAT('Devolución aprobada ID: ', NEW.ID_DEVOLUCION)
@@ -233,7 +234,40 @@ DELIMITER ;
 
 
 
------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_MARCAR_VENTA_DEVUELTA;
+/*
+TR_MARCAR_VENTA_DEVUELTA
+Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA, la venta
+queda marcada como DEVUELTA (solo si estaba REALIZADA). Asi deja de aparecer
+como venta buena cuando el cliente ya devolvio el producto.
+*/
+CREATE TRIGGER TR_MARCAR_VENTA_DEVUELTA
+AFTER UPDATE ON DEVOLUCIONES
+FOR EACH ROW
+BEGIN
+    DECLARE V_ID_VENTA INT;
+    DECLARE V_ESTADO VARCHAR(20);
+
+    IF (NEW.ESTADO IN ('APROBADA', 'REEMBOLSADA') AND OLD.ESTADO = 'PENDIENTE') THEN
+
+        SELECT DV.ID_VENTA, V.ESTADO INTO V_ID_VENTA, V_ESTADO
+        FROM DETALLES_VENTA DV
+        JOIN VENTAS V ON V.ID_VENTA = DV.ID_VENTA
+        WHERE DV.ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA;
+
+        IF V_ESTADO = 'REALIZADA' THEN
+            UPDATE VENTAS SET ESTADO = 'DEVUELTA' WHERE ID_VENTA = V_ID_VENTA;
+        END IF;
+    END IF;
+END ;
+DELIMITER ;
+
+
+
+
+-----------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 

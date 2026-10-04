@@ -285,36 +285,14 @@ END;
 DELIMITER ;
 
 /*
-TR_CALCULAR_BONO_VENTA
-Se dispara al insertar en DETALLES_VENTA y crea solo un bono de
-BONIFICACION al empleado de esa venta con el 1% del subtotal, estado
-PENDIENTE y la descripcion de comision automatica. Trabaja en automatico.
+LIMPIEZA DE TRIGGER MOVIDO AL COBRO
+TR_CALCULAR_BONO_VENTA creaba el bono del 1% al AGREGAR el producto, o sea
+antes de cobrar, y cancelar la venta no lo borraba. Ahora el bono lo crea
+TR_AUTO_FINALIZAR_VENTA (archivo 24) en el momento en que se paga el total
+de la venta. Solo queda el DROP para limpiar bases viejas.
 */
-
-DELIMITER // 
+DELIMITER //
 DROP TRIGGER IF EXISTS TR_CALCULAR_BONO_VENTA;
-CREATE TRIGGER TR_CALCULAR_BONO_VENTA
-AFTER INSERT ON DETALLES_VENTA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ID_EMPLEADO INT;
-    
-    -- Obtenemos el empleado de la tabla VENTAS
-    SELECT ID_EMPLEADO INTO V_ID_EMPLEADO 
-    FROM VENTAS 
-    WHERE ID_VENTA = NEW.ID_VENTA;
-
-    -- Insertamos adaptado a las columnas reales de nuestra tabla BONOS_EMPLEADOS
-    INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION, ESTADO)
-    VALUES (
-        V_ID_EMPLEADO, 
-        CURRENT_DATE(), 
-        'BONIFICACION', 
-        (NEW.SUBTOTAL * 0.01), 
-        'Comisión automática por venta', 
-        'PENDIENTE'
-    );
-END;
 DELIMITER ;
 
 

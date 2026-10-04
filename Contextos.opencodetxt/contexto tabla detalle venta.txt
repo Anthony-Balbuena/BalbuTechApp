@@ -28,15 +28,18 @@ INDICES (2)
   - IX_CLIENTE_NOMBRE ..... busqueda de clientes por nombre (sobre CLIENTES)
   - IX_VENTAS_FECHA ....... ventas por fecha (sobre VENTAS)
 
-PROCEDIMIENTOS ALMACENADOS (2)
-  - 23_SP_AGREGAR_DETALLE_VENTA .. version completa: valida empleado,
-                                    venta y stock
-  - SP_AGREGAR_DETALLE_VENTA ..... version corta sin validar empleado
+PROCEDIMIENTOS ALMACENADOS (1)
+  - SP_AGREGAR_DETALLE_VENTA ...... valida venta, empleado dueño y stock,
+                                    toma el precio actual y agrega la linea
 
-TRIGGERS (2)
+TRIGGERS (3)
   - TR_ACTUALIZAR_TOTAL_VENTA .... suma subtotales al TOTAL de la venta
   - TR_BLOQUEAR_VENTA_FINALIZADA . no deja agregar productos a una venta
                                     ya realizada
+  - TR_VALIDAR_STOCK_DETALLE_VENTA .. BEFORE INSERT: no deja vender mas de lo
+                                    que hay en INVENTARIO (aunque el INSERT
+                                    no pase por el SP) y tampoco deja pasar
+                                    productos sin fila de inventario
 
 VISTAS (0)
   - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
@@ -48,11 +51,11 @@ FUNCIONES (0)
 3. DECISIONES TOMADAS EN ESTA SESION
 ================================================================================
 - Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
-- NO se tocaron las anomalias existentes (solo informativas):
-  * Existen 2 procedimientos casi iguales: 23_SP_AGREGAR_DETALLE_VENTA y
-    SP_AGREGAR_DETALLE_VENTA (este ultimo sin validar el empleado).
+- Anomalias corregidas en la sesion del 02/10/2026 (ver seccion 6):
+  * Existian 2 procedimientos casi iguales; hoy queda uno solo
+    SP_AGREGAR_DETALLE_VENTA (version completa, 4 parametros).
   * Los indices IX_CLIENTE_NOMBRE e IX_VENTAS_FECHA estan definidos sobre
-    CLIENTES y VENTAS, no sobre DETALLES_VENTA.
+    CLIENTES y VENTAS, no sobre DETALLES_VENTA (sin tocar).
 - NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
@@ -72,3 +75,28 @@ FUNCIONES (0)
   agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_BLOQUEAR_VENTA_FINALIZADA ahora bloquea REALIZADA, CANCELADA y DEVUELTA
+  (antes solo REALIZADA; una venta cancelada aceptaba agregar productos).
+- TR_ACTUALIZAR_TOTAL_VENTA confirmado como UNICO sumador del TOTAL de la venta
+  (el duplicado TR_CALCULAR_TOTAL_VENTA del archivo 21 fue eliminado).
+- SP duplicado eliminado: el archivo tenia 2 veces el nombre
+  SP_AGREGAR_DETALLE_VENTA (uno bajo [Store procedure} y otro copiado dentro
+  de [TRIGERR}); el segundo DROP+CREATE pisaba al primero y dejaba la version
+  corta de 3 parametros sin validar empleado ni venta. Queda un solo SP con
+  4 parametros (valida venta existente, empleado dueño y stock). La version
+  corta NO se usa en ningun lado (ni app C++, ni otros SQL, ni tests).
+- Cerrado el tema del duplicado de afuera: 21_SP_AGREGAR_PRODUCTO_VENTA
+  (archivo 21) hacia lo mismo sin validar el dueño de la venta y tambien
+  fue eliminado, asi que este archivo queda con el UNICO camino de alta
+  de detalle.
+- TR_VALIDAR_STOCK_DETALLE_VENTA (nuevo, 3ro de la tabla): valida el stock
+  tambien en INSERT directos. Motivo: 5 de los 6 productos no tienen fila en
+  INVENTARIO, el SELECT del SP devolia NULL y la validacion se saltaba.
+- SP_AGREGAR_DETALLE_VENTA ahora usa IFNULL(V_STOCK,0) en la validacion de
+  stock por la misma razon.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).

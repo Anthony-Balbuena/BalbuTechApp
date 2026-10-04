@@ -36,18 +36,18 @@ CREATE INDEX IX_VENTAS_FECHA ON VENTAS (FECHA);
 
 DELIMITER //
 
-DROP PROCEDURE IF EXISTS 23_SP_AGREGAR_DETALLE_VENTA ;
+DROP PROCEDURE IF EXISTS SP_AGREGAR_DETALLE_VENTA ;
 /*
-23_SP_AGREGAR_DETALLE_VENTA
+SP_AGREGAR_DETALLE_VENTA
 Agrega un producto a una venta validando todo antes de guardar.
 Revisa que la venta exista, que el empleado sea el dueño de la venta y que
 haya stock suficiente; luego toma el precio actual y agrega la linea.
 */
-CREATE PROCEDURE 23_SP_AGREGAR_DETALLE_VENTA(
+CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_VENTA INT,
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD INT,
-    IN P_ID_EMPLEADO INT -- Nuevo parámetro
+    IN P_ID_EMPLEADO INT -- Nuevo parámetro 
 )
 proc_label: BEGIN
     DECLARE V_PRECIO DECIMAL(10, 2);
@@ -68,9 +68,9 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. Validar stock
+    -- 2. Validar stock (si el producto no esta en INVENTARIO, cuenta como 0)
     SELECT STOCK_ACTUAL INTO V_STOCK_DISPONIBLE FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-    IF V_STOCK_DISPONIBLE < P_CANTIDAD THEN
+    IF IFNULL(V_STOCK_DISPONIBLE, 0) < P_CANTIDAD THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE.';
         LEAVE proc_label;
     END IF;
@@ -89,43 +89,6 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
-
-
-DELIMITER //
-DROP PROCEDURE IF EXISTS SP_AGREGAR_DETALLE_VENTA ;
-/*
-SP_AGREGAR_DETALLE_VENTA
-Version corta de agregar producto a la venta, sin validar el empleado.
-Revisa que haya stock, toma el precio actual y agrega la linea del detalle.
-*/
-CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
-    IN P_ID_VENTA INT,
-    IN P_ID_PRODUCTO INT,
-    IN P_CANTIDAD INT
-)
-proc_label: BEGIN
-    DECLARE V_PRECIO DECIMAL(10, 2);
-    DECLARE V_STOCK_DISPONIBLE INT;
-
-    -- 1. Validaciones
-    SELECT STOCK_ACTUAL INTO V_STOCK_DISPONIBLE FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-    
-    IF V_STOCK_DISPONIBLE < P_CANTIDAD THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE PARA ESTE PRODUCTO.';
-        LEAVE proc_label;
-    END IF;
-
-    -- 2. Obtener precio actual de venta
-    SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-
-    -- 3. Insertar detalle (El subtotal se calcula solo gracias a tu columna generada)
-    INSERT INTO DETALLES_VENTA (ID_VENTA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO)
-    VALUES (P_ID_VENTA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO);
-
-    SELECT 'EXITO: PRODUCTO AGREGADO A LA VENTA.' AS MENSAJE;
-END ;
-DELIMITER ;
-
 
 
 DELIMITER //
@@ -152,8 +115,9 @@ DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_VENTA_FINALIZADA ;
 /*
 TR_BLOQUEAR_VENTA_FINALIZADA
-No deja agregar productos a una venta que ya esta realizada.
-Si alguien lo intenta, corta la operacion con un mensaje de error.
+No deja agregar productos a una venta que ya no este abierta: ni
+realizada, ni cancelada ni devuelta. Si alguien lo intenta, corta la
+operacion con un mensaje de error.
 */
 CREATE TRIGGER TR_BLOQUEAR_VENTA_FINALIZADA
 BEFORE INSERT ON DETALLES_VENTA
@@ -162,9 +126,38 @@ BEGIN
     DECLARE V_ESTADO VARCHAR(20);
     SELECT ESTADO INTO V_ESTADO FROM VENTAS WHERE ID_VENTA = NEW.ID_VENTA;
     
-    IF V_ESTADO = 'REALIZADA' THEN
+    IF V_ESTADO IN ('REALIZADA', 'CANCELADA', 'DEVUELTA') THEN
         SIGNAL SQLSTATE '45000' 
-        SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN AGREGAR PRODUCTOS A UNA VENTA YA FINALIZADA.';
+        SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN AGREGAR PRODUCTOS A UNA VENTA QUE YA NO ESTA ABIERTA.';
+    END IF;
+END ;
+DELIMITER ;
+
+
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_STOCK_DETALLE_VENTA ;
+/*
+TR_VALIDAR_STOCK_DETALLE_VENTA
+No deja vender mas unidades de las que hay en el inventario, aunque el
+INSERT venga a pelo y no pase por ningun SP. Si el producto ni siquiera
+tiene fila en INVENTARIO, tampoco lo deja pasar.
+*/
+CREATE TRIGGER TR_VALIDAR_STOCK_DETALLE_VENTA
+BEFORE INSERT ON DETALLES_VENTA
+FOR EACH ROW
+BEGIN
+    DECLARE V_STOCK INT;
+    SELECT STOCK_ACTUAL INTO V_STOCK FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+
+    IF V_STOCK IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO TIENE REGISTRO EN INVENTARIO.';
+    END IF;
+
+    IF V_STOCK < NEW.CANTIDAD THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE.';
     END IF;
 END ;
 DELIMITER ;
