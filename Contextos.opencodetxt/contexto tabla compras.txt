@@ -53,8 +53,10 @@ TRIGGERS (2)
   (La devolucion a proveedor vive en 19.6- DEVOLUCION_COMPRA.sql, ver
    seccion 11 y su propio contexto)
 
-VISTA (1)
+VISTA (2)
   - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha, total y estado
+  - VISTA_GASTOS_PROVEEDOR .. cuanto le compramos a cada proveedor en total
+                              (canceladas no cuentan; paquetito E)
 
 FUNCION (1)
   - FN_CONTAR_ITEMS_COMPRA .. cuenta los productos de una compra
@@ -196,3 +198,14 @@ FUNCION (1)
   (detalle y bloqueadores).
 - Verificado en vivo: test_devolucion_compra.sql 18/18 PASS + regresion
   63 checks en verde, residuos 0 (04/10/2026).
+
+================================================================================
+12. ACTUALIZACION 04/10/2026 - VISTA GASTOS POR PROVEEDOR (paquetito E)
+================================================================================
+- VISTA_GASTOS_PROVEEDOR: por proveedor, cuantas compras llevamos y el
+  gasto total (suma de TOTAL actual). Las CANCELADAS no cuentan como
+  gasto y una devolucion baja el gasto sola porque reduce el TOTAL.
+  Para rangos de fechas se filtra en la consulta sobre
+  VISTA_REPORTE_COMPRAS (la vista no recibe parametros).
+- Verificado en vivo: check E6 de test_paquetito_e.sql (7/7 PASS con
+  ROLLBACK, 04/10/2026).

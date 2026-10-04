@@ -44,8 +44,15 @@ TRIGGERS (2)
                                la compra RECIBIDA (equivalente a REALIZADA
                                en ventas; sin bonos, esos son de ventas)
 
-VISTA (0) / FUNCIONES (0)
-  - No se agregaron en este archivo.
+VISTAS (2)  (agregadas el 04/10/2026, paquetito E)
+  - VISTA_RESUMEN_PAGOS_COMPRA .... pagos a proveedores con el nombre del
+                                     metodo (espejo de VISTA_RESUMEN_PAGOS
+                                     de ventas)
+  - VISTA_COMPRAS_PENDIENTES_PAGO . deuda visible: TOTAL, PAGADO y SALDO
+                                     por compra (saldo negativo = exceso
+                                     pagado a favor); excluye CANCELADAS
+
+FUNCIONES (0)
 
 ================================================================================
 3. DECISIONES TOMADAS EN ESTA SESION
@@ -128,3 +135,17 @@ VISTA (0) / FUNCIONES (0)
   a favor y se ve en la vista de pendientes de pago (paquetito E).
 - Verificado en vivo: checks D14 de test_devolucion_compra.sql (18/18
   PASS, 04/10/2026).
+
+================================================================================
+9. ACTUALIZACION 04/10/2026 - VISTAS DE DEUDA (paquetito E)
+================================================================================
+- VISTA_RESUMEN_PAGOS_COMPRA: los pagos a proveedores con el nombre del
+  metodo de pago, espejo de la VISTA_RESUMEN_PAGOS de ventas.
+- VISTA_COMPRAS_PENDIENTES_PAGO: la deuda visible por compra con TOTAL,
+  PAGADO y SALDO (= TOTAL - PAGADO). Muestra toda compra que deba o
+  tenga de mas menos las CANCELADAS (esas nunca se pagaron). Un SALDO
+  negativo no es error: es el exceso pagado a favor tras una devolucion
+  (paquetito D), visible en vez de crear pagos negativos.
+- Ambas viven en este archivo porque son pura contabilidad de pagos.
+- Verificado en vivo: checks E0-E6 de /tmp/opencode/test_paquetito_e.sql
+  (7/7 PASS con ROLLBACK, 04/10/2026).
