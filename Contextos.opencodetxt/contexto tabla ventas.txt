@@ -19,15 +19,18 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (6 bloques)
+2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (bloques)
 ================================================================================
-TABLA
+TABLA (2)
   - VENTAS ................. cabecera de cada venta (cliente, empleado,
                               estado, fecha y total)
+  - HISTORIAL_ESTADOS_VENTA . un renglon por cada cambio de estado de una
+                              venta (quien, cuando y hacia donde paso)
 
-INDICES (2)
+INDICES (3)
   - IX_VENTAS_CLIENTE ....... historial de ventas por cliente
   - IX_VENTAS_EMPLEADO ...... ventas atendidas por empleado
+  - IX_HIST_ESTADO_VENTA_FECHA .. historial de estados por fecha
 
 PROCEDIMIENTOS ALMACENADOS (2)
   - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
@@ -38,9 +41,15 @@ PROCEDIMIENTOS ALMACENADOS (2)
   NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
   con SP_AGREGAR_DETALLE_VENTA (archivo 23).
 
-TRIGGERS (0)
-  - El archivo ya no crea triggers; solo quedan DROP de limpieza de los
-    duplicados TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
+TRIGGERS (3)
+  - TR_BLOQUEAR_BORRADO_VENTA . ningun DELETE directo borra una venta
+                                (ver seccion 9)
+  - TR_HISTORIAL_ESTADO_VENTA . al nacer la venta escribe su primera fila
+                                de historial ('Venta iniciada')
+  - TR_CAMBIO_ESTADO_VENTA .... anota antes/despues cada vez que cambia el
+                                ESTADO; si no cambia no anota nada
+  - Ademas quedan DROP de limpieza de los duplicados
+    TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
 
 VISTA (1)
   - VISTA_DETALLE_VENTA ...... productos de cada venta con subtotal
@@ -129,3 +138,18 @@ Verificacion:
   llega a correr el cascade hacia DETALLES_VENTA y PAGOS.
 - Verificado: check H8c de /tmp/opencode/test_fase_h.sql (14/14 PASS con
   ROLLBACK, 04/10/2026).
+================================================================================
+10. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS DE VENTA (paquetito J)
+================================================================================
+- Nueva tabla HISTORIAL_ESTADOS_VENTA (FK a VENTAS y a EMPLEADOS) con su
+  indice IX_HIST_ESTADO_VENTA_FECHA: es el espejo de
+  HISTORIAL_ESTADOS_COMPRA del paquetito G.
+- TR_HISTORIAL_ESTADO_VENTA (AFTER INSERT ON VENTAS): el renglon del
+  nacimiento, ESTADO_ANTERIOR NULL y MOTIVO 'Venta iniciada'.
+- TR_CAMBIO_ESTADO_VENTA (AFTER UPDATE ON VENTAS): anota
+  'Estado: A -> B' solo si el ESTADO cambio de verdad; un UPDATE que no
+  cambia el estado no ensucia el historial, y tambien lo captura si alguien
+  cambia el estado con un UPDATE directo (pago total, cancelacion,
+  devolucion o mano pelada).
+- Verificado: /tmp/opencode/test_paquetito_j.sql (8/8 PASS con ROLLBACK y
+  residuos 0, 04/10/2026).
