@@ -25,15 +25,17 @@ TABLA
   - HISTORIAL_MOVIMIENTOS_PRODUCTO .. cada movimiento de stock con el tipo,
                                        la cantidad y el stock antes y despues
 
-TRIGGERS (5)
+TRIGGERS (4)
   - TR_HISTORIAL_VENTA ...... anota el movimiento al vender (tipo VENTA)
   - TR_HISTORIAL_COMPRA ..... solo anota la ENTRADA al comprar (el stock lo
                                suma TR_ACTUALIZAR_STOCK_COMPRA del archivo 19)
-  - TR_HISTORIAL_DEVOLUCION (sobre DETALLES_DEVOLUCION) .. suma stock y
-                               anota AJUSTE
-  - TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES) .. suma stock solo si el
-                               producto esta en BUENO estado
-  - TR_HISTORIAL_AJUSTE ..... anota cada cambio de stock en INVENTARIO
+  - TR_HISTORIAL_DEVOLUCION (sobre DETALLES_DEVOLUCION) .. COMENTADO, la
+                               tabla no existe (solo queda el DROP)
+  - TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES) .. anota la devolucion con
+                               tipo DEVOLUCION (el stock lo suma
+                               TR_REINTEGRAR_STOCK_DEVOLUCION, que corre antes)
+  - (TR_HISTORIAL_AJUSTE fue ELIMINADO el 04/10/2026: duplicaba el historial
+     de todos los movimientos; ver seccion 7)
 
 PROCEDIMIENTOS (0), INDICES (0), VISTAS (0), FUNCIONES (0)
   - Las secciones [VIEW} y [FUNTION} estan vacias; no hay SP ni CREATE INDEX.
@@ -82,3 +84,29 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   ejecutan por ORDEN DE CREACION, verificado con prueba en PROBE_DB).
 - TR_HISTORIAL_AJUSTE intacto.
 - Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - UN HISTORIAL = UN MOVIMIENTO (paquetito A)
+================================================================================
+- TABLA: TIPO_MOVIMIENTO ahora es
+  ENUM('ENTRADA','SALIDA','AJUSTE','VENTA','DEVOLUCION') (se agrego
+  DEVOLUCION al final, sin mover posiciones).
+- ELIMINADO TR_HISTORIAL_AJUSTE: era un trigger generico sobre UPDATE de
+  INVENTARIO que anotaba TODA subida/bajada de stock como "Ajuste manual de
+  inventario" (falso para compras, ventas y devoluciones) y DUPLICABA la fila
+  del trigger de negocio. Junto con 17_TR_REGISTRAR_HISTORIAL_INVENTARIO
+  (archivo 17, tambien eliminado) cada movimiento dejaba 3 filas en el
+  historial.
+- Desde esta fase el historial lo escribe UNA sola vez quien hace el
+  movimiento: TR_HISTORIAL_COMPRA, TR_HISTORIAL_VENTA,
+  TR_HISTORIAL_DEVOLUCION, SP_CANCELAR_VENTA (21) o
+  20_SP_REGISTRAR_AJUSTE_INVENTARIO (20).
+- TR_HISTORIAL_DEVOLUCION anota ahora con tipo DEVOLUCION (antes decia
+  AJUSTE). Su INSERT en la bitacora (via TR_REINTEGRAR, archivo 25) tambien
+  quedo con tipo DEVOLUCION.
+- OJO con el orden de creacion: TR_REINTEGRAR_STOCK_DEVOLUCION (25) debe
+  crearse ANTES que TR_HISTORIAL_DEVOLUCION (32); si se recrea al reves, el
+  historial lee el stock antes del reintegro y anota mal antes/despues.
+- Verificado en vivo: /tmp/opencode/test_paquetito_a.sql 12/12 PASS con
+  ROLLBACK (residuos 0) + regresion smoke_fase1 9/9 + test_cierre_ventas
+  10/10 (04/10/2026).

@@ -30,8 +30,11 @@ INDICES (2)
   - IX_CANTIDAD_MOVIINVENTORIO .. busqueda de movimientos por cantidad
 
 PROCEDIMIENTO ALMACENADO (1)
-  - 20_SP_REGISTRAR_AJUSTE_INVENTARIO .. registra el movimiento y
-                                          suma/resta stock segun el tipo
+  - 20_SP_REGISTRAR_AJUSTE_INVENTARIO .. valida producto/empleado/cantidad > 0,
+                                          crea la fila en INVENTARIO si falta,
+                                          no deja stock negativo, anota el
+                                          movimiento en la bitacora Y su fila
+                                          en el historial del producto (04/10)
 
 TRIGGERS (2)
   - TR_AUDITORIA_MOVIMIENTO_COMPRA .. anota la ENTRADA al comprar
@@ -81,3 +84,21 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
 - Limpiada la linea "V----..." del separador de secciones [VIEW] del archivo,
   que rompia la carga del archivo completo.
 - Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - 20_SP_CON_BITACORA_E_HISTORIAL (paquetito A)
+================================================================================
+- 20_SP_REGISTRAR_AJUSTE_INVENTARIO ahora:
+    1) valida producto, empleado y cantidad > 0 (antes solo existencia);
+    2) crea la fila en INVENTARIO si falta (antes el UPDATE no matcheaba y
+       quedaba un movimiento anotado con el stock sin cambiar);
+    3) no deja bajar el stock de 0 para SALIDA/AJUSTE (SIGNAL de stock
+       insuficiente);
+    4) escribe su propia fila en HISTORIAL_MOVIMIENTOS_PRODUCTO con el stock
+       antes y despues (antes dependia de los triggers genericos, que fueron
+       eliminados hoy).
+- Con esto la regla de la BD es: TODO cambio de stock deja 1 fila en
+  MOVIMIENTOS_INVENTARIO (quien) y 1 fila en el historial (cuanto antes/despues),
+  escritas por quien hace el movimiento. Ningun trigger generico mas.
+- Verificado: /tmp/opencode/test_paquetito_a.sql 12/12 PASS con ROLLBACK
+  (04/10/2026).

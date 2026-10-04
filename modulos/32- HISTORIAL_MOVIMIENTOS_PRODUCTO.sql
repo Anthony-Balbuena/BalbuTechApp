@@ -7,7 +7,7 @@ stock de cualquier producto.
 CREATE TABLE HISTORIAL_MOVIMIENTOS_PRODUCTO (
     ID_MOVIMIENTO INT NOT NULL AUTO_INCREMENT,
     ID_PRODUCTO INT NOT NULL,
-    TIPO_MOVIMIENTO ENUM('ENTRADA', 'SALIDA', 'AJUSTE', 'VENTA') NOT NULL,
+    TIPO_MOVIMIENTO ENUM('ENTRADA', 'SALIDA', 'AJUSTE', 'VENTA', 'DEVOLUCION') NOT NULL,
     CANTIDAD INT NOT NULL,
     STOCK_ANTERIOR INT NOT NULL,
     STOCK_NUEVO INT NOT NULL,
@@ -133,7 +133,7 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_DEVOLUCION;
 /*
 TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES)
 Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA, anota
-en el historial el stock antes y despues con tipo AJUSTE. Solo registra:
+en el historial el stock antes y despues con tipo DEVOLUCION. Solo registra:
 el que devuelve el stock es TR_REINTEGRAR_STOCK_DEVOLUCION (25), que se
 crea primero y por eso corre antes (los triggers van en orden de creacion).
 */
@@ -164,7 +164,7 @@ BEGIN
         INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
             ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
         ) VALUES (
-            v_id_producto, 'AJUSTE', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo,
+            v_id_producto, 'DEVOLUCION', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo,
             CONCAT('Devolución aprobada: ', IFNULL(NEW.MOTIVO, ''))
         );
     END IF;
@@ -172,42 +172,18 @@ END;
 
 DELIMITER ;
 
------AJUSTE MANUAL
-
-DELIMITER //
-
-DROP TRIGGER IF EXISTS TR_HISTORIAL_AJUSTE;
-
+DROP TRIGGER IF EXISTS TR_HISTORIAL_AJUSTE ;
 /*
-TR_HISTORIAL_AJUSTE
-Cada vez que cambia el stock en INVENTARIO, anota el movimiento en el
-historial con la cantidad y el stock antes y despues del cambio.
+TR_HISTORIAL_AJUSTE (ELIMINADO)
+Era el segundo trigger generico sobre UPDATE de INVENTARIO: anotaba TODA
+subida o bajada de stock como si fuera un 'Ajuste manual de inventario',
+lo cual era falso para compras, ventas y devoluciones, y sumaba una fila
+a la que ya escribia el trigger de negocio (o la de
+17_TR_REGISTRAR_HISTORIAL_INVENTARIO, tambien eliminado): cada movimiento
+dejaba 3 filas en el historial.
+Desde esta fase el historial lo escribe UNA sola vez quien hace el
+movimiento (lista completa en 17- INVENTARIO.sql).
 */
-CREATE TRIGGER TR_HISTORIAL_AJUSTE
-AFTER UPDATE ON INVENTARIO
-FOR EACH ROW
-BEGIN
-    -- Solo registramos si el stock cambió
-    IF OLD.STOCK_ACTUAL <> NEW.STOCK_ACTUAL THEN
-        INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
-            ID_PRODUCTO, 
-            TIPO_MOVIMIENTO, 
-            CANTIDAD, 
-            STOCK_ANTERIOR, 
-            STOCK_NUEVO, 
-            OBSERVACION
-        ) VALUES (
-            NEW.ID_PRODUCTO, 
-            'AJUSTE', 
-            ABS(NEW.STOCK_ACTUAL - OLD.STOCK_ACTUAL), 
-            OLD.STOCK_ACTUAL, 
-            NEW.STOCK_ACTUAL, 
-            'Ajuste manual de inventario'
-        );
-    END IF;
-END ;
-
-DELIMITER ;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
