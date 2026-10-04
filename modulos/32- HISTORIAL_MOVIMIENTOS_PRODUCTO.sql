@@ -28,8 +28,9 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_VENTA ;
 
 /*
 TR_HISTORIAL_VENTA
-Cuando se vende un producto, calcula el stock antes y despues de la venta
-y deja el movimiento registrado en el historial con tipo VENTA.
+Cuando se vende un producto, anota en el historial el stock antes y
+despues de la venta con tipo VENTA. Solo registra: el que descuenta el
+stock es TR_AUDITORIA_MOVIMIENTO_VENTA (20), que corre antes.
 */
 CREATE TRIGGER TR_HISTORIAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
@@ -38,11 +39,12 @@ BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
 
-    -- 1. Obtenemos el stock actual del producto antes de la venta
-    SELECT STOCK INTO v_stock_anterior FROM PRODUCTOS WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-    
-    -- 2. Calculamos el nuevo stock restando la cantidad vendida
-    SET v_stock_nuevo = v_stock_anterior - NEW.CANTIDAD;
+    -- 1. Leemos el stock ya descontado (el trigger de la venta, archivo 20,
+    -- se crea primero y por eso corre antes)
+    SELECT STOCK_ACTUAL INTO v_stock_nuevo FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+
+    -- 2. El stock anterior era el actual mas lo vendido
+    SET v_stock_anterior = v_stock_nuevo + NEW.CANTIDAD;
 
     -- 3. Insertamos en el historial de movimientos
     INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
@@ -62,28 +64,25 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_COMPRA ;
 
 /*
 TR_HISTORIAL_COMPRA
-Al comprar, suma la cantidad al stock del producto y deja el movimiento
-en el historial con tipo ENTRADA y el stock antes y despues.
+Al comprar, anota en el historial la ENTRADA con el stock antes y
+despues. Solo registra: el que suma el stock es
+TR_ACTUALIZAR_STOCK_COMPRA (19), que corre antes.
 */
 CREATE TRIGGER TR_HISTORIAL_COMPRA
-AFTER INSERT ON DETALLE_COMPRA -- Ajusta aquí si tu tabla tiene otro nombre
+AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
 BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
 
-    -- 1. Obtenemos el stock actual del producto antes de la compra
-    SELECT STOCK INTO v_stock_anterior FROM PRODUCTOS WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-    
-    -- 2. Calculamos el nuevo stock (Sumamos la cantidad comprada)
-    SET v_stock_nuevo = v_stock_anterior + NEW.CANTIDAD;
+    -- 1. Leemos el stock ya actualizado (el trigger de la compra, archivo 19,
+    -- se crea primero y por eso corre antes)
+    SELECT STOCK_ACTUAL INTO v_stock_nuevo FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
 
-    -- 3. Actualizamos el stock en la tabla de productos (Paso CRÍTICO)
-    UPDATE PRODUCTOS 
-    SET STOCK = v_stock_nuevo 
-    WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+    -- 2. El stock anterior era el actual menos lo comprado
+    SET v_stock_anterior = v_stock_nuevo - NEW.CANTIDAD;
 
-    -- 4. Registramos el movimiento en el historial
+    -- 3. Registramos el movimiento en el historial
     INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
         ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
     ) VALUES (
@@ -93,47 +92,39 @@ END;
 
 DELIMITER ;
 
-----DEVOLUCIONES 
+----DEVOLUCIONES (version vieja, comentada)
 
 DELIMITER //
 
+-- Limpieza por si existiera en alguna base vieja
 DROP TRIGGER IF EXISTS TR_HISTORIAL_DEVOLUCION //
 
 /*
-TR_HISTORIAL_DEVOLUCION (sobre DETALLES_DEVOLUCION)
-Al insertar una devolucion, suma la cantidad al stock del producto y
-registra el movimiento como AJUSTE en el historial.
+TR_HISTORIAL_DEVOLUCION sobre DETALLES_DEVOLUCION
+COMENTADO: la tabla DETALLES_DEVOLUCION no existe en la base (las
+devoluciones se guardan completas en DEVOLUCIONES). El trigger de mas
+abajo, sobre DEVOLUCIONES, es el que ahora lleva el historial.
 */
-CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
-AFTER INSERT ON DETALLES_DEVOLUCION
-FOR EACH ROW
-BEGIN
-    DECLARE v_stock_anterior INT;
-    DECLARE v_stock_nuevo INT;
-
-    -- 1. Obtenemos el stock actual antes de la devolución
-    SELECT STOCK INTO v_stock_anterior FROM PRODUCTOS WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-    
-    -- 2. Calculamos el nuevo stock (Sumamos la cantidad devuelta)
-    SET v_stock_nuevo = v_stock_anterior + NEW.CANTIDAD;
-
-    -- 3. Actualizamos el stock en la tabla de productos
-    UPDATE PRODUCTOS 
-    SET STOCK = v_stock_nuevo 
-    WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-
-    -- 4. Registramos en el historial
-    INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
-        ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
-    ) VALUES (
-        NEW.ID_PRODUCTO, 'AJUSTE', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 'Devolución de producto'
-    );
-END //
+-- CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
+-- AFTER INSERT ON DETALLES_DEVOLUCION
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE v_stock_anterior INT;
+--     DECLARE v_stock_nuevo INT;
+--
+--     SELECT STOCK_ACTUAL INTO v_stock_anterior FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+--     SET v_stock_nuevo = v_stock_anterior + NEW.CANTIDAD;
+--
+--     INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
+--         ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
+--     ) VALUES (
+--         NEW.ID_PRODUCTO, 'AJUSTE', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 'Devolución de producto'
+--     );
+-- END //
 
 DELIMITER ;
 
-
-----DEVOLUCIONES 
+----DEVOLUCIONES
 
 DELIMITER //
 
@@ -141,37 +132,40 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_DEVOLUCION;
 
 /*
 TR_HISTORIAL_DEVOLUCION (sobre DEVOLUCIONES)
-Al insertar una devolucion, suma la cantidad al stock solo si el producto
-esta en BUENO estado, y deja el movimiento en el historial.
+Cuando una devolucion pasa de PENDIENTE a APROBADA o REEMBOLSADA, anota
+en el historial el stock antes y despues con tipo AJUSTE. Solo registra:
+el que devuelve el stock es TR_REINTEGRAR_STOCK_DEVOLUCION (25), que se
+crea primero y por eso corre antes (los triggers van en orden de creacion).
 */
 CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
-AFTER INSERT ON DEVOLUCIONES
+AFTER UPDATE ON DEVOLUCIONES
 FOR EACH ROW
 BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
     DECLARE v_id_producto INT;
 
-    -- 1. Obtenemos el ID del producto desde el detalle de la venta relacionada
-    SELECT ID_PRODUCTO INTO v_id_producto 
-    FROM DETALLES_VENTA 
-    WHERE ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA;
+    -- Solo cuando la devolucion es aprobada o reembolsada desde PENDIENTE
+    IF NEW.ESTADO IN ('APROBADA', 'REEMBOLSADA') AND OLD.ESTADO = 'PENDIENTE' THEN
 
-    -- 2. Solo actualizamos stock si el producto está en BUEN estado
-    IF NEW.CONDICION_PRODUCTO = 'BUENO' THEN
-        
-        SELECT STOCK INTO v_stock_anterior FROM PRODUCTOS WHERE ID_PRODUCTO = v_id_producto;
-        SET v_stock_nuevo = v_stock_anterior + NEW.CANTIDAD;
+        -- 1. Producto de la venta relacionada
+        SELECT ID_PRODUCTO INTO v_id_producto
+        FROM DETALLES_VENTA
+        WHERE ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA;
 
-        -- Actualizamos stock
-        UPDATE PRODUCTOS SET STOCK = v_stock_nuevo WHERE ID_PRODUCTO = v_id_producto;
+        -- 2. Stock actual: el reintegro (25) ya corrio y sumo la cantidad
+        SELECT STOCK_ACTUAL INTO v_stock_nuevo
+        FROM INVENTARIO
+        WHERE ID_PRODUCTO = v_id_producto;
 
-        -- Registramos el movimiento
+        SET v_stock_anterior = v_stock_nuevo - NEW.CANTIDAD;
+
+        -- 3. Registramos en el historial
         INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
             ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
         ) VALUES (
-            v_id_producto, 'AJUSTE', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 
-            CONCAT('Devolución: ', NEW.MOTIVO)
+            v_id_producto, 'AJUSTE', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo,
+            CONCAT('Devolución aprobada: ', IFNULL(NEW.MOTIVO, ''))
         );
     END IF;
 END;

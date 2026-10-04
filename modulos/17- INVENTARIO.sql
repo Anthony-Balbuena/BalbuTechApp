@@ -1,4 +1,3 @@
-
 /*
 TABLA INVENTARIO
 Guarda cuanto stock tiene cada producto y en que parte de la tienda.
@@ -26,11 +25,6 @@ asi los reportes salen rapidos sin recorrer toda la tabla.
 */
 CREATE INDEX IX_INVENTARIO_FECHA ON INVENTARIO (FECHA_ACTUALIZACION);
 
-
-
------------------------------------------------------------------------------------------------------------------------------
------------------------------------------[Store procedure}-------------------------------------------------------------------
------------------------------------------------------------------------------------------------------------------------------   
 
 --INSERTAR
 
@@ -83,48 +77,76 @@ END;
 DELIMITER ;
 
 
-call `SP_INSERTAR_INVENTARIO` (3,10,'Caja');
-
-----INCREMENTAR
+-- ===== VERSIÓN NUEVA (con ROLLBACK) — la vigente =====
+/*
+SP_INCREMENTAR_STOCK (versión con transacción)
+Suma unidades al stock cuando llega mercancia nueva.
+Valida cantidad > 0 y que el producto exista, luego aumenta el stock
+dentro de una transacción: si cualquier paso posterior falla,
+se ejecuta ROLLBACK y el stock queda como estaba.
+*/
 DELIMITER //
 
-DROP PROCEDURE IF EXISTS 17_SP_INCREMENTAR_STOCK ;
+DROP PROCEDURE IF EXISTS SP_INCREMENTAR_STOCK ;
 
-/*
-17_SP_INCREMENTAR_STOCK
-Suma unidades al stock cuando llega mercancia nueva.
-Valida que la cantidad sea mayor a cero y que el producto este en inventario,
-luego aumenta el stock y anota el movimiento en el log de entradas.
-*/
-CREATE PROCEDURE 17_SP_INCREMENTAR_STOCK(
+CREATE PROCEDURE SP_INCREMENTAR_STOCK(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD_ENTRADA INT,
     IN P_PROVEEDOR VARCHAR(100)
 )
 proc_label: BEGIN
-    -- 1. Validar que la cantidad sea lógica
+    -- 1. Validar que la cantidad sea lógica (fuera del handler:
+    --    un error esperado NO debe provocar ROLLBACK)
     IF P_CANTIDAD_ENTRADA <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD A SUMAR DEBE SER MAYOR A CERO.';
-        LEAVE proc_label;
     END IF;
 
     -- 2. Verificar que el producto exista en la tabla de inventario
     IF NOT EXISTS (SELECT 1 FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: PRODUCTO NO ENCONTRADO EN EL INVENTARIO.';
-        LEAVE proc_label;
     END IF;
 
-    -- 3. Incrementar el stock
-    UPDATE INVENTARIO 
-    SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD_ENTRADA
-    WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+    -- 3. Bloque transaccional: si algo falla después de aquí, se deshace todo
+    BEGIN
+        DECLARE v_transaccion_propia INT DEFAULT 0;
 
-    -- 4. Log para trazabilidad de la entrada
-    INSERT INTO LOG_ENTRADAS_INVENTARIO (ID_PRODUCTO, CANTIDAD, PROVEEDOR, FECHA)
-    VALUES (P_ID_PRODUCTO, P_CANTIDAD_ENTRADA, P_PROVEEDOR, CURRENT_TIMESTAMP);
+        DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        BEGIN
+            IF v_transaccion_propia = 1 THEN
+                ROLLBACK;
+            END IF;
+            RESIGNAL;
+        END;
+
+        -- Iniciar transacción solo si no hay una activa
+        -- (@@in_transaction detecta la tx del llamador aunque este vacía;
+        --  information_schema.INNODB_TRX no la ve de forma confiable)
+        IF @@in_transaction = 0 THEN
+            START TRANSACTION;
+            SET v_transaccion_propia = 1;
+        END IF;
+
+        -- 4. Incrementar el stock
+        UPDATE INVENTARIO
+        SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD_ENTRADA
+        WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
+        -- 5. Log para trazabilidad de la entrada.
+        --    OMITIDO: la tabla LOG_ENTRADAS_INVENTARIO no existe en la BD;
+        --    con el INSERT activo el SP siempre fallaba (y sin transacción
+        --    el UPDATE ya quedaba commiteado). Si se crea la tabla, descomentar:
+        -- INSERT INTO LOG_ENTRADAS_INVENTARIO (ID_PRODUCTO, CANTIDAD, PROVEEDOR, FECHA)
+        -- VALUES (P_ID_PRODUCTO, P_CANTIDAD_ENTRADA, P_PROVEEDOR, CURRENT_TIMESTAMP);
+
+        -- Solo se commitea si la transacción la inició este SP;
+        -- si la abrió el llamador, él decide (COMMIT/ROLLBACK).
+        IF v_transaccion_propia = 1 THEN
+            COMMIT;
+        END IF;
+    END;
 
     SELECT 'EXITO: STOCK AUMENTADO CORRECTAMENTE.' AS MENSAJE;
-END;
+END//
 
 DELIMITER ;
 
@@ -140,21 +162,58 @@ SP_RECIBIR_MERCANCIA
 Recibe mercancia de un producto y la refleja en el stock.
 Si el producto aun no tiene registro en inventario, lo crea primero en el
 ALMACEN_PRINCIPAL y enseguida le suma la cantidad recibida.
+Valida que la cantidad sea mayor a cero; el INSERT y el UPDATE corren en una
+transaccion, asi que si algo falla a mitad se ejecuta ROLLBACK y el inventario
+queda como estaba (sin filas fantasma ni stock a medias).
 */
 CREATE PROCEDURE SP_RECIBIR_MERCANCIA(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD INT
 )
-BEGIN
-    -- Intentar insertar si no existe (o ignorar si ya existe)
-    INSERT IGNORE INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
-    VALUES (P_ID_PRODUCTO, 0, 5, 'ALMACEN_PRINCIPAL');
+proc_label: BEGIN
+    -- 1. Validacion (fuera del handler: un error esperado NO debe provocar ROLLBACK)
+    IF P_CANTIDAD <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD A RECIBIR DEBE SER MAYOR A CERO.';
+    END IF;
 
-    -- Ahora sí, incrementar el stock
-    UPDATE INVENTARIO 
-    SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD
-    WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-END;
+    -- 2. Bloque transaccional: si algo falla despues de aqui, se deshace todo
+    BEGIN
+        DECLARE v_transaccion_propia INT DEFAULT 0;
+
+        DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        BEGIN
+            IF v_transaccion_propia = 1 THEN
+                ROLLBACK;
+            END IF;
+            RESIGNAL;
+        END;
+
+        -- Iniciar transaccion solo si no hay una activa
+        -- (@@in_transaction detecta la tx del llamador aunque este vacia;
+        --  information_schema.INNODB_TRX no la ve de forma confiable)
+        IF @@in_transaction = 0 THEN
+            START TRANSACTION;
+            SET v_transaccion_propia = 1;
+        END IF;
+
+        -- 3. Crear el registro en inventario si no existe (o ignorar si ya existe)
+        INSERT IGNORE INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
+        VALUES (P_ID_PRODUCTO, 0, 5, 'ALMACEN_PRINCIPAL');
+
+        -- 4. Incrementar el stock
+        UPDATE INVENTARIO
+        SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD
+        WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
+        -- Solo se commitea si la transaccion la inicio este SP;
+        -- si la abrio el llamador, el decide (COMMIT/ROLLBACK).
+        IF v_transaccion_propia = 1 THEN
+            COMMIT;
+        END IF;
+    END;
+
+    SELECT 'EXITO: MERCANCIA RECIBIDA, STOCK ACTUALIZADO.' AS MENSAJE;
+END//
 
 DELIMITER ;
 
@@ -198,14 +257,16 @@ DELIMITER //
 Cada vez que cambia el stock, revisa si quedo en o bajo el minimo.
 Si es asi, escribe una alerta en LOG_USUARIOS para que alguien compre mas.
 */
+DROP TRIGGER IF EXISTS 17_TR_VALIDAR_STOCK_MINIMO ;
 CREATE TRIGGER 17_TR_VALIDAR_STOCK_MINIMO
 AFTER UPDATE ON INVENTARIO
 FOR EACH ROW
 BEGIN
     IF NEW.STOCK_ACTUAL <= NEW.STOCK_MINIMO THEN
-        -- Aquí podrías insertar en una tabla de 'ALERTAS' si quisieras
-        INSERT INTO LOG_USUARIOS (USERNAME, ACCION, RESULTADO, FECHA)
-        VALUES ('SYSTEM', CONCAT('ALERTA: STOCK BAJO EN PRODUCTO ID ', NEW.ID_PRODUCTO), 'PENDIENTE', CURRENT_TIMESTAMP);
+        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO)
+        VALUES (NULL, 'ALERTA_STOCK_BAJO',
+                CONCAT('Producto ', NEW.ID_PRODUCTO, ' llego al stock minimo (', NEW.STOCK_MINIMO, ')'),
+                'PENDIENTE');
     END IF;
 END ;
 DELIMITER ;
@@ -275,14 +336,14 @@ WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO;
 /*
 VISTA_VALOR_PRODUCTOS
 Muestra cuanta dinero representa cada producto en bodega.
-Multiplica el stock por su precio de compra y ordena de mayor a menor valor.
+Multiplica el stock por su precio y ordena de mayor a menor valor.
 */
 CREATE OR REPLACE VIEW VISTA_VALOR_PRODUCTOS AS
 SELECT 
     P.NOMBRE,
     I.STOCK_ACTUAL,
-    P.PRECIO_COMPRA,
-    (I.STOCK_ACTUAL * P.PRECIO_COMPRA) AS VALOR_TOTAL_ITEM
+    P.PRECIO,
+    (I.STOCK_ACTUAL * P.PRECIO) AS VALOR_TOTAL_ITEM
 FROM INVENTARIO I
 JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
 ORDER BY VALOR_TOTAL_ITEM DESC;
@@ -298,7 +359,7 @@ DELIMITER //
 
 /*
 FN_VALOR_TOTAL_INVENTARIO
-Suma el valor de todo el inventario: stock multiplicado por precio de compra.
+Suma el valor de todo el inventario: stock multiplicado por precio.
 Se usa en reportes para saber cuanto dinero hay en bodega; devuelve 0 si no hay nada.
 */
 CREATE FUNCTION FN_VALOR_TOTAL_INVENTARIO() 
@@ -307,7 +368,7 @@ DETERMINISTIC
 BEGIN
     DECLARE V_TOTAL DECIMAL(15,2);
     
-    SELECT SUM(I.STOCK_ACTUAL * P.PRECIO_COMPRA) INTO V_TOTAL
+    SELECT SUM(I.STOCK_ACTUAL * P.PRECIO) INTO V_TOTAL
     FROM INVENTARIO I
     JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO;
     

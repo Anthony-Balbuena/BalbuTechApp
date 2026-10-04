@@ -29,8 +29,13 @@ INDICE
 
 PROCEDIMIENTOS ALMACENADOS (4)
   - SP_INSERTAR_INVENTARIO ..... da de alta un producto con stock en 0
-  - 17_SP_INCREMENTAR_STOCK .... suma unidades cuando entra mercancia
+  - SP_INCREMENTAR_STOCK ....... suma unidades cuando entra mercancia
+        (valida cantidad > 0 y producto existente; UPDATE con transaccion
+         y ROLLBACK/RESIGNAL si algo falla a mitad; el INSERT a
+         LOG_ENTRADAS_INVENTARIO esta comentado porque la tabla no existe)
   - SP_RECIBIR_MERCANCIA ....... recibe mercancia y la refleja en el stock
+        (valida cantidad > 0 y usa transaccion con ROLLBACK/RESIGNAL, igual
+         que 17_SP_INCREMENTAR_STOCK; crea la fila en INVENTARIO si falta)
   - SP_AJUSTE_INVENTARIO ....... correccion manual de stock (+ / -)
 
 TRIGGERS (2)
@@ -71,3 +76,14 @@ FUNCION (1)
   con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- Reparado 17_TR_VALIDAR_STOCK_MINIMO: insertaba en columnas que no existen en
+  LOG_USUARIOS (USERNAME/RESULTADO/FECHA), por lo que CUALQUIER UPDATE de stock
+  en o bajo el minimo abortaba (rompia ventas con stock bajo y reintegros).
+  Ahora usa ID_USUARIO(NULL=sistema), ACCION='ALERTA_STOCK_BAJO',
+  VALOR_ANTERIOR=detalle y VALOR_NUEVO='PENDIENTE'. Se agrego el DROP IF EXISTS.
+- Reprobar en vivo: smoke de venta+cancelacion 8/8 PASS con ROLLBACK (02/10).
