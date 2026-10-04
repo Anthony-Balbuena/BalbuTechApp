@@ -167,6 +167,24 @@ proc_label: BEGIN
 END ;
 DELIMITER ;
 
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_VENTA ;
+/*
+TR_BLOQUEAR_BORRADO_VENTA
+Las ventas tampoco se borran: ahi cuelgan sus lineas, sus pagos, sus
+devoluciones y el bono del 1%. Para deshacer una venta se usa
+SP_CANCELAR_VENTA, que la deja en CANCELADA con su motivo. Vale tambien
+para un DELETE directo sobre VENTAS (el cascade no llega a correr).
+*/
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_VENTA
+BEFORE DELETE ON VENTAS
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+END ;
+DELIMITER ;
+
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------

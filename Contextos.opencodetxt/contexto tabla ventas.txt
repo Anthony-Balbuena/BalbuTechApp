@@ -120,3 +120,12 @@ Verificacion:
 - Verificado en vivo con /tmp/opencode/test_cierre_ventas.sql (10 checks con
   ROLLBACK, residuos 0) mas la regresion smoke_fase1.sql (9 checks), todo en
   verde.
+================================================================================
+9. ACTUALIZACION 04/10/2026 - LA VENTA NO SE BORRA (fase H)
+================================================================================
+- TR_BLOQUEAR_BORRADO_VENTA (BEFORE DELETE ON VENTAS): todo DELETE directo
+  sobre VENTAS corta con 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE
+  SP_CANCELAR_VENTA PARA ANULARLA.' - como el trigger corre ANTES, ni siquiera
+  llega a correr el cascade hacia DETALLES_VENTA y PAGOS.
+- Verificado: check H8c de /tmp/opencode/test_fase_h.sql (14/14 PASS con
+  ROLLBACK, 04/10/2026).

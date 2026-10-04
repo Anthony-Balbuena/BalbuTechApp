@@ -105,3 +105,14 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   por eso borrar la fila hace cuadrar totales y disparadores solos.
 - Verificado en vivo con /tmp/opencode/test_cierre_ventas.sql (10 checks con
   ROLLBACK y residuos 0) mas la regresion smoke_fase1.sql (9 checks).
+================================================================================
+9. ACTUALIZACION 04/10/2026 - SEGURO SOBRE EL BORRADO DE PAGOS (fase H)
+================================================================================
+- TR_VALIDAR_BORRADO_PAGO (BEFORE DELETE ON PAGOS): no deja borrar pagos de
+  una venta CANCELADA ni DEVUELTA (ahi la plata ya quedo resuelta). Es la
+  misma regla que aplica SP_ANULAR_PAGO, ahora hecha valer tambien cuando el
+  borrado no pasa por el SP.
+- Una venta EN_PROCESO o REALIZADA si deja borrar sus pagos: por ahi entra
+  SP_ANULAR_PAGO, que ademas quita el bono del 1% si sigue PENDIENTE.
+- Verificado: checks H9a y H9b de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).

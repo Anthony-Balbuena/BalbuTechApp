@@ -143,8 +143,24 @@ CREATE PROCEDURE SP_CANCELAR_COMPRA(
     IN P_ID_EMPLEADO INT
 )
 proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     DECLARE V_ID_EMPLEADO_COMPRA INT;
     DECLARE V_ESTADO VARCHAR(20);
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. El empleado que cancela debe existir
     IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
@@ -221,6 +237,11 @@ proc_label: BEGIN
 
     -- 10. Cerrar la compra
     UPDATE COMPRAS SET ESTADO = 'CANCELADA' WHERE ID_COMPRA = P_ID_COMPRA;
+
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
 
     SELECT CONCAT('EXITO: COMPRA #', P_ID_COMPRA, ' CANCELADA Y MERCANCIA REVERTIDA.') AS MENSAJE;
 END ;
@@ -311,6 +332,24 @@ BEGIN
     END IF;
 END ;
 DELIMITER ; 
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_UPDATE_DETALLE_COMPRA ;
+/*
+TR_BLOQUEAR_UPDATE_DETALLE_COMPRA
+Nadie cambia una linea de compra con UPDATE a pelo: la cantidad y el precio
+son la prueba de lo que se acordo con el proveedor. Para corregir algo se
+usa SP_MODIFICAR_LINEA_COMPRA (archivo 22), o se quita la linea con
+SP_QUITAR_DETALLE_COMPRA y se vuelve a agregar. Trabaja en automatico.
+*/
+CREATE TRIGGER TR_BLOQUEAR_UPDATE_DETALLE_COMPRA
+BEFORE UPDATE ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA LINEA DE UNA COMPRA NO SE PUEDE EDITAR; USE SP_MODIFICAR_LINEA_COMPRA.';
+END ;
+DELIMITER ;
 
 
 
@@ -454,6 +493,24 @@ BEGIN
             (NEW.ID_COMPRA, OLD.ESTADO, NEW.ESTADO, NEW.ID_EMPLEADO,
              CONCAT('Estado: ', OLD.ESTADO, ' -> ', NEW.ESTADO));
     END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_COMPRA ;
+/*
+TR_BLOQUEAR_BORRADO_COMPRA
+Las compras no se borran: de ahi cuelgan sus pagos, su detalle, sus
+devoluciones y su historial de estados. Para deshacer una compra se usa
+SP_CANCELAR_COMPRA, que la deja en CANCELADA con el motivo y la fila de
+historial. Vale tambien para un DELETE directo sobre COMPRAS.
+*/
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_COMPRA
+BEFORE DELETE ON COMPRAS
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO SE PUEDE BORRAR; USE SP_CANCELAR_COMPRA PARA ANULARLA.';
 END ;
 DELIMITER ;
 

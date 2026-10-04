@@ -127,11 +127,27 @@ CREATE PROCEDURE SP_ANULAR_PAGO_COMPRA(
     IN P_ID_EMPLEADO INT
 )
 proc_label: BEGIN
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     DECLARE V_ID_COMPRA INT;
     DECLARE V_MONTO DECIMAL(10, 2);
     DECLARE V_ESTADO VARCHAR(20);
     DECLARE V_TOTAL DECIMAL(10, 2);
     DECLARE V_PAGADO DECIMAL(10, 2);
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
+    -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
+    -- no la toca y cualquier error se propaga para que el que llama decida.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. El empleado que anula debe existir
     IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
@@ -175,6 +191,11 @@ proc_label: BEGIN
     END IF;
 
     -- 7. Mensaje
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     SELECT CONCAT('EXITO: PAGO #', P_ID_PAGO_COMPRA, ' ANULADO (', V_MONTO,
                   '). PAGADO DE LA COMPRA #', V_ID_COMPRA, ': ', V_PAGADO) AS MENSAJE;
 END ;
@@ -250,6 +271,60 @@ BEGIN
 
     IF V_ESTADO = 'ABIERTA' AND V_TOTAL > 0 AND V_PAGADO >= V_TOTAL THEN
         UPDATE COMPRAS SET ESTADO = 'RECIBIDA' WHERE ID_COMPRA = NEW.ID_COMPRA;
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_BORRADO_PAGO_COMPRA ;
+/*
+TR_VALIDAR_BORRADO_PAGO_COMPRA
+El pago de una compra CANCELADA o DEVUELTA no se toca, ni con DELETE directo:
+ahi la plata ya quedo resuelta por otro camino y borrarla dejaria el
+resumen mintiendo. Es la misma regla que aplica SP_ANULAR_PAGO_COMPRA antes
+de borrar, ahora hecha valer tambien cuando el borrado viene a pelo.
+*/
+CREATE TRIGGER TR_VALIDAR_BORRADO_PAGO_COMPRA
+BEFORE DELETE ON PAGOS_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_ESTADO VARCHAR(20);
+
+    SELECT ESTADO INTO V_ESTADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
+
+    IF V_ESTADO IS NULL OR V_ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA O DEVUELTA, NO ADMITE CAMBIOS DE PAGO.';
+    END IF;
+END ;
+DELIMITER ;
+
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_ESTADO_PAGO_COMPRA ;
+/*
+TR_RECALCULAR_ESTADO_PAGO_COMPRA
+Cuando desaparece un pago vuelve a sumar lo pagado de la compra: si dejo de
+estar saldada le quita la RECIBIDA y la deja otra vez en ABIERTA, para que
+vuelva a aceptar productos y pagos. Hace lo mismo que el paso 6 de
+SP_ANULAR_PAGO_COMPRA, pero sirve tambien si el borrado no paso por el SP.
+*/
+CREATE TRIGGER TR_RECALCULAR_ESTADO_PAGO_COMPRA
+AFTER DELETE ON PAGOS_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL DECIMAL(10, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_PAGADO DECIMAL(10, 2);
+
+    SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
+    FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
+
+    SELECT IFNULL(SUM(MONTO), 0) INTO V_PAGADO
+    FROM PAGOS_COMPRA WHERE ID_COMPRA = OLD.ID_COMPRA;
+
+    IF V_ESTADO = 'RECIBIDA' AND V_PAGADO < V_TOTAL THEN
+        UPDATE COMPRAS SET ESTADO = 'ABIERTA' WHERE ID_COMPRA = OLD.ID_COMPRA;
     END IF;
 END ;
 DELIMITER ;

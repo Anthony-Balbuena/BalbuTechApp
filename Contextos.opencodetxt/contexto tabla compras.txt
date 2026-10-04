@@ -147,7 +147,7 @@ FUNCION (1)
   una compra cancelada no acepta productos ni con INSERT directo, mismo
   patron que TR_BLOQUEAR_VENTA_FINALIZADA.
 - VISTA_REPORTE_COMPRAS ahora incluye ESTADO.
-- Verificado en vivo: /tmp/opencode/test_paquetito_b.sql 13/13 PASS con
+- Verificado en vivo: /tmp/opencode/test_paquetito_b.sql 14/14 PASS con
   ROLLBACK (residuos 0) + regresion de las 3 suites anteriores en verde
   (04/10/2026).
 
@@ -261,3 +261,14 @@ FUNCION (1)
   sin cambio de estado no anotan nada.
 - Verificado: checks G0-G6 de test_paquetito_g.sql (9/9 PASS con
   ROLLBACK) + regresion 102 checks en verde (04/10/2026).
+================================================================================
+15. ACTUALIZACION 04/10/2026 - LA COMPRA NO SE BORRA (fase H)
+================================================================================
+- TR_BLOQUEAR_BORRADO_COMPRA (BEFORE DELETE ON COMPRAS): todo DELETE directo
+  sobre COMPRAS corta con 'ERROR: LA COMPRA NO SE PUEDE BORRAR; USE
+  SP_CANCELAR_COMPRA PARA ANULARLA.' - de la compra cuelgan sus pagos, su
+  detalle, sus devoluciones y su historial de estados.
+- Queda el trio de blindaje de la compra: INSERT (TR_BLOQUEAR_COMPRA_CERRADA),
+  UPDATE de linea (TR_BLOQUEAR_UPDATE_DETALLE_COMPRA, en 22-) y DELETE.
+- Verificado: check H4 de /tmp/opencode/test_fase_h.sql (14/14 PASS con
+  ROLLBACK, 04/10/2026).
