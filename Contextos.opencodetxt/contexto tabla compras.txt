@@ -272,3 +272,19 @@ FUNCION (1)
   UPDATE de linea (TR_BLOQUEAR_UPDATE_DETALLE_COMPRA, en 22-) y DELETE.
 - Verificado: check H4 de /tmp/opencode/test_fase_h.sql (14/14 PASS con
   ROLLBACK, 04/10/2026).
+================================================================================
+16. ACTUALIZACION 04/10/2026 - TRANSACCIONES EN LOS SPs (fase I)
+================================================================================
+- SP_CANCELAR_COMPRA ahora abre su propia transaccion solo si nadie la abrio
+  antes (@@in_transaction = 0). Si algo falla en el camino, el manejador
+  EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y vuelve a tirar el error con
+  RESIGNAL: nunca quedan a medias la SALIDA de stock, el historial de
+  producto, la bitacora y el estado de la compra.
+- Si la transaccion la abrio el llamador (por ejemplo un cierre de caja que
+  agrupa varias operaciones), el SP no la toca: ni COMMIT ni ROLLBACK, y el
+  error se propaga para que el que llama decida que hacer.
+- Mismo patron en 22_SP_AGREGAR_DETALLE_COMPRA, SP_QUITAR_DETALLE_COMPRA,
+  SP_MODIFICAR_LINEA_COMPRA (archivo 22), SP_ANULAR_PAGO_COMPRA (19.5) y
+  SP_ANULAR_PAGO (24): 6 SPs en total.
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+  04/10/2026).

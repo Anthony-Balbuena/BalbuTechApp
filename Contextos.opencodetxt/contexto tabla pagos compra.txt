@@ -163,3 +163,15 @@ FUNCIONES (0)
   borrado no paso por el SP.
 - Verificado: checks H6 y H7 de /tmp/opencode/test_fase_h.sql
   (14/14 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+11. ACTUALIZACION 04/10/2026 - TRANSACCION EN SP_ANULAR_PAGO_COMPRA (fase I)
+================================================================================
+- SP_ANULAR_PAGO_COMPRA abre su propia transaccion solo si nadie la abrio
+  antes (@@in_transaction = 0). Si algo truena despues de borrar el pago
+  (por ejemplo el UPDATE que deja la compra en ABIERTA), el manejador
+  EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y re-lanza el error con
+  RESIGNAL: no se puede borrar el pago y dejar la compra en RECIBIDA.
+- Si la transaccion la abrio el llamador, el SP no la toca (ni COMMIT ni
+  ROLLBACK) y el error se propaga.
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+  04/10/2026).

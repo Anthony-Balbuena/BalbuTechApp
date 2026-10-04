@@ -116,3 +116,16 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   SP_ANULAR_PAGO, que ademas quita el bono del 1% si sigue PENDIENTE.
 - Verificado: checks H9a y H9b de /tmp/opencode/test_fase_h.sql
   (14/14 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+10. ACTUALIZACION 04/10/2026 - TRANSACCION EN SP_ANULAR_PAGO (fase I)
+================================================================================
+- SP_ANULAR_PAGO abre su propia transaccion solo si nadie la abrio antes
+  (@@in_transaction = 0): borra el PAGO, recalcula lo cobrado, reabre la
+  venta y quita el bono del 1% (3 escrituras). Si alguna truena, el manejador
+  EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y re-lanza el error con
+  RESIGNAL, asi que nunca se borra el pago dejando la venta en REALIZADA o
+  el bono colgado.
+- Si la transaccion la abrio el llamador, el SP no la toca (ni COMMIT ni
+  ROLLBACK) y el error se propaga.
+- Verificado: checks I0, I2 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+  04/10/2026).
