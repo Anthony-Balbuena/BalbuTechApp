@@ -222,7 +222,7 @@ BEGIN
         VALUES (
             (SELECT ID_PRODUCTO FROM DETALLES_VENTA WHERE ID_DETALLE_VENTA = NEW.ID_DETALLE_VENTA), 
             NEW.ID_EMPLEADO,
-            'ENTRADA', 
+            'DEVOLUCION', 
             NEW.CANTIDAD, 
             CONCAT('Devolución aprobada ID: ', NEW.ID_DEVOLUCION)
         );

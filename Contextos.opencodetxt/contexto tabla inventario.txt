@@ -27,20 +27,16 @@ TABLA
 INDICE
   - IX_INVENTARIO_FECHA ... bloque agregado antes de CREATE INDEX
 
-PROCEDIMIENTOS ALMACENADOS (4)
+PROCEDIMIENTOS ALMACENADOS (1)
   - SP_INSERTAR_INVENTARIO ..... da de alta un producto con stock en 0
-  - SP_INCREMENTAR_STOCK ....... suma unidades cuando entra mercancia
-        (valida cantidad > 0 y producto existente; UPDATE con transaccion
-         y ROLLBACK/RESIGNAL si algo falla a mitad; el INSERT a
-         LOG_ENTRADAS_INVENTARIO esta comentado porque la tabla no existe)
-  - SP_RECIBIR_MERCANCIA ....... recibe mercancia y la refleja en el stock
-        (valida cantidad > 0 y usa transaccion con ROLLBACK/RESIGNAL, igual
-         que 17_SP_INCREMENTAR_STOCK; crea la fila en INVENTARIO si falta)
-  - SP_AJUSTE_INVENTARIO ....... correccion manual de stock (+ / -)
+    (SP_INCREMENTAR_STOCK, SP_RECIBIR_MERCANCIA y SP_AJUSTE_INVENTARIO
+     fueron ELIMINADOS el 04/10/2026: movian stock sin dejar movimiento en
+     MOVIMIENTOS_INVENTARIO; ver seccion 7)
 
-TRIGGERS (2)
+TRIGGERS (1)
   - 17_TR_VALIDAR_STOCK_MINIMO ............ alerta cuando el stock baja del minimo
-  - 17_TR_REGISTRAR_HISTORIAL_INVENTARIO .. anota cada cambio en el historial
+    (17_TR_REGISTRAR_HISTORIAL_INVENTARIO fue ELIMINADO el 04/10/2026:
+     duplicaba el historial; ver seccion 7)
 
 VISTAS (2)
   - VISTA_PRODUCTOS_CRITICOS ... productos que se estan quedando sin stock
@@ -85,3 +81,25 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   Ahora usa ID_USUARIO(NULL=sistema), ACCION='ALERTA_STOCK_BAJO',
   VALOR_ANTERIOR=detalle y VALOR_NUEVO='PENDIENTE'. Se agrego el DROP IF EXISTS.
 - Reprobar en vivo: smoke de venta+cancelacion 8/8 PASS con ROLLBACK (02/10).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - SPs SIN BITACORA ELIMINADOS (paquetito A)
+================================================================================
+- ELIMINADOS SP_INCREMENTAR_STOCK, SP_RECIBIR_MERCANCIA y SP_AJUSTE_INVENTARIO:
+  los tres modificaban STOCK_ACTUAL sin insertar en MOVIMIENTOS_INVENTARIO (nadie
+  podia saber quien movio el stock), sin validar el producto en el caso del
+  ajuste, admitiendo cantidad 0 y dejando el UPDATE sin efecto en silencio si
+  el producto no tenia fila en INVENTARIO. Ademas estaban sin uso en todo el
+  repo (grep = 0 llamadas). En los archivos solo queda el DROP IF EXISTS y un
+  bloque /* */ que explica por que se fueron.
+- Rutas vigentes para mover stock:
+    * Compra .......... 19_SP_INICIAR_COMPRA + 22_SP_AGREGAR_DETALLE_COMPRA
+    * Manual .......... 20_SP_REGISTRAR_AJUSTE_INVENTARIO (archivo 20)
+- ELIMINADO 17_TR_REGISTRAR_HISTORIAL_INVENTARIO: con TR_HISTORIAL_AJUSTE
+  (archivo 32) escribia DOS filas genericas por cada cambio de stock, ademas
+  de la del trigger de negocio (3 filas por movimiento). Ver detalle en el
+  contexto de HISTORIAL_MOVIMIENTOS_PRODUCTO.
+- Queda en este archivo 17_TR_VALIDAR_STOCK_MINIMO (alerta) y
+  SP_INSERTAR_INVENTARIO (alta con stock 0). UPDATE INVENTARIO en el archivo: 0.
+- Verificado: /tmp/opencode/test_paquetito_a.sql 12/12 PASS con ROLLBACK,
+  residuos 0 (04/10/2026).

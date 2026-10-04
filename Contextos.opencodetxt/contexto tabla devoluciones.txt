@@ -36,7 +36,8 @@ PROCEDIMIENTOS ALMACENADOS (2)
 
 TRIGGERS (2)
   - TR_REINTEGRAR_STOCK_DEVOLUCION .. al aprobar, devuelve stock y anota
-                                       la ENTRADA (se crea primero)
+                                       el movimiento con tipo DEVOLUCION
+                                       (se crea primero)
   - TR_MARCAR_VENTA_DEVUELTA ..... al aprobar o reembolsar, deja la venta
                                      en estado DEVUELTA
 
@@ -88,3 +89,17 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   DEVUELTA de VENTAS (grep = 0), asi que una venta devuelta quedaba
   REALIZADA para siempre. Se crea DESPUES de TR_REINTEGRAR_STOCK_DEVOLUCION
   para que el reintegro corra primero (orden de creacion = orden de ejecucion).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - TIPO REAL EN BITACORA E HISTORIAL (paquetito A)
+================================================================================
+- TR_REINTEGRAR_STOCK_DEVOLUCION anota ahora el movimiento con tipo
+  DEVOLUCION en MOVIMIENTOS_INVENTARIO (antes decia ENTRADA; nadie filtraba
+  por TIPO_MOVIMIENTO, verificado con grep).
+- TR_HISTORIAL_DEVOLUCION (archivo 32) anota con tipo DEVOLUCION en el
+  historial (antes AJUSTE).
+- OJO: el orden de creacion entre los dos triggers importa. Si se recrean,
+  va PRIMERO TR_REINTEGRAR (25) y DESPUES TR_HISTORIAL (32); al reves el
+  historial lee el stock antes del reintegro y anota mal antes/despues
+  (el 04/10/2026 se recrearon mal y se corrigio con la prueba H4).
+- Verificado: /tmp/opencode/test_paquetito_a.sql H4/H5 PASS (04/10/2026).

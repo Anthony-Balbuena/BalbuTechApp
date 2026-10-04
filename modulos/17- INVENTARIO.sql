@@ -77,172 +77,38 @@ END;
 DELIMITER ;
 
 
--- ===== VERSIÓN NUEVA (con ROLLBACK) — la vigente =====
-/*
-SP_INCREMENTAR_STOCK (versión con transacción)
-Suma unidades al stock cuando llega mercancia nueva.
-Valida cantidad > 0 y que el producto exista, luego aumenta el stock
-dentro de una transacción: si cualquier paso posterior falla,
-se ejecuta ROLLBACK y el stock queda como estaba.
-*/
-DELIMITER //
-
 DROP PROCEDURE IF EXISTS SP_INCREMENTAR_STOCK ;
+/*
+SP_INCREMENTAR_STOCK (ELIMINADO)
+Movia stock sin dejar rastro: no escribia en MOVIMIENTOS_INVENTARIO, el
+parametro P_PROVEEDOR no se usaba y el log al que apuntaba
+(LOG_ENTRADAS_INVENTARIO) ni siquiera existe en la base.
+Rutas vigentes para mover stock:
+  - Compra con proveedor .. 19_SP_INICIAR_COMPRA + 22_SP_AGREGAR_DETALLE_COMPRA
+  - Movimiento manual .... 20_SP_REGISTRAR_AJUSTE_INVENTARIO (archivo 20)
+    (deja el movimiento en la bitacora y la fila en el historial)
+*/
 
-CREATE PROCEDURE SP_INCREMENTAR_STOCK(
-    IN P_ID_PRODUCTO INT,
-    IN P_CANTIDAD_ENTRADA INT,
-    IN P_PROVEEDOR VARCHAR(100)
-)
-proc_label: BEGIN
-    -- 1. Validar que la cantidad sea lógica (fuera del handler:
-    --    un error esperado NO debe provocar ROLLBACK)
-    IF P_CANTIDAD_ENTRADA <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD A SUMAR DEBE SER MAYOR A CERO.';
-    END IF;
-
-    -- 2. Verificar que el producto exista en la tabla de inventario
-    IF NOT EXISTS (SELECT 1 FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: PRODUCTO NO ENCONTRADO EN EL INVENTARIO.';
-    END IF;
-
-    -- 3. Bloque transaccional: si algo falla después de aquí, se deshace todo
-    BEGIN
-        DECLARE v_transaccion_propia INT DEFAULT 0;
-
-        DECLARE EXIT HANDLER FOR SQLEXCEPTION
-        BEGIN
-            IF v_transaccion_propia = 1 THEN
-                ROLLBACK;
-            END IF;
-            RESIGNAL;
-        END;
-
-        -- Iniciar transacción solo si no hay una activa
-        -- (@@in_transaction detecta la tx del llamador aunque este vacía;
-        --  information_schema.INNODB_TRX no la ve de forma confiable)
-        IF @@in_transaction = 0 THEN
-            START TRANSACTION;
-            SET v_transaccion_propia = 1;
-        END IF;
-
-        -- 4. Incrementar el stock
-        UPDATE INVENTARIO
-        SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD_ENTRADA
-        WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-
-        -- 5. Log para trazabilidad de la entrada.
-        --    OMITIDO: la tabla LOG_ENTRADAS_INVENTARIO no existe en la BD;
-        --    con el INSERT activo el SP siempre fallaba (y sin transacción
-        --    el UPDATE ya quedaba commiteado). Si se crea la tabla, descomentar:
-        -- INSERT INTO LOG_ENTRADAS_INVENTARIO (ID_PRODUCTO, CANTIDAD, PROVEEDOR, FECHA)
-        -- VALUES (P_ID_PRODUCTO, P_CANTIDAD_ENTRADA, P_PROVEEDOR, CURRENT_TIMESTAMP);
-
-        -- Solo se commitea si la transacción la inició este SP;
-        -- si la abrió el llamador, él decide (COMMIT/ROLLBACK).
-        IF v_transaccion_propia = 1 THEN
-            COMMIT;
-        END IF;
-    END;
-
-    SELECT 'EXITO: STOCK AUMENTADO CORRECTAMENTE.' AS MENSAJE;
-END//
-
-DELIMITER ;
-
-
---- RECIBIR MERCANCIA 
-
-DELIMITER //
 
 DROP PROCEDURE IF EXISTS SP_RECIBIR_MERCANCIA;
-
 /*
-SP_RECIBIR_MERCANCIA
-Recibe mercancia de un producto y la refleja en el stock.
-Si el producto aun no tiene registro en inventario, lo crea primero en el
-ALMACEN_PRINCIPAL y enseguida le suma la cantidad recibida.
-Valida que la cantidad sea mayor a cero; el INSERT y el UPDATE corren en una
-transaccion, asi que si algo falla a mitad se ejecuta ROLLBACK y el inventario
-queda como estaba (sin filas fantasma ni stock a medias).
+SP_RECIBIR_MERCANCIA (ELIMINADO)
+Mismo problema que SP_INCREMENTAR_STOCK: sumaba stock sin movimiento en
+MOVIMIENTOS_INVENTARIO y sin dejar quien recibio la mercancia.
+La entrada de mercancia se hace por compra (con proveedor y empleado) o,
+si es manual, por 20_SP_REGISTRAR_AJUSTE_INVENTARIO.
 */
-CREATE PROCEDURE SP_RECIBIR_MERCANCIA(
-    IN P_ID_PRODUCTO INT,
-    IN P_CANTIDAD INT
-)
-proc_label: BEGIN
-    -- 1. Validacion (fuera del handler: un error esperado NO debe provocar ROLLBACK)
-    IF P_CANTIDAD <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD A RECIBIR DEBE SER MAYOR A CERO.';
-    END IF;
 
-    -- 2. Bloque transaccional: si algo falla despues de aqui, se deshace todo
-    BEGIN
-        DECLARE v_transaccion_propia INT DEFAULT 0;
-
-        DECLARE EXIT HANDLER FOR SQLEXCEPTION
-        BEGIN
-            IF v_transaccion_propia = 1 THEN
-                ROLLBACK;
-            END IF;
-            RESIGNAL;
-        END;
-
-        -- Iniciar transaccion solo si no hay una activa
-        -- (@@in_transaction detecta la tx del llamador aunque este vacia;
-        --  information_schema.INNODB_TRX no la ve de forma confiable)
-        IF @@in_transaction = 0 THEN
-            START TRANSACTION;
-            SET v_transaccion_propia = 1;
-        END IF;
-
-        -- 3. Crear el registro en inventario si no existe (o ignorar si ya existe)
-        INSERT IGNORE INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
-        VALUES (P_ID_PRODUCTO, 0, 5, 'ALMACEN_PRINCIPAL');
-
-        -- 4. Incrementar el stock
-        UPDATE INVENTARIO
-        SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD
-        WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-
-        -- Solo se commitea si la transaccion la inicio este SP;
-        -- si la abrio el llamador, el decide (COMMIT/ROLLBACK).
-        IF v_transaccion_propia = 1 THEN
-            COMMIT;
-        END IF;
-    END;
-
-    SELECT 'EXITO: MERCANCIA RECIBIDA, STOCK ACTUALIZADO.' AS MENSAJE;
-END//
-
-DELIMITER ;
-
----AJUSTE INVENTARI
-
-DELIMITER //
 DROP PROCEDURE IF EXISTS SP_AJUSTE_INVENTARIO;
-
 /*
-SP_AJUSTE_INVENTARIO
-Corrige el stock a mano por un motivo (faltante, sobrante, error de conteo).
-Suma si la cantidad es positiva y resta si es negativa; el historial lo
-guarda solo el trigger, sin tener que escribir nada extra.
+SP_AJUSTE_INVENTARIO (ELIMINADO)
+Era duplicado de 20_SP_REGISTRAR_AJUSTE_INVENTARIO (archivo 20) y encima
+no validaba el producto, admitia cantidad 0 y no dejaba movimiento en
+MOVIMIENTOS_INVENTARIO (contaba con los triggers genericos de historial,
+que fueron eliminados en esta misma fase).
+El ajuste manual ahora tiene una sola via:
+20_SP_REGISTRAR_AJUSTE_INVENTARIO(producto, empleado, tipo, cantidad, obs).
 */
-CREATE PROCEDURE SP_AJUSTE_INVENTARIO(
-    IN P_ID_PRODUCTO INT,
-    IN P_CANTIDAD_AJUSTE INT, -- Positivo para sumar, negativo para restar
-    IN P_MOTIVO VARCHAR(100)
-)
-BEGIN
-    UPDATE INVENTARIO 
-    SET STOCK_ACTUAL = STOCK_ACTUAL + P_CANTIDAD_AJUSTE
-    WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-    
-    -- El trigger que ya creamos registrará esto automáticamente en el historial
-    SELECT 'EXITO: AJUSTE REALIZADO.' AS MENSAJE;
-END ;
-
-DELIMITER ;
 
 
 
@@ -272,38 +138,23 @@ END ;
 DELIMITER ;
 
 
-----HISTORIAL DE INVENTARIO
-
-DELIMITER //
-
 DROP TRIGGER IF EXISTS 17_TR_REGISTRAR_HISTORIAL_INVENTARIO ;
-
 /*
-17_TR_REGISTRAR_HISTORIAL_INVENTARIO
-Vigila cada cambio de stock y lo anota en HISTORIAL_MOVIMIENTOS_PRODUCTO.
-Guarda cuanto habia antes, cuanto hay ahora y si fue entrada o salida,
-asi siempre se puede rastrear quien movio que y cuando.
+17_TR_REGISTRAR_HISTORIAL_INVENTARIO (ELIMINADO)
+Era el trigger generico que anotaba TODA actualizacion de stock en
+HISTORIAL_MOVIMIENTOS_PRODUCTO; junto con TR_HISTORIAL_AJUSTE (archivo 32)
+dejaba DOS filas genericas por cada movimiento, ademas de la del trigger
+de negocio: 3 filas por movimiento y observaciones falsas (por ejemplo
+'Ajuste manual de inventario' en una venta).
+Desde esta fase cada movimiento escribe UNA sola fila en el historial,
+la de quien lo hace:
+  - Compra .............. TR_HISTORIAL_COMPRA (32)
+  - Venta ............... TR_HISTORIAL_VENTA (32)
+  - Devolucion .......... TR_HISTORIAL_DEVOLUCION (32)
+  - Cancelacion ......... SP_CANCELAR_VENTA (21)
+  - Ajuste o entrada .... 20_SP_REGISTRAR_AJUSTE_INVENTARIO (20)
+Se mantiene 17_TR_VALIDAR_STOCK_MINIMO: no escribe historial, solo alerta.
 */
-CREATE TRIGGER 17_TR_REGISTRAR_HISTORIAL_INVENTARIO
-AFTER UPDATE ON INVENTARIO
-FOR EACH ROW
-BEGIN
-    IF OLD.STOCK_ACTUAL <> NEW.STOCK_ACTUAL THEN
-        INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
-            ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
-        )
-        VALUES (
-            NEW.ID_PRODUCTO,
-            IF(NEW.STOCK_ACTUAL > OLD.STOCK_ACTUAL, 'ENTRADA', 'SALIDA'),
-            ABS(NEW.STOCK_ACTUAL - OLD.STOCK_ACTUAL),
-            OLD.STOCK_ACTUAL,
-            NEW.STOCK_ACTUAL,
-            'Actualización automática de stock'
-        );
-    END IF;
-END ;
-
-DELIMITER ;
 
 
 
