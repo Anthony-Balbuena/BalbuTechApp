@@ -107,6 +107,18 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
 - OJO con el orden de creacion: TR_REINTEGRAR_STOCK_DEVOLUCION (25) debe
   crearse ANTES que TR_HISTORIAL_DEVOLUCION (32); si se recrea al reves, el
   historial lee el stock antes del reintegro y anota mal antes/despues.
+
+================================================================================
+ACTUALIZACION 04/10/2026 - HISTORIAL AL QUITAR LINEA DE COMPRA (F)
+================================================================================
+- TR_HISTORIAL_BORRADO_COMPRA NO vive aqui: el historial de cuando se
+  quita linea de una compra lo escribe TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
+  (19- COMPRAS) DENTRO del MISMO trigger que baja el stock. Motivo: los
+  triggers de DELETE no se pueden ordenar a gusto (al recrearlos, MariaDB
+  los disparo en un orden inesperado y el historial anotaba antes/despues
+  mal); fundidos en un trigger sale bien sin importar el orden.
+- Verificado en vivo: check F1b de test_paquetito_f.sql (14/14 PASS,
+  04/10/2026).
 - Verificado en vivo: /tmp/opencode/test_paquetito_a.sql 12/12 PASS con
   ROLLBACK (residuos 0) + regresion smoke_fase1 9/9 + test_cierre_ventas
   10/10 (04/10/2026).

@@ -91,7 +91,13 @@ BEGIN
 END;
 
 DELIMITER ;
-
+/*
+TR_HISTORIAL_BORRADO_COMPRA - NO SE CREA AQUI
+El historial de cuando se quita una linea de una compra lo escribe
+TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (19- COMPRAS) dentro del mismo
+trigger que baja el stock: los triggers de DELETE no se pueden ordenar
+y asi el antes/despues sale siempre bien. Aqui solo queda la nota.
+*/
 ----DEVOLUCIONES (version vieja, comentada)
 
 DELIMITER //
