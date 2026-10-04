@@ -20,39 +20,35 @@ Estilo acordado (hibrido minimalista):
 
 ================================================================================
 2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql
-   (2 tablas, 3 indices, 4 SPs, 4 triggers, 1 vista, 1 funcion)
+   (1 tabla, 2 indices, 2 SPs, 2 triggers, 1 vista, 1 funcion)
+   [Lo de PAGOS_COMPRA se mudo al archivo 19.5- PAGOS_COMPRA.sql]
 ================================================================================
-TABLA (2)
+TABLA (1)
   - COMPRAS ................ cabecera de cada compra a proveedor
                               (columna ESTADO: ABIERTA / RECIBIDA /
                                CANCELADA, agregada el 04/10/2026)
-  - PAGOS_COMPRA ........... pagos a proveedores por una compra (desde
-                               04/10/2026; ver su propio contexto)
 
-INDICES (3)
+INDICES (2)
   - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
   - IX_COMPRA_TOTAL ......... analisis de gastos por monto
-  - IX_PAGOS_COMPRA_COMPRA .. pagos de una compra concreta
 
-PROCEDIMIENTOS ALMACENADOS (4)
+PROCEDIMIENTOS ALMACENADOS (2)
   - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
   - SP_CANCELAR_COMPRA ...... cancela una compra ABIERTA y revierte el
-                               stock (valida dueno, que no tenga pagos y
-                               que la mercancia siga en el almacen)
-  - SP_REGISTRAR_PAGO_COMPRA . registra un pago parcial o total
-  - SP_ANULAR_PAGO_COMPRA ... borra un pago y reabre la compra si deja de
-                               estar saldada
+                               stock (valida dueno, que no tenga pagos -
+                               ver 19.5 - y que la mercancia siga en el
+                               almacen)
 
-TRIGGERS (4)
+TRIGGERS (2)
   - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
   - TR_BLOQUEAR_COMPRA_CERRADA .. una compra RECIBIDA o CANCELADA no
                                acepta mas productos (BEFORE INSERT sobre
                                DETALLE_COMPRA; renombrado desde
                                TR_BLOQUEAR_COMPRA_CANCELADA el 04/10/2026)
-  - TR_VALIDAR_PAGO_COMPRA .. valida pagos insertados directo
-  - TR_AUTO_RECIBIR_COMPRA .. si el pago cubrio el total deja la compra
-                               RECIBIDA
   (TR_CALCULAR_TOTAL_COMPRA se muevo a 22-DETALLE_COMPRA.sql, ver seccion 6)
+  (Tabla PAGOS_COMPRA, IX_PAGOS_COMPRA_COMPRA, SP_REGISTRAR_PAGO_COMPRA,
+   SP_ANULAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y TR_AUTO_RECIBIR_COMPRA
+   viven en 19.5- PAGOS_COMPRA.sql, ver seccion 9)
 
 VISTA (1)
   - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha, total y estado
@@ -146,3 +142,17 @@ FUNCION (1)
 - Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
   ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
   (9 + 10 + 12 + 13 = 44 checks, 04/10/2026).
+
+================================================================================
+9. ACTUALIZACION 04/10/2026 - PAGOS_COMPRA SE MUDO AL ARCHIVO 19.5
+================================================================================
+- Todo lo de la tabla PAGOS_COMPRA (tabla, indice, 2 SPs y 2 triggers) se
+  extrajo de este archivo al nuevo 19.5- PAGOS_COMPRA.sql, para que la
+  compra (COMPRAS + detalle + cancelacion) y su dinero (pagos) no vivan
+  todos juntos en el 19.
+- Aqui solo quedo la guarda de SP_CANCELAR_COMPRA que rechaza compras con
+  pagos (logica de la compra) y el TR_BLOQUEAR_COMPRA_CERRADA (logica de
+  DETALLE_COMPRA); ambos referencian el 19.5 en sus comentarios.
+- Carga: 19 -> 19.5 -> 20 (el loader ordena por numero). Sin cambios en la
+  BD en vivo: mismo esquema, otro archivo. Verificado con arena + paridad
+  y 63 checks en verde (04/10/2026).
