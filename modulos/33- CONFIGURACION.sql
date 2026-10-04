@@ -14,7 +14,7 @@ CREATE TABLE CONFIGURACION (
 ) ENGINE = InnoDB;
 
 -- Ejemplo de datos iniciales
-INSERT INTO CONFIGURACION (CLAVE, VALOR, DESCRIPCION) VALUES 
+INSERT IGNORE INTO CONFIGURACION (CLAVE, VALOR, DESCRIPCION) VALUES 
 ('ITBIS', '18', 'Impuesto sobre transferencia de bienes y servicios'),
 ('DIAS_GARANTIA', '30', 'Días de garantía por defecto en productos'),
 ('NOMBRE_TIENDA', 'BALBU_TECH', 'Nombre que aparecerá en los tickets');

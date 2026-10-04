@@ -120,9 +120,8 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: USUARIO "', v_usuario_limpio, '" CREADO.') AS MENSAJE;
 END;
 
-CALL `SP_INSERTAR_USUARIO` (1, 1, 'abalbuena', 'Pedro0110');
-DELIMITER ;
 
+DELIMITER ;
 --ACTUALIZAR
 
 /*
@@ -163,6 +162,18 @@ proc_label: BEGIN
     SELECT 'EXITO: DATOS ACTUALIZADOS.' AS MENSAJE;
 END;
 DELIMITER ;
+
+-- Semilla del administrador: solo se crea si existe el empleado 1 y aun no
+-- tiene cuenta, asi la recarga del archivo no se queja ni duplica la fila.
+SET @puede_crearse := (SELECT COUNT(*) FROM EMPLEADOS E
+                        WHERE E.ID_EMPLEADO = 1
+                          AND NOT EXISTS (SELECT 1 FROM USUARIOS U WHERE U.ID_EMPLEADO = 1));
+SET @sql_semilla := IF(@puede_crearse = 1,
+    'CALL SP_INSERTAR_USUARIO (1, 1, ''abalbuena'', ''Pedro0110'')',
+    'SELECT ''SEMILLA DE USUARIO OMITIDA (falta empleado 1 o ya tiene cuenta)'' AS AVISO');
+PREPARE semilla_usuario FROM @sql_semilla;
+EXECUTE semilla_usuario;
+DEALLOCATE PREPARE semilla_usuario;
 ---TOGGLER PARA ESTADO
 DELIMITER //
 
@@ -323,6 +334,7 @@ BEGIN
         SELECT 'ERROR' AS ESTADO, NULL AS ROL, NULL AS ID_USUARIO;
     END IF;
 END ;
+DELIMITER ;
 
 
 

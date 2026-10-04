@@ -1,6 +1,6 @@
 DELIMITER //
 
-DROP PROCEDURE IF EXISTS ;
+DROP PROCEDURE IF EXISTS sp_obtener_categorias_marcas ;
 CREATE PROCEDURE sp_obtener_categorias_marcas()
 BEGIN
     -- Primer conjunto de resultados: Las categorías
@@ -10,5 +10,5 @@ BEGIN
     SELECT id_marca, nombre_marca FROM marcas;
 END;
 
-DELIMITER //
+DELIMITER ;
     
