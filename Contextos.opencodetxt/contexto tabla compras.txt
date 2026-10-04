@@ -286,5 +286,22 @@ FUNCION (1)
 - Mismo patron en 22_SP_AGREGAR_DETALLE_COMPRA, SP_QUITAR_DETALLE_COMPRA,
   SP_MODIFICAR_LINEA_COMPRA (archivo 22), SP_ANULAR_PAGO_COMPRA (19.5) y
   SP_ANULAR_PAGO (24): 6 SPs en total.
-- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (6/6 PASS,
   04/10/2026).
+================================================================================
+17. ACTUALIZACION 04/10/2026 - LA NOTA DE CREDITO REABRE LA COMPRA (fase J)
+================================================================================
+- Cada fila de PAGOS_COMPRA lleva ahora el empleado que la firmo
+  (ID_EMPLEADO NOT NULL) y puede ser una nota de credito con MONTO negativo
+  (detalle en 19.5- PAGOS_COMPRA.sql).
+- Con eso el estado de la compra se mueve en las dos direcciones:
+  * TR_AUTO_RECIBIR_COMPRA: pagado >= total -> RECIBIDA;
+    pagado < total (porque entro una nota) -> vuelve a ABIERTA.
+  * TR_RECALCULAR_ESTADO_PAGO_COMPRA (al borrar una fila): lo mismo, en los
+    dos sentidos.
+- Traducido: si el proveedor hace un descuento o se devuelve mercancia que ya
+  estaba paga, la compra vuelve a aceptar productos sola, sin tener que tocar
+  el estado a mano. Los pagos que quedan pendientes siguen visibles en
+  VISTA_COMPRAS_PENDIENTES_PAGO (SUM(MONTO) ya netea las notas).
+- Verificado: checks J7a, J7b y J10 de /tmp/opencode/test_fase_j.sql
+  (13/13 PASS con ROLLBACK, 04/10/2026).

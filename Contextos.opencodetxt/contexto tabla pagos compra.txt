@@ -173,5 +173,41 @@ FUNCIONES (0)
   RESIGNAL: no se puede borrar el pago y dejar la compra en RECIBIDA.
 - Si la transaccion la abrio el llamador, el SP no la toca (ni COMMIT ni
   ROLLBACK) y el error se propaga.
-- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (6/6 PASS,
   04/10/2026).
+================================================================================
+12. ACTUALIZACION 04/10/2026 - QUIEN PAGA Y NOTAS DE CREDITO (fase J)
+================================================================================
+- PAGOS_COMPRA quedo con: ID_EMPLEADO NOT NULL (+ FK a EMPLEADOS), TIPO
+  ENUM('PAGO','NOTA_CREDITO') por defecto PAGO, OBSERVACION (el motivo de la
+  nota; los pagos normales no llevan), ID_METODO_PAGO ahora anulable (una
+  nota de credito no mueve plata por ningun metodo) y CHK_PAGOS_COMPRA_MONTO
+  (MONTO <> 0; antes era > 0). El archivo trae ademas la migracion
+  (ADD COLUMN IF NOT EXISTS, backfill del dueno de la compra a los pagos
+  viejos y DROP del check viejo): en una base recien creada no hace nada, en
+  la real deja la tabla al dia.
+- SP_REGISTRAR_PAGO_COMPRA recibe al empleado en un cuarto parametro
+  opcional (IN P_ID_EMPLEADO INT DEFAULT NULL). Si no viene, la tabla le pone
+  al dueno de la compra; si viene y no existe corta con 'ERROR: EL EMPLEADO
+  NO EXISTE.' Por eso las suites viejas que llaman con 3 argumentos siguen
+  corriendo igual.
+- SP_REGISTRAR_NOTA_CREDITO_COMPRA (nuevo): le anota un descuento o una
+  devolucion a la compra. Pide el monto en positivo y el motivo en
+  OBSERVACION (obligatorio: sin motivo no hay nota) y guarda la fila con
+  MONTO negativo, asi el SUM(MONTO) de las vistas netea solo.
+- TR_AUTOCOMPLETAR_EMPLEADO_PAGO (nuevo, BEFORE INSERT): si la fila entra sin
+  ID_EMPLEADO (INSERT directo o llamado viejo) le pone al dueno de la compra;
+  si la compra no existe corta con error. Ningun pago se queda sin
+  responsable.
+- TR_VALIDAR_PAGO_COMPRA: el MONTO ya no puede ser cero (antes: no podia ser
+  negativo), el signo tiene que concordar con el TIPO (un PAGO entra y una
+  NOTA sale) y la compra RECIBIDA solo rechaza los pagos positivos: la nota
+  si entra, porque es plata que vuelve.
+- TR_AUTO_RECIBIR_COMPRA: si la nota dejo la compra a medias (pagado < total)
+  la reabre sola, de RECIBIDA a ABIERTA.
+- TR_RECALCULAR_ESTADO_PAGO_COMPRA: ademas de lo de siempre, si al borrar
+  una fila quedo todo saldado la vuelve a marcar RECIBIDA.
+- VISTA_RESUMEN_PAGOS_COMPRA: trae ahora TIPO, ID_EMPLEADO y OBSERVACION, y
+  el metodo de pago paso a LEFT JOIN (las notas no tienen metodo).
+- Verificado: checks J0-J11 de /tmp/opencode/test_fase_j.sql (13/13 PASS con
+  ROLLBACK, 04/10/2026).
