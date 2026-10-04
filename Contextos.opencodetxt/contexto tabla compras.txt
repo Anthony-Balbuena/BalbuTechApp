@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (8 bloques)
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (7 bloques)
 ================================================================================
 TABLA
   - COMPRAS ................ cabecera de cada compra a proveedor
@@ -31,9 +31,9 @@ INDICES (2)
 PROCEDIMIENTO ALMACENADO (1)
   - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
 
-TRIGGERS (2)
+TRIGGERS (1)
   - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
-  - TR_CALCULAR_TOTAL_COMPRA .... suma subtotales al TOTAL
+  (TR_CALCULAR_TOTAL_COMPRA se muevo a 22-DETALLE_COMPRA.sql, ver seccion 6)
 
 VISTA (1)
   - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha y total
@@ -72,3 +72,19 @@ FUNCION (1)
   con /* ... */, cero lineas de SQL eliminadas o modificadas.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 03/10/2026 - LIMPIEZA DE REDUNDANCIAS (FASE A COMPRA)
+================================================================================
+- TR_CALCULAR_TOTAL_COMPRA eliminada de este archivo: estaba duplicada con
+  22-DETALLE_COMPRA.sql. Vive solo en el 22 (ya cargada en la BD).
+- DELIMITER reparado: tras el borrado quedaba un "DELIMITER //" sin cerrar
+  despues del END // del trigger; ahora va "END // / DELIMITER ;" y la vista
+  se crea con normalidad.
+- FN_CONTAR_ITEMS_COMPRA: se agrego DROP FUNCTION IF EXISTS antes del CREATE
+  (antes el archivo daba ERROR 1304 al recargarse).
+- La anomalia "V" suelta de la seccion [VIEW} ya no existe (borrada junto con
+  el bloque duplicado).
+- modulos/todo_modulos.sql: eliminado del repositorio.
+- Verificado recargando el archivo en la arena BALBU_TECH_TEST: solo errores
+  1050/1061 ("ya existe" de tabla/indices), cero errores de sintaxis.

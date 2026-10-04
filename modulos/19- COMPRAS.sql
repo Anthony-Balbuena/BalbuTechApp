@@ -62,6 +62,11 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    IF IFNULL((SELECT ESTADO FROM PROVEEDORES WHERE ID_PROVEEDOR = P_ID_PROVEEDOR), 'INACTIVO') <> 'ACTIVO' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PROVEEDOR NO ESTA ACTIVO.';
+        LEAVE proc_label;
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
         LEAVE proc_label;
@@ -87,46 +92,24 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 
 -- Trigger: Actualiza Inventario al comprar
+DELIMITER //
 DROP TRIGGER IF EXISTS TR_ACTUALIZAR_STOCK_COMPRA ;
 /*
 TR_ACTUALIZAR_STOCK_COMPRA
 Cada vez que entra un producto en una compra, le suma la cantidad al stock.
-Asi el inventario se actualiza solo, sin que nadie lo tenga que cambiar a mano.
+Si el producto todavia no tiene fila en INVENTARIO, la crea primero
+(mismos defaults que SP_RECIBIR_MERCANCIA) y le suma encima; asi nunca
+se pierde una entrada por falta de registro en inventario.
 */
 CREATE TRIGGER TR_ACTUALIZAR_STOCK_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
 BEGIN
-    UPDATE INVENTARIO 
-    SET STOCK_ACTUAL = STOCK_ACTUAL + NEW.CANTIDAD
-    WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
-END //
-
--- Trigger: Actualiza Total de la Compra
-DROP TRIGGER IF EXISTS TR_CALCULAR_TOTAL_COMPRA ;
-/*
-TR_CALCULAR_TOTAL_COMPRA
-Le va sumando el subtotal de cada producto al TOTAL de la compra.
-Asi el total de la compra siempre esta actualizado sin calcularlo a mano.
-*/
-CREATE TRIGGER TR_CALCULAR_TOTAL_COMPRA
-AFTER INSERT ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    UPDATE COMPRAS 
-    SET TOTAL = TOTAL + NEW.SUBTOTAL
-    WHERE ID_COMPRA = NEW.ID_COMPRA;
+    INSERT INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
+    VALUES (NEW.ID_PRODUCTO, NEW.CANTIDAD, 5, 'ALMACEN_PRINCIPAL')
+    ON DUPLICATE KEY UPDATE STOCK_ACTUAL = STOCK_ACTUAL + NEW.CANTIDAD;
 END //
 DELIMITER ;
-
-
-
-
-
-
-V-----------------------------------------------------------------------------------------------------------------------------
-----------------------------------------------------[VIEW}-------------------------------------------------------------------
------------------------------------------------------------------------------------------------------------------------------ 
 
 /*
 VISTA_REPORTE_COMPRAS
@@ -142,12 +125,9 @@ SELECT
 FROM COMPRAS C
 JOIN PROVEEDORES P ON C.ID_PROVEEDOR = P.ID_PROVEEDOR
 ORDER BY C.FECHA DESC;
------------------------------------------------------------------------------------------------------------------------
------------------------------------------[FUNTION}---------------------------------------------------------------------
------------------------------------------------------------------------------------------------------------------------
-
-
 DELIMITER //
+
+DROP FUNCTION IF EXISTS FN_CONTAR_ITEMS_COMPRA ;
 
 /*
 FN_CONTAR_ITEMS_COMPRA
