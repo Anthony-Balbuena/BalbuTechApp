@@ -32,7 +32,9 @@ INDICES (2)
 PROCEDIMIENTOS ALMACENADOS (2)
   - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
   - SP_CANCELAR_VENTA .............. cancela una venta EN_PROCESO y devuelve
-                                     el stock (valida empleado y pagos)
+                                     el stock con su movimiento y su fila en
+                                     el historial del producto (valida empleado
+                                     y pagos)
   NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
   con SP_AGREGAR_DETALLE_VENTA (archivo 23).
 
@@ -103,3 +105,18 @@ Verificacion:
 - Verificación: information_schema.ROUTINES con nombre
   21_SP_AGREGAR_PRODUCTO_VENTA = 0 en BALBU_TECH; grep en el repo solo
   muestra el DROP del archivo 21.
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - CIERRE DE VENTAS (PARTE 5)
+================================================================================
+- SP_CANCELAR_VENTA ahora anota la reposicion en HISTORIAL_MOVIMIENTOS_PRODUCTO
+  (tipo ENTRADA, STOCK_ANTERIOR = stock antes de reponer, STOCK_NUEVO = stock
+  ya repuesto, observacion 'Venta cancelada ID: <id>', la misma que usa
+  MOVIMIENTOS_INVENTARIO). Antes el movimiento si quedaba en la bitacora pero
+  el historial del producto se quedaba mudo: la mercancia volvia al almacen
+  sin rastro en esa tabla.
+- Comentario del SP renombrado de 21_SP_CANCELAR_VENTA al nombre real
+  SP_CANCELAR_VENTA (el prefijo viejo ya no existe).
+- Verificado en vivo con /tmp/opencode/test_cierre_ventas.sql (10 checks con
+  ROLLBACK, residuos 0) mas la regresion smoke_fase1.sql (9 checks), todo en
+  verde.
