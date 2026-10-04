@@ -94,7 +94,6 @@ END;
 
 DELIMITER ;
 
-DELIMITER ;
     
 
 
@@ -595,6 +594,7 @@ TRG_CARGO_UPPER_UPDATE
 Se dispara antes de actualizar un empleado y deja el cargo nuevo en
 mayusculas, igual que en la insercion. Trabaja en automatico.
 */
+DROP TRIGGER IF EXISTS TRG_CARGO_UPPER_UPDATE;
 CREATE TRIGGER TRG_CARGO_UPPER_UPDATE BEFORE UPDATE ON EMPLEADOS
 FOR EACH ROW
 BEGIN

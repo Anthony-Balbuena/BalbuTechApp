@@ -154,14 +154,13 @@ DELIMITER ;
 
 
 
-DELIMITER //
 
 
 
 /*
 TR_AUDITORIA_PRODUCTOS_UPDATE
 Se dispara al actualizar un producto, pero solo graba en la bitacora cuando
-cambia el PRECIO_VENTA, anotando el precio anterior y el nuevo. Es el
+cambia el PRECIO, anotando el precio anterior y el nuevo. Es el
 control para vigilar los cambios de precio.
 */
 DELIMITER //
@@ -170,8 +169,8 @@ CREATE TRIGGER TR_AUDITORIA_PRODUCTOS_UPDATE
 AFTER UPDATE ON PRODUCTOS
 FOR EACH ROW
 BEGIN
-    -- Auditamos el PRECIO_VENTA
-    IF OLD.PRECIO_VENTA <> NEW.PRECIO_VENTA THEN
+    -- Auditamos el PRECIO
+    IF OLD.PRECIO <> NEW.PRECIO THEN
         INSERT INTO AUDITORIA_SISTEMA (
             TABLA_AFECTADA, 
             ID_REGISTRO_AFECTADO, 
@@ -184,8 +183,8 @@ BEGIN
             NEW.ID_PRODUCTO, 
             'UPDATE', 
             USER(),
-            CONCAT('Precio venta anterior: ', OLD.PRECIO_VENTA), 
-            CONCAT('Precio venta nuevo: ', NEW.PRECIO_VENTA)
+            CONCAT('Precio venta anterior: ', OLD.PRECIO), 
+            CONCAT('Precio venta nuevo: ', NEW.PRECIO)
         );
     END IF;
 END ;
