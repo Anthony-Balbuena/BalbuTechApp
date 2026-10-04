@@ -1,0 +1,101 @@
+CONTEXTO DE DOCUMENTACION - TABLA PAGOS_COMPRA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/19- COMPRAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (5 bloques nuevos)
+================================================================================
+TABLA
+  - PAGOS_COMPRA .......... pagos a proveedores por una compra: cuanto,
+                            cuando y con que metodo (parciales o totales)
+
+INDICE (1)
+  - IX_PAGOS_COMPRA_COMPRA  pagos de una compra concreta, para ver como se
+                            fue saldando
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - SP_REGISTRAR_PAGO_COMPRA .. registra un pago parcial o total; valida
+                                 compra ABIERTA, metodo, monto > 0 y que no
+                                 exceda el total
+  - SP_ANULAR_PAGO_COMPRA ..... borra un pago registrado por error; si la
+                                 compra deja de estar saldada vuelve a
+                                 ABIERTA (valvula de escape)
+
+TRIGGERS (2)
+  - TR_VALIDAR_PAGO_COMPRA .. BEFORE INSERT: misma validacion que el SP para
+                               INSERT directos (no exceder el total)
+  - TR_AUTO_RECIBIR_COMPRA .. AFTER INSERT: si el pago cubrio el total deja
+                               la compra RECIBIDA (equivalente a REALIZADA
+                               en ventas; sin bonos, esos son de ventas)
+
+VISTA (0) / FUNCIONES (0)
+  - No se agregaron en este archivo.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Tabla propia PAGOS_COMPRA (no se reuso PAGOS de ventas): cada uno con su
+  FK a su cabecera (COMPRAS vs VENTAS) y asi ningun trigger de ventas se
+  dispara sobre pagos de compra ni viceversa.
+- Pagos PARCIALES permitidos: la suma de PAGOS_COMPRA siempre se calcula con
+  SUM(MONTO), asi que borrar o agregar una fila hace cuadrar totales y
+  estados solos (mismo modelo que PAGOS de ventas).
+- ESTADO 'RECIBIDA' de COMPRAS significa "saldada al 100%", no confirmacion
+  fisica de la mercancia. Si se anula un pago, la compra vuelve a ABIERTA.
+- Sin bonos: el bono del 1% es por ventas a clientes, no por compras.
+- Compra con pagos no se cancela: primero se anulan los pagos
+  (SP_ANULAR_PAGO_COMPRA) y recien ahi SP_CANCELAR_COMPRA la deja pasar.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- Devolucion de compra a proveedor (siguiente tema de compras).
+- ~85 procedimientos almacenados sin bloque de descripcion en otros archivos.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/19- COMPRAS.sql" -> los bloques nuevos de PAGOS_COMPRA
+  deben estar presentes y los anteriores intactos.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 04/10/2026 - PAGOS DE COMPRAS (paquetito C)
+================================================================================
+- Nueva tabla PAGOS_COMPRA (ID_PAGO_COMPRA, ID_COMPRA, ID_METODO_PAGO,
+  MONTO CHECK > 0, FECHA) con FK a COMPRAS y METODOS_PAGO, indice por
+  ID_COMPRA.
+- Nuevo SP_REGISTRAR_PAGO_COMPRA(P_ID_COMPRA, P_ID_METODO_PAGO, P_MONTO):
+  valida compra existente y ABIERTA (ni CANCELADA ni RECIBIDA), metodo
+  existente, monto > 0 y que suma anterior + monto no exceda el TOTAL.
+- Nuevo SP_ANULAR_PAGO_COMPRA(P_ID_PAGO_COMPRA, P_ID_EMPLEADO): valida
+  empleado y pago, rechaza si la compra esta CANCELADA, borra la fila y, si
+  la compra deja de estar saldada, la devuelve a ABIERTA.
+- Nuevos TR_VALIDAR_PAGO_COMPRA (BEFORE, mismas validaciones para INSERT
+  directos) y TR_AUTO_RECIBIR_COMPRA (AFTER, pasa a RECIBIDA al cubrir el
+  total; sin bonos).
+- Integraciones: SP_CANCELAR_COMPRA ahora rechaza compras con pagos
+  ('ANULELOS ANTES DE CANCELAR'); TR_BLOQUEAR_COMPRA_CANCELADA se renombro a
+  TR_BLOQUEAR_COMPRA_CERRADA (RECIBIDA tambien deja de aceptar productos);
+  22_SP_AGREGAR_DETALLE_COMPRA exige compra ABIERTA.
+- Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
+  ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
+  (9 + 10 + 12 + 13 = 44 checks).

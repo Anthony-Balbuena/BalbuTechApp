@@ -19,27 +19,39 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (7 bloques)
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql
+   (2 tablas, 3 indices, 4 SPs, 4 triggers, 1 vista, 1 funcion)
 ================================================================================
-TABLA
+TABLA (2)
   - COMPRAS ................ cabecera de cada compra a proveedor
                               (columna ESTADO: ABIERTA / RECIBIDA /
                                CANCELADA, agregada el 04/10/2026)
+  - PAGOS_COMPRA ........... pagos a proveedores por una compra (desde
+                               04/10/2026; ver su propio contexto)
 
-INDICES (2)
+INDICES (3)
   - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
   - IX_COMPRA_TOTAL ......... analisis de gastos por monto
+  - IX_PAGOS_COMPRA_COMPRA .. pagos de una compra concreta
 
-PROCEDIMIENTOS ALMACENADOS (2)
+PROCEDIMIENTOS ALMACENADOS (4)
   - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
   - SP_CANCELAR_COMPRA ...... cancela una compra ABIERTA y revierte el
-                               stock (valida dueno y que la mercancia siga
-                               en el almacen)
+                               stock (valida dueno, que no tenga pagos y
+                               que la mercancia siga en el almacen)
+  - SP_REGISTRAR_PAGO_COMPRA . registra un pago parcial o total
+  - SP_ANULAR_PAGO_COMPRA ... borra un pago y reabre la compra si deja de
+                               estar saldada
 
-TRIGGERS (2)
+TRIGGERS (4)
   - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
-  - TR_BLOQUEAR_COMPRA_CANCELADA .. una compra CANCELADA no acepta mas
-                               productos (BEFORE INSERT sobre DETALLE_COMPRA)
+  - TR_BLOQUEAR_COMPRA_CERRADA .. una compra RECIBIDA o CANCELADA no
+                               acepta mas productos (BEFORE INSERT sobre
+                               DETALLE_COMPRA; renombrado desde
+                               TR_BLOQUEAR_COMPRA_CANCELADA el 04/10/2026)
+  - TR_VALIDAR_PAGO_COMPRA .. valida pagos insertados directo
+  - TR_AUTO_RECIBIR_COMPRA .. si el pago cubrio el total deja la compra
+                               RECIBIDA
   (TR_CALCULAR_TOTAL_COMPRA se muevo a 22-DETALLE_COMPRA.sql, ver seccion 6)
 
 VISTA (1)
@@ -116,3 +128,21 @@ FUNCION (1)
 - Verificado en vivo: /tmp/opencode/test_paquetito_b.sql 13/13 PASS con
   ROLLBACK (residuos 0) + regresion de las 3 suites anteriores en verde
   (04/10/2026).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - PAGOS DE COMPRAS (paquetito C)
+================================================================================
+- Nueva tabla PAGOS_COMPRA (mas sus SPs y triggers) documentada en detalle en
+  "contexto tabla pagos compra.txt": pagos parciales o totales a proveedores,
+  y RECIBIDA pasa a significar "saldada al 100%" (se activo el uso que en la
+  seccion 7 quedo reservado).
+- SP_CANCELAR_COMPRA: nueva validacion 5 - una compra con pagos no se
+  cancela; hay que anularlos primero con SP_ANULAR_PAGO_COMPRA (asi nunca se
+  queda dinero colgado y se respeta el patron de ventas).
+- TR_BLOQUEAR_COMPRA_CANCELADA renombrado a TR_BLOQUEAR_COMPRA_CERRADA: el
+  bloqueo ahora es "solo compras ABIERTAS aceptan productos" (cubre RECIBIDA
+  ademas de CANCELADA). Mismo mensaje para los dos casos.
+- Afecta tambien a 22-DETALLE_COMPRA.sql (ver su seccion 8).
+- Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
+  ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
+  (9 + 10 + 12 + 13 = 44 checks, 04/10/2026).
