@@ -153,3 +153,14 @@ FUNCIONES (0)
     en DETALLE_COMPRA (recalculo exacto, no resta).
 - Verificado: checks F0-F12 de test_paquetito_f.sql (14/14 PASS con
   ROLLBACK, 04/10/2026).
+
+================================================================================
+10. ACTUALIZACION 04/10/2026 - AVISO DE MARGEN (paquetito G)
+================================================================================
+- 22_SP_AGREGAR_DETALLE_COMPRA avisa si el precio al que estas comprando
+  es igual o mayor al PRECIO de venta del producto: devuelve
+  'EXITO: PRODUCTO AGREGADO (ADVERTENCIA: PRECIO DE COMPRA IGUAL O MAYOR
+  AL DE VENTA).' (igual se guarda, solo es un aviso). Con precio normal
+  sigue diciendo 'EXITO: PRODUCTO AGREGADO.'. La comparacion usa
+  PRODUCTOS.PRECIO (la BD no tiene PRECIO_VENTA).
+- Verificado: checks G7a/G7b de test_paquetito_g.sql (9/9 PASS, 04/10/2026).

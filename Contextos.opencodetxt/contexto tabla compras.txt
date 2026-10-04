@@ -20,18 +20,22 @@ Estilo acordado (hibrido minimalista):
 
 ================================================================================
 2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql
-   (1 tabla, 2 indices, 2 SPs, 2 triggers, 1 vista, 1 funcion)
+   (2 tablas, 4 indices, 3 SPs, 6 triggers, 2 vistas, 1 funcion)
    [Lo de PAGOS_COMPRA se mudo al archivo 19.5- PAGOS_COMPRA.sql]
 ================================================================================
-TABLA (1)
+TABLA (2)
   - COMPRAS ................ cabecera de cada compra a proveedor
                               (columna ESTADO: ABIERTA / RECIBIDA /
                                CANCELADA / DEVUELTA, agregadas el
-                               04/10/2026)
+                               04/10/2026; FACTURA desde el paquetito F)
+  - HISTORIAL_ESTADOS_COMPRA  quien, cuando y como cambio el estado de
+                              cada compra; una fila por cambio (G)
 
-INDICES (2)
+INDICES (4)
   - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
   - IX_COMPRA_TOTAL ......... analisis de gastos por monto
+  - UQ_COMPRA_FACTURA ....... factura unica por proveedor (F)
+  - IX_HIST_ESTADO_FECHA .... historial de estados por fecha (G)
 
 PROCEDIMIENTOS ALMACENADOS (3)
   - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
@@ -42,12 +46,23 @@ PROCEDIMIENTOS ALMACENADOS (3)
   - SP_ASIGNAR_FACTURA_COMPRA ..... le pone la factura del proveedor
                                     (unica por proveedor; ver seccion 13)
 
-TRIGGERS (2)
+TRIGGERS (6)
   - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
   - TR_BLOQUEAR_COMPRA_CERRADA .. una compra RECIBIDA o CANCELADA no
                                acepta mas productos (BEFORE INSERT sobre
                                DETALLE_COMPRA; renombrado desde
                                TR_BLOQUEAR_COMPRA_CANCELADA el 04/10/2026)
+  - TR_BLOQUEAR_BORRADO_COMPRA_CERRADA .. lo mismo pero al BORRAR una
+                               linea: estado ABIERTA + stock alcanzante
+                               (BEFORE DELETE, paquetito F)
+  - TR_ACTUALIZAR_STOCK_BORRADO_COMPRA .. baja el stock al quitar linea
+                               y escribe el historial antes/despues en el
+                               MISMO trigger (F; orden a prueba de balas)
+  - TR_HISTORIAL_ESTADO_COMPRA .. primera fila del historial de estados
+                               al nacer la compra (AFTER INSERT, G)
+  - TR_CAMBIO_ESTADO_COMPRA .. anota cada cambio de estado con antes y
+                               despues (AFTER UPDATE, tambien en UPDATE
+                               directo, paquetito G)
   (TR_CALCULAR_TOTAL_COMPRA se muevo a 22-DETALLE_COMPRA.sql, ver seccion 6)
   (Tabla PAGOS_COMPRA, IX_PAGOS_COMPRA_COMPRA, SP_REGISTRAR_PAGO_COMPRA,
    SP_ANULAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y TR_AUTO_RECIBIR_COMPRA
@@ -56,7 +71,8 @@ TRIGGERS (2)
    seccion 11 y su propio contexto)
 
 VISTA (2)
-  - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha, total y estado
+  - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha, total, factura
+                              y estado
   - VISTA_GASTOS_PROVEEDOR .. cuanto le compramos a cada proveedor en total
                               (canceladas no cuentan; paquetito E)
 
@@ -229,3 +245,19 @@ FUNCION (1)
   Ver seccion 9 del contexto de detalle compra.
 - Verificado: checks F0-F12 de test_paquetito_f.sql (14/14 PASS con
   ROLLBACK) + regresion 88 checks en verde (04/10/2026).
+
+================================================================================
+14. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS (paquetito G)
+================================================================================
+- Nueva tabla HISTORIAL_ESTADOS_COMPRA: ID_COMPRA, ESTADO_ANTERIOR
+  (NULL al nacer), ESTADO_NUEVO, ID_EMPLEADO, MOTIVO y FECHA. Una fila
+  por cada cambio, con indice por fecha.
+- Escrita por 2 triggers en vez de por los SPs: TR_HISTORIAL_ESTADO_COMPRA
+  (AFTER INSERT: 'Compra iniciada') y TR_CAMBIO_ESTADO_COMPRA (AFTER
+  UPDATE: 'Estado: A -> B' solo si el estado cambio). Asi tambien cuenta
+  si alguien lo cambia con un UPDATE directo y no se duplica filas.
+- El empleado anotado es el dueno de la compra (los pagos no traen
+  empleado propio; para el detalle de pagos esta 19.5). Cambios de TOTAL
+  sin cambio de estado no anotan nada.
+- Verificado: checks G0-G6 de test_paquetito_g.sql (9/9 PASS con
+  ROLLBACK) + regresion 102 checks en verde (04/10/2026).
