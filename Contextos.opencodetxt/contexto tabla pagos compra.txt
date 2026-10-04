@@ -1,7 +1,7 @@
 CONTEXTO DE DOCUMENTACION - TABLA PAGOS_COMPRA
 Proyecto: BalbuTechApp (base de datos BALBU_TECH)
 Fecha: 04/10/2026
-Archivo trabajado: modulos/19- COMPRAS.sql
+Archivo trabajado: modulos/19.5- PAGOS_COMPRA.sql
 
 ================================================================================
 1. OBJETIVO DE LA SESION
@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (5 bloques nuevos)
+2. OBJETOS DOCUMENTADOS EN 19.5- PAGOS_COMPRA.sql (5 bloques)
 ================================================================================
 TABLA
   - PAGOS_COMPRA .......... pagos a proveedores por una compra: cuanto,
@@ -72,8 +72,8 @@ VISTA (0) / FUNCIONES (0)
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO
 ================================================================================
-- git diff "modulos/19- COMPRAS.sql" -> los bloques nuevos de PAGOS_COMPRA
-  deben estar presentes y los anteriores intactos.
+- git diff "modulos/19.5- PAGOS_COMPRA.sql" -> debe contener la tabla, el
+  indice, los 2 SPs y los 2 triggers completos.
 - Verificar que los delimitadores de comentario /* y */ quedan balanceados.
 - Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
 
@@ -99,3 +99,17 @@ VISTA (0) / FUNCIONES (0)
 - Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
   ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
   (9 + 10 + 12 + 13 = 44 checks).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - CAMBIO A SU PROPIO ARCHIVO
+================================================================================
+- Todo lo de PAGOS_COMPRA (tabla, indice, SP_REGISTRAR_PAGO_COMPRA,
+  SP_ANULAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y TR_AUTO_RECIBIR_COMPRA)
+  se mudo de 19- COMPRAS.sql al nuevo archivo 19.5- PAGOS_COMPRA.sql.
+- En el 19 solo quedo la guarda de 'no cancelar una compra con pagos'
+  (dentro de SP_CANCELAR_COMPRA) y el TR_BLOQUEAR_COMPRA_CERRADA, que es
+  logica de COMPRAS/DETALLE_COMPRA, no de la tabla de pagos.
+- El orden de carga sigue bien: 19 -> 19.5 -> 20 (el loader ordena por
+  numero) y la FK de PAGOS_COMPRA apunta a COMPRAS (19) y METODOS_PAGO (4).
+- Sin cambios en la BD en vivo: los objetos son identicos, solo cambio el
+  archivo que los contiene. Verificado con arena + paridad y 63 checks.

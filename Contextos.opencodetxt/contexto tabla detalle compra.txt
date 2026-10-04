@@ -118,6 +118,7 @@ FUNCIONES (0)
 - El trigger que cubre los INSERT directos se renombro a
   TR_BLOQUEAR_COMPRA_CERRADA (mismo cambio de logica; vive en 19- COMPRAS.sql).
 - Si hay que agregar productos a una compra ya saldada: primero se anula un
-  pago con SP_ANULAR_PAGO_COMPRA, la compra vuelve a ABIERTA y ahi si entra.
+  pago con SP_ANULAR_PAGO_COMPRA (archivo 19.5- PAGOS_COMPRA.sql), la compra
+  vuelve a ABIERTA y ahi si entra.
 - Verificado en vivo: checks C9 de /tmp/opencode/test_paquetito_c.sql
   (19/19 PASS, 04/10/2026).
