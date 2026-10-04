@@ -181,3 +181,17 @@ FUNCIONES (0)
   quitarla con SP_QUITAR_DETALLE_COMPRA.
 - Verificado: checks H0-H9 de /tmp/opencode/test_fase_h.sql
   (14/14 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+12. ACTUALIZACION 04/10/2026 - TRANSACCIONES EN LOS SPs (fase I)
+================================================================================
+- Los 3 SPs de este archivo abren su propia transaccion solo si nadie la
+  abrio antes (@@in_transaction = 0): 22_SP_AGREGAR_DETALLE_COMPRA,
+  SP_QUITAR_DETALLE_COMPRA y SP_MODIFICAR_LINEA_COMPRA.
+- Si falla algo, el manejador EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y
+  re-lanza el error con RESIGNAL, asi que no se queda el cambio a medias
+  (en SP_MODIFICAR_LINEA_COMPRA eso importa: son DELETE + INSERT, y si el
+  segundo truena el primero no debe quedarse borrado).
+- Si la transaccion es del llamador, el SP no la cierra ni la deshace y el
+  error llega al que llama para que el decida.
+- Verificado: checks I1, I1b, I1c de /tmp/opencode/test_fase_i.sql (7/7
+  PASS, 04/10/2026).
