@@ -253,3 +253,49 @@ BEGIN
     END IF;
 END ;
 DELIMITER ;
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------[VIEW}---------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+/*
+VISTA_RESUMEN_PAGOS_COMPRA
+Lista los pagos a proveedores con el nombre del metodo de pago, igual
+que la VISTA_RESUMEN_PAGOS de ventas pero para las compras.
+*/
+CREATE OR REPLACE VIEW VISTA_RESUMEN_PAGOS_COMPRA AS
+SELECT
+    PC.ID_PAGO_COMPRA,
+    PC.ID_COMPRA,
+    MP.NOMBRE AS NOMBRE_METODO,
+    PC.MONTO,
+    PC.FECHA
+FROM PAGOS_COMPRA PC
+JOIN METODOS_PAGO MP ON PC.ID_METODO_PAGO = MP.ID_METODO_PAGO;
+
+/*
+VISTA_COMPRAS_PENDIENTES_PAGO
+Las compras que aun tienen dinero de por medio: cuanto se le paga al
+proveedor y cuanto falta por pagar (SALDO). Si el saldo sale negativo
+es dinero de mas a favor (compra devuelta ya pagada). Excluye las
+CANCELADAS: esas nunca se pagaron.
+*/
+CREATE OR REPLACE VIEW VISTA_COMPRAS_PENDIENTES_PAGO AS
+SELECT
+    C.ID_COMPRA,
+    P.NOMBRE AS PROVEEDOR,
+    C.FECHA,
+    C.TOTAL,
+    IFNULL(PG.PAGADO, 0) AS PAGADO,
+    C.TOTAL - IFNULL(PG.PAGADO, 0) AS SALDO,
+    C.ESTADO
+FROM COMPRAS C
+JOIN PROVEEDORES P ON P.ID_PROVEEDOR = C.ID_PROVEEDOR
+LEFT JOIN (
+    SELECT ID_COMPRA, SUM(MONTO) AS PAGADO
+      FROM PAGOS_COMPRA
+     GROUP BY ID_COMPRA
+) PG ON PG.ID_COMPRA = C.ID_COMPRA
+WHERE C.ESTADO <> 'CANCELADA'
+  AND C.TOTAL - IFNULL(PG.PAGADO, 0) <> 0
+ORDER BY C.FECHA DESC;
