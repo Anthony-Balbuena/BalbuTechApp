@@ -1,0 +1,103 @@
+CONTEXTO DE DOCUMENTACION - TABLA DEVOLUCION_COMPRA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/19.6- DEVOLUCION_COMPRA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+- Estilo de delimitador: END ; / DELIMITER ; (estilo unico del repo desde
+  04/10/2026, ejecutable desde VS Code).
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19.6- DEVOLUCION_COMPRA.sql (4 bloques)
+================================================================================
+TABLA
+  - DEVOLUCION_COMPRA ..... devoluciones de mercancia al proveedor: que,
+                            cuando, porque y en que condicion
+
+INDICE (1)
+  - IX_DEVOLUCION_COMPRA_FECHA .. devoluciones por fecha (reportes)
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - SP_REGISTRAR_DEVOLUCION_COMPRA .. deja la devolucion PENDIENTE con
+                                       cantidad, motivo y subtotal; valida
+                                       compra RECIBIDA y cuota de lo ya
+                                       devuelto
+  - SP_PROCESAR_DEVOLUCION_COMPRA ... cierra la devolucion: PROCESADA o
+                                       RECHAZADA
+
+TRIGGERS (1)
+  - TR_PROCESAR_DEVOLUCION_COMPRA .. los efectos reales: baja stock,
+                                      anota SALIDA + historial, baja el
+                                      TOTAL y deja DEVUELTA si se devolvio
+                                      todo (tambien en UPDATE directo)
+
+VISTA (0) / FUNCIONES (0)
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Dos pasos como en DEVOLUCIONES de ventas: REGISTRAR (PENDIENTE, no toca
+  nada) y PROCESAR (ahi ocurre el efecto). RECHAZADA libera la cuota.
+- Solo se devuelve de una compra RECIBIDA: de una ABIERTA se cancela y de
+  una CANCELADA/DEVUELTA ya no hay nada que devolver.
+- Los efectos viven en el trigger (no en el SP) para que tambien apliquen
+  si alguien cambia el estado con un UPDATE directo; el trigger valida
+  RECIBIDA + stock alcanzante y si algo falla todo revierte sin cambios.
+- MOVIMIENTOS_INVENTARIO: tipo SALIDA (la mercancia sale) con observacion
+  'Devolucion a proveedor ID: N'. HISTORIAL: tipo DEVOLUCION (enum creado
+  en el paquetito A) con stock antes/despues. UNA fila en cada uno.
+- El subtotal se guarda al registrar (cant x precio) para no depender de
+  precios que cambien despues.
+- El exceso pagado tras devolver queda A FAVOR visible en la vista de
+  pendientes de pago (paquetito E); no se crean pagos negativos.
+- ENUM COMPRAS.ESTADO + 'DEVUELTA': se activa sola cuando el TOTAL llega a
+  0. DEVUELTA no acepta productos, pagos ni anulaciones (los SPs de 19 y
+  19.5 quedaron validando).
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- Paquetito E: vistas de deuda (VISTA_RESUMEN_PAGOS_COMPRA,
+  VISTA_COMPRAS_PENDIENTES_PAGO, VISTA_GASTOS_PROVEEDOR).
+- Paquetito F: SP_QUITAR_DETALLE_COMPRA y columna FACTURA.
+- Paquetito G: historial de estados de compra y aviso de margen.
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/19.6- DEVOLUCION_COMPRA.sql" -> solo bloques de
+  comentario agregados, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recarga: el loader normaliza END ; a END // al cargar (estilo del repo).
+
+================================================================================
+6. ACTUALIZACION 04/10/2026 - DEVOLUCION A PROVEEDOR (paquetito D)
+================================================================================
+- Archivo nuevo 19.6- DEVOLUCION_COMPRA.sql (carga entre el 19.5 y el 20).
+- Nueva tabla DEVOLUCION_COMPRA (FK a DETALLE_COMPRA y EMPLEADOS, indice
+  por fecha), 2 SPs y 1 trigger, todos documentados arriba.
+- COMPRAS.ESTADO gana el valor 'DEVUELTA' (ALTER en vivo); en 19, 19.5 y
+  22 se actualizaron los mensajes y validaciones para cubrir el nuevo
+  estado (SP_CANCELAR, TR_BLOQUEAR, SP_REGISTRAR/ANULAR_PAGO,
+  TR_VALIDAR_PAGO y 22_SP_AGREGAR).
+- Verificado en vivo: /tmp/opencode/test_devolucion_compra.sql 18/18 PASS
+  con ROLLBACK (residuos 0) + regresion de las 5 suites anteriores en
+  verde (9+10+12+13+19 = 63 checks, 04/10/2026).
+- Carga: el 19.6 va antes del 22 (orden numerico), asi que en la pasada 1
+  del loader la FK a DETALLE_COMPRA da los 3 errores "table doesn't
+  exist" de costumbre y en la pasada 2 el archivo se crea completo sin
+  errores. Es el mismo comportamiento de orden de carga del resto del
+  repo (arena reconstruida con paridad: mismas 16 diferencias legacy).

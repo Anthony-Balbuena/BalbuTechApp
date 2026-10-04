@@ -124,3 +124,7 @@ FUNCIONES (0)
   vuelve a ABIERTA y ahi si entra.
 - Verificado en vivo: checks C9 de /tmp/opencode/test_paquetito_c.sql
   (19/19 PASS, 04/10/2026).
+- Ampliado el 04/10/2026 (paquetito D): el mensaje unico ahora es
+  'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O
+  DEVUELTA).' por el nuevo estado DEVUELTA de COMPRAS (19.6). Ver checks
+  D14 y D16 de test_devolucion_compra.sql (18/18 PASS).

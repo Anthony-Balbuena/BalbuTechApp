@@ -113,3 +113,18 @@ VISTA (0) / FUNCIONES (0)
   numero) y la FK de PAGOS_COMPRA apunta a COMPRAS (19) y METODOS_PAGO (4).
 - Sin cambios en la BD en vivo: los objetos son identicos, solo cambio el
   archivo que los contiene. Verificado con arena + paridad y 63 checks.
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - EL NUEVO ESTADO DEVUELTA (paquetito D)
+================================================================================
+- COMPRAS.ESTADO gano 'DEVUELTA' (devolvio toda la mercancia al proveedor,
+  ver 19.6- DEVOLUCION_COMPRA.sql) y aqui se blindo el dinero:
+  * SP_REGISTRAR_PAGO_COMPRA: DEVUELTA rechaza pagos ('ERROR: LA COMPRA
+    ESTA DEVUELTA.'), ademas de CANCELADA y RECIBIDA.
+  * TR_VALIDAR_PAGO_COMPRA: igual para INSERT directos.
+  * SP_ANULAR_PAGO_COMPRA: DEVUELTA no admite cambios de pago (el dinero
+    ya quedo cerrado con la devolucion).
+- Si se devuelve mercancia de una compra saldada, lo pagado de mas queda
+  a favor y se ve en la vista de pendientes de pago (paquetito E).
+- Verificado en vivo: checks D14 de test_devolucion_compra.sql (18/18
+  PASS, 04/10/2026).
