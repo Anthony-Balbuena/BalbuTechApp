@@ -94,11 +94,12 @@ DROP PROCEDURE IF EXISTS 21_SP_AGREGAR_PRODUCTO_VENTA ;
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_CANCELAR_VENTA ;
 /*
-21_SP_CANCELAR_VENTA
+SP_CANCELAR_VENTA
 Cancela una venta que sigue en proceso y le regresa todo el stock.
 Valida que el empleado sea el dueño de la venta y que no tenga pagos;
-si todo esta bien devuelve las unidades al inventario con su movimiento
-de ENTRADA y deja la venta en estado CANCELADA.
+si todo esta bien devuelve las unidades al inventario, deja el movimiento
+de ENTRADA en la bitacora, anota la reposicion en el historial del producto
+y deja la venta en estado CANCELADA.
 */
 CREATE PROCEDURE SP_CANCELAR_VENTA(
     IN P_ID_VENTA INT,
@@ -147,7 +148,19 @@ proc_label: BEGIN
     FROM DETALLES_VENTA DV
     WHERE DV.ID_VENTA = P_ID_VENTA;
 
-    -- 6. Cerrar la venta
+    -- 6. Anotar la reposicion en el historial del producto (stock ya repuesto:
+    --    STOCK_ANTERIOR es el actual menos lo que se acaba de devolver)
+    INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
+        ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
+    )
+    SELECT DV.ID_PRODUCTO, 'ENTRADA', DV.CANTIDAD,
+           I.STOCK_ACTUAL - DV.CANTIDAD, I.STOCK_ACTUAL,
+           CONCAT('Venta cancelada ID: ', P_ID_VENTA)
+    FROM DETALLES_VENTA DV
+    JOIN INVENTARIO I ON I.ID_PRODUCTO = DV.ID_PRODUCTO
+    WHERE DV.ID_VENTA = P_ID_VENTA;
+
+    -- 7. Cerrar la venta
     UPDATE VENTAS SET ESTADO = 'CANCELADA' WHERE ID_VENTA = P_ID_VENTA;
 
     SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA, ' CANCELADA Y STOCK RESTITUIDO.') AS MENSAJE;

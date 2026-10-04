@@ -19,7 +19,7 @@ Estilo acordado (hibrido minimalista):
 - Se conserva el motor InnoDB, claves, indices y restricciones existentes.
 
 ================================================================================
-2. OBJETOS DOCUMENTADOS EN 24- PAGOS.sql (6 bloques)
+2. OBJETOS DOCUMENTADOS EN 24- PAGOS.sql (7 bloques)
 ================================================================================
 TABLA
   - PAGOS ................. pagos de cada venta con metodo, monto y fecha
@@ -27,8 +27,11 @@ TABLA
 INDICE (1)
   - IX_PAGOS_FECHA ........ pagos por fecha (reportes de caja)
 
-PROCEDIMIENTO ALMACENADO (1)
+PROCEDIMIENTO ALMACENADO (2)
   - 24_SP_REGISTRAR_PAGO .. registra un pago y confirma con el empleado
+  - SP_ANULAR_PAGO ........ borra un pago que se registro por error; si la
+                            venta deja de estar cobrada al 100% la reabre y
+                            retira el bono del 1%
 
 TRIGGERS (2)
   - TR_VALIDAR_MONTO_PAGO .. no deja pagar mas del total de la venta
@@ -86,3 +89,19 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   TR_CALCULAR_BONO_VENTA (archivo 14) y dejaba bonos fantasma en ventas
   canceladas o nunca pagadas. Ese trigger fue eliminado (solo DROP de
   limpieza en el 14).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - ANULACION DE PAGOS (PARTE 6)
+================================================================================
+- Nuevo SP_ANULAR_PAGO(P_ID_PAGO, P_ID_EMPLEADO): valida empleado, valida que
+  el pago exista y que la venta siga EN_PROCESO o REALIZADA (no cancelada ni
+  devuelta), borra el pago y recalcula lo cobrado.
+- Si con eso la venta deja de estar cobrada al 100%, vuelve a EN_PROCESO y
+  elimina el bono del 1% ('Comisión por venta #<id>') SOLO si sigue PENDIENTE;
+  si el bono ya fue aprobado se deja intacto para que lo resuelva nomina.
+- Cierra el callejón sin salida: SP_CANCELAR_VENTA no deja cancelar una venta
+  con pagos y antes no existia forma de quitarselos.
+- No cambia el modelo de calculo: todo sigue siendo SUM(MONTO) sobre PAGOS,
+  por eso borrar la fila hace cuadrar totales y disparadores solos.
+- Verificado en vivo con /tmp/opencode/test_cierre_ventas.sql (10 checks con
+  ROLLBACK y residuos 0) mas la regresion smoke_fase1.sql (9 checks).

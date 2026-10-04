@@ -68,6 +68,82 @@ proc_label: BEGIN
 END;
 DELIMITER ;
 
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ANULAR_PAGO ;
+/*
+SP_ANULAR_PAGO
+Anula un pago que se registro por error. Al borrarlo los totales vuelven a
+cuadrar solos, porque todo se calcula con SUM sobre PAGOS. Si con eso la venta
+deja de estar cobrada al 100%, la venta vuelve a EN_PROCESO y se elimina el
+bono del 1% que se habia creado al cobrar (solo si sigue PENDIENTE; si ya
+fue aprobado se deja para que lo resuelva nomina).
+No se puede anular un pago de una venta CANCELADA ni DEVUELTA.
+*/
+CREATE PROCEDURE SP_ANULAR_PAGO(
+    IN P_ID_PAGO INT,
+    IN P_ID_EMPLEADO INT
+)
+proc_label: BEGIN
+    DECLARE V_ID_VENTA INT;
+    DECLARE V_MONTO DECIMAL(10, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_TOTAL_VENTA DECIMAL(12, 2);
+    DECLARE V_TOTAL_PAGADO DECIMAL(12, 2);
+    DECLARE V_ID_EMPLEADO_VENTA INT;
+    DECLARE V_BONOS_BORRADOS INT DEFAULT 0;
+
+    -- 1. El empleado que anula debe existir
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. El pago debe existir
+    SELECT ID_VENTA, MONTO INTO V_ID_VENTA, V_MONTO
+    FROM PAGOS WHERE ID_PAGO = P_ID_PAGO;
+
+    IF V_ID_VENTA IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PAGO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. La venta debe seguir viva (no cancelada ni devuelta)
+    SELECT ESTADO, TOTAL, ID_EMPLEADO
+    INTO V_ESTADO, V_TOTAL_VENTA, V_ID_EMPLEADO_VENTA
+    FROM VENTAS WHERE ID_VENTA = V_ID_VENTA;
+
+    IF V_ESTADO NOT IN ('EN_PROCESO', 'REALIZADA') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA VENTA NO ADMITE CAMBIOS DE PAGO (ESTA CANCELADA O DEVUELTA).';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. Borra el pago
+    DELETE FROM PAGOS WHERE ID_PAGO = P_ID_PAGO;
+
+    -- 5. Recalcula lo cobrado
+    SELECT IFNULL(SUM(MONTO), 0) INTO V_TOTAL_PAGADO
+    FROM PAGOS WHERE ID_VENTA = V_ID_VENTA;
+
+    -- 6. Si dejo de estar cobrada al 100%, se reabre y se quita el bono del 1%
+    IF V_ESTADO = 'REALIZADA' AND V_TOTAL_PAGADO < V_TOTAL_VENTA THEN
+        UPDATE VENTAS SET ESTADO = 'EN_PROCESO' WHERE ID_VENTA = V_ID_VENTA;
+
+        DELETE FROM BONOS_EMPLEADOS
+        WHERE ID_EMPLEADO = V_ID_EMPLEADO_VENTA
+          AND DESCRIPCION = CONCAT('Comisión por venta #', V_ID_VENTA)
+          AND ESTADO = 'PENDIENTE';
+        SET V_BONOS_BORRADOS = ROW_COUNT();
+    END IF;
+
+    -- 7. Mensaje
+    SELECT CONCAT('EXITO: PAGO #', P_ID_PAGO, ' ANULADO (', V_MONTO,
+                  '). COBRADO DE LA VENTA #', V_ID_VENTA, ': ', V_TOTAL_PAGADO,
+                  IF(V_BONOS_BORRADOS > 0, ' - SE RETIRO EL BONO DEL 1%', '')
+                 ) AS MENSAJE;
+END //
+DELIMITER ;
+
 
 
 
