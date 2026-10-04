@@ -56,7 +56,6 @@ FUNCIONES (0)
     SP_AGREGAR_DETALLE_VENTA (version completa, 4 parametros).
   * Los indices IX_CLIENTE_NOMBRE e IX_VENTAS_FECHA estan definidos sobre
     CLIENTES y VENTAS, no sobre DETALLES_VENTA (sin tocar).
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -66,7 +65,6 @@ FUNCIONES (0)
 - ~14 archivos con indices sin documentar.
 - ~67 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

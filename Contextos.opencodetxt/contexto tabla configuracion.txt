@@ -36,7 +36,6 @@ INDICES (0), SPs (0), TRIGGERS (0), VISTAS (0), FUNCIONES (0)
   iniciales" originales.
 - NO se toco el INSERT de datos iniciales (ITBIS, DIAS_GARANTIA,
   NOMBRE_TIENDA).
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -46,7 +45,6 @@ INDICES (0), SPs (0), TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - ~10 archivos con indices sin documentar.
 - ~56 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

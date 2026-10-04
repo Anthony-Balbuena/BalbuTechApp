@@ -55,7 +55,6 @@ FUNCION (1)
 - Estilo de comentario: hibrido (tablas minimalistas, no campo por campo).
 - Si se documentan triggers, vistas y funciones (el usuario lo pidio para
   el archivo de inventario).
-- NO se modifica modulos/todo_modulos.sql (queda pendiente de aprobacion).
 - NO se corrigen errores de logica: el comentario "-- POSIBLE ERROR AQUÍ" en
   la vista VISTA_PRODUCTOS_CRITICOS (columna P.NOMBRE) se dejo intacto.
 - No se tocaron: DELIMITER, CALL, DESCRIBE ni ninguna sentencia SQL.
@@ -67,7 +66,6 @@ FUNCION (1)
 - ~22 archivos con CREATE INDEX sin documentar (~47 indices en total).
 - ~88 procedimientos almacenados sin bloque de descripcion (112 en total).
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

@@ -36,7 +36,6 @@ INDICES (0), TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 3. DECISIONES TOMADAS EN ESTA SESION
 ================================================================================
 - Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -46,7 +45,6 @@ INDICES (0), TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - ~9 archivos con indices sin documentar.
 - ~53 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

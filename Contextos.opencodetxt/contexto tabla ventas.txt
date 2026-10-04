@@ -51,7 +51,6 @@ FUNCIONES (0)
 ================================================================================
 - Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
 - La seccion [FUNTION} vacia (linea 156) se dejo intacta, sin inventar nada.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -61,7 +60,6 @@ FUNCIONES (0)
 - ~18 archivos con CREATE INDEX sin documentar (~41 indices en total).
 - ~82 procedimientos almacenados sin bloque de descripcion (112 en total).
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO
@@ -79,7 +77,7 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   descontaban stock dos veces). El TOTAL lo suma TR_ACTUALIZAR_TOTAL_VENTA (23) y
   el stock lo descuenta TR_AUDITORIA_MOVIMIENTO_VENTA (20); en el archivo solo
   quedan DROP IF EXISTS de limpieza para bases viejas.
-- Agregado 21_SP_CANCELAR_VENTA(P_ID_VENTA, P_ID_EMPLEADO): valida empleado,
+- Agregado SP_CANCELAR_VENTA(P_ID_VENTA, P_ID_EMPLEADO): valida empleado,
   estado EN_PROCESO y ausencia de pagos; devuelve el stock, registra la ENTRADA
   en MOVIMIENTOS_INVENTARIO y deja la venta CANCELADA.
 - La seccion 2 de arriba (TRIGGERS 2) quedo obsoleta: hoy el archivo 21 ya no
@@ -102,10 +100,6 @@ Verificacion:
   el dueño de la venta. En el archivo solo queda el DROP de limpieza y un
   bloque /* */ que explica por qué se fue. La alta de detalle es una sola
   via: SP_AGREGAR_DETALLE_VENTA(venta, producto, cantidad, empleado).
-- BORRADO modulos/todo_modulos.sql completo (aprobado por el usuario el
-  02/10/2026). Era un duplicado consolidado de todos los módulos que ya
-  quedó desfasado respecto de los archivos individuales; las referencias
-  históricas que quedan en otros contextos documentan sesiones anteriores.
 - Verificación: information_schema.ROUTINES con nombre
   21_SP_AGREGAR_PRODUCTO_VENTA = 0 en BALBU_TECH; grep en el repo solo
   muestra el DROP del archivo 21.

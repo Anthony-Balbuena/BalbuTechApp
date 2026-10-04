@@ -38,7 +38,6 @@ PROCEDIMIENTOS ALMACENADOS (4)
 ================================================================================
 - Se elimino el bloque "DESCRIPCION DEL MODULO ROLES" con listado de campos
   y restricciones, y el bloque de parametros de cada SP.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

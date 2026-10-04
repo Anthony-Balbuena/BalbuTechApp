@@ -46,7 +46,6 @@ FUNCIONES (0)
 ================================================================================
 - Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
 - La seccion [FUNTION} vacia (linea 133) se dejo intacta, sin inventar nada.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -56,7 +55,6 @@ FUNCIONES (0)
 - ~13 archivos con indices sin documentar.
 - ~66 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

@@ -44,7 +44,6 @@ VISTA (1)
   conservando los comentarios cortos "-- 1. Para ver...", "-- 2. ...",
   "-- 3. ...".
 - Se AGREGO el bloque de la vista VISTA_PERMISOS_ACTIVOS.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

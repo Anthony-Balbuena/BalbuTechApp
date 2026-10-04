@@ -48,7 +48,6 @@ FUNCION (0)
 - La seccion [FUNTION} vacia (linea 106) se dejo intacta, sin inventar nada.
 - Se conservaron los comentarios "-- 1. Estructura de la Tabla" y
   "-- 2. Indices para optimizar consultas de auditoria" originales.
-- NO se modifica modulos/todo_modulos.sql (queda pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE ni ninguna sentencia SQL.
 
 ================================================================================
@@ -58,7 +57,6 @@ FUNCION (0)
 - ~22 archivos con CREATE INDEX sin documentar (~47 indices en total).
 - ~87 procedimientos almacenados sin bloque de descripcion (112 en total).
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

@@ -40,7 +40,6 @@ PROCEDIMIENTOS ALMACENADOS (5)
 - Se elimino el bloque "ESTRUCTURA DE LA TABLA METODOS_PAGO" con listado de
   campos y restricciones, y los bloques de parametros de cada SP.
 - NO se tocaron los CALL de prueba del final del archivo.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

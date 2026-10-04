@@ -43,7 +43,6 @@ TRIGGER (1)
 ================================================================================
 - Los 3 bloques de indices ya estaban en el estilo objetivo (4 lineas sin
   parametros): se conservaron tal cual.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

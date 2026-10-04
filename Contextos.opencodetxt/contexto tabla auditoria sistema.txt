@@ -44,7 +44,6 @@ TRIGGERS (3)
 - NOTA (no tocada, es SQL raro del archivo original): hay un "DELIMITER //"
   suelto sin cuerpo cerca de la linea 110 original. NO se modifico porque
   el SQL debe quedar identico.
-- NO se toco modulos/todo_modulos.sql (pendiente de aprobacion).
 
 ================================================================================
 4. VERIFICACION

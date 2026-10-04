@@ -49,7 +49,6 @@ PROCEDIMIENTOS (0), INDICES (0), VISTAS (0), FUNCIONES (0)
     DROP (linea ~119) borra al primero.
   * Los triggers usan la columna PRODUCTOS.STOCK y la tabla
     DETALLES_DEVOLUCION, que no aparecen en el resto de los archivos.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -59,7 +58,6 @@ PROCEDIMIENTOS (0), INDICES (0), VISTAS (0), FUNCIONES (0)
 - ~10 archivos con indices sin documentar.
 - ~56 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

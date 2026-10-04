@@ -44,7 +44,6 @@ INDICES (0), TRIGGERS (0), VISTAS (0)
   "-- ADMIN: acceso total", "-- RRHH: ...", "-- EMPLEADO: ..." y los que
   preceden a cada SP y la funcion.
 - NO se tocaron los INSERT de permisos base ni la asignacion por rol.
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, INSERT, SELECT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -54,7 +53,6 @@ INDICES (0), TRIGGERS (0), VISTAS (0)
 - ~9 archivos con indices sin documentar.
 - ~51 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO

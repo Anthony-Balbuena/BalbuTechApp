@@ -41,7 +41,6 @@ TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
 - Se conservaron los comentarios originales "-- 1.", "-- 2.", "----reporte"
   y "----eliminar no usar".
-- NO se modifica modulos/todo_modulos.sql (pendiente de aprobacion).
 - No se tocaron: DELIMITER, DROP, DELETE, INSERT ni ninguna sentencia SQL.
 
 ================================================================================
@@ -51,7 +50,6 @@ TRIGGERS (0), VISTAS (0), FUNCIONES (0)
 - ~10 archivos con indices sin documentar.
 - ~57 procedimientos almacenados sin bloque de descripcion.
 - README.md del proyecto C++ (no existe).
-- Decidir si el criterio aplicado se replica en todo_modulos.sql.
 
 ================================================================================
 5. COMO SE VERIFICA EL TRABAJO
