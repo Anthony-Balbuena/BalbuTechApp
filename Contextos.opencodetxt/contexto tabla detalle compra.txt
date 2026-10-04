@@ -93,7 +93,9 @@ FUNCIONES (0)
 - Reparado el bug de delimitadores preexistente: el bloque de
   TR_CALCULAR_TOTAL_COMPRA usaba "END ;" adentro de un "DELIMITER //",
   por lo que el DROP/CREATE nunca se ejecutaba limpio (ERROR 1064 al
-  recargar). Ahora usa "END // / DELIMITER ;" como el resto del repo.
+  recargar). El estilo unico del repo desde el 04/10/2026 es "END ; /
+  DELIMITER ;" (asi VS Code puede ejecutar los SP; el loader normaliza el
+  "END ;" adyacente a "END //" al cargar).
 - Verificado: archivo recargado en la arena BALBU_TECH_TEST sin errores
   de sintaxis y con paridad de cuerpos contra la BD real.
 

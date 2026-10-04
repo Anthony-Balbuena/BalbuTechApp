@@ -101,7 +101,7 @@ proc_label: BEGIN
     VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, P_PRECIO);
 
     SELECT 'EXITO: PRODUCTO AGREGADO.' AS MENSAJE;
-END //
+END ;
 DELIMITER ;
 
 ------------------------------------------------------------------------------------------------------------------------------
@@ -122,7 +122,7 @@ BEGIN
     UPDATE COMPRAS 
     SET TOTAL = TOTAL + NEW.SUBTOTAL
     WHERE ID_COMPRA = NEW.ID_COMPRA;
-END //
+END ;
 DELIMITER ;
 
 -----
