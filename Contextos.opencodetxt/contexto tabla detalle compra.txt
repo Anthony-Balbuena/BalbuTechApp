@@ -193,5 +193,5 @@ FUNCIONES (0)
   segundo truena el primero no debe quedarse borrado).
 - Si la transaccion es del llamador, el SP no la cierra ni la deshace y el
   error llega al que llama para que el decida.
-- Verificado: checks I1, I1b, I1c de /tmp/opencode/test_fase_i.sql (7/7
+- Verificado: checks I1, I1b, I1c de /tmp/opencode/test_fase_i.sql (6/6
   PASS, 04/10/2026).

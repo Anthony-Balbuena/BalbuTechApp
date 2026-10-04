@@ -38,8 +38,10 @@ TRIGGERS (2)
   - TR_AUTO_FINALIZAR_VENTA .. si ya se pago todo, marca la venta REALIZADA
                                    y ahi crea el bono del 1% al empleado
 
-VISTA (1)
+VISTA (2)
   - VISTA_RESUMEN_PAGOS .... pagos con nombre del metodo de pago
+  - VISTA_VENTAS_PENDIENTES_PAGO . saldo por cobrar de cada venta (TOTAL
+    menos lo pagado); excluye CANCELADA, DEVUELTA y las ya saldadas
 
 FUNCIONES (0)
   - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
@@ -127,5 +129,16 @@ Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
   el bono colgado.
 - Si la transaccion la abrio el llamador, el SP no la toca (ni COMMIT ni
   ROLLBACK) y el error se propaga.
-- Verificado: checks I0, I2 de /tmp/opencode/test_fase_i.sql (7/7 PASS,
+- Verificado: checks I0, I2 de /tmp/opencode/test_fase_i.sql (6/6 PASS,
   04/10/2026).
+================================================================================
+11. ACTUALIZACION 04/10/2026 - VISTA DE DEUDA DE CLIENTES (paquetito I)
+================================================================================
+- Nueva VISTA_VENTAS_PENDIENTES_PAGO: por cada venta no cerrada muestra TOTAL,
+  PAGADO (SUM de PAGOS con IFNULL 0) y SALDO = TOTAL - PAGADO.
+- Excluye CANCELADA y DEVUELTA (no se les cobra) y toda venta con saldo 0
+  (ya saldadas). El saldo nunca queda negativo porque TR_VALIDAR_MONTO_PAGO
+  bloquea el pago en exceso.
+- Verificado: /tmp/opencode/test_paquetito_i.sql (6/6 PASS con ROLLBACK y
+  residuos 0, 04/10/2026). Los 3 "END;" sueltos del archivo pasaron a
+  "END ;" (estilo del repo).

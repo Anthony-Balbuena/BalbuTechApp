@@ -65,7 +65,7 @@ proc_label: BEGIN
 
     -- 4. Mensaje personalizado
     SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
-END;
+END ;
 DELIMITER ;
 
 DELIMITER //
@@ -203,7 +203,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' 
         SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.';
     END IF;
-END;
+END ;
 DELIMITER ;
 
 DELIMITER //
@@ -264,7 +264,7 @@ BEGIN
                 CONCAT('Comisión por venta #', NEW.ID_VENTA),
                 'PENDIENTE');
     END IF;
-END;
+END ;
 DELIMITER ;
 
 
@@ -290,6 +290,31 @@ SELECT
     P.FECHA
 FROM PAGOS P
 JOIN METODOS_PAGO MP ON P.ID_METODO_PAGO = MP.ID_METODO_PAGO;
+
+
+
+
+
+/*
+VISTA_VENTAS_PENDIENTES_PAGO
+Cuanto le falta por cobrar cada venta. El trigger de pagos no deja que se
+pague de mas, asi que el saldo nunca queda negativo. Se excluyen las ventas
+CANCELADAS (ya no se les cobra nada) y las DEVUELTAS, ademas de las que ya
+estan saldadas (saldo 0).
+*/
+CREATE OR REPLACE VIEW VISTA_VENTAS_PENDIENTES_PAGO AS
+SELECT 
+    V.ID_VENTA,
+    V.ID_CLIENTE,
+    V.ESTADO,
+    V.TOTAL,
+    IFNULL(SUM(P.MONTO), 0) AS PAGADO,
+    V.TOTAL - IFNULL(SUM(P.MONTO), 0) AS SALDO
+FROM VENTAS V
+LEFT JOIN PAGOS P ON P.ID_VENTA = V.ID_VENTA
+WHERE V.ESTADO NOT IN ('CANCELADA', 'DEVUELTA')
+GROUP BY V.ID_VENTA, V.ID_CLIENTE, V.ESTADO, V.TOTAL
+HAVING V.TOTAL - IFNULL(SUM(P.MONTO), 0) <> 0;
 
 
 
