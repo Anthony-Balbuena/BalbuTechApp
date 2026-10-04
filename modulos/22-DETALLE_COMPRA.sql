@@ -49,7 +49,8 @@ DROP PROCEDURE IF EXISTS 22_SP_AGREGAR_DETALLE_COMPRA ;
 /*
 22_SP_AGREGAR_DETALLE_COMPRA
 Agrega un producto a una compra que ya esta abierta.
-Revisa que la compra y el producto existan, que la cantidad y el precio sean
+Revisa que la compra exista y no este cancelada, que el producto exista,
+que la cantidad y el precio sean
 positivos y que el producto no este repetido; si algo falla no guarda nada.
 */
 CREATE PROCEDURE 22_SP_AGREGAR_DETALLE_COMPRA(
@@ -62,6 +63,11 @@ proc_label: BEGIN
     -- 1. VALIDACIONES DE INTEGRIDAD
     IF NOT EXISTS (SELECT 1 FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    IF (SELECT ESTADO FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA) = 'CANCELADA' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA.';
         LEAVE proc_label;
     END IF;
 
