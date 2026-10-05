@@ -21,16 +21,16 @@ Estilo acordado (hibrido minimalista):
 ================================================================================
 2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (bloques)
 ================================================================================
-TABLA (2)
+NOTA: desde el 04/10/2026 lo de HISTORIAL_ESTADOS_VENTA vive en el archivo
+21.5- HISTORIAL_ESTADOS_VENTA.sql (ver seccion 12).
+
+TABLA (1)
   - VENTAS ................. cabecera de cada venta (cliente, empleado,
                               estado, fecha, total y FACTURA opcional)
-  - HISTORIAL_ESTADOS_VENTA . un renglon por cada cambio de estado de una
-                              venta (quien, cuando y hacia donde paso)
 
-INDICES (4)
+INDICES (3)
   - IX_VENTAS_CLIENTE ....... historial de ventas por cliente
   - IX_VENTAS_EMPLEADO ...... ventas atendidas por empleado
-  - IX_HIST_ESTADO_VENTA_FECHA .. historial de estados por fecha
   - UQ_VENTA_FACTURA ........ una factura no se repite en el mismo cliente
 
 PROCEDIMIENTOS ALMACENADOS (3)
@@ -46,15 +46,13 @@ PROCEDIMIENTOS ALMACENADOS (3)
   NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
   con SP_AGREGAR_DETALLE_VENTA (archivo 23).
 
-TRIGGERS (3)
+TRIGGERS (1)
   - TR_BLOQUEAR_BORRADO_VENTA . ningun DELETE directo borra una venta
                                 (ver seccion 9)
-  - TR_HISTORIAL_ESTADO_VENTA . al nacer la venta escribe su primera fila
-                                de historial ('Venta iniciada')
-  - TR_CAMBIO_ESTADO_VENTA .... anota antes/despues cada vez que cambia el
-                                ESTADO; si no cambia no anota nada
   - Ademas quedan DROP de limpieza de los duplicados
     TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
+  NOTA: TR_HISTORIAL_ESTADO_VENTA y TR_CAMBIO_ESTADO_VENTA se mudaron al
+  archivo 21.5 (ver seccion 12).
 
 VISTA (1)
   - VISTA_DETALLE_VENTA ...... productos de cada venta con su FACTURA,
@@ -159,6 +157,8 @@ Verificacion:
   devolucion o mano pelada).
 - Verificado: /tmp/opencode/test_paquetito_j.sql (8/8 PASS con ROLLBACK y
   residuos 0, 04/10/2026).
+  [Actualizado 04/10/2026: todo lo de esta seccion se mudo al archivo
+  21.5- HISTORIAL_ESTADOS_VENTA.sql, ver seccion 12.]
 ================================================================================
 11. ACTUALIZACION 04/10/2026 - FACTURA DEL CLIENTE (paquetito K)
 ================================================================================
@@ -173,3 +173,29 @@ Verificacion:
 - VISTA_DETALLE_VENTA ahora trae tambien la FACTURA de la venta.
 - Verificado: /tmp/opencode/test_paquetito_k.sql (14/14 PASS con ROLLBACK y
   residuos 0, 04/10/2026).
+================================================================================
+12. ACTUALIZACION 04/10/2026 - HISTORIAL_ESTADOS_VENTA SE MUDO AL 21.5
+================================================================================
+- La tabla HISTORIAL_ESTADOS_VENTA, su indice IX_HIST_ESTADO_VENTA_FECHA y
+  los dos triggers que la alimentan (TR_HISTORIAL_ESTADO_VENTA y
+  TR_CAMBIO_ESTADO_VENTA) se extrajeron de 21- VENTAS.sql al nuevo archivo
+  modulos/21.5- HISTORIAL_ESTADOS_VENTA.sql, siguiendo el precedente de
+  PAGOS_COMPRA (19 -> 19.5).
+- Motivo: en 21 vivia todo mezclado (VENTAS + su historial); ahora cada
+  archivo se queda con lo suyo. Los triggers se llevaron juntos porque son
+  los UNICOS dos puntos que escriben en esa tabla: sin ellos la tabla
+  existiria pero nunca se le insertaria nada.
+- En 21- VENTAS.sql quedan dos comentarios -- que apuntan al 21.5 en los dos
+  lugares de donde se fueron los bloques (seccion de indices y seccion de
+  triggers). Nada de SQL operativo se toco: solo se movieron bloques.
+- Orden de carga: 21 -> 21.5 -> 22 ... (el loader ordena por numero). Los
+  triggers del 21.5 son ON VENTAS y VENTAS ya existe porque carga antes.
+- Nada mas en el repo referenciaba HISTORIAL_ESTADOS_VENTA (verificado con
+  grep): no dependencias rotas.
+- Verificacion: git diff de ambos archivos debe mostrar solo bloques movidos
+  (mismo texto, sin editar), mas los comentarios -- de apuntada al 21.5.
+- Verificado en vivo en BALBU_TECH (04/10/2026): carga con load_modules.py,
+  los 2 triggers se recrearon desde el 21.5 (55 triggers totales, sin
+  duplicados) y quedaron en verde: test_paquetito_j 8/8 PASS, smoke_fase1
+  10/10, test_fase_h 14/14, test_paquetito_k 14/14, residuos 0. Respaldos:
+  /tmp/opencode/backup/pre_215_2109.sql (previo a la sesion).
