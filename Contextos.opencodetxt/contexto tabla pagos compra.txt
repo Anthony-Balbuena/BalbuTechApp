@@ -211,3 +211,30 @@ FUNCIONES (0)
   el metodo de pago paso a LEFT JOIN (las notas no tienen metodo).
 - Verificado: checks J0-J11 de /tmp/opencode/test_fase_j.sql (13/13 PASS con
   ROLLBACK, 04/10/2026).
+================================================================================
+13. ACTUALIZACION 04/10/2026 - SINCRONIA DE LA BD REAL (tras la mudanza al 21.5)
+================================================================================
+- Al recargar todos los modulos en BALBU_TECH (para validar la mudanza de
+  HISTORIAL_ESTADOS_VENTA al archivo 21.5) salio a la luz que la BD real
+  estaba atrasada respecto a este archivo, y el test_fase_j daba 2 FAIL:
+  * Faltaba FK_PAGO_COMPRA_EMPLEADO: el CREATE TABLE no corre en la real
+    ('table already exists') y el archivo no tenia ningun ALTER que lo
+    agregara, asi que nunca se habia creado. Agregado con ADD CONSTRAINT.
+  * El CHECK viejo MONTO > 0 seguia vivo y rechazaba las notas de credito
+    negativas (ERROR 4025). La linea DROP CONSTRAINT IF EXISTS MONTO no
+    servia: esta version de MariaDB la ejecuta sin error pero no borra nada
+    (y DROP CHECK ni siquiera compila).
+- Arreglo en el archivo (migracion, en el bloque 'Deja al dia una BD que ya
+  tenia esta tabla'):
+  * El DROP CONSTRAINT se reemplazo por MODIFY COLUMN MONTO DECIMAL(10,2)
+    NOT NULL: al redefinir la columna sin el CHECK inline el check viejo se
+    va solo. Idempotente: en BDs limpias no cambia nada.
+  * Se agrego ADD CONSTRAINT FK_PAGO_COMPRA_EMPLEADO (el indice lo crea sola).
+    Si ya existe tira ERROR 1826 'Duplicate FOREIGN KEY constraint name', que
+    es inofensivo, mismo criterio que los ERROR 1050/1061 de toda la carga.
+- Verificado en vivo (BALBU_TECH): constraints = CHK_PAGOS_COMPRA_MONTO
+  (MONTO <> 0) unica, FK_PAGO_COMPRA_EMPLEADO presente, test_fase_j 13/13
+  PASS con ROLLBACK y residuos 0. Regresion completa en verde:
+  paquetito_j 8/8, paquetito_k 14/14, fase_h 14/14, smoke 10/10.
+- Respaldo previo a toda la sesion: /tmp/opencode/backup/pre_215_2109.sql
+  (ahi se ve que la real no tenia ni las 3 columnas extra antes de cargar).
