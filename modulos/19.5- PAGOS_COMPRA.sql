@@ -35,9 +35,10 @@ CREATE TABLE PAGOS_COMPRA (
 
 -- ============================================================
 -- Deja al dia una BD que ya tenia esta tabla (como la real): agrega las
--- columnas, le pone el dueno de la compra a los pagos viejos y cambia el
--- CHECK viejo de MONTO > 0 por MONTO <> 0 (ahi entran las notas). En una
--- BD recien creada nada de esto hace falta, el CREATE de arriba ya lo trae.
+-- columnas, le pone el dueno de la compra a los pagos viejos, cambia el
+-- CHECK viejo de MONTO > 0 por MONTO <> 0 (ahi entran las notas) y le
+-- pone el FK del empleado si la BD vieja no lo trajo. En una BD recien
+-- creada nada de esto hace falta, el CREATE de arriba ya lo trae.
 -- ============================================================
 ALTER TABLE PAGOS_COMPRA ADD COLUMN IF NOT EXISTS ID_EMPLEADO INT NULL;
 UPDATE PAGOS_COMPRA PC JOIN COMPRAS C ON C.ID_COMPRA = PC.ID_COMPRA
@@ -47,8 +48,18 @@ ALTER TABLE PAGOS_COMPRA MODIFY COLUMN ID_EMPLEADO INT NOT NULL;
 ALTER TABLE PAGOS_COMPRA ADD COLUMN IF NOT EXISTS TIPO ENUM('PAGO', 'NOTA_CREDITO') NOT NULL DEFAULT 'PAGO';
 ALTER TABLE PAGOS_COMPRA ADD COLUMN IF NOT EXISTS OBSERVACION VARCHAR(100) NULL;
 ALTER TABLE PAGOS_COMPRA MODIFY COLUMN ID_METODO_PAGO INT NULL;
-ALTER TABLE PAGOS_COMPRA DROP CONSTRAINT IF EXISTS MONTO;        -- viejo: MONTO > 0
+-- El CHECK viejo MONTO > 0 no se puede borrar con DROP CONSTRAINT (esta
+-- version de MariaDB lo ignora en silencio) ni con DROP CHECK (syntax
+-- error): al redefinir la columna sin el CHECK inline se va solo. En una
+-- BD vieja que tenga el check en la columna, esto lo limpia.
+ALTER TABLE PAGOS_COMPRA MODIFY COLUMN MONTO DECIMAL(10, 2) NOT NULL;
 ALTER TABLE PAGOS_COMPRA ADD CONSTRAINT IF NOT EXISTS CHK_PAGOS_COMPRA_MONTO CHECK (MONTO <> 0);
+-- El FK del empleado: las BDs viejas (como la real) crearon esta tabla
+-- antes de que el CREATE de arriba lo trajera, y como el CREATE no corre
+-- (table already exists) hay que agregarlo aparte. Si ya existe tira el
+-- error 1826 'Duplicate foreign key constraint name', que es inofensivo
+-- (mismo criterio que los ERROR 1050/1061 de toda la carga).
+ALTER TABLE PAGOS_COMPRA ADD CONSTRAINT FK_PAGO_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO);
 
 /*
 INDICE IX_PAGOS_COMPRA_COMPRA
