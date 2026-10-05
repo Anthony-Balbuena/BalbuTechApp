@@ -1,0 +1,81 @@
+/*
+ARCHIVO 21.5 - HISTORIAL_ESTADOS_VENTA
+Un renglon por cada vez que una venta cambia de estado: quien fue, cuando
+y hacia donde paso. Todo lo de esta tabla vive aqui (tabla, indice y los
+dos triggers que la alimentan); en 21- VENTAS.sql solo quedo la venta en
+si. Carga despues del 21 y antes del 22.
+*/
+/*
+TABLA HISTORIAL_ESTADOS_VENTA
+Un renglon por cada vez que una venta cambia de estado: quien fue, cuando
+y hacia donde paso. El primer renglon (sin estado anterior) se escribe
+solo al nacer la venta; los demas los ponen los triggers de cambio.
+*/
+CREATE TABLE HISTORIAL_ESTADOS_VENTA (
+    ID_HISTORIAL_ESTADO INT NOT NULL AUTO_INCREMENT,
+    ID_VENTA INT NOT NULL,
+    ESTADO_ANTERIOR VARCHAR(20) NULL,
+    ESTADO_NUEVO VARCHAR(20) NOT NULL,
+    ID_EMPLEADO INT NOT NULL,
+    MOTIVO VARCHAR(100) NOT NULL,
+    FECHA TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (ID_HISTORIAL_ESTADO),
+    CONSTRAINT FK_HIST_ESTADO_VENTA FOREIGN KEY (ID_VENTA) REFERENCES VENTAS (ID_VENTA),
+    CONSTRAINT FK_HIST_ESTADO_VTA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
+) ENGINE = InnoDB;
+
+/*
+INDICE IX_HIST_ESTADO_VENTA_FECHA
+Trae el historial de estados por fecha para los reportes (por venta
+ya lo cubre el FK).
+*/
+CREATE INDEX IX_HIST_ESTADO_VENTA_FECHA ON HISTORIAL_ESTADOS_VENTA (FECHA);
+
+
+ -----------------------------------------------------------------------------------------------------------------------
+ -----------------------------------------[TRIGERR}---------------------------------------------------------------------
+ -----------------------------------------------------------------------------------------------------------------------
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_HISTORIAL_ESTADO_VENTA ;
+/*
+TR_HISTORIAL_ESTADO_VENTA
+Cuando nace una venta deja su primera fila en el historial de estados
+(EN_PROCESO, con el empleado que la atendio). Solo registra el
+nacimiento: los cambios de ahi en adelante los anota
+TR_CAMBIO_ESTADO_VENTA.
+*/
+CREATE TRIGGER TR_HISTORIAL_ESTADO_VENTA
+AFTER INSERT ON VENTAS
+FOR EACH ROW
+BEGIN
+    INSERT INTO HISTORIAL_ESTADOS_VENTA
+        (ID_VENTA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
+    VALUES
+        (NEW.ID_VENTA, NULL, NEW.ESTADO, NEW.ID_EMPLEADO, 'Venta iniciada');
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_CAMBIO_ESTADO_VENTA ;
+/*
+TR_CAMBIO_ESTADO_VENTA
+Cada vez que una venta cambia de estado (realizada, cancelada o
+devuelta) anota una fila con el antes y el despues en
+HISTORIAL_ESTADOS_VENTA. Si el estado no cambia no anota nada y
+tambien vale si alguien lo cambia con un UPDATE directo. El empleado
+es el dueno de la venta.
+*/
+CREATE TRIGGER TR_CAMBIO_ESTADO_VENTA
+AFTER UPDATE ON VENTAS
+FOR EACH ROW
+BEGIN
+    IF NEW.ESTADO <> OLD.ESTADO THEN
+        INSERT INTO HISTORIAL_ESTADOS_VENTA
+            (ID_VENTA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
+        VALUES
+            (NEW.ID_VENTA, OLD.ESTADO, NEW.ESTADO, NEW.ID_EMPLEADO,
+             CONCAT('Estado: ', OLD.ESTADO, ' -> ', NEW.ESTADO));
+    END IF;
+END ;
+DELIMITER ;
