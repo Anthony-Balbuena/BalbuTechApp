@@ -505,6 +505,95 @@ BEGIN
 END ;
 DELIMITER ;
 
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_UPDATE_PAGO_COMPRA ;
+/*
+TR_VALIDAR_UPDATE_PAGO_COMPRA
+El pago de una compra tampoco se edita a pelo: un UPDATE directo no puede
+moverlo a otra compra, no puede cambiarle el signo (el PAGO entra y la
+NOTA sale) ni pasarse del total de la compra. Las compras CANCELADA o
+DEVUELTA no admiten ni siquiera eso, igual que en el borrado.
+*/
+CREATE TRIGGER TR_VALIDAR_UPDATE_PAGO_COMPRA
+BEFORE UPDATE ON PAGOS_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL DECIMAL(10, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_PAGADO DECIMAL(10, 2);
+
+    -- El pago se queda en su compra
+    IF NEW.ID_COMPRA <> OLD.ID_COMPRA THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL PAGO NO CAMBIA DE COMPRA.';
+    END IF;
+
+    SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
+      FROM COMPRAS WHERE ID_COMPRA = NEW.ID_COMPRA;
+
+    IF V_ESTADO IS NULL OR V_ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA O DEVUELTA, NO ADMITE CAMBIOS DE PAGO.';
+    END IF;
+
+    IF IFNULL(NEW.MONTO, 0) = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL MONTO NO PUEDE SER CERO.';
+    END IF;
+
+    -- El signo tiene que ver con el tipo: un PAGO entra y una NOTA sale
+    IF (NEW.TIPO = 'PAGO' AND NEW.MONTO < 0)
+       OR (NEW.TIPO = 'NOTA_CREDITO' AND NEW.MONTO > 0) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL MONTO Y EL TIPO NO COINCIDEN (LA NOTA DE CREDITO ES NEGATIVA).';
+    END IF;
+
+    -- La suma con el cambio aplicado no puede pasarse del total
+    SELECT IFNULL(SUM(MONTO), 0) INTO V_PAGADO
+      FROM PAGOS_COMPRA WHERE ID_COMPRA = NEW.ID_COMPRA;
+
+    IF (V_PAGADO - OLD.MONTO + NEW.MONTO) > V_TOTAL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA COMPRA.';
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE ;
+/*
+TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE
+Si alguien le cambia el monto o el tipo a un pago, la compra puede dejar de
+estar saldada (o quedarlo): aqui se vuelve a sumar lo pagado y se mueve el
+estado igual que al insertar. Mismo cuerpo que TR_AUTO_RECIBIR_COMPRA, para
+que un UPDATE directo no deje la compra mintiendo.
+*/
+CREATE TRIGGER TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE
+AFTER UPDATE ON PAGOS_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL DECIMAL(10, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_PAGADO DECIMAL(10, 2);
+
+    IF NEW.MONTO <> OLD.MONTO OR NEW.TIPO <> OLD.TIPO THEN
+        SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
+          FROM COMPRAS WHERE ID_COMPRA = NEW.ID_COMPRA;
+
+        SELECT IFNULL(SUM(MONTO), 0) INTO V_PAGADO
+          FROM PAGOS_COMPRA WHERE ID_COMPRA = NEW.ID_COMPRA;
+
+        IF V_ESTADO = 'ABIERTA' AND V_TOTAL > 0 AND V_PAGADO >= V_TOTAL THEN
+            UPDATE COMPRAS SET ESTADO = 'RECIBIDA' WHERE ID_COMPRA = NEW.ID_COMPRA;
+        END IF;
+
+        IF V_ESTADO = 'RECIBIDA' AND V_PAGADO < V_TOTAL THEN
+            UPDATE COMPRAS SET ESTADO = 'ABIERTA' WHERE ID_COMPRA = NEW.ID_COMPRA;
+        END IF;
+    END IF;
+END ;
+DELIMITER ;
+
 
 -------------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}---------------------------------------------------------------

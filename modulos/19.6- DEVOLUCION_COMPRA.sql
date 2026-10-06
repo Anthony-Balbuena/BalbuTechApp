@@ -246,15 +246,83 @@ BEGIN
             (V_ID_PRODUCTO, 'DEVOLUCION', NEW.CANTIDAD, V_STOCK_ANTES, V_STOCK_ANTES - NEW.CANTIDAD,
              CONCAT('Devolucion a proveedor ID: ', NEW.ID_DEVOLUCION_COMPRA));
 
-        -- 4. Baja el TOTAL de la compra (el detalle queda como evidencia)
+        -- 4. Baja el TOTAL de la compra (el detalle queda como evidencia).
+        --    El candado interno avisa a TR_VALIDAR_ACTUALIZACION_COMPRA de
+        --    que este cambio de TOTAL viene de la devolucion y no a pelo.
+        SET @COMPRAS_INTERNO = 1;
         UPDATE COMPRAS
            SET TOTAL = TOTAL - NEW.SUBTOTAL_DEVUELTO
          WHERE ID_COMPRA = V_ID_COMPRA;
+        SET @COMPRAS_INTERNO = 0;
 
         -- 5. Si se devolvio todo, la compra queda DEVUELTA
         UPDATE COMPRAS
            SET ESTADO = 'DEVUELTA'
          WHERE ID_COMPRA = V_ID_COMPRA AND TOTAL <= 0;
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA ;
+/*
+TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA
+Una devolucion que ya salio de PENDIENTE no se edita mas: si alguien la
+pasara de PROCESADA a RECHAZADA a pelo, el stock y el TOTAL ya estarian
+bajados y encima se liberaria la cuota para devolver otra vez. Mientras
+sigue PENDIENTE si se puede tocar la cantidad, pero volviendo a validar
+que no se pase de lo comprado.
+*/
+CREATE TRIGGER TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA
+BEFORE UPDATE ON DEVOLUCION_COMPRA
+FOR EACH ROW
+BEGIN
+    DECLARE V_CANTIDAD_COMPRADA INT;
+    DECLARE V_YA_DEVUELTA INT;
+
+    IF OLD.ESTADO <> 'PENDIENTE' THEN
+        IF NEW.ESTADO <> OLD.ESTADO
+           OR NEW.CANTIDAD <> OLD.CANTIDAD
+           OR NEW.SUBTOTAL_DEVUELTO <> OLD.SUBTOTAL_DEVUELTO
+           OR NEW.ID_DETALLE_COMPRA <> OLD.ID_DETALLE_COMPRA THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION YA FUE PROCESADA O RECHAZADA; SU FILA NO CAMBIA.';
+        END IF;
+    ELSEIF NEW.CANTIDAD <> OLD.CANTIDAD THEN
+        -- La cuota: lo comprado menos lo demas devuelto o pendiente de este detalle
+        SELECT DC.CANTIDAD INTO V_CANTIDAD_COMPRADA
+          FROM DETALLE_COMPRA DC
+         WHERE DC.ID_DETALLE_COMPRA = NEW.ID_DETALLE_COMPRA;
+
+        SELECT IFNULL(SUM(CANTIDAD), 0) INTO V_YA_DEVUELTA
+          FROM DEVOLUCION_COMPRA
+         WHERE ID_DETALLE_COMPRA = NEW.ID_DETALLE_COMPRA
+           AND ID_DEVOLUCION_COMPRA <> NEW.ID_DEVOLUCION_COMPRA
+           AND ESTADO IN ('PENDIENTE', 'PROCESADA');
+
+        IF NEW.CANTIDAD < 1 OR NEW.CANTIDAD > (V_CANTIDAD_COMPRADA - V_YA_DEVUELTA) THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD SUPERA LO COMPRADO (YA HAY DEVOLUCIONES DE ESTE PRODUCTO).';
+        END IF;
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA ;
+/*
+TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA
+La devolucion PROCESADA no se borra: en ese punto ya movio stock, bitacora,
+historial y TOTAL; borrarla dejaria todo eso sin respaldo. Las PENDIENTE y
+RECHAZADA si se pueden descartar.
+*/
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA
+BEFORE DELETE ON DEVOLUCION_COMPRA
+FOR EACH ROW
+BEGIN
+    IF OLD.ESTADO = 'PROCESADA' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION PROCESADA NO SE BORRA; EL STOCK Y EL TOTAL YA SE MOVIERON.';
     END IF;
 END ;
 DELIMITER ;
