@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Dinámico Avanzado - BalbuTechApp</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Librería SheetJS para exportar a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-flex">
+        <div>
+            <h2>Reporte Dinámico Avanzado - BalbuTechApp</h2>
+            <div class="subtitle">Panel analítico con resumen general, buscador, ITBIS (18%) y opciones de exportación.</div>
+        </div>
+
+        <!-- Ruedita de Configuración con Menú Desplegable -->
+        <div class="config-menu-container">
+            <button class="config-btn" onclick="toggleMenuConfig(event)" title="Opciones de Configuración">⚙️</button>
+            <div id="menuConfig" class="config-dropdown">
+                <button onclick="exportarPDF()">📄 Exportar PDF</button>
+                <button onclick="exportarExcel()">📊 Exportar Excel</button>
+                <button onclick="window.print()">🖨️ Imprimir</button>
+                <button onclick="crearCopiaRespaldo()">📋 Crear una copia</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de control superior -->
+    <div class="filter-panel">
+        <div class="filter-group">
+            <label for="anoReporte">Año del Reporte</label>
+            <select id="anoReporte">
+                <option value="2026" selected>2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="mesInicio">Mes Inicial</label>
+            <select id="mesInicio">
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3" selected>Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="mesFin">Mes Final</label>
+            <select id="mesFin">
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3" selected>Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        </div>
+
+        <!-- Opciones globales (Aplicar a Todos) -->
+        <div class="global-config-box">
+            <div class="filter-group" style="flex: 1;">
+                <label>Aplicar Modo Global a Todas las Tarjetas</label>
+                <select id="modoGlobal" onchange="toggleGlobalDias()">
+                    <option value="independiente">-- Mantener configuración individual --</option>
+                    <option value="completo">Todos en Mes Completo</option>
+                    <option value="personalizado">Todos en Rango de Días Específico</option>
+                </select>
+            </div>
+            <div class="filter-group oculto" id="grupoGlobalDias" style="flex: 1;">
+                <label>Días Globales (Inicio - Fin)</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="number" id="globalDiaInicio" min="1" max="31" value="1">
+                    <input type="number" id="globalDiaFin" min="1" max="31" value="15">
+                </div>
+            </div>
+        </div>
+
+        <button onclick="generarVentanasMeses()" class="btn-primary">Generar Cuadras de Reporte</button>
+    </div>
+
+    <!-- Resumen General / Tarjeta KPI -->
+    <div id="resumenGeneralContainer" class="summary-kpi-card oculto">
+        <div class="summary-kpi-header">
+            <strong style="color: var(--accent);">📊 Resumen Consolidado del Periodo</strong>
+            <span id="kpiPeriodoTexto" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+        </div>
+        <div class="summary-kpi-grid">
+            <div class="kpi-item">
+                <div class="kpi-title">Total Transacciones</div>
+                <div class="kpi-value" id="kpiTransacciones">0</div>
+            </div>
+            <div class="kpi-item">
+                <div class="kpi-title">Subtotal Acumulado</div>
+                <div class="kpi-value" id="kpiSubtotal">$0.00</div>
+            </div>
+            <div class="kpi-item">
+                <div class="kpi-title">ITBIS Total (18%)</div>
+                <div class="kpi-value" id="kpiItbis" style="color: #facc15;">$0.00</div>
+            </div>
+            <div class="kpi-item">
+                <div class="kpi-title">Gran Total General</div>
+                <div class="kpi-value" id="kpiTotalGeneral" style="color: #4ade80;">$0.00</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de búsqueda rápida de meses -->
+    <div class="search-bar-container oculto" id="searchBarContainer">
+        <input type="text" id="inputBuscarMes" onkeyup="filtrarMesesEnPantalla()" placeholder="🔍 Buscar mes en pantalla (ej. Enero, Marzo)...">
+    </div>
+
+    <!-- Contenedor de tarjetas -->
+    <div id="contenedorMeses" class="months-grid">
+        <div class="placeholder-msg">Configura los parámetros arriba y haz clic en "Generar Cuadras de Reporte".</div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
