@@ -267,6 +267,143 @@ BEGIN
 END ;
 DELIMITER ;
 
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_UPDATE_PAGO ;
+/*
+TR_VALIDAR_UPDATE_PAGO
+El pago de una venta tampoco se edita a pelo: un UPDATE directo no puede
+moverlo a otra venta, no puede pasarse del total y no toca pagos de una
+venta que ya esta CANCELADA o DEVUELTA (ahi la plata ya quedo resuelta).
+Misma regla que TR_VALIDAR_MONTO_PAGO al insertar y que
+TR_VALIDAR_BORRADO_PAGO al borrar.
+*/
+CREATE TRIGGER TR_VALIDAR_UPDATE_PAGO
+BEFORE UPDATE ON PAGOS
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL_VENTA DECIMAL(12, 2);
+    DECLARE V_TOTAL_PAGADO DECIMAL(12, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+
+    -- El pago se queda en su venta
+    IF NEW.ID_VENTA <> OLD.ID_VENTA THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL PAGO NO CAMBIA DE VENTA.';
+    END IF;
+
+    SELECT TOTAL, ESTADO INTO V_TOTAL_VENTA, V_ESTADO
+      FROM VENTAS WHERE ID_VENTA = NEW.ID_VENTA;
+
+    IF V_ESTADO IS NULL OR V_ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA VENTA NO ADMITE CAMBIOS DE PAGO (ESTA CANCELADA O DEVUELTA).';
+    END IF;
+
+    -- La suma con el cambio aplicado no puede pasarse del total
+    SELECT IFNULL(SUM(MONTO), 0) INTO V_TOTAL_PAGADO
+      FROM PAGOS WHERE ID_VENTA = NEW.ID_VENTA;
+
+    IF (V_TOTAL_PAGADO - OLD.MONTO + NEW.MONTO) > V_TOTAL_VENTA THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.';
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_ESTADO_PAGO_UPDATE ;
+/*
+TR_RECALCULAR_ESTADO_PAGO_UPDATE
+Si alguien le cambia el monto a un pago, la venta puede quedar cobrada al
+100% o dejar de estarlo: aqui se vuelve a sumar lo cobrado y se mueve el
+estado (con su bono del 1% y su reapertura) igual que al insertar o al
+anular, para que un UPDATE directo no deje la venta mintiendo.
+*/
+CREATE TRIGGER TR_RECALCULAR_ESTADO_PAGO_UPDATE
+AFTER UPDATE ON PAGOS
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL_VENTA DECIMAL(12, 2);
+    DECLARE V_TOTAL_PAGADO DECIMAL(12, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_ID_EMPLEADO INT;
+
+    IF NEW.MONTO <> OLD.MONTO THEN
+        SELECT TOTAL, ESTADO, ID_EMPLEADO INTO V_TOTAL_VENTA, V_ESTADO, V_ID_EMPLEADO
+          FROM VENTAS WHERE ID_VENTA = NEW.ID_VENTA;
+
+        SELECT IFNULL(SUM(MONTO), 0) INTO V_TOTAL_PAGADO
+          FROM PAGOS WHERE ID_VENTA = NEW.ID_VENTA;
+
+        -- Quedo cobrada al 100%: se cierra y nace el bono del 1%
+        IF V_ESTADO = 'EN_PROCESO' AND V_TOTAL_VENTA > 0 AND V_TOTAL_PAGADO >= V_TOTAL_VENTA THEN
+            UPDATE VENTAS SET ESTADO = 'REALIZADA' WHERE ID_VENTA = NEW.ID_VENTA;
+
+            INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION, ESTADO)
+            VALUES (V_ID_EMPLEADO, CURRENT_DATE(), 'BONIFICACION',
+                    ROUND(V_TOTAL_VENTA * 0.01, 2),
+                    CONCAT('Comisión por venta #', NEW.ID_VENTA),
+                    'PENDIENTE');
+        END IF;
+
+        -- Dejo de estar cobrada: se reabre y se va el bono pendiente
+        IF V_ESTADO = 'REALIZADA' AND V_TOTAL_PAGADO < V_TOTAL_VENTA THEN
+            UPDATE VENTAS SET ESTADO = 'EN_PROCESO' WHERE ID_VENTA = NEW.ID_VENTA;
+
+            DELETE FROM BONOS_EMPLEADOS
+            WHERE ID_EMPLEADO = V_ID_EMPLEADO
+              AND DESCRIPCION = CONCAT('Comisión por venta #', NEW.ID_VENTA)
+              AND ESTADO = 'PENDIENTE';
+        END IF;
+    END IF;
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_ESTADO_PAGO_BORRADO ;
+/*
+TR_RECALCULAR_ESTADO_PAGO_BORRADO
+Cuando un pago desaparece (DELETE directo, no por SP) la venta puede dejar
+de estar cobrada: aqui se vuelve a sumar lo cobrado y se mueve el estado,
+mismo trabajo que hace SP_ANULAR_PAGO pero para el borrado que no pasa por
+el. Con su bono del 1% pendiente, que ya no corresponde si se fue el pago.
+*/
+CREATE TRIGGER TR_RECALCULAR_ESTADO_PAGO_BORRADO
+AFTER DELETE ON PAGOS
+FOR EACH ROW
+BEGIN
+    DECLARE V_TOTAL_VENTA DECIMAL(12, 2);
+    DECLARE V_TOTAL_PAGADO DECIMAL(12, 2);
+    DECLARE V_ESTADO VARCHAR(20);
+    DECLARE V_ID_EMPLEADO INT;
+
+    SELECT TOTAL, ESTADO, ID_EMPLEADO INTO V_TOTAL_VENTA, V_ESTADO, V_ID_EMPLEADO
+      FROM VENTAS WHERE ID_VENTA = OLD.ID_VENTA;
+
+    SELECT IFNULL(SUM(MONTO), 0) INTO V_TOTAL_PAGADO
+      FROM PAGOS WHERE ID_VENTA = OLD.ID_VENTA;
+
+    IF V_ESTADO = 'REALIZADA' AND V_TOTAL_PAGADO < V_TOTAL_VENTA THEN
+        UPDATE VENTAS SET ESTADO = 'EN_PROCESO' WHERE ID_VENTA = OLD.ID_VENTA;
+
+        DELETE FROM BONOS_EMPLEADOS
+        WHERE ID_EMPLEADO = V_ID_EMPLEADO
+          AND DESCRIPCION = CONCAT('Comisión por venta #', OLD.ID_VENTA)
+          AND ESTADO = 'PENDIENTE';
+    END IF;
+
+    IF V_ESTADO = 'EN_PROCESO' AND V_TOTAL_VENTA > 0 AND V_TOTAL_PAGADO >= V_TOTAL_VENTA THEN
+        UPDATE VENTAS SET ESTADO = 'REALIZADA' WHERE ID_VENTA = OLD.ID_VENTA;
+
+        INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION, ESTADO)
+        VALUES (V_ID_EMPLEADO, CURRENT_DATE(), 'BONIFICACION',
+                ROUND(V_TOTAL_VENTA * 0.01, 2),
+                CONCAT('Comisión por venta #', OLD.ID_VENTA),
+                'PENDIENTE');
+    END IF;
+END ;
+DELIMITER ;
+
 
 
 

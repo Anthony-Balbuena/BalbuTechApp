@@ -171,8 +171,11 @@ proc_label: BEGIN
     JOIN INVENTARIO I ON I.ID_PRODUCTO = DV.ID_PRODUCTO
     WHERE DV.ID_VENTA = P_ID_VENTA;
 
-    -- 7. Cerrar la venta
+    -- 7. Cerrar la venta (el candado interno avisa al trigger de validacion
+    --    de que esta cancelacion viene de un SP y no de un UPDATE a pelo)
+    SET @VENTAS_INTERNO = 1;
     UPDATE VENTAS SET ESTADO = 'CANCELADA' WHERE ID_VENTA = P_ID_VENTA;
+    SET @VENTAS_INTERNO = 0;
 
     SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA, ' CANCELADA Y STOCK RESTITUIDO.') AS MENSAJE;
 END ;
@@ -273,6 +276,95 @@ DROP TRIGGER IF EXISTS TR_PROCESAR_VENTA ;
 -- Los triggers TR_HISTORIAL_ESTADO_VENTA y TR_CAMBIO_ESTADO_VENTA (los que
 -- escriben en HISTORIAL_ESTADOS_VENTA) se mudaron al archivo
 -- 21.5- HISTORIAL_ESTADOS_VENTA.sql.
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_ACTUALIZACION_VENTA ;
+/*
+TR_VALIDAR_ACTUALIZACION_VENTA
+El candado de la cabecera de la venta: nadie cambia el ESTADO ni el TOTAL
+con un UPDATE a pelo. El TOTAL solo lo mueve su trigger de detalle (que
+levanta @VENTAS_INTERNO), REALIZADA exige cobro al 100%, CANCELADA solo
+sale de SP_CANCELAR_VENTA (asi nadie se salta la reversión del stock) y
+DEVUELTA solo cuando no queda ni una unidad por devolver. Una venta ya
+CANCELADA o DEVUELTA no vuelve a cambiar jamas.
+*/
+CREATE TRIGGER TR_VALIDAR_ACTUALIZACION_VENTA
+BEFORE UPDATE ON VENTAS
+FOR EACH ROW
+BEGIN
+    DECLARE V_COBRADO DECIMAL(12, 2);
+
+    -- El TOTAL solo lo toca TR_ACTUALIZAR_TOTAL_VENTA
+    IF NEW.TOTAL <> OLD.TOTAL AND IFNULL(@VENTAS_INTERNO, 0) <> 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL TOTAL DE LA VENTA SOLO CAMBIA CON SU DETALLE.';
+    END IF;
+
+    IF NEW.ESTADO <> OLD.ESTADO THEN
+        IF OLD.ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: LA VENTA YA ESTA CANCELADA O DEVUELTA; ESE ESTADO NO CAMBIA.';
+        END IF;
+
+        IF NEW.ESTADO = 'REALIZADA' THEN
+            -- Solo se marca REALIZADA una venta cobrada al 100%
+            SELECT IFNULL(SUM(MONTO), 0) INTO V_COBRADO
+              FROM PAGOS WHERE ID_VENTA = NEW.ID_VENTA;
+            IF OLD.ESTADO <> 'EN_PROCESO' OR NEW.TOTAL <= 0 OR V_COBRADO < NEW.TOTAL THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE MARCA REALIZADA UNA VENTA COBRADA AL 100%.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'EN_PROCESO' THEN
+            -- Reapertura: solo de una REALIZADA (se anulo un pago)
+            IF OLD.ESTADO <> 'REALIZADA' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE REABRE UNA VENTA REALIZADA.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'CANCELADA' THEN
+            -- La cancelacion revierte stock y bitacora: solo por el SP
+            IF IFNULL(@VENTAS_INTERNO, 0) <> 1 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: USE SP_CANCELAR_VENTA; LA CANCELACION REVERSIA EL STOCK.';
+            END IF;
+            IF OLD.ESTADO <> 'EN_PROCESO' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE CANCELA UNA VENTA EN PROCESO.';
+            END IF;
+            IF EXISTS (SELECT 1 FROM PAGOS WHERE ID_VENTA = NEW.ID_VENTA) THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: LA VENTA TIENE PAGOS; ANULELOS ANTES DE CANCELAR.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'DEVUELTA' THEN
+            -- Solo llega devuelta enterita (mismo criterio que
+            -- TR_MARCAR_VENTA_DEVUELTA en el archivo 25)
+            IF OLD.ESTADO <> 'REALIZADA' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE MARCA DEVUELTA UNA VENTA REALIZADA.';
+            END IF;
+            IF EXISTS (
+                SELECT 1
+                FROM DETALLES_VENTA DV
+                WHERE DV.ID_VENTA = NEW.ID_VENTA
+                  AND DV.CANTIDAD > IFNULL(
+                        (SELECT SUM(D.CANTIDAD)
+                           FROM DEVOLUCIONES D
+                          WHERE D.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+                            AND D.ESTADO IN ('APROBADA', 'REEMBOLSADA')), 0)
+            ) THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: LA VENTA NO ESTA DEVUELTA ENTERA; QUEDAN UNIDADES.';
+            END IF;
+
+        ELSE
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: ESTADO DE VENTA DESCONOCIDO.';
+        END IF;
+    END IF;
+END ;
+DELIMITER ;
 
 
 -----------------------------------------------------------------------------------------------------------------------------

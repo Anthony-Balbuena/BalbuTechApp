@@ -154,6 +154,7 @@ proc_label: BEGIN
         IF V_PROPIA_TRANSACCION = 1 THEN
             ROLLBACK;
         END IF;
+        SET @COMPRAS_INTERNO = 0;
         RESIGNAL;
     END;
 
@@ -235,8 +236,11 @@ proc_label: BEGIN
     JOIN INVENTARIO I ON I.ID_PRODUCTO = DC.ID_PRODUCTO
     WHERE DC.ID_COMPRA = P_ID_COMPRA;
 
-    -- 10. Cerrar la compra
+    -- 10. Cerrar la compra (el candado interno avisa al trigger de validacion
+    --     de que esta cancelacion viene de un SP y no de un UPDATE a pelo)
+    SET @COMPRAS_INTERNO = 1;
     UPDATE COMPRAS SET ESTADO = 'CANCELADA' WHERE ID_COMPRA = P_ID_COMPRA;
+    SET @COMPRAS_INTERNO = 0;
 
 
     IF V_PROPIA_TRANSACCION = 1 THEN
@@ -469,6 +473,85 @@ BEGIN
         (ID_COMPRA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
     VALUES
         (NEW.ID_COMPRA, NULL, NEW.ESTADO, NEW.ID_EMPLEADO, 'Compra iniciada');
+END ;
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_ACTUALIZACION_COMPRA ;
+/*
+TR_VALIDAR_ACTUALIZACION_COMPRA
+El candado de la cabecera: nadie cambia el ESTADO ni el TOTAL de una compra
+con un UPDATE a pelo. El TOTAL solo lo mueven sus triggers internos (que
+levantan @COMPRAS_INTERNO), RECIBIDA exige estar saldada al 100%, CANCELADA
+solo sale de SP_CANCELAR_COMPRA (asi nadie se salta la reversión del stock)
+y DEVUELTA solo con el TOTAL en cero. Una compra ya CANCELADA o DEVUELTA no
+vuelve a cambiar jamas.
+*/
+CREATE TRIGGER TR_VALIDAR_ACTUALIZACION_COMPRA
+BEFORE UPDATE ON COMPRAS
+FOR EACH ROW
+BEGIN
+    DECLARE V_PAGADO DECIMAL(12, 2);
+
+    -- El TOTAL solo lo tocan los triggers de detalle y el de devolucion
+    IF NEW.TOTAL <> OLD.TOTAL AND IFNULL(@COMPRAS_INTERNO, 0) <> 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL TOTAL DE LA COMPRA SOLO CAMBIA CON SU DETALLE O SU DEVOLUCION.';
+    END IF;
+
+    IF NEW.ESTADO <> OLD.ESTADO THEN
+        IF OLD.ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: LA COMPRA YA ESTA CANCELADA O DEVUELTA; ESE ESTADO NO CAMBIA.';
+        END IF;
+
+        IF NEW.ESTADO = 'RECIBIDA' THEN
+            -- Solo se marca RECIBIDA una compra pagada al 100%
+            SELECT IFNULL(SUM(MONTO), 0) INTO V_PAGADO
+              FROM PAGOS_COMPRA WHERE ID_COMPRA = NEW.ID_COMPRA;
+            IF NEW.TOTAL <= 0 OR V_PAGADO < NEW.TOTAL THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE MARCA RECIBIDA UNA COMPRA PAGADA AL 100%.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'ABIERTA' THEN
+            -- Reapertura: solo de una RECIBIDA (anulacion o nota de credito)
+            IF OLD.ESTADO <> 'RECIBIDA' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE REABRE UNA COMPRA RECIBIDA.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'CANCELADA' THEN
+            -- La cancelacion revierte stock y bitacora: solo por el SP
+            IF IFNULL(@COMPRAS_INTERNO, 0) <> 1 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: USE SP_CANCELAR_COMPRA; LA CANCELACION REVERSIA EL STOCK.';
+            END IF;
+            IF OLD.ESTADO <> 'ABIERTA' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE CANCELA UNA COMPRA ABIERTA.';
+            END IF;
+            IF EXISTS (SELECT 1 FROM PAGOS_COMPRA WHERE ID_COMPRA = NEW.ID_COMPRA) THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: LA COMPRA TIENE PAGOS; ANULELOS ANTES DE CANCELAR.';
+            END IF;
+
+        ELSEIF NEW.ESTADO = 'DEVUELTA' THEN
+            -- Solo llega con todo devuelto (el TOTAL ya quedo en cero)
+            IF OLD.ESTADO <> 'RECIBIDA' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: SOLO SE MARCA DEVUELTA UNA COMPRA RECIBIDA.';
+            END IF;
+            IF NEW.TOTAL > 0 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA DEVUELTA ENTERA; EL TOTAL SIGUE EN PIE.';
+            END IF;
+
+        ELSE
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: ESTADO DE COMPRA DESCONOCIDO.';
+        END IF;
+    END IF;
 END ;
 DELIMITER ;
 
