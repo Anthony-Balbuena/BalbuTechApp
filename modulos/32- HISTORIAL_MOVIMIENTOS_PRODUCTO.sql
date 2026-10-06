@@ -17,6 +17,14 @@ CREATE TABLE HISTORIAL_MOVIMIENTOS_PRODUCTO (
     CONSTRAINT FK_HISTORIAL_PROD FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE
 ) ENGINE = InnoDB; 
 
+/*
+INDICE IX_HIST_MOVIMIENTO_FECHA
+Trae el historial de movimientos por fecha: hasta ahora solo estaba la PK
+y el FK del producto, y todo lo que pide "que paso en tal dia" tenia que
+recorrer la tabla entera.
+*/
+CREATE INDEX IX_HIST_MOVIMIENTO_FECHA ON HISTORIAL_MOVIMIENTOS_PRODUCTO (FECHA_MOVIMIENTO);
+
 
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------

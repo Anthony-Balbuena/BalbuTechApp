@@ -68,6 +68,13 @@ saldando.
 */
 CREATE INDEX IX_PAGOS_COMPRA_COMPRA ON PAGOS_COMPRA (ID_COMPRA);
 
+/*
+INDICE IX_PAGOS_COMPRA_FECHA
+Trae los pagos por fecha para el cierre de caja y los reportes del dia
+(mismo rol que IX_PAGOS_FECHA en PAGOS de ventas).
+*/
+CREATE INDEX IX_PAGOS_COMPRA_FECHA ON PAGOS_COMPRA (FECHA);
+
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[PAGOS DE LA COMPRA}-----------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
