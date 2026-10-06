@@ -21,12 +21,20 @@ CREATE TABLE DEVOLUCION_COMPRA (
     CANTIDAD INT NOT NULL CHECK (CANTIDAD > 0),
     MOTIVO VARCHAR(200),
     CONDICION_PRODUCTO ENUM('BUENO', 'DANADO', 'USADO') NOT NULL DEFAULT 'BUENO',
-    SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL CHECK (SUBTOTAL_DEVUELTO > 0),
     ESTADO ENUM('PENDIENTE', 'PROCESADA', 'RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
     PRIMARY KEY (ID_DEVOLUCION_COMPRA),
     CONSTRAINT FK_DEVOLUCION_COMPRA_DETALLE FOREIGN KEY (ID_DETALLE_COMPRA) REFERENCES DETALLE_COMPRA (ID_DETALLE_COMPRA),
     CONSTRAINT FK_DEVOLUCION_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
 ) ENGINE = InnoDB;
+
+-- ============================================================
+-- Deja al dia una BD que ya tenia esta tabla (como la real): le pone el
+-- CHECK de que el subtotal nunca sea cero. Un INSERT a pelo con subtotal 0
+-- devolveria mercancia sin bajar el TOTAL y la compra nunca llegaria a
+-- DEVUELTA. En una BD recien creada el CREATE de arriba ya lo trae.
+-- ============================================================
+ALTER TABLE DEVOLUCION_COMPRA MODIFY COLUMN SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL CHECK (SUBTOTAL_DEVUELTO > 0);
 
 /*
 INDICE IX_DEVOLUCION_COMPRA_FECHA
@@ -34,6 +42,14 @@ Busca las devoluciones por fecha, igual que las demas tablas de compra,
 para los reportes del periodo.
 */
 CREATE INDEX IX_DEVOLUCION_COMPRA_FECHA ON DEVOLUCION_COMPRA (FECHA);
+
+/*
+INDICE IX_DEVOLUCION_COMPRA_ESTADO_FECHA
+Trae las devoluciones por estado y fecha: es el de "devoluciones
+pendientes del dia". Sin este indice ese reporte recorria la tabla entera
+(ventas si lo tiene: IX_DEVOLUCION_ESTADO_FECHA en el archivo 25).
+*/
+CREATE INDEX IX_DEVOLUCION_COMPRA_ESTADO_FECHA ON DEVOLUCION_COMPRA (ESTADO, FECHA);
 
 
 -----------------------------------------------------------------------------------------------------------------------

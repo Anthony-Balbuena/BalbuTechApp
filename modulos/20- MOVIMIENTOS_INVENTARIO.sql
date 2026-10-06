@@ -37,6 +37,13 @@ grandes de mercancia.
 */
 CREATE INDEX IX_CANTIDAD_MOVIINVENTORIO ON MOVIMIENTOS_INVENTARIO (CANTIDAD);
 
+/*
+INDICE IX_MOVIMIENTO_FECHA
+Trae los movimientos por fecha: es el que usan los reportes de kardex y
+el cierre del dia, que recorren el dia completo de mas reciente a viejo.
+*/
+CREATE INDEX IX_MOVIMIENTO_FECHA ON MOVIMIENTOS_INVENTARIO (FECHA);
+
 
 
 

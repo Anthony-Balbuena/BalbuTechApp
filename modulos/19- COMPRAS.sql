@@ -48,6 +48,13 @@ el indice la rechaza solo; el SP da el mensaje amable.
 CREATE UNIQUE INDEX UQ_COMPRA_FACTURA ON COMPRAS (ID_PROVEEDOR, FACTURA);
 
 /*
+INDICE IX_COMPRA_EMPLEADO
+Busca las compras que hizo cada empleado, para reportes de quien compra
+que (mismo rol que IX_VENTAS_EMPLEADO en el archivo 21).
+*/
+CREATE INDEX IX_COMPRA_EMPLEADO ON COMPRAS (ID_EMPLEADO);
+
+/*
 TABLA HISTORIAL_ESTADOS_COMPRA
 Quien, cuando y como cambio el estado de cada compra: iniciada,
 saldada, reabierta, cancelada o devuelta. Una fila por cada cambio,
@@ -285,9 +292,9 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 3. Una compra cancelada ya no tiene factura que llevar
-    IF V_ESTADO = 'CANCELADA' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA.';
+    -- 3. Una compra cancelada o devuelta ya no tiene factura que llevar
+    IF V_ESTADO IN ('CANCELADA', 'DEVUELTA') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA ESTA CANCELADA O DEVUELTA.';
         LEAVE proc_label;
     END IF;
 
