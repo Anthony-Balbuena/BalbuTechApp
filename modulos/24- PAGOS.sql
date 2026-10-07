@@ -2,16 +2,27 @@
 TABLA PAGOS
 Guarda cada pago que se recibe por una venta: cuanto, cuando y con que
 metodo de pago. Puede haber varios pagos por venta (parciales o completos).
+CAMBIO P8 (06/10/2026): se agrego ID_EMPLEADO (+ su FK) para dejar
+constancia de QUIEN COBRO el pago, igual que ya hace PAGOS_COMPRA.
+Antes el empleado solo servia para el mensaje del SP.
+CAMBIO P9 (07/10/2026): se agrego MONTO_RECIBIDO (lo que el cliente
+entrego, nullable) para poder registrar el VUELTO. MONTO no cambia de
+significado: sigue siendo lo que se aplica a la venta, por eso saldos,
+cierre automatico, cancelaciones y devoluciones no se tocaron. El CHECK
+evita recibir menos de lo cobrado (el NULL pasa: significa 'no aplica').
 */
 CREATE TABLE PAGOS (
     ID_PAGO INT NOT NULL AUTO_INCREMENT,
     ID_VENTA INT NOT NULL,
     ID_METODO_PAGO INT NOT NULL,
+    ID_EMPLEADO INT NOT NULL,
     MONTO DECIMAL(10, 2) NOT NULL CHECK (MONTO > 0),
+    MONTO_RECIBIDO DECIMAL(10, 2) NULL CHECK (MONTO_RECIBIDO >= MONTO),
     FECHA TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     PRIMARY KEY (ID_PAGO),
     CONSTRAINT FK_PAGO_VENTA FOREIGN KEY (ID_VENTA) REFERENCES VENTAS (ID_VENTA) ON DELETE CASCADE,
-    CONSTRAINT FK_PAGO_METODO FOREIGN KEY (ID_METODO_PAGO) REFERENCES METODOS_PAGO (ID_METODO_PAGO)
+    CONSTRAINT FK_PAGO_METODO FOREIGN KEY (ID_METODO_PAGO) REFERENCES METODOS_PAGO (ID_METODO_PAGO),
+    CONSTRAINT FK_PAGO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
 ) ENGINE = InnoDB;
 
 /*
@@ -33,12 +44,90 @@ DROP PROCEDURE IF EXISTS 24_SP_REGISTRAR_PAGO;
 Registra un pago de una venta con su metodo de pago.
 Revisa que la venta exista, guarda el pago y devuelve un mensaje
 confirmando el monto con el nombre del empleado que lo proceso.
+NOTA P8 (06/10/2026): ahora guarda ID_EMPLEADO en PAGOS (quien cobro) y
+valida que el empleado exista; antes seguia igual aunque no existiera,
+poniendo 'DESCONOCIDO' unicamente en el mensaje.
 */
+-- ============================================================
+-- VERSION ANTERIOR (guardada para revision, NO se ejecuta)
+-- ============================================================
+-- CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
+--     IN P_ID_VENTA INT,
+--     IN P_ID_METODO_PAGO INT,
+--     IN P_MONTO DECIMAL(10, 2),
+--     IN P_ID_EMPLEADO INT -- Recibimos el ID del empleado que procesa el pago
+-- )
+-- proc_label: BEGIN
+--     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
+--     DECLARE V_NOMBRE_EMPLEADO VARCHAR(100);
+--
+--     -- 1. Validar venta
+--     SELECT TOTAL INTO V_TOTAL_VENTA FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
+--     IF V_TOTAL_VENTA IS NULL THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
+--         LEAVE proc_label;
+--     END IF;
+--
+--     -- 2. Obtener nombre del empleado para el mensaje
+--     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
+--
+--     -- Si el empleado no existe, ponemos uno genérico o lanzamos error
+--     IF V_NOMBRE_EMPLEADO IS NULL THEN
+--         SET V_NOMBRE_EMPLEADO = 'DESCONOCIDO';
+--     END IF;
+--
+--     -- 3. Insertar el pago
+--     INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO)
+--     VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO);
+--
+--     -- 4. Mensaje personalizado
+--     SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
+-- END ;
+
+-- ============================================================
+-- VERSION P8 (guardada para revision, NO se ejecuta)
+-- ============================================================
+-- CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
+--     IN P_ID_VENTA INT,
+--     IN P_ID_METODO_PAGO INT,
+--     IN P_MONTO DECIMAL(10, 2),
+--     IN P_ID_EMPLEADO INT -- El empleado que procesa el pago (P8)
+-- )
+-- proc_label: BEGIN
+--     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
+--     DECLARE V_NOMBRE_EMPLEADO VARCHAR(100);
+--
+--     -- 1. Validar venta
+--     SELECT TOTAL INTO V_TOTAL_VENTA FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
+--     IF V_TOTAL_VENTA IS NULL THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
+--         LEAVE proc_label;
+--     END IF;
+--
+--     -- 2. Validar el empleado que cobra (P8): si no existe, no se guarda
+--     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
+--     IF V_NOMBRE_EMPLEADO IS NULL THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+--         LEAVE proc_label;
+--     END IF;
+--
+--     -- 3. Insertar el pago con quien lo cobro (P8)
+--     INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO, ID_EMPLEADO)
+--     VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO, P_ID_EMPLEADO);
+--
+--     -- 4. Mensaje personalizado
+--     SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
+-- END ;
+
+-- ============================================================
+-- VERSION NUEVA (la que se crea) - P9
+-- ============================================================
 CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
     IN P_ID_VENTA INT,
     IN P_ID_METODO_PAGO INT,
     IN P_MONTO DECIMAL(10, 2),
-    IN P_ID_EMPLEADO INT -- Recibimos el ID del empleado que procesa el pago
+    IN P_ID_EMPLEADO INT, -- El empleado que procesa el pago (P8)
+    IN P_MONTO_RECIBIDO DECIMAL(10, 2) DEFAULT NULL -- Lo que entrego el cliente; NULL = no aplica (P9)
 )
 proc_label: BEGIN
     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
@@ -51,20 +140,29 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. Obtener nombre del empleado para el mensaje
+    -- 2. Validar el empleado que cobra (P8): si no existe, no se guarda
     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
-    
-    -- Si el empleado no existe, ponemos uno genérico o lanzamos error
     IF V_NOMBRE_EMPLEADO IS NULL THEN
-        SET V_NOMBRE_EMPLEADO = 'DESCONOCIDO';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
     END IF;
 
-    -- 3. Insertar el pago
-    INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO)
-    VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO);
+    -- 3. Validar el monto recibido (P9): si viene, no puede ser menor que lo cobrado
+    IF P_MONTO_RECIBIDO IS NOT NULL AND P_MONTO_RECIBIDO < P_MONTO THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO RECIBIDO ES MENOR QUE EL PAGO.';
+        LEAVE proc_label;
+    END IF;
 
-    -- 4. Mensaje personalizado
-    SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
+    -- 4. Insertar el pago: lo aplicado (MONTO) y lo entregado (MONTO_RECIBIDO);
+    --    si el parametro no viene, se guarda igual a MONTO (vuelto 0)
+    INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO, ID_EMPLEADO, MONTO_RECIBIDO)
+    VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO, P_ID_EMPLEADO, IFNULL(P_MONTO_RECIBIDO, P_MONTO));
+
+    -- 5. Mensaje personalizado (con vuelto si lo hay)
+    SELECT CONCAT('EXITO: PAGO DE ', P_MONTO,
+                  IF(IFNULL(P_MONTO_RECIBIDO, P_MONTO) > P_MONTO,
+                     CONCAT(' (VUELTO ', IFNULL(P_MONTO_RECIBIDO, P_MONTO) - P_MONTO, ')'), ''),
+                  ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
 END ;
 DELIMITER ;
 
@@ -417,16 +515,22 @@ DELIMITER ;
 VISTA_RESUMEN_PAGOS
 Muestra los pagos con el nombre de su metodo de pago, monto y fecha.
 Sirve como resumen de cobros para revisar en pantalla o en reportes.
+Ahora trae tambien al empleado que cobro (P8).
+Ahora trae tambien el monto recibido y el VUELTO (P9).
 */
 CREATE OR REPLACE VIEW VISTA_RESUMEN_PAGOS AS
 SELECT 
     P.ID_PAGO,
     P.ID_VENTA,
     MP.NOMBRE AS NOMBRE_METODO, 
+    E.NOMBRE AS NOMBRE_EMPLEADO,
     P.MONTO,
+    P.MONTO_RECIBIDO,
+    P.MONTO_RECIBIDO - P.MONTO AS VUELTO,
     P.FECHA
 FROM PAGOS P
-JOIN METODOS_PAGO MP ON P.ID_METODO_PAGO = MP.ID_METODO_PAGO;
+JOIN METODOS_PAGO MP ON P.ID_METODO_PAGO = MP.ID_METODO_PAGO
+JOIN EMPLEADOS E ON P.ID_EMPLEADO = E.ID_EMPLEADO;
 
 
 

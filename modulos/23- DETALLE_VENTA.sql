@@ -42,6 +42,19 @@ SP_AGREGAR_DETALLE_VENTA
 Agrega un producto a una venta validando todo antes de guardar.
 Revisa que la venta exista, que el empleado sea el dueño de la venta y que
 haya stock suficiente; luego toma el precio actual y agrega la linea.
+
+NOTA (fase A2): este chequeo de stock es la PRIMERA RED, no la garantia.
+Lee sin candado, asi que en una carrera entre dos cajeros puede ver un
+numero viejo. La garantia de verdad vive en el archivo 20: el descuento
+condicional de TR_AUDITORIA_MOVIMIENTO_VENTA comprueba y resta en la
+misma sentencia y corta con 'ERROR: STOCK INSUFICIENTE.' si no alcanza.
+NOTA P10 (06/10/2026): el ERROR 1020 si es alcanzable en produccion.
+Un INSERT cuyo trigger lee el stock y luego lo descuenta comparte
+transaccion; si otro cajero commitea un cambio en INVENTARIO en medio,
+InnoDB aborta con 'Record has changed since last read' en vez del
+mensaje amigable. Por eso este SP trae un EXIT HANDLER FOR 1020 que
+lo traduce a 'ERROR: STOCK INSUFICIENTE, INTENTE DE NUEVO.' (la
+sentencia siempre revirtio, cero residuos; solo cambiaba el mensaje).
 */
 CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_VENTA INT,
@@ -53,6 +66,12 @@ proc_label: BEGIN
     DECLARE V_PRECIO DECIMAL(10, 2);
     DECLARE V_STOCK_DISPONIBLE INT;
     DECLARE V_ID_VENTA_EMPLEADO INT;
+
+    -- P10 (06/10/2026): traduce el ERROR 1020 de una carrera en el
+    -- descuento de stock (trigger del archivo 20) a mensaje amigable.
+    DECLARE EXIT HANDLER FOR 1020
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE, INTENTE DE NUEVO.';
 
     -- 1. Validar que la venta exista y verificar empleado
     SELECT ID_EMPLEADO INTO V_ID_VENTA_EMPLEADO FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
@@ -146,6 +165,13 @@ TR_VALIDAR_STOCK_DETALLE_VENTA
 No deja vender mas unidades de las que hay en el inventario, aunque el
 INSERT venga a pelo y no pase por ningun SP. Si el producto ni siquiera
 tiene fila en INVENTARIO, tampoco lo deja pasar.
+
+NOTA (fase A2): tambien es red, no garantia: valida contra lo que ve en su
+momento y sin candado. Si su lectura queda vieja por una carrera, manda el
+mensaje amigable; si otro cambio el stock en el medio, el que corta es el
+descuento condicional del archivo 20 (o el ERROR 1020 del servidor). Sea
+cual sea el caso, la sentencia se revierte entera: nunca queda una linea
+de venta sin su descuento.
 */
 CREATE TRIGGER TR_VALIDAR_STOCK_DETALLE_VENTA
 BEFORE INSERT ON DETALLES_VENTA
