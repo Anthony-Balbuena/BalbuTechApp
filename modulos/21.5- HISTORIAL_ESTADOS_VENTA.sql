@@ -4,6 +4,13 @@ Un renglon por cada vez que una venta cambia de estado: quien fue, cuando
 y hacia donde paso. Todo lo de esta tabla vive aqui (tabla, indice y los
 dos triggers que la alimentan); en 21- VENTAS.sql solo quedo la venta en
 si. Carga despues del 21 y antes del 22.
+NOTA (Parte 3, 07/10/2026): orden verificado en
+information_schema.TRIGGERS.ACTION_ORDER - en VENTAS el candado
+(BEFORE UPDATE) corre ANTES que el historial (AFTER UPDATE), y en
+DETALLES_VENTA el AFTER INSERT va stock(20) -> total(23) ->
+historial(32). Pruebas: Pruebas/test_blindaje_p3.sql (los 5 candados
+responden, la cancelacion deja 2 filas de historial y la bandera
+@VENTAS_INTERNO demostrada riesgosa).
 */
 /*
 TABLA HISTORIAL_ESTADOS_VENTA

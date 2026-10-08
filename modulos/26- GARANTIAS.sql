@@ -54,6 +54,11 @@ SP_REGISTRAR_GARANTIA
 Crea la garantia de un producto vendido contando desde hoy.
 Revisa que ese producto no tenga ya una garantia; si la tiene corta con
 error, y si no, guarda las fechas y devuelve el ID nuevo.
+NOTA (Parte 5, 07/10/2026): el UNIQUE UQ_GARANTIA_DETALLE es el
+respaldo del paso 1 - si dos sesiones registran a la vez, el conteo
+pasa a ambas pero el UNIQUE corta a la segunda. Fechas: CHECK
+CK_GARANTIA_FECHAS (FIN > INICIO) y TR_VALIDAR_FECHAS_GARANTIA
+autocorrige un inicio en el pasado (silencioso, no senala).
 */
 CREATE PROCEDURE SP_REGISTRAR_GARANTIA(
     IN P_ID_DETALLE_VENTA INT,
@@ -103,6 +108,13 @@ DROP PROCEDURE IF EXISTS 26_SP_RECHAZAR_DEVOLUCION;
 Rechaza una devolucion que este en estado PENDIENTE.
 Le agrega al motivo el motivo del rechazo; si ya fue procesada o no existe
 corta con error y no cambia nada.
+NOTA (Parte 5, 07/10/2026): opera sobre DEVOLUCIONES aunque vive en
+el 26. El rechazo CONCATENA ' | RECHAZO: ...' al motivo original (no
+lo pisa; P12: si el original es NULL se guarda solo el rechazo). Ser RECHAZADA libera la cuota (las RECHAZADAS no cuentan
+en el tope del registro) y su fila SI se puede borrar
+(TR_BLOQUEAR_BORRADO solo frena APROBADA/REEMBOLSADA). Es la
+alternativa al paso 3 de 25_SP_PROCESAR_DEVOLUCION, que cambia el
+estado sin anotar motivo.
 */
 CREATE PROCEDURE 26_SP_RECHAZAR_DEVOLUCION(
     IN P_ID_DEVOLUCION INT,
@@ -128,7 +140,9 @@ proc_label: BEGIN
     -- 3. Aplicar el rechazo
     UPDATE DEVOLUCIONES 
     SET ESTADO = 'RECHAZADA',
-        MOTIVO = CONCAT(MOTIVO, ' | RECHAZO: ', P_MOTIVO_RECHAZO)
+        -- ANTES (P12): MOTIVO = CONCAT(MOTIVO, ' | RECHAZO: ', P_MOTIVO_RECHAZO)
+        -- P12 (07/10/2026): si el motivo original es NULL no se pierde el rechazo.
+        MOTIVO = CONCAT(IFNULL(CONCAT(MOTIVO, ' | '), ''), 'RECHAZO: ', P_MOTIVO_RECHAZO)
     WHERE ID_DEVOLUCION = P_ID_DEVOLUCION;
     
     -- 4. Confirmación
@@ -146,6 +160,10 @@ DROP TRIGGER IF EXISTS TR_VALIDAR_FECHAS_GARANTIA ;
 TR_VALIDAR_FECHAS_GARANTIA
 No permite que una garantia empiece en una fecha del pasado.
 Si eso pasa, le cambia el inicio a hoy antes de guardarla.
+NOTA (Parte 5, 07/10/2026): a diferencia del resto de candados del
+flujo (que cortan con SIGNAL), este NO da error: corrige en silencio
+FECHA_INICIO a hoy. Un inicio pasado nunca llega grabado - vigilar
+si se esperaba un error explicito.
 */
 CREATE TRIGGER TR_VALIDAR_FECHAS_GARANTIA
 BEFORE INSERT ON GARANTIAS

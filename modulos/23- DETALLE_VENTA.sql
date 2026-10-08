@@ -121,6 +121,15 @@ CREATE TRIGGER TR_ACTUALIZAR_TOTAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
 BEGIN
+    -- P11 (07/10/2026): si el UPDATE falla, apagar la bandera antes
+    -- de propagar el error (las variables de usuario no se revierten
+    -- con ROLLBACK).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET @VENTAS_INTERNO = 0;
+        RESIGNAL;
+    END;
+
     -- @VENTAS_INTERNO le avisa al candado de cabecera que este cambio de
     -- TOTAL viene del detalle y no de un UPDATE a pelo
     SET @VENTAS_INTERNO = 1;
@@ -141,6 +150,7 @@ TR_BLOQUEAR_VENTA_FINALIZADA
 No deja agregar productos a una venta que ya no este abierta: ni
 realizada, ni cancelada ni devuelta. Si alguien lo intenta, corta la
 operacion con un mensaje de error.
+P11 (07/10/2026): EXIT HANDLER apaga la bandera si el UPDATE falla.
 */
 CREATE TRIGGER TR_BLOQUEAR_VENTA_FINALIZADA
 BEFORE INSERT ON DETALLES_VENTA
