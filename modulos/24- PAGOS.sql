@@ -47,6 +47,11 @@ confirmando el monto con el nombre del empleado que lo proceso.
 NOTA P8 (06/10/2026): ahora guarda ID_EMPLEADO en PAGOS (quien cobro) y
 valida que el empleado exista; antes seguia igual aunque no existiera,
 poniendo 'DESCONOCIDO' unicamente en el mensaje.
+NOTA (Parte 2, 07/10/2026): este SP es la PUERTA DE ENTRADA de una cadena
+de tres. Su INSERT dispara en el mismo movimiento a TR_VALIDAR_MONTO_PAGO
+(BEFORE: el freno) y a TR_AUTO_FINALIZAR_VENTA (AFTER: el cierre + bono).
+El SP valida lo suyo (venta, empleado y vuelto); lo demas lo resuelven los
+triggers, incluso si el pago llega a pelo sin pasar por aqui.
 */
 -- ============================================================
 -- VERSION ANTERIOR (guardada para revision, NO se ejecuta)
@@ -176,6 +181,15 @@ deja de estar cobrada al 100%, la venta vuelve a EN_PROCESO y se elimina el
 bono del 1% que se habia creado al cobrar (solo si sigue PENDIENTE; si ya
 fue aprobado se deja para que lo resuelva nomina).
 No se puede anular un pago de una venta CANCELADA ni DEVUELTA.
+NOTA (Parte 4, 07/10/2026): es el unico camino para deshacer un cobro.
+Patron de TRANSACCION PROPIA: si nadie abrio una (@@in_transaction = 0)
+la abre y la cierra con COMMIT; si venimos de adentro de otra, no la
+toca y el EXIT HANDLER hace ROLLBACK solo cuando la transaccion es suya
+(y RESIGNAL para que el que llama decida). Al borrar el pago, si la
+venta deja de estar cobrada al 100%: se reabre a EN_PROCESO y se borra
+el bono del 1% PENDIENTE (si ya esta APROBADO se deja - lo resuelve
+nomina). Con la venta reaberta y sin pagos, ya califica para
+SP_CANCELAR_VENTA (ese era el bloqueo del paso 3 de alla).
 */
 CREATE PROCEDURE SP_ANULAR_PAGO(
     IN P_ID_PAGO INT,
@@ -280,6 +294,11 @@ TR_VALIDAR_MONTO_PAGO
 Solo acepta pagos mientras la venta siga abierta (EN_PROCESO) y no deja
 que se pague mas de lo que vale la venta. Antes de guardar, revisa el
 estado y suma lo ya pagado; si algo no cuadra corta con error.
+NOTA (Parte 2, 07/10/2026): es el FRENO de la cadena de cobro. Corre
+dentro del MISMO INSERT que hace 24_SP_REGISTRAR_PAGO, antes de guardar:
+1) la venta esta abierta (EN_PROCESO) y 2) pagado + nuevo <= TOTAL; si no
+cuadra, SIGNAL y no se guarda nada. Nunca mira MONTO_RECIBIDO (el vuelto):
+solo MONTO, lo que se aplica a la venta.
 */
 CREATE TRIGGER TR_VALIDAR_MONTO_PAGO
 BEFORE INSERT ON PAGOS
@@ -336,6 +355,11 @@ TR_AUTO_FINALIZAR_VENTA
 Cuando entra un pago, revisa si ya se cubrio el total de la venta.
 Si se pago todo, marca la venta REALIZADA y ahi si crea el bono del 1%
 al empleado: el bono se gana al cobrar, no al agregar productos.
+NOTA (Parte 2, 07/10/2026): es el CIERRE de la cadena. Corre despues de
+guardar el pago, en el mismo INSERT. El bono del 1% se calcula sobre el
+TOTAL de la venta (no sobre lo pagado) y solo dispara la PRIMERA vez que
+se cubre: la condicion V_ESTADO = 'EN_PROCESO' es el guardia
+anti-doble-bono (un pago extra o un UPDATE ya no vuelve a crear bono).
 */
 CREATE TRIGGER TR_AUTO_FINALIZAR_VENTA
 AFTER INSERT ON PAGOS

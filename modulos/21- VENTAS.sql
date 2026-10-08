@@ -111,6 +111,19 @@ Valida que el empleado sea el dueño de la venta y que no tenga pagos;
 si todo esta bien devuelve las unidades al inventario, deja el movimiento
 de ENTRADA en la bitacora, anota la reposicion en el historial del producto
 y deja la venta en estado CANCELADA.
+NOTA (Parte 4, 07/10/2026): la cancelacion es una cadena de 5 pasos
+que se ejecutan juntos - (3) valida que NO tenga pagos (si tiene, antes
+va SP_ANULAR_PAGO), (4) repone el stock, (5) deja ENTRADA en la bitacora,
+(6) anota la reposicion en HISTORIAL_MOVIMIENTOS_PRODUCTO y (7) cierra
+con la bandera @VENTAS_INTERNO. El paso 3 duplica la regla del candado
+TR_VALIDAR_ACTUALIZACION_VENTA pero con mensaje amigable (el candado
+tambien exige bandera + EN_PROCESO + cero pagos). Ojo: reponer stock
+puede disparar la alerta de stock minimo del trigger del archivo 17.
+Es la unica puerta a estado CANCELADA; una venta CANCELADA no tiene
+vuelta (candado) y sus pagos quedan blindados por
+TR_VALIDAR_BORRADO_PAGO / TR_VALIDAR_UPDATE_PAGO.
+P11 (07/10/2026): EXIT HANDLER FOR SQLEXCEPTION apaga la bandera
+si algo falla despues de levantarla (ver hallazgo Parte 3).
 */
 CREATE PROCEDURE SP_CANCELAR_VENTA(
     IN P_ID_VENTA INT,
@@ -119,6 +132,14 @@ CREATE PROCEDURE SP_CANCELAR_VENTA(
 proc_label: BEGIN
     DECLARE V_ID_VENTA_EMPLEADO INT;
     DECLARE V_ESTADO VARCHAR(20);
+    -- P11 (07/10/2026): si algo falla despues de levantar la bandera,
+    -- se apaga aqui antes de propagar el error.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET @VENTAS_INTERNO = 0;
+        RESIGNAL;
+    END;
+
 
     -- 1. Validar que la venta exista y sea del empleado
     SELECT ID_EMPLEADO, ESTADO INTO V_ID_VENTA_EMPLEADO, V_ESTADO
@@ -287,6 +308,19 @@ levanta @VENTAS_INTERNO), REALIZADA exige cobro al 100%, CANCELADA solo
 sale de SP_CANCELAR_VENTA (asi nadie se salta la reversión del stock) y
 DEVUELTA solo cuando no queda ni una unidad por devolver. Una venta ya
 CANCELADA o DEVUELTA no vuelve a cambiar jamas.
+NOTA (Parte 3, 07/10/2026): resumen del candado - el TOTAL solo se
+mueve con la bandera @VENTAS_INTERNO; -> REALIZADA exige cobro al 100%
+(por eso el auto-cierre del 24 pasa SIN bandera); -> CANCELADA exige
+bandera + EN_PROCESO + cero pagos; CANCELADA/DEVUELTA no salen jamas.
+La bandera la levantan solo SP_CANCELAR_VENTA (21) y
+TR_ACTUALIZAR_TOTAL_VENTA (23). RIESGO VIGILADO: el par SET 1/0 no
+tiene EXIT HANDLER - si el UPDATE interno falla, la credencial queda
+prendida en la sesion y, como las variables de usuario no se revierten
+con ROLLBACK, un UPDATE a pelo posterior se colaria (demostrado en
+Pruebas/test_blindaje_p3.sql). OBSERVACION: la rama 'SOLO SE REABRE
+UNA VENTA REALIZADA' es inalcanzable con los 4 estados (pasar de
+EN_PROCESO al mismo valor no es cambio; CANCELADA/DEVUELTA las corta
+el primer if) - queda como codigo defensivo.
 */
 CREATE TRIGGER TR_VALIDAR_ACTUALIZACION_VENTA
 BEFORE UPDATE ON VENTAS

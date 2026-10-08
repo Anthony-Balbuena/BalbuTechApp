@@ -57,6 +57,13 @@ SP_REGISTRAR_DEVOLUCION
 Registra una devolucion nueva en estado PENDIENTE.
 Valida que la cantidad sea posible (sin pasarse de lo ya devuelto), que la
 garantia corresponda a esa venta y calcula el monto a reembolsar.
+NOTA (Parte 5, 07/10/2026): el flujo es de DOS tiempos - aqui solo se
+registra la devolucion en PENDIENTE (sin tocar stock ni dinero); el
+stock lo devuelve el trigger al aprobarla con
+25_SP_PROCESAR_DEVOLUCION. La cuota anti-sobre-devolucion (paso 4)
+suma PENDIENTE + APROBADA + REEMBOLSADA y deja fuera las RECHAZADAS;
+es la MISMA cuenta que repite TR_BLOQUEAR_CAMBIO si se edita la
+cantidad a pelo mientras sigue PENDIENTE.
 */
 CREATE PROCEDURE SP_REGISTRAR_DEVOLUCION(
     IN P_ID_DETALLE_VENTA INT,
@@ -163,6 +170,16 @@ DROP PROCEDURE IF EXISTS 25_SP_PROCESAR_DEVOLUCION ;
 Aprueba, rechaza o marca como reembolsada una devolucion.
 Solo deja cambiar devoluciones que esten en PENDIENTE; si ya fue procesada
 corta con error. Al cambiar el estado, el trigger devuelve el stock solo.
+NOTA (Parte 5, 07/10/2026): al cambiar el estado corren 3 triggers
+AFTER UPDATE en orden de creacion (verificado con ACTION_ORDER):
+TR_REINTEGRAR_STOCK_DEVOLUCION (1) suma el stock y deja la bitacora
+con TIPO 'DEVOLUCION' -> TR_MARCAR_VENTA_DEVUELTA (2) solo marca
+DEVUELTA si NO queda ni una unidad por devolver y la venta estaba
+REALIZADA (una devolucion parcial NO la toca) ->
+TR_HISTORIAL_DEVOLUCION (32) anota STOCK_ANTERIOR/STOCK_NUEVO leyendo
+el stock YA sumado por el (1): por eso el orden importa. Ojo:
+aprobar devuelve MERCANCIA, no dinero - los PAGOS de la venta quedan
+intactos (el reembolso esta fuera del alcance de la BD).
 */
 CREATE PROCEDURE 25_SP_PROCESAR_DEVOLUCION(
     IN P_ID_DEVOLUCION INT,
