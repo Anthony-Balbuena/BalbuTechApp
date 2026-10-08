@@ -37,3 +37,6 @@
 - Ningún trigger fantasma en BD (los `DROP` de limpieza sí corrieron).
 - Flujos de compras y ventas: blindados y probados.
 - 5 productos sin fila en `INVENTARIO` → por diseño (se crea al comprar).
+
+
+Anthony
