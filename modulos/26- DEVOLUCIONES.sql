@@ -156,7 +156,7 @@ proc_label: BEGIN
     );
 
     SELECT 'EXITO: DEVOLUCIÓN REGISTRADA COMO PENDIENTE.' AS MENSAJE, LAST_INSERT_ID() AS ID_DEVOLUCION;
-END ;
+END //
 
 DELIMITER ;
 
@@ -208,7 +208,7 @@ proc_label: BEGIN
     WHERE ID_DEVOLUCION = P_ID_DEVOLUCION;
 
     SELECT CONCAT('EXITO: DEVOLUCIÓN MARCADA COMO ', P_NUEVO_ESTADO) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -244,7 +244,7 @@ BEGIN
             CONCAT('Devolución aprobada ID: ', NEW.ID_DEVOLUCION)
         );
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -293,7 +293,7 @@ BEGIN
             END IF;
         END IF;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -338,7 +338,7 @@ BEGIN
             SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD SUPERA LO VENDIDO (YA HAY DEVOLUCIONES DE ESTE PRODUCTO).';
         END IF;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -357,7 +357,7 @@ BEGIN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION APROBADA NO SE BORRA; EL STOCK YA FUE REINTEGRADO.';
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -387,3 +387,18 @@ GROUP BY P.ID_PRODUCTO, D.MOTIVO, D.CONDICION_PRODUCTO;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+
+-- Vista VISTA_DEVOLUCIONES_PENDIENTES movida (25- GARANTIAS.sql).
+CREATE OR REPLACE VIEW VISTA_DEVOLUCIONES_PENDIENTES AS
+SELECT 
+    D.ID_DEVOLUCION,
+    D.FECHA,
+    V.ID_VENTA,
+    P.NOMBRE AS PRODUCTO,
+    D.CANTIDAD,
+    D.MOTIVO
+FROM DEVOLUCIONES D
+JOIN DETALLES_VENTA DV ON D.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+JOIN VENTAS V ON DV.ID_VENTA = V.ID_VENTA
+JOIN PRODUCTOS P ON DV.ID_PRODUCTO = P.ID_PRODUCTO
+WHERE D.ESTADO = 'PENDIENTE';

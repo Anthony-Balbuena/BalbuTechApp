@@ -68,7 +68,7 @@ proc_label: BEGIN
     VALUES (v_nombre_limpio, v_desc_limpia, P_ICONO);
 
     SELECT CONCAT('EXITO: CATEGORÍA "', v_nombre_limpio, '" INSERTADA. ID: ', LAST_INSERT_ID()) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -118,7 +118,7 @@ proc_label: BEGIN
     WHERE ID_CATEGORIA = P_ID_CATEGORIA;
 
     SELECT CONCAT('EXITO: CATEGORÍA ID ', P_ID_CATEGORIA, ' ACTUALIZADA.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -155,7 +155,7 @@ proc_label: BEGIN
     FROM CATEGORIAS
     WHERE ID_CATEGORIA = P_ID_CATEGORIA;
 
-END ;
+END //
 DELIMITER ;
 
 --4. BUSCAR CATEGORIAS 
@@ -165,8 +165,8 @@ Busca categorias por nombre o descripcion.
 Si la busqueda viene vacia o nula, devuelve todas las categorias sin filtrar.
 */
 DELIMITER //
-drop PROCEDURE if EXISTS SP_BUSCAR_CATEGORIAS ;
-CREATE PROCEDURE SP_BUSCAR_CATEGORIAS(
+drop PROCEDURE if EXISTS SP_BUSCAR_CATEGORIA ;
+CREATE PROCEDURE SP_BUSCAR_CATEGORIA(
     IN P_BUSQUEDA VARCHAR(50)
 )
 BEGIN
@@ -176,7 +176,7 @@ BEGIN
     WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = '') 
        OR (NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%') 
        OR DESCRIPCION LIKE CONCAT('%', P_BUSQUEDA, '%'));
-END ;
+END //
 DELIMITER ;
 
 
@@ -194,7 +194,7 @@ CREATE PROCEDURE 1_SP_CATEGORIAS_POR_FECHA(
 BEGIN
     SELECT * FROM CATEGORIAS 
     WHERE FECHA_REGISTRO BETWEEN P_FECHA_INICIO AND P_FECHA_FIN;
-END ;
+END //
 DELIMITER ;
 
 --6. VERIFICAR SI LA CATEGORIA EXISTE
@@ -215,9 +215,20 @@ BEGIN
         WHERE NOMBRE = TRIM(P_NOMBRE) 
         AND ID_CATEGORIA <> P_ID_EXCLUIR
     ) AS EXISTE;
-END ;
+END //
 DELIMITER ;
 
 USE BALBU_TECH;
+
+-----------------------------------------------------------------------------------------------------------------------
+--- SP requerido por la app C++ (categorias.cpp:listarCategorias).
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_LISTAR_CATEGORIAS ;
+CREATE PROCEDURE SP_LISTAR_CATEGORIAS()
+BEGIN
+    SELECT ID_CATEGORIA, NOMBRE, ESTADO FROM CATEGORIAS ORDER BY ID_CATEGORIA;
+END //
+DELIMITER ;
 
 

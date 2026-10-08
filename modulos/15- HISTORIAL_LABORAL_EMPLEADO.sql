@@ -96,7 +96,7 @@ BEGIN
             CONCAT('Cambio automático: Cargo(', OLD.CARGO, '->', NEW.CARGO, ') Estado(', OLD.ESTADO, '->', NEW.ESTADO, ')')
         );
     END IF;
-END ;
+END //
 DELIMITER ;
 
 SELECT * FROM `HISTORIAL_LABORAL_EMPLEADO`

@@ -1,17 +1,19 @@
 # Auditoría general de la BD — 08/10/2026
 
 > Solo lectura: no se tocó código ni datos. Verificado contra la BD viva `BALBU_TECH`.
+> Seguimiento 08/10/2026 (tarde): corregidos y probados en vivo **1, 2, 3, 5, 7**. Pendientes: **4, 6, 8**.
+> Seguimiento 08/10/2026 (noche): **8/8 corregidos** — se suman **4, 6, 8**, todos probados en vivo.
 
 ## 🔴 Errores reales (fallan SIEMPRE al ejecutarse)
 
-1. **`SP_TOGGLE_ESTADO_MARCA`** — `2- MARCAS.sql:123`: alterna `'ACTIVO'/'INACTIVO'`, pero `MARCAS.ESTADO` es `ENUM('ACTIVA','INACTIVA')` → ERROR 1265. El toggle de marcas es imposible.
-2. **`SP_TOGGLE_ESTADO_METODO_PAGO`** — `4-METODOS_PAGO.sql:142`: hace `UPDATE METODOS_PAGO SET ESTADO=…`, pero la tabla **no tiene columna ESTADO** → Unknown column.
-3. **`SP_ASIGNAR_TECNICO_RECLAMO`** — `34- ASIGNAR RECLAMOS.sql:96`: pone `ESTADO='EN_PROCESO'`, pero `RECLAMOS_GARANTIAS.ESTADO` es `('PENDIENTE','APROBADO','RECHAZADO','CERRADO')` → ERROR 1265. Además `TR_FINALIZAR_RECLAMO_APROBADO` nunca ve ese estado.
+1. **`SP_TOGGLE_ESTADO_MARCA`** — `2- MARCAS.sql:123`: alterna `'ACTIVO'/'INACTIVO'`, pero `MARCAS.ESTADO` es `ENUM('ACTIVA','INACTIVA')` → ERROR 1265. El toggle de marcas es imposible. ✅ **CORREGIDO 08/10**: toggle a `'ACTIVA'/'INACTIVA'`; probado en vivo (ACTIVA→INACTIVA→ACTIVA).
+2. **`SP_TOGGLE_ESTADO_METODO_PAGO`** — `4-METODOS_PAGO.sql:142`: hace `UPDATE METODOS_PAGO SET ESTADO=…`, pero la tabla **no tiene columna ESTADO** → Unknown column. ✅ **CORREGIDO 08/10**: columna `ESTADO ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO'` agregada (CREATE + migración `ADD COLUMN IF NOT EXISTS`); toggle probado en vivo ida y vuelta.
+3. **`SP_ASIGNAR_TECNICO_RECLAMO`** — `34- ASIGNAR RECLAMOS.sql:96`: pone `ESTADO='EN_PROCESO'`, pero `RECLAMOS_GARANTIAS.ESTADO` es `('PENDIENTE','APROBADO','RECHAZADO','CERRADO')` → ERROR 1265. Además `TR_FINALIZAR_RECLAMO_APROBADO` nunca ve ese estado. ✅ **CORREGIDO 08/10**: eliminado el `UPDATE` inválido (el reclamo queda `PENDIENTE`; el avance vive en `ASIGNACIONES_RECLAMOS.ESTADO_ASIGNACION`); probado e2e con cadena completa (asignación en `EN_PROCESO`).
 4. **`SP_ASIGNAR_PERMISO_A_ROL` / `FN_TIENE_PERMISO`** — `36- PERMISOS_ROLES.sql:110,169,181`: leen tabla `USUARIOS_SISTEMA`, que **no existe** (lo real es `USUARIOS` + `ROLES`).
-5. **`SP_REGISTRAR_ASISTENCIA`** — `11-ASISTENCIA_EMPLEADOS.sql:100`: inserta en tabla `ASISTENCIA`, que **no existe** (lo real es `ASISTENCIA_EMPLEADOS` con otras columnas).
+5. **`SP_REGISTRAR_ASISTENCIA`** — `11-ASISTENCIA_EMPLEADOS.sql:100`: inserta en tabla `ASISTENCIA`, que **no existe** (lo real es `ASISTENCIA_EMPLEADOS` con otras columnas). ✅ **CORREGIDO 08/10**: `ENTRADA` crea la fila (`PRESENTE`), `SALIDA` pone `HORA_SALIDA`; probado en vivo (fila + hora).
 6. **`27_SP_FINALIZAR_RECLAMO_TOTAL`** — `27- RECLAMOS_GARANTIAS.sql:117`: inserta en `LOG_AUDITORIA`, que **no existe** (existen `AUDITORIA_SISTEMA`, `LOG_USUARIOS`, `LOG_AUDITORIA_PERMISOS`) → siempre ROLLBACK.
-7. **SP de `28-LOG_ACCESOS.sql:45`** — usa `U.NOMBRE_USUARIO`, pero la columna real es `USUARIOS.USUARIO`.
-8. **`sp_obtener_categorias_marcas`** — `Mejoras_extras.sql:4`: lee `categorias`/`marcas` minúsculas con columnas que no existen (real: `CATEGORIAS(ID_CATEGORIA,NOMBRE)`, `MARCAS(ID_MARCA,NOMBRE)`).
+7. **SP de `28-LOG_ACCESOS.sql:45`** — usa `U.NOMBRE_USUARIO`, pero la columna real es `USUARIOS.USUARIO`. ✅ **CORREGIDO 08/10**: `U.USUARIO`; `CALL SP_REPORTAR_ACCESOS()` corre limpio.
+8. **`sp_obtener_categorias_marcas`** — `Mejoras_extras.sql:4`: lee `categorias`/`marcas` minúsculas con columnas que no existen (real: `CATEGORIAS(ID_CATEGORIA,NOMBRE)`, `MARCAS(ID_MARCA,NOMBRE)`). ✅ **CORREGIDO 08/10**: archivo eliminado (`git rm`) — SP sin llamadas en todo el repo, excluido del import y roto; su función la cubren `SP_BUSCAR_CATEGORIA`/`SP_BUSCAR_MARCA`. Nota: `mostrarCategoriasYMarcas()` (`database.cpp:48`, C++) también está muerta y apunta a tablas singulares inexistentes — pendiente fuera de alcance SQL.
 
 ## 🟡 Gemelos en BD (mismo propósito, dos nombres)
 

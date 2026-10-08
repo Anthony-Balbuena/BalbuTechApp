@@ -6,50 +6,7 @@ devolucion baja el stock, anota la SALIDA, escribe el historial y baja el
 TOTAL de la compra. Si se devuelve todo, la compra queda DEVUELTA.
 Carga despues del 19.5 y antes del 20.
 */
-/*
-TABLA DEVOLUCION_COMPRA
-Guarda cada devolucion al proveedor con su cantidad, motivo y condicion.
-Nace PENDIENTE; al procesarla devuelve la mercancia y al rechazarla no
-toca nada. El subtotal se guarda al registrar para no depender de
-precios que puedan cambiar despues.
-*/
-CREATE TABLE DEVOLUCION_COMPRA (
-    ID_DEVOLUCION_COMPRA INT NOT NULL AUTO_INCREMENT,
-    ID_DETALLE_COMPRA INT NOT NULL,
-    ID_EMPLEADO INT NOT NULL,
-    FECHA DATE NOT NULL DEFAULT (CURRENT_DATE),
-    CANTIDAD INT NOT NULL CHECK (CANTIDAD > 0),
-    MOTIVO VARCHAR(200),
-    CONDICION_PRODUCTO ENUM('BUENO', 'DANADO', 'USADO') NOT NULL DEFAULT 'BUENO',
-    SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL CHECK (SUBTOTAL_DEVUELTO > 0),
-    ESTADO ENUM('PENDIENTE', 'PROCESADA', 'RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
-    PRIMARY KEY (ID_DEVOLUCION_COMPRA),
-    CONSTRAINT FK_DEVOLUCION_COMPRA_DETALLE FOREIGN KEY (ID_DETALLE_COMPRA) REFERENCES DETALLE_COMPRA (ID_DETALLE_COMPRA),
-    CONSTRAINT FK_DEVOLUCION_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
-
--- ============================================================
--- Deja al dia una BD que ya tenia esta tabla (como la real): le pone el
--- CHECK de que el subtotal nunca sea cero. Un INSERT a pelo con subtotal 0
--- devolveria mercancia sin bajar el TOTAL y la compra nunca llegaria a
--- DEVUELTA. En una BD recien creada el CREATE de arriba ya lo trae.
--- ============================================================
-ALTER TABLE DEVOLUCION_COMPRA MODIFY COLUMN SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL CHECK (SUBTOTAL_DEVUELTO > 0);
-
-/*
-INDICE IX_DEVOLUCION_COMPRA_FECHA
-Busca las devoluciones por fecha, igual que las demas tablas de compra,
-para los reportes del periodo.
-*/
-CREATE INDEX IX_DEVOLUCION_COMPRA_FECHA ON DEVOLUCION_COMPRA (FECHA);
-
-/*
-INDICE IX_DEVOLUCION_COMPRA_ESTADO_FECHA
-Trae las devoluciones por estado y fecha: es el de "devoluciones
-pendientes del dia". Sin este indice ese reporte recorria la tabla entera
-(ventas si lo tiene: IX_DEVOLUCION_ESTADO_FECHA en el archivo 25).
-*/
-CREATE INDEX IX_DEVOLUCION_COMPRA_ESTADO_FECHA ON DEVOLUCION_COMPRA (ESTADO, FECHA);
+-- TABLA DEVOLUCION_COMPRA (+indices) reubicada en 22-DETALLE_COMPRA.sql: necesita DETALLE_COMPRA ya creada.
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -162,7 +119,7 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: DEVOLUCION #', P_ID_DEVOLUCION_GENERADO,
                   ' REGISTRADA (PENDIENTE).') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -179,8 +136,8 @@ TR_PROCESAR_DEVOLUCION_COMPRA, que tambien valen en un UPDATE directo.
 */
 -- P12C (07/10/2026): el rechazo no dejaba rastro del por que; ahora el
 -- SP acepta el motivo del rechazo y lo anota en MOTIVO encima del motivo
--- original. Los llamados viejos de 2 argumentos siguen valiendo: el
--- parametro nuevo viene con DEFAULT NULL.
+-- original. Los llamados pasan NULL explicito si no hay motivo
+-- (MariaDB no admite DEFAULT en parametros de procedures).
 -- CREATE PROCEDURE SP_PROCESAR_DEVOLUCION_COMPRA(
 --     IN P_ID_DEVOLUCION_COMPRA INT,
 --     IN P_NUEVO_ESTADO ENUM('PROCESADA', 'RECHAZADA')
@@ -188,7 +145,7 @@ TR_PROCESAR_DEVOLUCION_COMPRA, que tambien valen en un UPDATE directo.
 CREATE PROCEDURE SP_PROCESAR_DEVOLUCION_COMPRA(
     IN P_ID_DEVOLUCION_COMPRA INT,
     IN P_NUEVO_ESTADO ENUM('PROCESADA', 'RECHAZADA'),
-    IN P_MOTIVO_RECHAZO VARCHAR(200) DEFAULT NULL
+    IN P_MOTIVO_RECHAZO VARCHAR(200)
 )
 proc_label: BEGIN
     DECLARE V_ESTADO_ACTUAL VARCHAR(20);
@@ -256,7 +213,7 @@ proc_label: BEGIN
     END IF;
 
     SELECT CONCAT('EXITO: DEVOLUCION #', P_ID_DEVOLUCION_COMPRA, ' ', P_NUEVO_ESTADO, '.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -264,168 +221,8 @@ DELIMITER ;
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_PROCESAR_DEVOLUCION_COMPRA ;
-/*
-TR_PROCESAR_DEVOLUCION_COMPRA
-Cuando una devolucion pasa de PENDIENTE a PROCESADA: valida que la compra
-sigue RECIBIDA y que el stock alcanza (si no, todo falla sin cambios),
-baja el stock, anota la SALIDA en movimientos, escribe UNA fila de
-historial con el stock antes y despues, y baja el TOTAL de la compra; si
-el TOTAL llega a 0 la compra queda DEVUELTA. RECHAZADA no toca nada.
-Tambien se aplica si alguien cambia el estado con un UPDATE directo.
-*/
-CREATE TRIGGER TR_PROCESAR_DEVOLUCION_COMPRA
-AFTER UPDATE ON DEVOLUCION_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ID_COMPRA INT;
-    DECLARE V_ID_PRODUCTO INT;
-    DECLARE V_ESTADO_COMPRA VARCHAR(20);
-    DECLARE V_STOCK_ANTES INT;
-    DECLARE V_TOTAL_ACTUAL DECIMAL(10, 2);
+-- Trigger TR_PROCESAR_DEVOLUCION_COMPRA movido a 22 (tabla DEVOLUCION_COMPRA vive ahi).
 
-    -- P11C (07/10/2026): el paso 4 prende @COMPRAS_INTERNO; si el UPDATE
-    -- de TOTAL falla, apagar la bandera antes de propagar (las variables
-    -- de usuario no se revierten con ROLLBACK).
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        SET @COMPRAS_INTERNO = 0;
-        RESIGNAL;
-    END;
+-- Trigger TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA movido a 22 (idem).
 
-    IF NEW.ESTADO = 'PROCESADA' AND OLD.ESTADO = 'PENDIENTE' THEN
-
-        -- Datos del detalle que se devuelve
-        SELECT DC.ID_COMPRA, DC.ID_PRODUCTO
-          INTO V_ID_COMPRA, V_ID_PRODUCTO
-          FROM DETALLE_COMPRA DC
-         WHERE DC.ID_DETALLE_COMPRA = NEW.ID_DETALLE_COMPRA;
-
-        -- La compra debe seguir RECIBIDA
-        SELECT ESTADO INTO V_ESTADO_COMPRA
-          FROM COMPRAS WHERE ID_COMPRA = V_ID_COMPRA;
-
-        IF V_ESTADO_COMPRA <> 'RECIBIDA' THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA RECIBIDA; NO SE PUEDE PROCESAR LA DEVOLUCION.';
-        END IF;
-
-        -- El stock tiene que alcanzar (si alguien ya se lo vendio, no hay)
-        SET V_STOCK_ANTES = IFNULL((
-            SELECT STOCK_ACTUAL FROM INVENTARIO WHERE ID_PRODUCTO = V_ID_PRODUCTO
-        ), 0);
-
-        IF V_STOCK_ANTES < NEW.CANTIDAD THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'ERROR: EL STOCK ACTUAL NO ALCANZA PARA DEVOLVER (YA HUBO VENTAS DE ESA MERCANCIA).';
-        END IF;
-
-        -- El subtotal nunca puede pasarse del total (candado ante UPDATE directo)
-        SELECT TOTAL INTO V_TOTAL_ACTUAL
-          FROM COMPRAS WHERE ID_COMPRA = V_ID_COMPRA;
-
-        IF NEW.SUBTOTAL_DEVUELTO > V_TOTAL_ACTUAL THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'ERROR: EL SUBTOTAL DE LA DEVOLUCION EXCEDE EL TOTAL DE LA COMPRA.';
-        END IF;
-
-        -- 1. Baja el stock
-        UPDATE INVENTARIO
-           SET STOCK_ACTUAL = STOCK_ACTUAL - NEW.CANTIDAD
-         WHERE ID_PRODUCTO = V_ID_PRODUCTO;
-
-        -- 2. Bitacora: la SALIDA hacia el proveedor
-        INSERT INTO MOVIMIENTOS_INVENTARIO
-            (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
-        VALUES
-            (V_ID_PRODUCTO, NEW.ID_EMPLEADO, 'SALIDA', NEW.CANTIDAD,
-             CONCAT('Devolucion a proveedor ID: ', NEW.ID_DEVOLUCION_COMPRA));
-
-        -- 3. Historial UNA fila con el stock antes y despues
-        INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO
-            (ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION)
-        VALUES
-            (V_ID_PRODUCTO, 'DEVOLUCION', NEW.CANTIDAD, V_STOCK_ANTES, V_STOCK_ANTES - NEW.CANTIDAD,
-             CONCAT('Devolucion a proveedor ID: ', NEW.ID_DEVOLUCION_COMPRA));
-
-        -- 4. Baja el TOTAL de la compra (el detalle queda como evidencia).
-        --    El candado interno avisa a TR_VALIDAR_ACTUALIZACION_COMPRA de
-        --    que este cambio de TOTAL viene de la devolucion y no a pelo.
-        SET @COMPRAS_INTERNO = 1;
-        UPDATE COMPRAS
-           SET TOTAL = TOTAL - NEW.SUBTOTAL_DEVUELTO
-         WHERE ID_COMPRA = V_ID_COMPRA;
-        SET @COMPRAS_INTERNO = 0;
-
-        -- 5. Si se devolvio todo, la compra queda DEVUELTA
-        UPDATE COMPRAS
-           SET ESTADO = 'DEVUELTA'
-         WHERE ID_COMPRA = V_ID_COMPRA AND TOTAL <= 0;
-    END IF;
-END ;
-DELIMITER ;
-
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA ;
-/*
-TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA
-Una devolucion que ya salio de PENDIENTE no se edita mas: si alguien la
-pasara de PROCESADA a RECHAZADA a pelo, el stock y el TOTAL ya estarian
-bajados y encima se liberaria la cuota para devolver otra vez. Mientras
-sigue PENDIENTE si se puede tocar la cantidad, pero volviendo a validar
-que no se pase de lo comprado.
-*/
-CREATE TRIGGER TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA
-BEFORE UPDATE ON DEVOLUCION_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_CANTIDAD_COMPRADA INT;
-    DECLARE V_YA_DEVUELTA INT;
-
-    IF OLD.ESTADO <> 'PENDIENTE' THEN
-        IF NEW.ESTADO <> OLD.ESTADO
-           OR NEW.CANTIDAD <> OLD.CANTIDAD
-           OR NEW.SUBTOTAL_DEVUELTO <> OLD.SUBTOTAL_DEVUELTO
-           OR NEW.ID_DETALLE_COMPRA <> OLD.ID_DETALLE_COMPRA THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION YA FUE PROCESADA O RECHAZADA; SU FILA NO CAMBIA.';
-        END IF;
-    ELSEIF NEW.CANTIDAD <> OLD.CANTIDAD THEN
-        -- La cuota: lo comprado menos lo demas devuelto o pendiente de este detalle
-        SELECT DC.CANTIDAD INTO V_CANTIDAD_COMPRADA
-          FROM DETALLE_COMPRA DC
-         WHERE DC.ID_DETALLE_COMPRA = NEW.ID_DETALLE_COMPRA;
-
-        SELECT IFNULL(SUM(CANTIDAD), 0) INTO V_YA_DEVUELTA
-          FROM DEVOLUCION_COMPRA
-         WHERE ID_DETALLE_COMPRA = NEW.ID_DETALLE_COMPRA
-           AND ID_DEVOLUCION_COMPRA <> NEW.ID_DEVOLUCION_COMPRA
-           AND ESTADO IN ('PENDIENTE', 'PROCESADA');
-
-        IF NEW.CANTIDAD < 1 OR NEW.CANTIDAD > (V_CANTIDAD_COMPRADA - V_YA_DEVUELTA) THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD SUPERA LO COMPRADO (YA HAY DEVOLUCIONES DE ESTE PRODUCTO).';
-        END IF;
-    END IF;
-END ;
-DELIMITER ;
-
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA ;
-/*
-TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA
-La devolucion PROCESADA no se borra: en ese punto ya movio stock, bitacora,
-historial y TOTAL; borrarla dejaria todo eso sin respaldo. Las PENDIENTE y
-RECHAZADA si se pueden descartar.
-*/
-CREATE TRIGGER TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA
-BEFORE DELETE ON DEVOLUCION_COMPRA
-FOR EACH ROW
-BEGIN
-    IF OLD.ESTADO = 'PROCESADA' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION PROCESADA NO SE BORRA; EL STOCK Y EL TOTAL YA SE MOVIERON.';
-    END IF;
-END ;
-DELIMITER ;
+-- Trigger TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA movido a 22 (idem).

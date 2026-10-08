@@ -50,7 +50,8 @@ DROP PROCEDURE IF EXISTS SP_ASIGNAR_TECNICO_RECLAMO;
 SP_ASIGNAR_TECNICO_RECLAMO
 Asigna un tecnico a un reclamo que este PENDIENTE.
 Revisa que el reclamo exista y no este ya tomado, crea la asignacion en
-EN_PROCESO y deja el reclamo en EN_PROCESO.
+EN_PROCESO y deja el reclamo en PENDIENTE (su enum no admite EN_PROCESO;
+el avance vive en ASIGNACIONES_RECLAMOS.ESTADO_ASIGNACION).
 */
 CREATE PROCEDURE SP_ASIGNAR_TECNICO_RECLAMO(
     IN P_ID_RECLAMO INT,
@@ -92,13 +93,12 @@ proc_label: BEGIN
         P_OBSERVACIONES
     );
     
-    -- 3. Actualizar el estado del reclamo principal
-    UPDATE RECLAMOS_GARANTIAS 
-    SET ESTADO = 'EN_PROCESO' 
-    WHERE ID_RECLAMO_GARAN = P_ID_RECLAMO;
+    -- 3. El reclamo sigue PENDIENTE (su ENUM no admite EN_PROCESO; antes este
+    -- UPDATE ponia 'EN_PROCESO' y fallaba con ERROR 1265. El avance del trabajo
+    -- vive en ASIGNACIONES_RECLAMOS.ESTADO_ASIGNACION = 'EN_PROCESO').
     
     SELECT 'EXITO: TÉCNICO ASIGNADO CORRECTAMENTE.' AS MENSAJE;
-END;
+END//
 
 DELIMITER ;
 
@@ -132,6 +132,6 @@ BEGIN
     WHERE ID_RECLAMO_GARAN = (SELECT ID_RECLAMO_GARAN FROM ASIGNACIONES_RECLAMOS WHERE ID_ASIGNACION = P_ID_ASIGNACION);
     
     SELECT 'EXITO: RECLAMO FINALIZADO Y CERRADO.' AS MENSAJE;
-END;
+END//
 
 DELIMITER ;

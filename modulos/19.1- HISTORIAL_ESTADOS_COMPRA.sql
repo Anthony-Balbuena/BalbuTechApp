@@ -45,45 +45,6 @@ CREATE INDEX IX_HIST_ESTADO_FECHA ON HISTORIAL_ESTADOS_COMPRA (FECHA);
 -----------------------------------------[TRIGGER}--------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------
 
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_HISTORIAL_ESTADO_COMPRA ;
-/*
-TR_HISTORIAL_ESTADO_COMPRA
-Cuando nace una compra deja su primera fila en el historial de estados
-(ABIERTA, con el empleado que la abrio). Solo registra el nacimiento:
-los cambios de ahi en adelante los anota TR_CAMBIO_ESTADO_COMPRA.
-*/
-CREATE TRIGGER TR_HISTORIAL_ESTADO_COMPRA
-AFTER INSERT ON COMPRAS
-FOR EACH ROW
-BEGIN
-    INSERT INTO HISTORIAL_ESTADOS_COMPRA
-        (ID_COMPRA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
-    VALUES
-        (NEW.ID_COMPRA, NULL, NEW.ESTADO, NEW.ID_EMPLEADO, 'Compra iniciada');
-END ;
-DELIMITER ;
+-- Trigger TR_HISTORIAL_ESTADO_COMPRA movido a 19 (su tabla).
 
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_CAMBIO_ESTADO_COMPRA ;
-/*
-TR_CAMBIO_ESTADO_COMPRA
-Cada vez que una compra cambia de estado (saldada, reabierta,
-cancelada o devuelta) anota una fila con el antes y el despues en
-HISTORIAL_ESTADOS_COMPRA. Si el estado no cambia no anota nada y
-tambien vale si alguien lo cambia con un UPDATE directo. El empleado
-es el dueno de la compra (los pagos no traen empleado propio).
-*/
-CREATE TRIGGER TR_CAMBIO_ESTADO_COMPRA
-AFTER UPDATE ON COMPRAS
-FOR EACH ROW
-BEGIN
-    IF NEW.ESTADO <> OLD.ESTADO THEN
-        INSERT INTO HISTORIAL_ESTADOS_COMPRA
-            (ID_COMPRA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
-        VALUES
-            (NEW.ID_COMPRA, OLD.ESTADO, NEW.ESTADO, NEW.ID_EMPLEADO,
-             CONCAT('Estado: ', OLD.ESTADO, ' -> ', NEW.ESTADO));
-    END IF;
-END ;
-DELIMITER ;
+-- Trigger TR_CAMBIO_ESTADO_COMPRA movido a 19 (su tabla).

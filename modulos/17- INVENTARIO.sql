@@ -72,7 +72,7 @@ proc_label: BEGIN
         P_ID_PRODUCTO AS ID, 
         V_NOMBRE_PRODUCTO AS PRODUCTO, 
         'AGREGADO AL INVENTARIO CON STOCK 0' AS MENSAJE;
-END;
+END//
 
 DELIMITER ;
 
@@ -134,7 +134,7 @@ BEGIN
                 CONCAT('Producto ', NEW.ID_PRODUCTO, ' llego al stock minimo (', NEW.STOCK_MINIMO, ')'),
                 'PENDIENTE');
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -224,7 +224,7 @@ BEGIN
     JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO;
     
     RETURN IFNULL(V_TOTAL, 0);
-END ;
+END //
 DELIMITER ;
 
 

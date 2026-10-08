@@ -86,7 +86,7 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA_GENERADO, ' INICIADA.') AS MENSAJE;
 
-END ;
+END //
 DELIMITER ;
 
 
@@ -199,7 +199,7 @@ proc_label: BEGIN
     SET @VENTAS_INTERNO = 0;
 
     SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA, ' CANCELADA Y STOCK RESTITUIDO.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -260,7 +260,7 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: FACTURA ', V_FACTURA_LIMPIA,
                   ' ASIGNADA A LA VENTA #', P_ID_VENTA, '.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -278,7 +278,7 @@ FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000'
     SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
-END ;
+END //
 DELIMITER ;
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -397,7 +397,7 @@ BEGIN
             SET MESSAGE_TEXT = 'ERROR: ESTADO DE VENTA DESCONOCIDO.';
         END IF;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -410,17 +410,7 @@ VISTA_DETALLE_VENTA
 Muestra los productos de cada venta con su cantidad, precio y subtotal.
 Trae el nombre del producto en lugar de su ID, lista para ver en pantalla.
 */
-CREATE OR REPLACE VIEW VISTA_DETALLE_VENTA AS
-SELECT 
-    DV.ID_VENTA,
-    V.FACTURA,
-    P.NOMBRE AS PRODUCTO,
-    DV.CANTIDAD,
-    DV.PRECIO_UNITARIO,
-    DV.SUBTOTAL
-FROM DETALLES_VENTA DV
-JOIN VENTAS V ON V.ID_VENTA = DV.ID_VENTA
-JOIN PRODUCTOS P ON DV.ID_PRODUCTO = P.ID_PRODUCTO;
+-- Vista VISTA_DETALLE_VENTA movida a 23- DETALLE_VENTA.sql.
 
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------

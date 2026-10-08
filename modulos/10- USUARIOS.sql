@@ -66,7 +66,7 @@ BEGIN
     INNER JOIN ROLES R ON U.ID_ROL = R.ID_ROL
     WHERE U.USUARIO = P_USUARIO 
       AND U.ESTADO = 'ACTIVO';
-END ;
+END //
 DELIMITER ;
 
 
@@ -118,7 +118,7 @@ proc_label: BEGIN
     VALUES (P_ID_EMPLEADO, P_ID_ROL, v_usuario_limpio, P_HASH_CLAVE);
 
     SELECT CONCAT('EXITO: USUARIO "', v_usuario_limpio, '" CREADO.') AS MENSAJE;
-END;
+END//
 
 
 DELIMITER ;
@@ -160,7 +160,7 @@ proc_label: BEGIN
     WHERE `ID_USUARIO` = P_ID_USUARIO;
 
     SELECT 'EXITO: DATOS ACTUALIZADOS.' AS MENSAJE;
-END;
+END//
 DELIMITER ;
 
 -- Semilla del administrador: solo se crea si existe el empleado 1 y aun no
@@ -223,7 +223,7 @@ proc_label: BEGIN
         ' A: ', v_NUEVO_ESTADO
     ) AS MENSAJE;
 
-END ;
+END //
 DELIMITER ;
 
 
@@ -252,7 +252,7 @@ BEGIN
            OR U.USUARIO LIKE CONCAT('%', P_BUSQUEDA, '%')
            OR E.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%'))
     ORDER BY U.USUARIO ASC;
-END ;
+END //
 
 DELIMITER ;
 
@@ -297,7 +297,7 @@ proc_label: BEGIN
         '" (ID: ', P_ID_USUARIO, ')'
     ) AS MENSAJE;
 
-END ;
+END //
 DELIMITER ;
 
 
@@ -333,7 +333,7 @@ BEGIN
     ELSE
         SELECT 'ERROR' AS ESTADO, NULL AS ROL, NULL AS ID_USUARIO;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -350,7 +350,7 @@ CREATE PROCEDURE PARA_INSERTAR_USUARIOS()
 BEGIN
     SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL ASC;
     SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS ORDER BY ID_EMPLEADO ASC;
-END ;
+END //
 DELIMITER ;
 
 /*
@@ -367,7 +367,7 @@ BEGIN
     LEFT JOIN ROLES AS R ON U.ID_ROL = R.ID_ROL
     LEFT JOIN EMPLEADOS AS E ON U.ID_EMPLEADO = E.ID_EMPLEADO
     ORDER BY U.ID_USUARIO ASC, E.ID_EMPLEADO ASC, R.ID_ROL ASC;
-END ;
+END //
 DELIMITER ;
 
 
@@ -384,7 +384,7 @@ BEGIN
     FROM USUARIOS AS U
     LEFT JOIN EMPLEADOS AS E ON U.ID_EMPLEADO = E.ID_EMPLEADO
     ORDER BY U.ID_USUARIO ASC;
-END ;
+END //
 DELIMITER ;
 
 
@@ -392,36 +392,8 @@ DELIMITER ;
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 
--- FUNCIÓN DE PERMISOS ADAPTADA AL NUEVO ESQUEMA
-/*
-FN_TIENE_PERMISO
-Devuelve TRUE o FALSE segun el rol del usuario permita o no la accion
-pedida (por ejemplo REGISTRAR_BONO). Solo la aprueban ROLE_ADMIN y
-ROLE_GERENTE; cualquier otro caso devuelve FALSE.
-*/
-DELIMITER //
-DROP FUNCTION IF EXISTS FN_TIENE_PERMISO ;
-CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(50))
-RETURNS BOOLEAN
-DETERMINISTIC
-BEGIN
-    DECLARE v_rol_nombre VARCHAR(50);
-    
-    -- Se obtiene el rol mediante el JOIN
-    SELECT R.NOMBRE_ROL INTO v_rol_nombre 
-    FROM USUARIOS U
-    INNER JOIN ROLES R ON U.ID_ROL = R.ID_ROL
-    WHERE U.USUARIO = P_USERNAME;
-    
-    -- Ajusta los nombres de roles según los que hayas creado (Ej: ROLE_ADMIN)
-    IF P_ACCION = 'REGISTRAR_BONO' AND (v_rol_nombre = 'ROLE_ADMIN' OR v_rol_nombre = 'ROLE_GERENTE') THEN
-        RETURN TRUE;
-    ELSE
-        RETURN FALSE;
-    END IF;
-END ;
-
-DELIMITER ;
+-- FN_TIENE_PERMISO vivia aqui en version angosta (solo REGISTRAR_BONO);
+-- la version general y canonica esta en 36- PERMISOS_ROLES.sql (ese archivo la crea al final).
 
 
 
@@ -453,5 +425,37 @@ BEGIN
         WHERE ID_EMPLEADO = NEW.ID_EMPLEADO;
         
     END IF;
-END ;
+END //
     DELIMITER ;
+
+-----------------------------------------------------------------------------------------------------------------------
+--- SPs requeridos por la app C++ (usuarios.cpp:buscarUsuario/cambiarClaveUsuario).
+--- La tabla usa columna USUARIO; se expone como NOMBRE_USUARIO para la app.
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_BUSCAR_USUARIOS ;
+CREATE PROCEDURE SP_BUSCAR_USUARIOS(
+    IN P_FILTRO VARCHAR(50)
+)
+BEGIN
+    SELECT ID_USUARIO, USUARIO AS NOMBRE_USUARIO, ESTADO FROM USUARIOS
+    WHERE (P_FILTRO IS NULL OR P_FILTRO = '')
+       OR (USUARIO LIKE CONCAT('%', P_FILTRO, '%'));
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_CAMBIAR_CLAVE_USUARIO ;
+CREATE PROCEDURE SP_CAMBIAR_CLAVE_USUARIO(
+    IN P_ID_USUARIO INT,
+    IN P_HASH VARCHAR(255)
+)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM USUARIOS WHERE ID_USUARIO = P_ID_USUARIO) THEN
+        SELECT 'ERROR: EL USUARIO NO EXISTE.' AS MENSAJE;
+    ELSE
+        UPDATE USUARIOS SET CONTRASENA = P_HASH WHERE ID_USUARIO = P_ID_USUARIO;
+        SELECT CONCAT('EXITO: CLAVE DEL USUARIO ID ', P_ID_USUARIO, ' ACTUALIZADA.') AS MENSAJE;
+    END IF;
+END //
+DELIMITER ;

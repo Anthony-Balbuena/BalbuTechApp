@@ -62,8 +62,6 @@ bool intentarLogin(const string& usuario, const string& password) {
         delete pSelect;
 
         // No fallback SP: autenticación manejada por PBKDF2/legacy rehash arriba
-        delete rsel;
-        delete pSelect;
         return false;
 
     } catch (const exception &e) {

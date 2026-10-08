@@ -1,26 +1,25 @@
-FROM mcr.microsoft.com/devcontainers/cpp:3-debian13
+FROM mcr.microsoft.com/devcontainers/cpp:1-bookworm
 
-# Everything below this is needed for installing MariaDB
-# Instructions are copied and modified from: https://mariadb.com/docs/clients/mariadb-connectors/connector-cpp/install/
+# Toolchain C++ + conectores MariaDB/MySQL + cliente para importar SQL.
+# Nota: bookworm no trae el Connector/C++ de MariaDB en APT, asi que se usa
+# libmysqlcppconn-dev de Debian (API JDBC: mysql_connection.h + cppconn/*,
+# link -lmysqlcppconn), 100% compatible con el codigo (sql::mysql) y con el
+# protocolo de MariaDB 10.11 por TCP con clave nativa.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install curl
+    && apt-get -y install --no-install-recommends \
+        g++ \
+        gdb \
+        make \
+        git \
+        locales \
+        mariadb-client \
+        libmariadb-dev \
+        libmysqlcppconn-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY ./install-mariadb.sh /tmp/
-RUN chmod +x /tmp/install-mariadb.sh && /tmp/install-mariadb.sh && rm -f /tmp/install-mariadb.sh
-
-ARG REINSTALL_CMAKE_VERSION_FROM_SOURCE="none"
-
-# Optionally install the cmake for vcpkg
-COPY ./reinstall-cmake.sh /tmp/
-
-RUN if [ "${REINSTALL_CMAKE_VERSION_FROM_SOURCE}" != "none" ]; then \
-        chmod +x /tmp/reinstall-cmake.sh && /tmp/reinstall-cmake.sh ${REINSTALL_CMAKE_VERSION_FROM_SOURCE}; \
-    fi \
-    && rm -f /tmp/reinstall-cmake.sh
-
-# [Optional] Uncomment this section to install additional vcpkg ports.
-# RUN su vscode -c "${VCPKG_ROOT}/vcpkg install <your-port-name-here>"
-
-# [Optional] Uncomment this section to install additional packages.
-# RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-#     && apt-get -y install --no-install-recommends <your-package-list-here>
+# Locale UTF-8 para los mensajes en espanol de la app y los .sql
+RUN sed -i 's/# es_ES.UTF-8 UTF-8/es_ES.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen; \
+    sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen; \
+    locale-gen || true
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8

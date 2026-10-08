@@ -107,7 +107,7 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: COMPRA #', P_ID_COMPRA_GENERADO, ' INICIADA CORRECTAMENTE.') AS MENSAJE;
 
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -232,7 +232,7 @@ proc_label: BEGIN
     END IF;
 
     SELECT CONCAT('EXITO: COMPRA #', P_ID_COMPRA, ' CANCELADA Y MERCANCIA REVERTIDA.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -325,52 +325,12 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: FACTURA ', V_FACTURA_LIMPIA,
                   ' ASIGNADA A LA COMPRA #', P_ID_COMPRA, '.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_COMPRA_CERRADA ;
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_COMPRA_CANCELADA ;
-/*
-TR_BLOQUEAR_COMPRA_CERRADA
-Una compra que no esta ABIERTA (RECIBIDA o CANCELADA) no acepta mas
-productos, ni siquiera con un INSERT directo (misma idea que
-TR_BLOQUEAR_VENTA_FINALIZADA en ventas). Si hay que agregar algo despues
-de estar saldada, primero se anula el pago que cerro la compra con
-SP_ANULAR_PAGO_COMPRA (archivo 19.5) y vuelve a ABIERTA.
-Reemplaza a TR_BLOQUEAR_COMPRA_CANCELADA (solo cubria CANCELADA).
-*/
-CREATE TRIGGER TR_BLOQUEAR_COMPRA_CERRADA
-BEFORE INSERT ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ESTADO VARCHAR(20);
+-- Trigger TR_BLOQUEAR_COMPRA_CERRADA movido a 22 (su tabla).
 
-    SELECT ESTADO INTO V_ESTADO FROM COMPRAS WHERE ID_COMPRA = NEW.ID_COMPRA;
-
-    IF V_ESTADO <> 'ABIERTA' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).';
-    END IF;
-END ;
-DELIMITER ; 
-
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_UPDATE_DETALLE_COMPRA ;
-/*
-TR_BLOQUEAR_UPDATE_DETALLE_COMPRA
-Nadie cambia una linea de compra con UPDATE a pelo: la cantidad y el precio
-son la prueba de lo que se acordo con el proveedor. Para corregir algo se
-usa SP_MODIFICAR_LINEA_COMPRA (archivo 22), o se quita la linea con
-SP_QUITAR_DETALLE_COMPRA y se vuelve a agregar. Trabaja en automatico.
-*/
-CREATE TRIGGER TR_BLOQUEAR_UPDATE_DETALLE_COMPRA
-BEFORE UPDATE ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'ERROR: LA LINEA DE UNA COMPRA NO SE PUEDE EDITAR; USE SP_MODIFICAR_LINEA_COMPRA.';
-END ;
-DELIMITER ;
+-- Trigger TR_BLOQUEAR_UPDATE_DETALLE_COMPRA movido a 22 (su tabla).
 
 
 
@@ -380,99 +340,11 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 
 -- Trigger: Actualiza Inventario al comprar
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_ACTUALIZAR_STOCK_COMPRA ;
-/*
-TR_ACTUALIZAR_STOCK_COMPRA
-Cada vez que entra un producto en una compra, le suma la cantidad al stock.
-Si el producto todavia no tiene fila en INVENTARIO, la crea primero
-(mismos defaults que SP_RECIBIR_MERCANCIA) y le suma encima; asi nunca
-se pierde una entrada por falta de registro en inventario.
-*/
-CREATE TRIGGER TR_ACTUALIZAR_STOCK_COMPRA
-AFTER INSERT ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    INSERT INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
-    VALUES (NEW.ID_PRODUCTO, NEW.CANTIDAD, 5, 'ALMACEN_PRINCIPAL')
-    ON DUPLICATE KEY UPDATE STOCK_ACTUAL = STOCK_ACTUAL + NEW.CANTIDAD;
-END ;
-DELIMITER ;
+-- Trigger TR_ACTUALIZAR_STOCK_COMPRA movido a 22 (su tabla).
 
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_COMPRA_CERRADA ;
-/*
-TR_BLOQUEAR_BORRADO_COMPRA_CERRADA
-Lo mismo que TR_BLOQUEAR_COMPRA_CERRADA pero cuando se borra una linea:
-solo una compra ABIERTA deja quitarle productos y ademas el stock tiene
-que alcanzar (la mercancia se regresa del inventario). En RECIBIDA,
-CANCELADA o DEVUELTA el detalle queda como evidencia y nadie lo puede
-borrar, ni siquiera con un DELETE directo.
-*/
-CREATE TRIGGER TR_BLOQUEAR_BORRADO_COMPRA_CERRADA
-BEFORE DELETE ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ESTADO VARCHAR(20);
-    DECLARE V_STOCK INT;
+-- Trigger TR_BLOQUEAR_BORRADO_COMPRA_CERRADA movido a 22 (su tabla).
 
-    SELECT ESTADO INTO V_ESTADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
-
-    IF V_ESTADO IS NOT NULL AND V_ESTADO <> 'ABIERTA' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).';
-    END IF;
-
-    -- El stock tiene que alcanzar para regresar la mercancia
-    SET V_STOCK = IFNULL((
-        SELECT STOCK_ACTUAL FROM INVENTARIO WHERE ID_PRODUCTO = OLD.ID_PRODUCTO
-    ), 0);
-
-    IF V_STOCK < OLD.CANTIDAD THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'ERROR: EL STOCK ACTUAL NO ALCANZA PARA QUITAR ESTE PRODUCTO (YA HUBO VENTAS DE ESA MERCANCIA).';
-    END IF;
-END ;
-DELIMITER ;
-
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_ACTUALIZAR_STOCK_BORRADO_COMPRA ;
-/*
-TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
-Cuando se quita una linea de una compra, le resta la cantidad al stock
-(lo inverso de TR_ACTUALIZAR_STOCK_COMPRA) y en el MISMO trigger anota
-la SALIDA en el historial con el stock antes y despues. Van juntos a
-proposito: los triggers de DELETE no se pueden ordenar a gusto y asi el
-antes/despues sale bien sin importar en que orden disparen los demas.
-El guard de stock y de estado esta en el BEFORE, que corre primero.
-*/
-CREATE TRIGGER TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
-AFTER DELETE ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_STOCK_ANTES INT;
-    DECLARE V_STOCK_DESPUES INT;
-
-    -- 1. Stock antes de restar
-    SELECT STOCK_ACTUAL INTO V_STOCK_ANTES
-      FROM INVENTARIO WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
-
-    SET V_STOCK_DESPUES = V_STOCK_ANTES - OLD.CANTIDAD;
-
-    -- 2. Bajar el stock
-    UPDATE INVENTARIO
-       SET STOCK_ACTUAL = V_STOCK_DESPUES
-     WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
-
-    -- 3. UNA fila de historial con el antes y el despues
-    INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
-        ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
-    ) VALUES (
-        OLD.ID_PRODUCTO, 'SALIDA', OLD.CANTIDAD, V_STOCK_ANTES, V_STOCK_DESPUES,
-        'Producto quitado de la compra'
-    );
-END ;
-DELIMITER ;
+-- Trigger TR_ACTUALIZAR_STOCK_BORRADO_COMPRA movido a 22 (su tabla).
 
 -- El trigger TR_HISTORIAL_ESTADO_COMPRA (la primera fila del historial al
 -- nacer la compra) se mudo al archivo 19.1- HISTORIAL_ESTADOS_COMPRA.sql.
@@ -553,7 +425,7 @@ BEGIN
             SET MESSAGE_TEXT = 'ERROR: ESTADO DE COMPRA DESCONOCIDO.';
         END IF;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 -- El trigger TR_CAMBIO_ESTADO_COMPRA (los cambios de estado del historial)
@@ -574,7 +446,7 @@ FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000'
     SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO SE PUEDE BORRAR; USE SP_CANCELAR_COMPRA PARA ANULARLA.';
-END ;
+END //
 DELIMITER ;
 
 /*
@@ -631,5 +503,52 @@ BEGIN
     WHERE ID_COMPRA = P_ID_COMPRA;
     
     RETURN IFNULL(V_TOTAL_ITEMS, 0);
-END ;
+END //
+DELIMITER ;
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Trigger TR_HISTORIAL_ESTADO_COMPRA movido a 19 (su tabla).
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_HISTORIAL_ESTADO_COMPRA ;
+/*
+TR_HISTORIAL_ESTADO_COMPRA
+Cuando nace una compra deja su primera fila en el historial de estados
+(ABIERTA, con el empleado que la abrio). Solo registra el nacimiento:
+los cambios de ahi en adelante los anota TR_CAMBIO_ESTADO_COMPRA.
+*/
+CREATE TRIGGER TR_HISTORIAL_ESTADO_COMPRA
+AFTER INSERT ON COMPRAS
+FOR EACH ROW
+BEGIN
+    INSERT INTO HISTORIAL_ESTADOS_COMPRA
+        (ID_COMPRA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
+    VALUES
+        (NEW.ID_COMPRA, NULL, NEW.ESTADO, NEW.ID_EMPLEADO, 'Compra iniciada');
+END //
+DELIMITER ;
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Trigger TR_CAMBIO_ESTADO_COMPRA movido a 19 (su tabla).
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_CAMBIO_ESTADO_COMPRA ;
+/*
+TR_CAMBIO_ESTADO_COMPRA
+Cada vez que una compra cambia de estado (saldada, reabierta,
+cancelada o devuelta) anota una fila con el antes y el despues en
+HISTORIAL_ESTADOS_COMPRA. Si el estado no cambia no anota nada y
+tambien vale si alguien lo cambia con un UPDATE directo. El empleado
+es el dueno de la compra (los pagos no traen empleado propio).
+*/
+CREATE TRIGGER TR_CAMBIO_ESTADO_COMPRA
+AFTER UPDATE ON COMPRAS
+FOR EACH ROW
+BEGIN
+    IF NEW.ESTADO <> OLD.ESTADO THEN
+        INSERT INTO HISTORIAL_ESTADOS_COMPRA
+            (ID_COMPRA, ESTADO_ANTERIOR, ESTADO_NUEVO, ID_EMPLEADO, MOTIVO)
+        VALUES
+            (NEW.ID_COMPRA, OLD.ESTADO, NEW.ESTADO, NEW.ID_EMPLEADO,
+             CONCAT('Estado: ', OLD.ESTADO, ' -> ', NEW.ESTADO));
+    END IF;
+END //
 DELIMITER ;

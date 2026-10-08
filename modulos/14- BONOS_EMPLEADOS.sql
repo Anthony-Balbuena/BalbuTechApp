@@ -103,7 +103,7 @@ proc_label: BEGIN
 
     -- 4. Mensaje con ID y Nombre para confirmación total
     SELECT CONCAT('EXITO: BONO DE $', P_MONTO, ' REGISTRADO A: ', v_nombre_empleado, ' (ID: ', P_ID_EMPLEADO, ').') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -136,7 +136,7 @@ proc_label: BEGIN
     WHERE ID_BONO = P_ID_BONO;
 
     SELECT 'EXITO: BONO ACTUALIZADO CORRECTAMENTE.' AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 /*
@@ -180,7 +180,7 @@ proc_label: BEGIN
 
     -- 4. Confirmación
     SELECT CONCAT('EXITO: EL BONO CON ID ', P_ID_BONO, ' HA SIDO MARCADO COMO PAGADO.') AS MENSAJE;
-END;
+END//
 DELIMITER ;
 
 /*
@@ -223,7 +223,7 @@ proc_label: BEGIN
 
     -- 3. Confirmación
     SELECT CONCAT('EXITO: EL BONO CON ID ', P_ID_BONO, ' FUE ANULADO CORRECTAMENTE.') AS MENSAJE;
-END;
+END//
 
 DELIMITER ;
 
@@ -255,7 +255,7 @@ BEGIN
     INNER JOIN EMPLEADOS e ON b.ID_EMPLEADO = e.ID_EMPLEADO
     WHERE (P_ESTADO IS NULL OR P_ESTADO = '' OR b.ESTADO = P_ESTADO)
     ORDER BY b.FECHA DESC;
-END;
+END//
 DELIMITER ;
 
 
@@ -281,7 +281,7 @@ BEGIN
     IF NEW.FECHA < DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 30 DÍAS.';
     END IF;
-END;
+END//
 DELIMITER ;
 
 /*
@@ -291,7 +291,6 @@ antes de cobrar, y cancelar la venta no lo borraba. Ahora el bono lo crea
 TR_AUTO_FINALIZAR_VENTA (archivo 24) en el momento en que se paga el total
 de la venta. Solo queda el DROP para limpiar bases viejas.
 */
-DELIMITER //
 DROP TRIGGER IF EXISTS TR_CALCULAR_BONO_VENTA;
 DELIMITER ;
 

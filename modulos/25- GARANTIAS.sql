@@ -93,7 +93,7 @@ proc_label: BEGIN
         'EXITO' AS ESTATUS,
         'GARANTÍA REGISTRADA CON ÉXITO.' AS MENSAJE,
         V_NUEVO_ID AS ID_GENERADO;
-END ;
+END //
 DELIMITER ;
 
 
@@ -147,7 +147,7 @@ proc_label: BEGIN
     
     -- 4. Confirmación
     SELECT 'EXITO: DEVOLUCIÓN RECHAZADA CORRECTAMENTE.' AS MENSAJE;
-END;
+END//
 
 DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
@@ -172,7 +172,7 @@ BEGIN
     IF NEW.FECHA_INICIO < CURRENT_DATE THEN
         SET NEW.FECHA_INICIO = CURRENT_DATE;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -188,19 +188,7 @@ VISTA_DEVOLUCIONES_PENDIENTES
 Muestra las devoluciones que aun estan en PENDIENTE.
 Trae la venta, el producto, la cantidad y el motivo, listas para revisar.
 */
-CREATE OR REPLACE VIEW VISTA_DEVOLUCIONES_PENDIENTES AS
-SELECT 
-    D.ID_DEVOLUCION,
-    D.FECHA,
-    V.ID_VENTA,
-    P.NOMBRE AS PRODUCTO,
-    D.CANTIDAD,
-    D.MOTIVO
-FROM DEVOLUCIONES D
-JOIN DETALLES_VENTA DV ON D.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
-JOIN VENTAS V ON DV.ID_VENTA = V.ID_VENTA
-JOIN PRODUCTOS P ON DV.ID_PRODUCTO = P.ID_PRODUCTO
-WHERE D.ESTADO = 'PENDIENTE';
+-- Vista VISTA_DEVOLUCIONES_PENDIENTES movida a 26- DEVOLUCIONES.sql.
 
 
 -----------------------------------------------------------------------------------------------------------------------

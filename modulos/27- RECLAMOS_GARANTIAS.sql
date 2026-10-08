@@ -64,7 +64,7 @@ proc_label: BEGIN
     VALUES (P_ID_GARANTIA, P_DESCRIPCION);
 
     SELECT 'EXITO: RECLAMO REGISTRADO CORRECTAMENTE.' AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 USE BALBU_TECH;
@@ -90,7 +90,7 @@ BEGIN
         SET ESTADO = 'CANCELADA' -- O el estado que prefieras para indicar "garantía agotada"
         WHERE ID_GARANTIA = NEW.ID_GARANTIA;
     END IF;
-END;
+END//
 DELIMITER ;
 
 DELIMITER //
@@ -103,6 +103,7 @@ Si algo falla en el camino, deshace todo para no dejar datos a medias.
 CREATE PROCEDURE 27_SP_FINALIZAR_RECLAMO_TOTAL(IN P_ID_RECLAMO INT)
 BEGIN
     -- Declarar manejador de errores
+    DECLARE V_ESTADO_ANT VARCHAR(20);
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK; -- Si algo falla, deshace todo
@@ -110,13 +111,15 @@ BEGIN
     END;
 
     START TRANSACTION;
-        -- 1. Cerrar el reclamo
+        -- 1. Cerrar el reclamo (se guarda el estado previo para auditarlo)
+        SELECT ESTADO INTO V_ESTADO_ANT FROM RECLAMOS_GARANTIAS WHERE ID_RECLAMO_GARAN = P_ID_RECLAMO;
         UPDATE RECLAMOS_GARANTIAS SET ESTADO = 'CERRADO' WHERE ID_RECLAMO_GARAN = P_ID_RECLAMO;
         
-        -- 2. Registrar en la auditoría (si tienes la tabla)
-        INSERT INTO LOG_AUDITORIA (ACCION, DETALLES) VALUES ('CIERRE_RECLAMO', CONCAT('Reclamo #', P_ID_RECLAMO));
+        -- 2. Registrar en la auditoria (era LOG_AUDITORIA, inexistente; se usa AUDITORIA_SISTEMA).
+        INSERT INTO AUDITORIA_SISTEMA (TABLA_AFECTADA, ID_REGISTRO_AFECTADO, ACCION, USUARIO_SISTEMA, VALOR_ANTERIOR, VALOR_NUEVO)
+        VALUES ('RECLAMOS_GARANTIAS', P_ID_RECLAMO, 'UPDATE', USER(), V_ESTADO_ANT, 'CERRADO');
     COMMIT;
-END;
+END//
 
 DELIMITER ;
 

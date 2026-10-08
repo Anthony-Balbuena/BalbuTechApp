@@ -1,0 +1,4 @@
+# Los scripts bash deben conservar LF aunque el checkout sea en Windows
+# (con CRLF, bash falla con `$'\r': command not found`).
+*.sh text eol=lf
+Dockerfile text eol=lf
