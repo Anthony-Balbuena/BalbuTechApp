@@ -127,7 +127,7 @@ proc_label: BEGIN
 
     SELECT CONCAT('EXITO: PRODUCTO "', v_nombre_limpio, '" REGISTRADO CORRECTAMENTE.') AS MENSAJE;
 
-END ;
+END //
 
 DELIMITER ;
 
@@ -227,7 +227,7 @@ proc_label: BEGIN
 
     SELECT @mensaje_final AS MENSAJE;
 
-END ;
+END //
 
 DELIMITER ;
 
@@ -279,7 +279,7 @@ END IF;
         ' A: ', v_NUEVO_ESTADO
     ) AS MENSAJE;
 
-END ;
+END //
 DELIMITER ;
 
 ---4. CONSULTAR PRODUCTO FILTRADO
@@ -312,8 +312,8 @@ BEGIN
            OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%') 
            OR P.CODIGO = P_BUSQUEDA)
     ORDER BY P.ID_PRODUCTO ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
-END ;
-DELIMITER ;  
+END //
+DELIMITER ;
 
 --5. consultar inventario
 DELIMITER //
@@ -355,7 +355,7 @@ BEGIN
            OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%'))
       AND P.ESTADO = 'ACTIVO'
     ORDER BY P.ID_PRODUCTO ASC; -- Ordenado numéricamente por ID de producto
-END ;
+END //
 DELIMITER ;
 --6. REPORTE STOCK 
 DELIMITER //
@@ -376,7 +376,7 @@ BEGIN
     JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
     WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO
     ORDER BY CANTIDAD_FALTANTE DESC;
-END ;
+END //
 
 
 
@@ -413,10 +413,10 @@ BEGIN
     SELECT ID_PROVEEDOR, NOMBRE
     FROM PROVEEDORES
     ORDER BY ID_PROVEEDOR ASC;
-END;
+END//
 
-CALL PARA_INSERTAR_PRODUCTO();
 DELIMITER ;
+CALL PARA_INSERTAR_PRODUCTO();
 
 
 
@@ -454,11 +454,11 @@ P.ID_PRODUCTO ASC,
     C.ID_CATEGORIA ASC, 
     M.ID_MARCA ASC;
 
-END;
-
-CALL PARA_ACTUALIZARDATOS(); 
+END//
 
 DELIMITER ;
+CALL PARA_ACTUALIZARDATOS(); 
+
 
 --SP PARA VER EL LA LOGICA DEL C++ el backend los para activar o desactivar 
 DELIMITER //
@@ -476,7 +476,7 @@ BEGIN
 
 SELECT ID_PRODUCTO , NOMBRE ,ESTADO FROM PRODUCTOS 
 ORDER BY ID_PRODUCTO ASC;
-END;
+END//
 
 DELIMITER ;
 
@@ -519,3 +519,32 @@ DESCRIBE PRODUCTOS;
 
 ALTER TABLE PRODUCTOS 
 MODIFY COLUMN ID_PROVEEDOR INT NOT NULL;
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Trigger TR_AUDITORIA_PRODUCTOS_UPDATE movido a 9 (su tabla).
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_AUDITORIA_PRODUCTOS_UPDATE ;
+CREATE TRIGGER TR_AUDITORIA_PRODUCTOS_UPDATE
+AFTER UPDATE ON PRODUCTOS
+FOR EACH ROW
+BEGIN
+    -- Auditamos el PRECIO
+    IF OLD.PRECIO <> NEW.PRECIO THEN
+        INSERT INTO AUDITORIA_SISTEMA (
+            TABLA_AFECTADA, 
+            ID_REGISTRO_AFECTADO, 
+            ACCION, 
+            USUARIO_SISTEMA, 
+            VALOR_ANTERIOR, 
+            VALOR_NUEVO
+        ) VALUES (
+            'PRODUCTOS', 
+            NEW.ID_PRODUCTO, 
+            'UPDATE', 
+            USER(),
+            CONCAT('Precio venta anterior: ', OLD.PRECIO), 
+            CONCAT('Precio venta nuevo: ', NEW.PRECIO)
+        );
+    END IF;
+END //
+DELIMITER ;

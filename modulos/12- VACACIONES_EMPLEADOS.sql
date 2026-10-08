@@ -92,7 +92,7 @@ DROP PROCEDURE IF EXISTS SP_INSERTAR_VACACIONES ;
             '" (ID: ', P_ID_EMPLEADO, ') DEL ', P_FECHA_INICIO, ' AL ', P_FECHA_FIN, '.'
         ) AS MENSAJE;
 
-    END ;
+    END //
     DELIMITER ;
 
     /*
@@ -145,7 +145,7 @@ SP_ACTUALIZAR_VACACIONES
         -- 5. MENSAJE DE RETORNO ESTANDARIZADO
         SELECT CONCAT('EXITO: VACACIONES (ID: ', P_ID_VACACION, ') ACTUALIZADAS CORRECTAMENTE PARA EL EMPLEADO ID: ', v_id_empleado) AS MENSAJE;
 
-    END ;
+    END //
     DELIMITER ;
 
 
@@ -190,7 +190,7 @@ SP_ACTUALIZAR_VACACIONES
             IF((15 - v_dias_tomados) < 0, 'EXCEDE LÍMITE', 'DISPONIBLE') AS ESTATUS_VACACIONES
         FROM DUAL; -- DUAL es una tabla virtual para mostrar cálculos sin necesidad de FROM tablas físicas
 
-    END ;
+    END //
     DELIMITER ;
 
 
@@ -235,7 +235,7 @@ SP_ACTUALIZAR_VACACIONES
         ELSE
             SET P_DISPONIBLE = FALSE;
         END IF;
-    END ;
+    END //
     DELIMITER ;
 
 
@@ -267,7 +267,7 @@ SP_ACTUALIZAR_VACACIONES
         -- 2. NOTA: Si la consulta no devuelve filas, tu aplicación en C# 
         -- simplemente recibirá un "Data Table" vacío, lo cual es correcto.
         -- No requiere SIGNAL porque no es un error que no haya nadie de vacaciones.
-    END ;
+    END //
     DELIMITER ;
 
 

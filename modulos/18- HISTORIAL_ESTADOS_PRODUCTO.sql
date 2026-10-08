@@ -71,7 +71,7 @@ BEGIN
     -- 3. Limpiar variables de sesión para evitar conflictos
     SET @ID_EMPLEADO_ACTUAL = NULL;
     SET @MOTIVO_CAMBIO = NULL;
-END ;
+END //
 DELIMITER ;
 
 
@@ -109,7 +109,7 @@ BEGIN
             IFNULL(@MOTIVO_CAMBIO, 'Cambio de estado automático')
         );
     END IF;
-END ;
+END //
 DELIMITER ;
 
 

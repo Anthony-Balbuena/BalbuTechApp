@@ -60,7 +60,7 @@ BEGIN
     ) VALUES (
         NEW.ID_PRODUCTO, 'VENTA', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 'Venta registrada automáticamente'
     );
-END ;
+END //
 
 DELIMITER ;
 
@@ -96,7 +96,7 @@ BEGIN
     ) VALUES (
         NEW.ID_PRODUCTO, 'ENTRADA', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 'Compra registrada automáticamente'
     );
-END;
+END//
 
 DELIMITER ;
 /*
@@ -182,7 +182,7 @@ BEGIN
             CONCAT('Devolución aprobada: ', IFNULL(NEW.MOTIVO, ''))
         );
     END IF;
-END;
+END//
 
 DELIMITER ;
 

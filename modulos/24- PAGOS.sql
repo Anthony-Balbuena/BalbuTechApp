@@ -132,7 +132,7 @@ CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
     IN P_ID_METODO_PAGO INT,
     IN P_MONTO DECIMAL(10, 2),
     IN P_ID_EMPLEADO INT, -- El empleado que procesa el pago (P8)
-    IN P_MONTO_RECIBIDO DECIMAL(10, 2) DEFAULT NULL -- Lo que entrego el cliente; NULL = no aplica (P9)
+    IN P_MONTO_RECIBIDO DECIMAL(10, 2) -- Lo que entrego el cliente; NULL = no aplica (P9)
 )
 proc_label: BEGIN
     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
@@ -168,7 +168,7 @@ proc_label: BEGIN
                   IF(IFNULL(P_MONTO_RECIBIDO, P_MONTO) > P_MONTO,
                      CONCAT(' (VUELTO ', IFNULL(P_MONTO_RECIBIDO, P_MONTO) - P_MONTO, ')'), ''),
                   ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -274,7 +274,7 @@ proc_label: BEGIN
                   '). COBRADO DE LA VENTA #', V_ID_VENTA, ': ', V_TOTAL_PAGADO,
                   IF(V_BONOS_BORRADOS > 0, ' - SE RETIRO EL BONO DEL 1%', '')
                  ) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -320,7 +320,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' 
         SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.';
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -344,7 +344,7 @@ BEGIN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'ERROR: LA VENTA NO ADMITE CAMBIOS DE PAGO (ESTA CANCELADA O DEVUELTA).';
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -386,7 +386,7 @@ BEGIN
                 CONCAT('Comisión por venta #', NEW.ID_VENTA),
                 'PENDIENTE');
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -429,7 +429,7 @@ BEGIN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.';
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -478,7 +478,7 @@ BEGIN
               AND ESTADO = 'PENDIENTE';
         END IF;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 DELIMITER //
@@ -523,7 +523,7 @@ BEGIN
                 CONCAT('Comisión por venta #', OLD.ID_VENTA),
                 'PENDIENTE');
     END IF;
-END ;
+END //
 DELIMITER ;
 
 

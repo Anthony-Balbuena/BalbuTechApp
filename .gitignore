@@ -1,4 +1,25 @@
-.devcontainer/.env
-Skills/
-Contextos.opencodetxt/
-Documentos/
+# Docker / entorno
+.env
+mariadb-data/
+
+# Build Linux (contenedor) y Windows (msys64)
+output/
+*.o
+*.obj
+*.exe
+BalbuTechApp
+main
+app
+
+# Respaldo local del experimento API-C
+database.cpp.c-api-bak
+database.h.c-api-bak
+
+# Conector Windows (solo local, ~200MB, no va al repo ni a Docker)
+mysql-connector-c++-26.7.0-winx64/
+
+# Ofimatica / notas locales
+*.ods
+*.odt
+*.tmp
+.~lock.*#

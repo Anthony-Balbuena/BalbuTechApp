@@ -123,7 +123,7 @@ proc_label: BEGIN
     );
 
     SELECT CONCAT('EXITO: MOVIMIENTO ', P_TIPO, ' REGISTRADO Y STOCK ACTUALIZADO.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -132,119 +132,12 @@ DELIMITER ;
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 --COMPRA
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_AUDITORIA_MOVIMIENTO_COMPRA ;
-/*
-TR_AUDITORIA_MOVIMIENTO_COMPRA
-Cuando se registra una compra, anota automaticamente la ENTRADA de mercancia.
-Toma el empleado de la compra y deja el movimiento con su observacion.
-*/
-CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_COMPRA
-AFTER INSERT ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    -- Obtenemos el empleado de la cabecera de la compra para el registro
-    DECLARE V_ID_EMPLEADO INT;
-    SELECT ID_EMPLEADO INTO V_ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = NEW.ID_COMPRA;
-
-    INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
-    VALUES (NEW.ID_PRODUCTO, V_ID_EMPLEADO, 'ENTRADA', NEW.CANTIDAD, CONCAT('Compra registrada ID: ', NEW.ID_COMPRA));
-END ;
-
-DELIMITER ;
-DELIMITER //
-DROP TRIGGER IF EXISTS TR_AUDITORIA_BORRADO_COMPRA ;
-
-/*
-TR_AUDITORIA_BORRADO_COMPRA
-Cuando se quita una linea de una compra, anota la SALIDA de esa
-mercancia (el stock que se regresa al inventario). El empleado lo toma
-de la compra, igual que en la ENTRADA.
-*/
-CREATE TRIGGER TR_AUDITORIA_BORRADO_COMPRA
-AFTER DELETE ON DETALLE_COMPRA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ID_EMPLEADO INT;
-    SELECT ID_EMPLEADO INTO V_ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
-
-    INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
-    VALUES (OLD.ID_PRODUCTO, V_ID_EMPLEADO, 'SALIDA', OLD.CANTIDAD,
-            CONCAT('Producto quitado de la compra ID: ', OLD.ID_COMPRA));
-END ;
+-- Trigger TR_AUDITORIA_MOVIMIENTO_COMPRA movido a 22 (su tabla).
+-- Trigger TR_AUDITORIA_BORRADO_COMPRA movido a 22 (su tabla).
 
 --VENTAS
 DELIMITER ;
-DELIMITER //
-
-DROP TRIGGER IF EXISTS TR_AUDITORIA_MOVIMIENTO_VENTA ;
-
-/*
-TR_AUDITORIA_MOVIMIENTO_VENTA
-Cuando se inserta una linea de venta descuenta el stock con UNA SOLA
-sentencia: comprueba y resta a la vez (un solo golpe). Si no alcanza el
-stock corta con error y la linea se revierte sola, asi nunca queda una
-venta sin su salida de inventario. La bitacora SALIDA va igual que antes.
-*/
-
--- ============================================================
--- VERSION ANTERIOR (guardada para revision, NO se ejecuta)
--- Restaba el stock sin comprobar: en una carrera entre dos cajeros
--- podia dejar el inventario negativo; lo frenaba recien el CHECK
--- de INVENTARIO, con un error tecnico y no un mensaje claro.
--- ============================================================
--- CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_VENTA
--- AFTER INSERT ON DETALLES_VENTA -- <--- AQUÍ ESTABA EL ERROR
--- FOR EACH ROW
--- BEGIN
---     DECLARE V_ID_EMPLEADO INT;
---
---     -- Obtenemos el empleado de la cabecera de la venta
---     SELECT ID_EMPLEADO INTO V_ID_EMPLEADO 
---     FROM VENTAS 
---     WHERE ID_VENTA = NEW.ID_VENTA;
---
---     -- Restamos del Inventario
---     UPDATE INVENTARIO 
---     SET STOCK_ACTUAL = STOCK_ACTUAL - NEW.CANTIDAD
---     WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
---
---     -- Registramos el movimiento
---     INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
---     VALUES (NEW.ID_PRODUCTO, V_ID_EMPLEADO, 'SALIDA', NEW.CANTIDAD, CONCAT('Venta realizada ID: ', NEW.ID_VENTA));
--- END ;
-
--- ============================================================
--- VERSION NUEVA (la que se crea) - "un solo golpe"
--- ============================================================
-CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_VENTA
-AFTER INSERT ON DETALLES_VENTA
-FOR EACH ROW
-BEGIN
-    DECLARE V_ID_EMPLEADO INT;
-
-    -- Obtenemos el empleado de la cabecera de la venta
-    SELECT ID_EMPLEADO INTO V_ID_EMPLEADO 
-    FROM VENTAS 
-    WHERE ID_VENTA = NEW.ID_VENTA;
-
-    -- UN SOLO GOLPE: la comprobacion y la resta en la misma sentencia.
-    -- Si no alcanza el stock, no descuenta nada y corta con error.
-    UPDATE INVENTARIO 
-       SET STOCK_ACTUAL = STOCK_ACTUAL - NEW.CANTIDAD
-     WHERE ID_PRODUCTO = NEW.ID_PRODUCTO
-       AND STOCK_ACTUAL >= NEW.CANTIDAD;
-
-    IF ROW_COUNT() = 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE.';
-    END IF;
-
-    -- Registramos el movimiento (igual que antes)
-    INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
-    VALUES (NEW.ID_PRODUCTO, V_ID_EMPLEADO, 'SALIDA', NEW.CANTIDAD, CONCAT('Venta realizada ID: ', NEW.ID_VENTA));
-END ;
-
-DELIMITER ;
+-- Trigger TR_AUDITORIA_MOVIMIENTO_VENTA movido a 23 (su tabla).
 
 
 

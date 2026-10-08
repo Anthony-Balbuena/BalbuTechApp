@@ -68,7 +68,7 @@ Valida que el empleado exista, que las fechas no sean retroactivas ni
 invertidas y que no se cruce con otro permiso pendiente o aprobado; si
 todo esta bien lo guarda y responde con un mensaje de exito.
 */
-DELIMITER // 
+DELIMITER //
 DROP PROCEDURE IF EXISTS SP_SOLICITAR_PERMISO ;
 CREATE PROCEDURE SP_SOLICITAR_PERMISO(
     IN P_ID_EMPLEADO INT,
@@ -108,7 +108,7 @@ proc_label: BEGIN
     VALUES (P_ID_EMPLEADO, P_TIPO_PERMISO, P_FECHA_INICIO, P_FECHA_FIN, REGEXP_REPLACE(TRIM(P_DESCRIPCION), '[[:space:]]+', ' '));
 
     SELECT CONCAT('EXITO: SOLICITUD DE PERMISO CREADA PARA "', v_nombre_empleado, '".') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 /*
@@ -136,7 +136,7 @@ proc_label: BEGIN
     WHERE ID_PERMISO = P_ID_PERMISO;
 
     SELECT CONCAT('EXITO: PERMISO ID ', P_ID_PERMISO, ' ACTUALIZADO A ESTADO: ', P_NUEVO_ESTADO) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -161,7 +161,7 @@ BEGIN
     FROM PERMISOS_EMPLEADOS
     WHERE ID_EMPLEADO = P_ID_EMPLEADO
     ORDER BY FECHA_INICIO DESC;
-END ;
+END //
 DELIMITER ;
 
 

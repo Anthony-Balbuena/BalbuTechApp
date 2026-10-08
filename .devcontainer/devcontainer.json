@@ -1,6 +1,25 @@
 {
-    "name": "C++ and MariaDB",
-    "dockerComposeFile": "docker-compose.yml",
+    "name": "BalbuTechApp C++ + MariaDB",
+    "dockerComposeFile": [
+        "../docker-compose.yml"
+    ],
     "service": "app",
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+    "workspaceFolder": "/workspace",
+    "forwardPorts": [3306],
+    "portsAttributes": {
+        "3306": {
+            "label": "MariaDB",
+            "onAutoForward": "notify"
+        }
+    },
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "cweijan.vscode-mysql-client2"
+            ]
+        }
+    },
+    "postCreateCommand": "bash build.sh || true"
 }

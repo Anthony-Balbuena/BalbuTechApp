@@ -48,7 +48,7 @@ proc_label: BEGIN
     INSERT INTO MARCAS (NOMBRE) VALUES (v_nombre_limpio);
 
     SELECT CONCAT('EXITO: MARCA "', v_nombre_limpio, '" INSERTADA. ID: ', LAST_INSERT_ID()) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 
@@ -87,7 +87,7 @@ proc_label: BEGIN
     UPDATE MARCAS SET NOMBRE = COALESCE(v_nombre_limpio, NOMBRE) WHERE ID_MARCA = P_ID_MARCA;
 
     SELECT CONCAT('EXITO: MARCA ID ', P_ID_MARCA, ' ACTUALIZADA.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 --3. BUSCAR 
@@ -97,8 +97,8 @@ Busca marcas por nombre parcial.
 Si la busqueda viene vacia o nula, devuelve todas las marcas.
 */
 DELIMITER //
-drop PROCEDURE if EXISTS SP_BUSCAR_MARCAS; 
-CREATE PROCEDURE SP_BUSCAR_MARCAS(
+drop PROCEDURE if EXISTS SP_BUSCAR_MARCA; 
+CREATE PROCEDURE SP_BUSCAR_MARCA(
     IN P_BUSQUEDA VARCHAR(100)
 )
 BEGIN
@@ -107,7 +107,7 @@ BEGIN
     SELECT * FROM MARCAS 
     WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = '') 
        OR (NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%'));
-END ;
+END //
 DELIMITER ;
 
 --4. TOGLER ACTUALIZAR ESTADO 
@@ -130,9 +130,10 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. Realizamos el cambio de estado (Toggle)
+    -- 2. Realizamos el cambio de estado (Toggle). Ojo: MARCAS.ESTADO es
+    -- ENUM('ACTIVA','INACTIVA') en femenino; con 'ACTIVO' daba ERROR 1265.
     UPDATE MARCAS
-    SET ESTADO = IF(ESTADO = 'ACTIVO', 'INACTIVO', 'ACTIVO')
+    SET ESTADO = IF(ESTADO = 'ACTIVA', 'INACTIVA', 'ACTIVA')
     WHERE ID_MARCA = P_ID_MARCA;
 
     -- 3. Retornamos el mensaje con los datos actualizados
@@ -143,7 +144,7 @@ proc_label: BEGIN
     FROM MARCAS
     WHERE ID_MARCA = P_ID_MARCA;
 
-END ;
+END //
 DELIMITER ;
 
 --5. BUSCAR TODAS LAS MARCAS 
@@ -156,7 +157,7 @@ DELIMITER //
 CREATE PROCEDURE 2_SP_OBTENER_MARCA(IN P_ID INT)
 BEGIN
     SELECT * FROM MARCAS WHERE ID_MARCA = P_ID;
-END ;
+END //
 DELIMITER ;
 
 --6. BUSCAR MARCAS ACTIVAS
@@ -173,7 +174,7 @@ BEGIN
     ELSE
         SELECT * FROM MARCAS;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 CALL `SP_INSERTAR_MARCA` ('ASUS');
@@ -186,3 +187,14 @@ CALL `SP_INSERTAR_MARCA` ('IPHONE');
 CALL `SP_INSERTAR_MARCA` ('XIAOMI');
 CALL `SP_INSERTAR_MARCA` ('JBL');
 CALL `SP_INSERTAR_MARCA` ('RED MAGIC');
+
+-----------------------------------------------------------------------------------------------------------------------
+--- SP requerido por la app C++ (marcas.cpp:listarMarcas).
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_LISTAR_MARCAS ;
+CREATE PROCEDURE SP_LISTAR_MARCAS()
+BEGIN
+    SELECT ID_MARCA, NOMBRE, ESTADO FROM MARCAS ORDER BY ID_MARCA;
+END //
+DELIMITER ;

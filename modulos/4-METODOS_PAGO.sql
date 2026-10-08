@@ -7,9 +7,13 @@ La tabla usa InnoDB para transacciones y restricciones.
 CREATE TABLE METODOS_PAGO (
     ID_METODO_PAGO INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
+    ESTADO ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     PRIMARY KEY (ID_METODO_PAGO),
     CONSTRAINT CK_METODO_NOMBRE CHECK (CHAR_LENGTH(TRIM(NOMBRE)) > 0)
 ) ENGINE = InnoDB;
+-- Migracion para BDs ya creadas sin la columna (P-auditoria #2):
+-- el toggle SP_TOGGLE_ESTADO_METODO_PAGO y la app la exigen NOT NULL.
+ALTER TABLE METODOS_PAGO ADD COLUMN IF NOT EXISTS ESTADO ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO';
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------
@@ -51,7 +55,7 @@ proc_label: BEGIN
 
     -- 4. MENSAJE ESTANDARIZADO PARA C++
     SELECT CONCAT('EXITO: MÉTODO DE PAGO "', v_nombre_limpio, '" INSERTADO. ID: ', LAST_INSERT_ID()) AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 -- 2. ACTUALIZAR 
@@ -89,7 +93,7 @@ proc_label: BEGIN
     UPDATE METODOS_PAGO SET NOMBRE = COALESCE(v_nombre_limpio, NOMBRE) WHERE ID_METODO_PAGO = P_ID_METODO;
 
     SELECT CONCAT('EXITO: MÉTODO DE PAGO ID ', P_ID_METODO, ' ACTUALIZADO.') AS MENSAJE;
-END ;
+END //
 DELIMITER ;
 
 --LISTAR 
@@ -103,7 +107,7 @@ DROP PROCEDURE IF EXISTS SP_LISTAR_METODOS_PAGO;
 CREATE PROCEDURE SP_LISTAR_METODOS_PAGO()
 BEGIN
     SELECT ID_METODO_PAGO, NOMBRE FROM METODOS_PAGO ORDER BY NOMBRE ASC;
-END ;
+END //
 DELIMITER ;
 
 --BUSCAR
@@ -114,7 +118,6 @@ Si la busqueda viene vacia o nula, devuelve todos ordenados por ID.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS  SP_BUSCAR_METODOS_PAGO ;
-
 CREATE PROCEDURE SP_BUSCAR_METODOS_PAGO(
     IN P_BUSQUEDA VARCHAR(50)
 )
@@ -124,9 +127,7 @@ BEGIN
     WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = '') 
        OR (NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%'))
     ORDER BY ID_METODO_PAGO ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
-END ;
-
-
+END //
 DELIMITER ;
 
 
@@ -163,7 +164,7 @@ proc_label: BEGIN
     FROM METODOS_PAGO
     WHERE ID_METODO_PAGO = P_ID_METODO;
 
-END ;
+END //
 
 DELIMITER ;
 

@@ -20,7 +20,7 @@ CREATE TABLE CLIENTES (
 ) ENGINE = InnoDB;
 
 --1. INSERTAR
-DELIMITER //      
+DELIMITER //
 /*
 SP_INSERTAR_CLIENTES
 Da de alta un cliente nuevo limpiando nombre, telefono, email y
@@ -70,7 +70,7 @@ proc_label: BEGIN
 
     -- 4. MENSAJE ESTANDARIZADO PARA C++
     SELECT CONCAT('EXITO: CLIENTE "', v_nombre_limpio, '" INSERTADO. ID: ', LAST_INSERT_ID()) AS MENSAJE;
-END;
+END//
 DELIMITER ;
  
 --2.ACTUALIZAR
@@ -160,7 +160,7 @@ proc_label: BEGIN
 
     SELECT @mensaje_final AS MENSAJE;
 
-END ;
+END //
 
 DELIMITER ;
 
@@ -201,7 +201,7 @@ proc_label: BEGIN
            OR EMAIL LIKE CONCAT('%', v_filtro_limpio, '%'))
     ORDER BY NOMBRE ASC;
 
-END ;
+END //
 
 DELIMITER ;
 
@@ -232,7 +232,7 @@ BEGIN
         FROM CLIENTES 
         WHERE ID_CLIENTE = P_ID_CLIENTE;
     END IF;
-END ;
+END //
 DELIMITER ;
 
 
@@ -256,7 +256,7 @@ BEGIN
     INSERT INTO AUDITORIA_SISTEMA (TABLA_AFECTADA, ID_REGISTRO_AFECTADO, ACCION, USUARIO_SISTEMA, VALOR_NUEVO)
     VALUES ('CLIENTES', NEW.ID_CLIENTE, 'INSERT', CURRENT_USER(), 
             CONCAT('Nombre: ', NEW.NOMBRE, ', Email: ', NEW.EMAIL));
-END ;
+END //
 
 -- 2. Trigger para registrar cambios en clientes existentes
 /*
@@ -274,9 +274,9 @@ BEGIN
     VALUES ('CLIENTES', OLD.ID_CLIENTE, 'UPDATE', CURRENT_USER(), 
             CONCAT('Nombre: ', OLD.NOMBRE, ', Email: ', OLD.EMAIL),
             CONCAT('Nombre: ', NEW.NOMBRE, ', Email: ', NEW.EMAIL));
-END ;
+END //
 
 DELIMITER ;
 
 
-CALL `SP_INSERTAR_CLIENTES` ('Jose Perez', '8097282431','perez01@gmail.com','Villa carmen')
+CALL `SP_INSERTAR_CLIENTES` ('Jose Perez', '8097282431','perez01@gmail.com','Villa carmen');

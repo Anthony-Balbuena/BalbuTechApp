@@ -3,7 +3,7 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "Compilar y Ejecutar BalbuTechApp",
+            "label": "Compilar y Ejecutar BalbuTechApp (Windows)",
             "command": "g++",
             "args": [
                 "-std=c++14",
@@ -12,19 +12,75 @@
                 "main",
                 "-lmysqlcppconn",
                 "-lssl",
-                "-lcrypto",
-                "&&",
-                "./main"
+                "-lcrypto"
             ],
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": false
             },
             "problemMatcher": ["$gcc"],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+        {
+            "type": "shell",
+            "label": "Docker: levantar (app + MariaDB 10.11)",
+            "command": "docker",
+            "args": ["compose", "up", "--build", "-d"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Docker: compilar con g++ (todos los .cpp)",
+            "command": "docker",
+            "args": ["compose", "exec", "app", "bash", "build.sh"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "type": "shell",
+            "label": "Docker: importar modulos/*.sql en orden",
+            "command": "docker",
+            "args": ["compose", "exec", "app", "bash", "db/import.sh"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Docker: crear admin + verificar SPs",
+            "command": "docker",
+            "args": ["compose", "exec", "app", "bash", "db/seed-admin.sh"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Docker: ver tablas",
+            "command": "docker",
+            "args": ["compose", "exec", "db", "mariadb", "-uroot", "-plinux01", "-DBALBU_TECH", "-e", "SHOW TABLES;"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Docker: bajar",
+            "command": "docker",
+            "args": ["compose", "down"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "always", "panel": "shared"},
+            "problemMatcher": []
         }
     ]
 }

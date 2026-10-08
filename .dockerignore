@@ -1,0 +1,14 @@
+# Evita mandar binarios Windows y carpetas pesadas al contexto Docker
+.git/
+.vscode/
+.gitignore
+output/
+mysql-connector-c++-26.7.0-winx64/
+BalbuTechApp
+main
+*.exe
+*.o
+*.obj
+*.ods
+Comandos de gibhub
+.env
