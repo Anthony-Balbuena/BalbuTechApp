@@ -317,6 +317,15 @@ CREATE TRIGGER TR_CALCULAR_TOTAL_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
 BEGIN
+    -- P11C (07/10/2026): si el UPDATE de TOTAL falla, apagar la bandera
+    -- antes de propagar el error (las variables de usuario no se
+    -- revierten con ROLLBACK); patron P11 del flujo de ventas.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET @COMPRAS_INTERNO = 0;
+        RESIGNAL;
+    END;
+
     -- @COMPRAS_INTERNO le avisa al candado de cabecera que este cambio de
     -- TOTAL viene del detalle y no de un UPDATE a pelo
     SET @COMPRAS_INTERNO = 1;
@@ -338,6 +347,15 @@ CREATE TRIGGER TR_RECALCULAR_TOTAL_COMPRA
 AFTER DELETE ON DETALLE_COMPRA
 FOR EACH ROW
 BEGIN
+    -- P11C (07/10/2026): si el UPDATE de TOTAL falla, apagar la bandera
+    -- antes de propagar el error (las variables de usuario no se
+    -- revierten con ROLLBACK); patron P11 del flujo de ventas.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET @COMPRAS_INTERNO = 0;
+        RESIGNAL;
+    END;
+
     -- Mismo candado interno que TR_CALCULAR_TOTAL_COMPRA: el TOTAL aqui
     -- lo pone el recalculo contra el detalle, no un UPDATE a mano
     SET @COMPRAS_INTERNO = 1;

@@ -101,10 +101,33 @@ proc_label: BEGIN
     DECLARE V_TOTAL DECIMAL(10, 2);
     DECLARE V_ESTADO VARCHAR(20);
     DECLARE V_PAGADO DECIMAL(10, 2);
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra
+    -- este SP; si venimos de adentro de otra, no la toca (mismo patron
+    -- de la fase I en SP_ANULAR_PAGO_COMPRA).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. La compra debe existir
+    -- BLINDAJE (07/10/2026): FOR UPDATE congela la fila de la compra para
+    -- que dos movimientos a la vez no pasen juntos su validacion de montos
+    -- (evita exceder el total por carrera).
+    -- SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
+    -- FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
     SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
-    FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
+      FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA
+      FOR UPDATE;
 
     IF V_TOTAL IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO EXISTE.';
@@ -159,6 +182,10 @@ proc_label: BEGIN
     --    Si P_ID_EMPLEADO viene NULL lo completa el trigger de la tabla.
     INSERT INTO PAGOS_COMPRA (ID_COMPRA, ID_METODO_PAGO, ID_EMPLEADO, TIPO, MONTO)
     VALUES (P_ID_COMPRA, P_ID_METODO_PAGO, P_ID_EMPLEADO, 'PAGO', P_MONTO);
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
 
     -- 8. Mensaje con el estado final
     SELECT ESTADO INTO V_ESTADO FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
@@ -280,10 +307,33 @@ proc_label: BEGIN
     DECLARE V_TOTAL DECIMAL(10, 2);
     DECLARE V_ESTADO VARCHAR(20);
     DECLARE V_PAGADO DECIMAL(10, 2);
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra
+    -- este SP; si venimos de adentro de otra, no la toca (mismo patron
+    -- de la fase I en SP_ANULAR_PAGO_COMPRA).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. La compra debe existir
+    -- BLINDAJE (07/10/2026): FOR UPDATE congela la fila de la compra para
+    -- que dos movimientos a la vez no pasen juntos su validacion de montos
+    -- (evita exceder el total por carrera).
+    -- SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
+    -- FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
     SELECT TOTAL, ESTADO INTO V_TOTAL, V_ESTADO
-    FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA;
+      FROM COMPRAS WHERE ID_COMPRA = P_ID_COMPRA
+      FOR UPDATE;
 
     IF V_TOTAL IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA COMPRA NO EXISTE.';
@@ -319,6 +369,10 @@ proc_label: BEGIN
     -- 6. Se guarda con el signo cambiado (la fila siempre es negativa)
     INSERT INTO PAGOS_COMPRA (ID_COMPRA, ID_METODO_PAGO, ID_EMPLEADO, TIPO, MONTO, OBSERVACION)
     VALUES (P_ID_COMPRA, NULL, P_ID_EMPLEADO, 'NOTA_CREDITO', -ABS(P_MONTO), TRIM(P_OBSERVACION));
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
 
     -- 7. Mensaje con lo que queda pagado
     SELECT IFNULL(SUM(MONTO), 0) INTO V_PAGADO

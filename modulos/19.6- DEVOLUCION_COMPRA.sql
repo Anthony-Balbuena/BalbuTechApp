@@ -80,6 +80,23 @@ proc_label: BEGIN
     DECLARE V_CANTIDAD_COMPRADA INT;
     DECLARE V_PRECIO_UNITARIO DECIMAL(10, 2);
     DECLARE V_YA_DEVUELTA INT;
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra
+    -- este SP; si venimos de adentro de otra, no la toca (mismo patron
+    -- de la fase I en SP_ANULAR_PAGO_COMPRA).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. Cantidad valida
     IF IFNULL(P_CANTIDAD, 0) <= 0 THEN
@@ -98,7 +115,12 @@ proc_label: BEGIN
       INTO V_ID_COMPRA, V_CANTIDAD_COMPRADA, V_PRECIO_UNITARIO, V_ESTADO_COMPRA
       FROM DETALLE_COMPRA DC
       JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
-     WHERE DC.ID_DETALLE_COMPRA = P_ID_DETALLE_COMPRA;
+     -- BLINDAJE (07/10/2026): FOR UPDATE congela el detalle y la compra
+     -- para que dos devoluciones a la vez no pasen juntas la validacion
+     -- del paso 5 (evita devolver de mas por carrera).
+     -- WHERE DC.ID_DETALLE_COMPRA = P_ID_DETALLE_COMPRA;
+     WHERE DC.ID_DETALLE_COMPRA = P_ID_DETALLE_COMPRA
+       FOR UPDATE;
 
     IF V_ID_COMPRA IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL DETALLE DE LA COMPRA NO EXISTE.';
@@ -134,6 +156,10 @@ proc_label: BEGIN
 
     SET P_ID_DEVOLUCION_GENERADO = LAST_INSERT_ID();
 
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     SELECT CONCAT('EXITO: DEVOLUCION #', P_ID_DEVOLUCION_GENERADO,
                   ' REGISTRADA (PENDIENTE).') AS MENSAJE;
 END ;
@@ -145,21 +171,55 @@ DROP PROCEDURE IF EXISTS SP_PROCESAR_DEVOLUCION_COMPRA ;
 SP_PROCESAR_DEVOLUCION_COMPRA
 Cierra una devolucion pendiente: PROCESADA devuelve la mercancia al
 proveedor (baja stock, anota SALIDA + historial, baja el TOTAL y deja la
-compra DEVUELTA si se devolvio todo); RECHAZADA no toca nada. Valida que
+compra DEVUELTA si se devolvio todo); RECHAZADA no toca efectos (stock, total ni bitacora) pero si
+anota el motivo del rechazo en MOTIVO encima del motivo original
+(P12C). Valida que
 exista y que siga PENDIENTE; los efectos los hace
 TR_PROCESAR_DEVOLUCION_COMPRA, que tambien valen en un UPDATE directo.
 */
+-- P12C (07/10/2026): el rechazo no dejaba rastro del por que; ahora el
+-- SP acepta el motivo del rechazo y lo anota en MOTIVO encima del motivo
+-- original. Los llamados viejos de 2 argumentos siguen valiendo: el
+-- parametro nuevo viene con DEFAULT NULL.
+-- CREATE PROCEDURE SP_PROCESAR_DEVOLUCION_COMPRA(
+--     IN P_ID_DEVOLUCION_COMPRA INT,
+--     IN P_NUEVO_ESTADO ENUM('PROCESADA', 'RECHAZADA')
+-- )
 CREATE PROCEDURE SP_PROCESAR_DEVOLUCION_COMPRA(
     IN P_ID_DEVOLUCION_COMPRA INT,
-    IN P_NUEVO_ESTADO ENUM('PROCESADA', 'RECHAZADA')
+    IN P_NUEVO_ESTADO ENUM('PROCESADA', 'RECHAZADA'),
+    IN P_MOTIVO_RECHAZO VARCHAR(200) DEFAULT NULL
 )
 proc_label: BEGIN
     DECLARE V_ESTADO_ACTUAL VARCHAR(20);
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+
+    -- Transaccion propia: si nadie la abrio antes, la abre y la cierra
+    -- este SP; si venimos de adentro de otra, no la toca (mismo patron
+    -- de la fase I en SP_ANULAR_PAGO_COMPRA).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. La devolucion debe existir
+    -- BLINDAJE (07/10/2026): FOR UPDATE congela la fila; dos procesos
+    -- a la vez se serializan y el segundo ve el estado ya cambiado.
+    -- SELECT ESTADO INTO V_ESTADO_ACTUAL
+    --   FROM DEVOLUCION_COMPRA
+    --  WHERE ID_DEVOLUCION_COMPRA = P_ID_DEVOLUCION_COMPRA;
     SELECT ESTADO INTO V_ESTADO_ACTUAL
       FROM DEVOLUCION_COMPRA
-     WHERE ID_DEVOLUCION_COMPRA = P_ID_DEVOLUCION_COMPRA;
+     WHERE ID_DEVOLUCION_COMPRA = P_ID_DEVOLUCION_COMPRA
+       FOR UPDATE;
 
     IF V_ESTADO_ACTUAL IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA DEVOLUCION NO EXISTE.';
@@ -172,10 +232,28 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 3. Cambiar el estado dispara TR_PROCESAR_DEVOLUCION_COMPRA
+    -- 3. Cambiar el estado dispara TR_PROCESAR_DEVOLUCION_COMPRA.
+    -- P12C (07/10/2026): al rechazar se anota el motivo encima del
+    -- original (LEFT: MOTIVO es VARCHAR(200) y la concatenacion no
+    -- puede pasarse de largo); a PROCESADA no se le toca el motivo.
+    -- UPDATE DEVOLUCION_COMPRA
+    --    SET ESTADO = P_NUEVO_ESTADO
+    --  WHERE ID_DEVOLUCION_COMPRA = P_ID_DEVOLUCION_COMPRA;
     UPDATE DEVOLUCION_COMPRA
-       SET ESTADO = P_NUEVO_ESTADO
+       SET ESTADO = P_NUEVO_ESTADO,
+           MOTIVO = CASE
+                        WHEN P_NUEVO_ESTADO = 'RECHAZADA' THEN
+                            LEFT(CONCAT(IFNULL(CONCAT(MOTIVO, ' | '), ''),
+                                        'RECHAZO: ',
+                                        IFNULL(P_MOTIVO_RECHAZO, 'NO ESPECIFICADO')),
+                                 200)
+                        ELSE MOTIVO
+                    END
      WHERE ID_DEVOLUCION_COMPRA = P_ID_DEVOLUCION_COMPRA;
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
 
     SELECT CONCAT('EXITO: DEVOLUCION #', P_ID_DEVOLUCION_COMPRA, ' ', P_NUEVO_ESTADO, '.') AS MENSAJE;
 END ;
@@ -206,6 +284,15 @@ BEGIN
     DECLARE V_ESTADO_COMPRA VARCHAR(20);
     DECLARE V_STOCK_ANTES INT;
     DECLARE V_TOTAL_ACTUAL DECIMAL(10, 2);
+
+    -- P11C (07/10/2026): el paso 4 prende @COMPRAS_INTERNO; si el UPDATE
+    -- de TOTAL falla, apagar la bandera antes de propagar (las variables
+    -- de usuario no se revierten con ROLLBACK).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET @COMPRAS_INTERNO = 0;
+        RESIGNAL;
+    END;
 
     IF NEW.ESTADO = 'PROCESADA' AND OLD.ESTADO = 'PENDIENTE' THEN
 
