@@ -1,0 +1,103 @@
+CONTEXTO DE DOCUMENTACION - TABLA HISTORIAL_ESTADOS_COMPRA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/19- COMPRAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql (4 bloques)
+================================================================================
+TABLA (1)
+  - HISTORIAL_ESTADOS_COMPRA .. quien, cuando y como cambio el estado de
+                                cada compra; una fila por cambio (paquetito G)
+
+INDICE (1)
+  - IX_HIST_ESTADO_FECHA ...... historial de estados por fecha, para los
+                                reportes (por compra ya lo cubre el FK)
+
+TRIGGERS (2)
+  - TR_HISTORIAL_ESTADO_COMPRA .. AFTER INSERT ON COMPRAS: la primera fila
+                                  del historial al nacer la compra
+                                  (ESTADO_ANTERIOR queda NULL)
+  - TR_CAMBIO_ESTADO_COMPRA .... AFTER UPDATE ON COMPRAS: anota cada cambio
+                                  de estado con el antes y el despues, y el
+                                  motivo "Estado: X -> Y"
+
+PROCEDIMIENTOS (0), VISTAS (0), FUNCIONES (0)
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Solo lectura: este contexto documenta lo que ya estaba en 19- COMPRAS.sql
+  (tabla creada en el paquetito G, 04/10/2026) y se creo junto con el
+  contexto gemelo de HISTORIAL_ESTADOS_VENTA.
+- Nada de SQL se toco: no hay DROP, INSERT ni UPDATE de este archivo aqui.
+- Ambos historiales tienen la misma forma a proposito (compras y ventas se
+  leen igual), menos la FK, que apunta a su cabecera.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- Nada pendiente de este archivo: la tabla, su indice y sus 2 triggers ya
+  estan documentados y probados (paquetito G, 8/8 PASS).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- grep -n "HISTORIAL_ESTADOS_COMPRA" modulos/19-\ COMPRAS.sql -> aparecen el
+  CREATE TABLE, el indice y los 2 triggers, cada uno con su bloque /* ... */.
+- Recarga en la BD de prueba con load_modules.py (2 pasadas) y correr
+  /tmp/opencode/test_paquetito_g.sql con START TRANSACTION ... ROLLBACK.
+
+================================================================================
+6. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS (paquetito G)
+================================================================================
+- La tabla guarda un fila por cada cambio de estado de compra:
+  ESTADO_ANTERIOR puede ser NULL (nacimiento), ESTADO_NUEVO es obligatorio,
+  ID_EMPLEADO dice quien lo firma y MOTIVO explica por que (o "Estado: X -> Y"
+  cuando es automatico).
+- Se llena sola: nadie hace INSERT a mano. TR_HISTORIAL_ESTADO_COMPRA anota
+  el nacimiento y TR_CAMBIO_ESTADO_COMPRA anota cada movimiento posterior,
+  tambien si el cambio viene de un UPDATE directo sobre COMPRAS.
+- Cuidado con lo nuevo (fases 1+2): desde el candado TR_VALIDAR_ACTUALIZACION
+  COMPRA los unicos cambios de estado que llegan hasta ahi son los legitimos
+  (bandera de SP o del trigger de total, o transiciones validas), asi que el
+  historial quedo con la verdad: no puede registrar mas un salto que el que
+  la BD permitio hacer.
+- Estados terminales: CANCELADA y DEVUELTA no salen de ahi, asi que en la
+  practica el historial de una compra cerrada no vuelve a crecer.
+- Verificado: /tmp/opencode/test_paquetito_g.sql (8/8 PASS: G1 nacimiento,
+  G2 saldada, G3 reabierta, G4 cancelada, G5 devuelta, G6 update directo,
+  G6b des-cancelar rechazado) y test_blindaje B10 en BALBU_TECH con
+  START TRANSACTION ... ROLLBACK (04/10/2026).
+
+7. ACTUALIZACION 07/10/2026 - EL HISTORIAL SE MUDO A SU PROPIO ARCHIVO
+================================================================================
+- Este tema ahora vive en su propio archivo: 19.1- HISTORIAL_ESTADOS_COMPRA.sql
+  (tabla + indice IX_HIST_ESTADO_FECHA + TR_HISTORIAL_ESTADO_COMPRA +
+  TR_CAMBIO_ESTADO_COMPRA), espejo de 21.5- HISTORIAL_ESTADOS_VENTA.sql con
+  su cabecera de "ARCHIVO 19.1" y la nota de orden de carga (despues del 19 y
+  antes del 19.5).
+- El codigo se movio VERBATIM desde 19- COMPRAS.sql, que quedo con 3
+  punteros -- en los lugares donde estaba; no cambio una coma del contenido.
+- Sin efectos en la BD: los objetos ya existian y su ACTION_ORDER no se toco
+  (COMPRAS: INSERT AFTER 1 = TR_HISTORIAL_ESTADO_COMPRA, UPDATE AFTER 1 =
+  TR_CAMBIO_ESTADO_COMPRA; el candado TR_VALIDAR_ACTUALIZACION_COMPRA BEFORE
+  UPDATE sigue corriendo antes que el historial).
+- Verificado 07/10/2026: tabla con sus 2 triggers en information_schema,
+  2 filas de historial (las nacidas de las compras #426/#464), CRLF integro
+  en ambos archivos y 19 sin CREATEs duplicados.

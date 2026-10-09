@@ -1,0 +1,60 @@
+CONTEXTO DE DOCUMENTACION - TABLA LOG_ACCESOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/28-LOG_ACCESOS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 28-LOG_ACCESOS.sql (4 bloques)
+================================================================================
+TABLA
+  - LOG_ACCESOS ........... intentos de acceso con fecha y resultado
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - SP_REGISTRAR_ACCESO .... anota un intento de acceso
+  - SP_REPORTAR_ACCESOS .... muestra los ultimos 50 intentos
+  - SP_LIMPIAR_LOGS_ANTIGUOS .. borra registros de mas de 90 dias
+                               (marcado en el archivo como "no usar")
+
+INDICES (0)
+  - El archivo no tiene CREATE INDEX.
+TRIGGERS (0), VISTAS (0), FUNCIONES (0)
+  - Las secciones [TRIGERR}, [VIEW} y [FUNTION} estan vacias.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los comentarios originales "-- 1.", "-- 2.", "----reporte"
+  y "----eliminar no usar".
+- No se tocaron: DELIMITER, DROP, DELETE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 13 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~10 archivos con indices sin documentar.
+- ~57 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/28-LOG_ACCESOS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

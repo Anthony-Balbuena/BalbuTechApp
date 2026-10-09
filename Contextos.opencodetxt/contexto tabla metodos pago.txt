@@ -1,0 +1,49 @@
+CONTEXTO DE DOCUMENTACION - TABLA METODOS_PAGO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/4-METODOS_PAGO.sql
+LOTE A (archivos 1 a 4) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Reemplazar la documentacion vieja de los archivos 1 a 16 por el mismo estilo
+usado en los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas coloquiales
+que solo expliquen la funcion de cada objeto, sin listados de campos ni de
+parametros.
+
+Reglas aplicadas:
+- Se ELIMINO el texto viejo y se puso el bloque nuevo en su lugar.
+- Se CONSERVARON: separadores ----[Store procedure}----, comentarios cortos
+  "-- 1. INSERTAR", "-- 2. ACTUALIZAR", etc. y todo el SQL (incluidos CALL).
+- El SQL operativo NO se modifico: solo cambiaron comentarios.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 4-METODOS_PAGO.sql (6 bloques)
+================================================================================
+TABLA
+  - METODOS_PAGO ........... metodos de pago (nombre unico y obligatorio)
+
+INDICES (0)
+  - El archivo no tiene CREATE INDEX.
+
+PROCEDIMIENTOS ALMACENADOS (5)
+  - SP_INSERTAR_METODO_PAGO ....... da de alta un metodo de pago
+  - SP_ACTUALIZAR_METODO_PAGO ..... cambia el nombre
+  - SP_LISTAR_METODOS_PAGO ........ lista todos ordenados
+  - SP_BUSCAR_METODOS_PAGO ........ busqueda por nombre parcial
+  - SP_TOGGLE_ESTADO_METODO_PAGO .. activa o desactiva
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se elimino el bloque "ESTRUCTURA DE LA TABLA METODOS_PAGO" con listado de
+  campos y restricciones, y los bloques de parametros de cada SP.
+- NO se tocaron los CALL de prueba del final del archivo.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 6 objetos CREATE / 6 bloques con bloque previo.
+- /* balanceados: 6 / 6.
+- SQL identico al original al quitar los comentarios (sin diferencias).

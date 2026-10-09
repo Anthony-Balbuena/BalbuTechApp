@@ -1,0 +1,86 @@
+CONTEXTO DE DOCUMENTACION - BUILD DE LA BASE DE DATOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/*.sql (11 archivos con arreglos de carga)
+
+================================================================================
+1. OBJETIVO DE LA SESION (Fase 0)
+================================================================================
+Armar la arena BALBU_TECH_TEST desde cero y que quedara sin ningun error de
+sintaxis, antes de seguir con los paquetites de compras (H, I, J, K).
+
+Para eso se arreglo el loader /tmp/opencode/load_modules.py, que es el que
+traduce el estilo del repo a algo que el cliente mysql acepta.
+
+================================================================================
+2. COMO SE ARMA LA BASE (el loader)
+================================================================================
+El estilo del repo es "END ; / DELIMITER ;". El cliente mysql NO entiende eso
+tal cual: al llegar a "DELIMITER ;" con un bloque sin cerrar, lo mete como SQL
+y manda ERROR 1064 en cascada. Por eso el loader:
+
+- Simula el cliente linea por linea (delimitador activo + buffer con SQL real).
+- Un buffer que trae solo comentarios o blancos cuenta como vacio: ahi si
+  reconoce el comando DELIMITER.
+- Cuando el DELIMITER llega con SQL acumulado, reescribe la ultima sentencia
+  del bloque ("END ;" -> "END //") para que el buffer se vacie justo ahi.
+- Si el buffer ya estaba vacio no toca nada (hay bloques que se cierran solos
+  con un "//" suelto, y reescribirlos los rompia).
+
+Comandos:
+  python3 /tmp/opencode/load_modules.py BALBU_TECH_TEST /tmp/opencode/build.log 2
+  mysql -uroot -plinux01 -e "DROP DATABASE IF EXISTS BALBU_TECH_TEST; \
+        CREATE DATABASE BALBU_TECH_TEST CHARACTER SET utf8mb4;"
+
+Se corren 2 pasadas a proposito: la 1 crea todo lo que puede y la 2 pega los
+triggers/tables que apuntan a tablas que recien se crean despues (ver punto 4).
+
+================================================================================
+3. ARREGLOS HECHOS EN LOS ARCHIVOS (11)
+================================================================================
+- 9- PRODUCTOS: 3 "DELIMITER;" sin espacio (el cliente no los reconoce) y un
+  "DELIMITER //" duplicado que dejaba un bloque abierto.
+- 10- USUARIOS: faltaba el cierre del bloque de SP_LOGIN; la semilla del
+  administrador ahora se salta si no existe el empleado 1 o si ya tiene cuenta.
+- 20- MOVIMIENTOS_INVENTARIO: faltaban 2 "DELIMITER ;" entre triggers.
+- 6- AUDITORIA_SISTEMA: habia dos "DELIMITER //" seguidos y el trigger usaba
+  PRECIO_VENTA, que no existe en PRODUCTOS (la columna es PRECIO).
+- 2- MARCAS y 4-METODOS_PAGO: los CALL de semilla pedian "2_SP_..." /
+  "4_SP_..." y el SP se llama sin el prefijo (nunca se insertaban).
+- 8- EMPLEADOS y 16- LIQUIDACIONES: "CREATE TRIGGER" sin "DROP TRIGGER IF
+  EXISTS" delante (rompia al recargar) + un "DELIMITER ;" duplicado.
+- 34- ASIGNAR RECLAMOS: "ADD CONSTRAINT IF NOT EXISTS" (el CHECK ya existia
+  al recargar).
+- 33- CONFIGURACION: "INSERT IGNORE" para que la semilla sea recargable.
+- Mejoras_extras.sql: "DROP PROCEDURE IF EXISTS ;" sin nombre y el cierre
+  apuntaba a "//" en vez de ";".
+
+================================================================================
+4. ERRORES QUE QUEDAN (y estan bien)
+================================================================================
+Pasada 1 (desde cero): 21 errores, todos 1146/1005 = "tabla todavia no
+existe". Pasan porque los archivos se cargan en orden numerico y hay triggers
+de 19- COMPRAS que apuntan a DETALLE_COMPRA (22-), 19.6/25 que apuntan a
+tablas de 22/23, y 6- AUDITORIA que apuntan a PRODUCTOS (9-). La pasada 2 los
+crea todos: ningun error de sintaxis.
+
+Pasada 2 (sobre BD existente): 110 errores, todos de tipo "ya existe"
+(1050/1061/1304) + 15 avisos 1644 de semillas ("ESTA MARCA YA EXISTE",
+"ESTE METODO DE PAGO YA EXISTE", un telefono de CLIENTES). Son amables: el SP
+captura la duplicidad y solo avisa; los datos quedan bien.
+
+Diferencia contra la BD real: BALBU_TECH tiene 11 SPs que ya no estan en el
+repo (1_SP_BUSCAR_CATEGORIAS, SP_CREAR_USUARIO, SP_ELIMINAR_BONO, ...) y un
+trigger viejo 14_TR_VALIDAR_FECHA_BONO. Es deuda historica de la BD real, no
+del build.
+
+================================================================================
+5. REGRESION DE SUITES (se corre al final de cada paquetite)
+================================================================================
+for f in /tmp/opencode/test_*.sql; do mysql -uroot -plinux01 BALBU_TECH < $f; done
+
+Ojo: las suites buscan datos de semilla (proveedor, producto, empleado) que el
+repo NO trae, por eso se corren contra BALBU_TECH y no contra la arena. Los
+checks de information_schema traen TABLE_SCHEMA='BALBU_TECH' literal.
+
+Resultado de la fase 0 (04/10): 100 PASS, 0 FAIL en las 8 suites.

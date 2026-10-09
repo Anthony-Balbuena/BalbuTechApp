@@ -1,0 +1,55 @@
+CONTEXTO DE DOCUMENTACION - TABLA PRODUCTOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/9- PRODUCTOS.sql
+LOTE C (archivos 9 a 12) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo de este archivo: bloques "MODULO: PRODUCTOS",
+"SECCION: PROCEDIMIENTOS ALMACENADOS (PRODUCTOS)", "INDICE: X / Proposito:"
+y "SP: X / Proposito: ...".
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 9- PRODUCTOS.sql (12 bloques)
+================================================================================
+TABLA
+  - PRODUCTOS ............... catalogo (precio > 0, codigo unico, nombre
+    unico por marca, FKs a MARCAS/CATEGORIAS/PROVEEDORES)
+
+INDICES (2)
+  - IX_PRODUCTOS_MARCA ...... joins y filtros por marca
+  - IX_PRODUCTOS_CATEGORIA .. busquedas y reportes por categoria
+
+PROCEDIMIENTOS ALMACENADOS (9)
+  - SP_INSERTAR_PRODUCTO ......... alta con validaciones completas
+  - SP_ACTUALIZAR_PRODUCTOS ..... actualizacion parcial
+  - SP_TOGGLE_ESTADO_PRODUCTOS .. activa o desactiva
+  - SP_CONSULTAR_PRODUCTOS_FILTRADO . busqueda por nombre o codigo
+  - SP_CONSULTAR_INVENTARIO ..... inventario con estatus de stock
+  - SP_REPORTE_STOCK_CRITICO .... reporte de stock bajo
+  - PARA_INSERTAR_PRODUCTO ...... datos para el formulario de alta
+  - PARA_ACTUALIZARDATOS ........ datos para el formulario de edicion
+  - PARA_ACTIVARODESACTIVAR_PROC. lista para activar/desactivar en bloque
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se ELIMINO el bloque "SECCION: PROCEDIMIENTOS ALMACENADOS (PRODUCTOS)".
+- Se CONSERVO la nota inline "/*Este procedure loique para mejorarlo*/"
+  del procedure PARA_INSERTAR_PRODUCTO (nota corta, no es estilo viejo).
+- Se conservaron los SELECT/DESCRIBE/ALTER de prueba del final del archivo.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 12 objetos CREATE / 12 bloques con bloque previo.
+- /* balanceados: 13/13 (12 bloques + 1 nota inline).
+- Estilo viejo restante: 0.
+- SQL identico al original al quitar los comentarios (1 linea en blanco).

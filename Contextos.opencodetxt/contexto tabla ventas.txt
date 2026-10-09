@@ -1,0 +1,551 @@
+CONTEXTO DE DOCUMENTACION - TABLA VENTAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/21- VENTAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 21- VENTAS.sql (bloques)
+================================================================================
+NOTA: desde el 04/10/2026 lo de HISTORIAL_ESTADOS_VENTA vive en el archivo
+21.5- HISTORIAL_ESTADOS_VENTA.sql (ver seccion 12).
+
+TABLA (1)
+  - VENTAS ................. cabecera de cada venta (cliente, empleado,
+                              estado, fecha, total y FACTURA opcional)
+
+INDICES (3)
+  - IX_VENTAS_CLIENTE ....... historial de ventas por cliente
+  - IX_VENTAS_EMPLEADO ...... ventas atendidas por empleado
+  - UQ_VENTA_FACTURA ........ una factura no se repite en el mismo cliente
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - 21_SP_INICIAR_VENTA ............ abre una venta y devuelve su ID
+  - SP_CANCELAR_VENTA .............. cancela una venta EN_PROCESO y devuelve
+                                     el stock con su movimiento y su fila en
+                                     el historial del producto (valida empleado
+                                     y pagos). Es el UNICO camino a CANCELADA:
+                                     levanta @VENTAS_INTERNO para que el
+                                     candado deje pasar ese UPDATE (seccion 13)
+  - SP_ASIGNAR_FACTURA_VENTA ...... le pone numero de factura (opcional,
+                                     unica por cliente; valida vacia,
+                                     inexistente, cancelada/devuelta y
+                                     duplicada)
+  NOTA: agregar productos a la venta NO se hace desde este archivo, se hace
+  con SP_AGREGAR_DETALLE_VENTA (archivo 23).
+
+TRIGGERS (2)
+  - TR_BLOQUEAR_BORRADO_VENTA . ningun DELETE directo borra una venta
+                                (ver seccion 9)
+  - TR_VALIDAR_ACTUALIZACION_VENTA .. EL CANDADO de la cabecera: no deja
+                                cambiar ESTADO ni TOTAL con un UPDATE a pelo
+                                (BEFORE UPDATE, 04/10/2026; ver seccion 13)
+  - Ademas quedan DROP de limpieza de los duplicados
+    TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (ver seccion 6).
+  NOTA: TR_HISTORIAL_ESTADO_VENTA y TR_CAMBIO_ESTADO_VENTA se mudaron al
+  archivo 21.5 (ver seccion 12).
+
+VISTA (1)
+  - VISTA_DETALLE_VENTA ...... productos de cada venta con su FACTURA,
+                               cantidad, precio y subtotal
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- La seccion [FUNTION} vacia (linea 156) se dejo intacta, sin inventar nada.
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 25 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~18 archivos con CREATE INDEX sin documentar (~41 indices en total).
+- ~82 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/21- VENTAS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- Eliminados TR_CALCULAR_TOTAL_VENTA y TR_PROCESAR_VENTA (duplicaban el TOTAL y
+  descontaban stock dos veces). El TOTAL lo suma TR_ACTUALIZAR_TOTAL_VENTA (23) y
+  el stock lo descuenta TR_AUDITORIA_MOVIMIENTO_VENTA (20); en el archivo solo
+  quedan DROP IF EXISTS de limpieza para bases viejas.
+- Agregado SP_CANCELAR_VENTA(P_ID_VENTA, P_ID_EMPLEADO): valida empleado,
+  estado EN_PROCESO y ausencia de pagos; devuelve el stock, registra la ENTRADA
+  en MOVIMIENTOS_INVENTARIO y deja la venta CANCELADA.
+- La seccion 2 de arriba (TRIGGERS 2) quedo obsoleta: hoy el archivo 21 ya no
+  crea triggers.
+- Orden real verificado: los triggers se ejecutan por ORDEN DE CREACION (no
+  alfabetico); los de venta viven en los archivos 20 y 23.
+
+Verificacion:
+- Prueba funcional en BALBU_TECH_TEST: 29/29 PASS (total unico, stock una vez,
+  pagos, cancelacion, devolucion, bloqueos).
+- Smoke en vivo con transaccion + ROLLBACK: 8/8 PASS, cero residuos.
+- Respaldos: /tmp/opencode/backup/ (pre_sync_live.sql).
+- Cargador: /tmp/opencode/loader.py (entiende DELIMITER, no fugas de base).
+
+================================================================================
+7. ACTUALIZACION 02/10/2026 (2da parte) - UNIFICACION DE SP Y LIMPIEZA
+================================================================================
+- Eliminado 21_SP_AGREGAR_PRODUCTO_VENTA: hacia lo mismo que
+  SP_AGREGAR_DETALLE_VENTA (archivo 23) pero SIN validar que el empleado sea
+  el dueño de la venta. En el archivo solo queda el DROP de limpieza y un
+  bloque /* */ que explica por qué se fue. La alta de detalle es una sola
+  via: SP_AGREGAR_DETALLE_VENTA(venta, producto, cantidad, empleado).
+- Verificación: information_schema.ROUTINES con nombre
+  21_SP_AGREGAR_PRODUCTO_VENTA = 0 en BALBU_TECH; grep en el repo solo
+  muestra el DROP del archivo 21.
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - CIERRE DE VENTAS (PARTE 5)
+================================================================================
+- SP_CANCELAR_VENTA ahora anota la reposicion en HISTORIAL_MOVIMIENTOS_PRODUCTO
+  (tipo ENTRADA, STOCK_ANTERIOR = stock antes de reponer, STOCK_NUEVO = stock
+  ya repuesto, observacion 'Venta cancelada ID: <id>', la misma que usa
+  MOVIMIENTOS_INVENTARIO). Antes el movimiento si quedaba en la bitacora pero
+  el historial del producto se quedaba mudo: la mercancia volvia al almacen
+  sin rastro en esa tabla.
+- Comentario del SP renombrado de 21_SP_CANCELAR_VENTA al nombre real
+  SP_CANCELAR_VENTA (el prefijo viejo ya no existe).
+- Verificado en vivo con /tmp/opencode/test_cierre_ventas.sql (10 checks con
+  ROLLBACK, residuos 0) mas la regresion smoke_fase1.sql (9 checks), todo en
+  verde.
+================================================================================
+9. ACTUALIZACION 04/10/2026 - LA VENTA NO SE BORRA (fase H)
+================================================================================
+- TR_BLOQUEAR_BORRADO_VENTA (BEFORE DELETE ON VENTAS): todo DELETE directo
+  sobre VENTAS corta con 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE
+  SP_CANCELAR_VENTA PARA ANULARLA.' - como el trigger corre ANTES, ni siquiera
+  llega a correr el cascade hacia DETALLES_VENTA y PAGOS.
+- Verificado: check H8c de /tmp/opencode/test_fase_h.sql (14/14 PASS con
+  ROLLBACK, 04/10/2026).
+================================================================================
+10. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS DE VENTA (paquetito J)
+================================================================================
+- Nueva tabla HISTORIAL_ESTADOS_VENTA (FK a VENTAS y a EMPLEADOS) con su
+  indice IX_HIST_ESTADO_VENTA_FECHA: es el espejo de
+  HISTORIAL_ESTADOS_COMPRA del paquetito G.
+- TR_HISTORIAL_ESTADO_VENTA (AFTER INSERT ON VENTAS): el renglon del
+  nacimiento, ESTADO_ANTERIOR NULL y MOTIVO 'Venta iniciada'.
+- TR_CAMBIO_ESTADO_VENTA (AFTER UPDATE ON VENTAS): anota
+  'Estado: A -> B' solo si el ESTADO cambio de verdad; un UPDATE que no
+  cambia el estado no ensucia el historial, y tambien lo captura si alguien
+  cambia el estado con un UPDATE directo (pago total, cancelacion,
+  devolucion o mano pelada).
+- Verificado: /tmp/opencode/test_paquetito_j.sql (8/8 PASS con ROLLBACK y
+  residuos 0, 04/10/2026).
+  [Actualizado 04/10/2026: todo lo de esta seccion se mudo al archivo
+  21.5- HISTORIAL_ESTADOS_VENTA.sql, ver seccion 12.]
+================================================================================
+11. ACTUALIZACION 04/10/2026 - FACTURA DEL CLIENTE (paquetito K)
+================================================================================
+- VENTAS.FACTURA VARCHAR(30) NULL: numero de factura del cliente, opcional
+  (muchas ventas de mostrador no llevan).
+- Indice unico UQ_VENTA_FACTURA (ID_CLIENTE, FACTURA): la misma factura no se
+  repite dentro del mismo cliente; entre clientes distintos si se puede.
+  Tambien bloquea el UPDATE directo a pelo.
+- SP_ASIGNAR_FACTURA_VENTA(P_ID_VENTA, P_FACTURA): valida que no venga vacia,
+  que la venta exista, que no este CANCELADA ni DEVUELTA y que no este ya
+  usada por otra venta del mismo cliente.
+- VISTA_DETALLE_VENTA ahora trae tambien la FACTURA de la venta.
+- Verificado: /tmp/opencode/test_paquetito_k.sql (14/14 PASS con ROLLBACK y
+  residuos 0, 04/10/2026).
+================================================================================
+12. ACTUALIZACION 04/10/2026 - HISTORIAL_ESTADOS_VENTA SE MUDO AL 21.5
+================================================================================
+- La tabla HISTORIAL_ESTADOS_VENTA, su indice IX_HIST_ESTADO_VENTA_FECHA y
+  los dos triggers que la alimentan (TR_HISTORIAL_ESTADO_VENTA y
+  TR_CAMBIO_ESTADO_VENTA) se extrajeron de 21- VENTAS.sql al nuevo archivo
+  modulos/21.5- HISTORIAL_ESTADOS_VENTA.sql, siguiendo el precedente de
+  PAGOS_COMPRA (19 -> 19.5).
+- Motivo: en 21 vivia todo mezclado (VENTAS + su historial); ahora cada
+  archivo se queda con lo suyo. Los triggers se llevaron juntos porque son
+  los UNICOS dos puntos que escriben en esa tabla: sin ellos la tabla
+  existiria pero nunca se le insertaria nada.
+- En 21- VENTAS.sql quedan dos comentarios -- que apuntan al 21.5 en los dos
+  lugares de donde se fueron los bloques (seccion de indices y seccion de
+  triggers). Nada de SQL operativo se toco: solo se movieron bloques.
+- Orden de carga: 21 -> 21.5 -> 22 ... (el loader ordena por numero). Los
+  triggers del 21.5 son ON VENTAS y VENTAS ya existe porque carga antes.
+- Nada mas en el repo referenciaba HISTORIAL_ESTADOS_VENTA (verificado con
+  grep): no dependencias rotas.
+- Verificacion: git diff de ambos archivos debe mostrar solo bloques movidos
+  (mismo texto, sin editar), mas los comentarios -- de apuntada al 21.5.
+- Verificado en vivo en BALBU_TECH (04/10/2026): carga con load_modules.py,
+  los 2 triggers se recrearon desde el 21.5 (55 triggers totales, sin
+  duplicados) y quedaron en verde: test_paquetito_j 8/8 PASS, smoke_fase1
+  10/10, test_fase_h 14/14, test_paquetito_k 14/14, residuos 0. Respaldos:
+  /tmp/opencode/backup/pre_215_2109.sql (previo a la sesion).
+================================================================================
+13. ACTUALIZACION 04/10/2026 - CANDADO DE CABECERA (fases 1+2)
+================================================================================
+- Nuevo TR_VALIDAR_ACTUALIZACION_VENTA (BEFORE UPDATE ON VENTAS), espejo del
+  de compras: ya nadie cambia el ESTADO ni el TOTAL de una venta con un
+  UPDATE a pelo.
+  * TOTAL: solo lo tocan TR_ACTUALIZAR_TOTAL_VENTA (detalle) y
+    TR_PROCESAR_DEVOLUCION (devolucion), que levantan @VENTAS_INTERNO
+    mientras corre su UPDATE (sin la bandera: "EL TOTAL DE LA VENTA SOLO
+    CAMBIA CON SU DETALLE").
+  * REALIZADA exige venir de EN_PROCESO y estar cobrada al 100%; EN_PROCESO
+    solo se recupera desde REALIZADA; DEVUELTA solo desde REALIZADA y con
+    todo el detalle devuelto (cubre el movimiento en cualquier orden entre
+    el ultimo reembolso y la ultima devolucion).
+  * CANCELADA y DEVUELTA son terminales: una venta ahi ya no vuelve a
+    cambiar jamas, y CANCELADA solo la pone SP_CANCELAR_VENTA (bandera +
+    venta EN_PROCESO + sin pagos), asi nadie se salta la devolucion del
+    stock ni el asiento de la bitacora del cierre.
+- Ajuste simetrico en 23- DETALLE_VENTA.sql: TR_ACTUALIZAR_TOTAL_VENTA
+  levanta @VENTAS_INTERNO antes de su UPDATE del total (en compras ya lo
+  hacian TR_CALCULAR_TOTAL_COMPRA y TR_RECALCULAR_TOTAL_COMPRA).
+- Verificado: /tmp/opencode/test_blindaje.sql checks B11 a B17 (REALIZADA a
+  pelo, TOTAL a pelo, pago que recalcula, pago editado, devolucion y pago
+  borrado que reabre) y test_fase_h H9a/H9b, todo PASS en BALBU_TECH con
+  START TRANSACTION ... ROLLBACK (04/10/2026).
+
+================================================================================
+14. ACTUALIZACION 06/10/2026 - STOCK ATOMICO "UN SOLO GOLPE" (fase 1b, A1-A3)
+================================================================================
+P10 (06/10/2026) - EL ERROR 1020 SI ES ALCANZABLE: SE MAPEA EN EL SP
+================================================================================
+- Repro determinista (2 sesiones): S1 con transaccion explicita lee el stock,
+  S2 actualiza y commitea, S1 luego actualiza -> ERROR 1020 (HY000): Record
+  has changed since last read in table 'INVENTARIO'. Control: sin la lectura
+  previa el mismo UPDATE pasa normal -> el 1020 nace de LEER y luego modificar
+  en la misma transaccion algo que otro commiteo en medio.
+- Alcance en produccion: SI. Los triggers de un INSERT comparten transaccion
+  con el (BEFORE lee el stock sin candado y AFTER lo descuenta); si el otro
+  cajero commitea en esa ventana, InnoDB aborta. Repro con triggers
+  temporales en AUTOCOMMIT (una sola sentencia) -> 1020. Ojo: un PROCEDIMIENTO
+  en autocommit NO lo reproduce porque cada sentencia va en su propia
+  transaccion (por eso no aparece en todos lados). Las rutas de PAGOS y
+  VENTAS quedan protegidas por los candados que su propio INSERT toma sobre
+  VENTAS via FK -> ahi NO se repartio handler (no demostrado; ver "a vigilar").
+- Cambio: DECLARE EXIT HANDLER FOR 1020 en SP_AGREGAR_DETALLE_VENTA
+  (23- DETALLE_VENTA.sql) que lo traduce con SIGNAL 45000 a
+  'ERROR: STOCK INSUFICIENTE, INTENTE DE NUEVO.' +26 lineas, 0 borradas,
+  nota P10 en el encabezado del SP. Solo atrapa el 1020: los demas errores
+  (ej. 'ERROR: STOCK INSUFICIENTE.' de la validacion del paso 2) siguen su
+  camino normal.
+- Verificacion: carrera determinista contra el SP real -> sale el mensaje
+  amigable (no el 1020) y residuos 0 (venta revertida, stock 8, bitacora 2);
+  regresion OK (ruta feliz stock 8->6 y TOTAL 200.00, insuficiencia normal
+  intacta); se limpiaron 2 alertas que genero el stock bajo durante las
+  pruebas (alertas 14 -> 12) y 0 objetos tmp_*; respaldo
+  /tmp/opencode/backup/pre_p10_23-DETALLE_VENTA.sql.
+
+================================================================================
+- A1: TR_AUDITORIA_MOVIMIENTO_VENTA (archivo 20) ya no descuenta a ciegas.
+  Ahora es UPDATE INVENTARIO ... WHERE ID_PRODUCTO = NEW.ID_PRODUCTO
+  AND STOCK_ACTUAL >= NEW.CANTIDAD  +  IF ROW_COUNT() = 0 THEN SIGNAL
+  'ERROR: STOCK INSUFICIENTE.'; Si no alcanza el stock, no descuenta nada y
+  la SIGNAL revierte la LINEA ENTERA: venta y stock quedan juntos o no queda
+  ninguno de los dos. El descuento sigue siendo una sola sentencia (comprueba
+  y resta a la vez) y la bitacora SALIDA no cambia. La version vieja quedo
+  comentada arriba en el mismo archivo (marcada VERSION ANTERIOR).
+- Orden de triggers: al recrear el del 20 se fue al FINAL de la cola AFTER
+  INSERT ON DETALLES_VENTA y desalineo a TR_HISTORIAL_VENTA (que lee el stock
+  YA descontado). Se recrearon los tres en orden de carga (20 -> 23 -> 32):
+  stock -> total -> historial, igual que una carga completa. OJO al recrear
+  cualquier trigger: revisar information_schema.TRIGGERS.ACTION_ORDER.
+- A2: notas dentro de los bloques /* */ de SP_AGREGAR_DETALLE_VENTA y
+  TR_VALIDAR_STOCK_DETALLE_VENTA (archivo 23): ahora son RED DE MENSAJES
+  AMIGABLES, no la garantia; la garantia es el UPDATE condicional del 20.
+  Solo comentarios, cero SQL.
+- A3: prueba de carrera con 2 sesiones, 4 variantes (candado retenido,
+  commit previo, snapshot viejo y minimo repro SIN triggers). En TODAS la
+  segunda venta no se registro y residuos 0 (bitacora 2, historial 2,
+  alertas 12, ventas 0 = linea base).
+- HALLAZGO A3: en carrera encadenada InnoDB aborta con
+  ERROR 1020 (HY000): Record has changed since last read in table
+  'INVENTARIO'; try restarting transaction, en vez del mensaje amigable.
+  Se reprodujo SIN triggers -> es del servidor (REPEATABLE-READ), no de A1.
+  En el caso tipico (el otro cajero ya descont antes de que lleguemos) si
+  sale el mensaje amigable. Pendiente P10 (mapear el 1020).
+- Verificacion A1: ruta feliz stock 8->6 (una sola vez), 1 fila SALIDA de 2
+  unidades, historial 8->6, TOTAL 200.00, ROLLBACK sin residuos; y el caso
+  de stock insuficiente sin residuos.
+- Respaldos: /tmp/opencode/backup/pre_a1_20-MOVIMIENTOS.sql (la carpeta
+  /tmp fue limpiada despues; el original de 20 quedo como VERSION ANTERIOR
+  comentada y en git).
+
+================================================================================
+15. ACTUALIZACION 06/10/2026 - PAGOS: QUIEN COBRO (P8)
+================================================================================
+- PAGOS.ID_EMPLEADO INT NOT NULL + FK_PAGO_EMPLEADO -> EMPLEADOS: deja
+  constancia de QUIEN COBRO cada pago, igual que ya hace PAGOS_COMPRA.
+  La tabla estaba vacia, asi que sin backfill.
+- 24_SP_REGISTRAR_PAGO: valida que el empleado exista ('ERROR: EL EMPLEADO
+  NO EXISTE.') en vez del viejo 'DESCONOCIDO' que seguia de largo, y el
+  INSERT guarda ID_EMPLEADO. El cuerpo viejo del SP quedo comentado arriba
+  del nuevo (mismo formato que A1). El resto del SP no cambio.
+- VISTA_RESUMEN_PAGOS: agrega NOMBRE_EMPLEADO (JOIN EMPLEADOS), para que
+  quien cobro sea visible.
+- No se tocaron: SP_ANULAR_PAGO, los 6 triggers de pagos ni
+  VISTA_VENTAS_PENDIENTES_PAGO (ninguno depende de quien cobra).
+- Verificacion: pago de 200.00 con empleado 7 -> fila con ID_EMPLEADO,
+  nombre visible en la vista, venta REALIZADA y bono 2.00 PENDIENTE;
+  empleado 9999 -> error amigable y nada guardado; todo con ROLLBACK y
+  residuos 0 (PAGOS 0, VENTAS 0, BONOS 0, stock 8, alertas 12).
+- Respaldos: /tmp/opencode/backup/pre_p8_24-PAGOS.sql y
+  pre_p8_PAGOS_estructura.sql (mysqldump --no-data).
+- OJO: las bases BALBU_TECH_TEST / _PRE / _V92 NO se actualizaron (siguen
+  sin ID_EMPLEADO en PAGOS); replicar los cambios ahi si se usan.
+
+================================================================================
+P9 (07/10/2026) - VUELTO: MONTO_RECIBIDO (Opcion A)
+================================================================================
+- Problema: TR_VALIDAR_MONTO_PAGO rechaza cualquier pago que supere el total
+  ('ERROR: EL MONTO DEL PAGO EXCEDE EL TOTAL DE LA VENTA.'), asi que no se
+  podia registrar un cliente que entrega 150 por una compra de 100.
+- Opcion A elegida: MONTO conserva su significado (lo que se aplica a la
+  venta) y lo nuevo MONTO_RECIBIDO (nullable) guarda lo que el cliente
+  entrego; el VUELTO es MONTO_RECIBIDO - MONTO y solo se muestra.
+  Descartadas B (MONTO mayor que el total: rompe SUM(MONTO) vs TOTAL en
+  saldos, cierre, cancelaciones y devoluciones) y C (vuelto en registro
+  aparte: mas tablas y SPs para poco beneficio).
+- Cambios en 24- PAGOS.sql: (1) columna + CHECK (MONTO_RECIBIDO >= MONTO) -
+  el NULL pasa porque NULL >= X da NULL y el CHECK solo rechaza FALSO;
+  (2) SP con param DEFAULT NULL (las llamadas viejas de 4 args siguen
+  sirviendo), validacion SIGNAL 'ERROR: EL MONTO RECIBIDO ES MENOR QUE EL
+  PAGO.', INSERT con IFNULL(param, P_MONTO) y mensaje con '(VUELTO n)';
+  (3) VISTA_RESUMEN_PAGOS con MONTO_RECIBIDO y VUELTO. El cuerpo P8 quedo
+  comentado arriba del P9 (3 versiones visibles en el archivo: original,
+  P8 y P9 activa). CUIDADO: el CHECK es la red, la validacion de negocio
+  vive en el SP (mismo patron A2).
+- NO se tocaron: TR_VALIDAR_MONTO_PAGO, TR_AUTO_FINALIZAR_VENTA,
+  SP_CANCELAR_VENTA, SP_ANULAR_PAGO ni devoluciones.
+- Verificacion: vuelto 50 (venta 100, recibido 150) con venta REALIZADA y
+  bono 1.00; recibido 50 < 100 -> error amigable; llamada vieja sin el
+  param -> MONTO_RECIBIDO=100 y VUELTO=0; CHECK y columnas verificados en
+  information_schema; todo con ROLLBACK y residuos 0 (PAGOS 0, VENTAS 0,
+  BONOS 0, stock 8, bitacora 2, alertas 12). Respaldos:
+  /tmp/opencode/backup/pre_p9_24-PAGOS.sql y pre_p9_PAGOS_estructura.sql.
+- OJO: las bases TEST/PRE/V92 siguen sin MONTO_RECIBIDO (mismo caso que P8).
+- CIERRE DE LA PARTE 1b (stock atomico): A1, A2, A3, A4, P8, P10 y P9
+  completos.
+
+================================================================================
+16. PARTE 2 (07/10/2026) - COBRO Y CIERRE AUTOMATICO (DOCUMENTACION)
+================================================================================
+- Solo comentarios (patron A2), cero SQL operativo: 15 lineas agregadas en
+  los bloques /* */ de 24_SP_REGISTRAR_PAGO, TR_VALIDAR_MONTO_PAGO y
+  TR_AUTO_FINALIZAR_VENTA (24- PAGOS.sql). Describe la cadena de cobro:
+  SP (puerta de entrada: venta, empleado y vuelto) -> BEFORE
+  (TR_VALIDAR_MONTO_PAGO = freno: EN_PROCESO y pagado + nuevo <= TOTAL;
+  nunca mira MONTO_RECIBIDO, solo MONTO) -> AFTER (TR_AUTO_FINALIZAR_VENTA
+  = cierre: REALIZADA + bono 1% sobre el TOTAL, guardia anti-doble-bono
+  porque exige V_ESTADO = 'EN_PROCESO'; solo dispara la primera vez).
+- Sin cambios en la BD: los comentarios viven en los bloques previos a los
+  CREATE, no en la definicion almacenada de SP/triggers.
+- Ya probado en vivo con P8/P9: pago de 200 -> REALIZADA + bono 2.00;
+  parciales 60 + 40 en venta de 100 -> REALIZADA + bono 1.00; exceso de
+  monto y venta cerrada -> errores amigables; residuos 0 en todas.
+- Recordatorios: son 6 triggers en PAGOS (INSERT/UPDATE/DELETE); al
+  recrear cualquiera revisar information_schema.TRIGGERS.ACTION_ORDER
+  (leccion A1). Limite con la Parte 4: TR_VALIDAR_BORRADO_PAGO y
+  TR_VALIDAR_UPDATE_PAGO blindan los pagos de ventas CANCELADA/DEVUELTA.
+
+================================================================================
+17. PARTE 3 (07/10/2026) - BLINDAJES: CANDADOS, BANDERA, ORDEN E HISTORIAL
+================================================================================
+- Documentacion (patron A2): 20 lineas de comentario, 0 SQL, en dos
+  archivos: nota en TR_VALIDAR_ACTUALIZACION_VENTA (21- VENTAS.sql) con el
+  resumen de la matriz de reglas + el riesgo de la bandera + la observacion
+  de la rama inalcanzable, y nota en 21.5- HISTORIAL_ESTADOS_VENTA.sql con
+  el orden verificado. OJO: el 21.5 usa finales LF, no CRLF como el resto
+  de modulos (no mezclar estilos al editarlo).
+- Orden verificado en information_schema.TRIGGERS.ACTION_ORDER:
+  * VENTAS: BEFORE UPDATE (TR_VALIDAR_ACTUALIZACION_VENTA, candado) corre
+    ANTES que AFTER UPDATE (TR_CAMBIO_ESTADO_VENTA, historial).
+  * DETALLES_VENTA AFTER INSERT: stock(20) -> total(23) -> historial(32).
+- Pruebas B1-B5 + B4b + H: los 5 candados responden con su mensaje exacto
+  ('EL TOTAL SOLO CAMBIA CON SU DETALLE', 'SOLO SE MARCA REALIZADA ...',
+  'USE SP_CANCELAR_VENTA', 'LA VENTA NO SE PUEDE BORRAR'); reabrir una
+  REALIZADA a pelo si es legitimo; la cancelacion por SP deja 2 filas de
+  historial (NULL->EN_PROCESO 'Venta iniciada' y EN_PROCESO->CANCELADA).
+- HALLAZGO 1: la rama 'SOLO SE REABRE UNA VENTA REALIZADA' es
+  INALCANZABLE con los 4 estados (EN_PROCESO->EN_PROCESO no es cambio de
+  estado; CANCELADA/DEVUELTA las corta el primer if) -> es codigo
+  defensivo, documentado en el archivo 21.
+- HALLAZGO 2 (riesgo real): el par SET @VENTAS_INTERNO = 1 / = 0 NO tiene
+  EXIT HANDLER. Si el UPDATE interno falla, el = 0 no corre, y como las
+  variables de usuario NO se revierten con ROLLBACK, la credencial queda
+  prendida toda la sesion. DEMOSTRADO: con la bandera prendida,
+  'UPDATE VENTAS SET TOTAL = 99999' paso el candado (BYPASS CONFIRMADO).
+  Mitigacion futura posible: apagar la bandera al inicio de los SPs que
+  la usan o EXIT HANDLER que la limpie (no implementado; ver pendientes).
+- Suites viejos recreados (sub-pendiente de A3 CERRADO):
+  'Proyecto manejo inventario/Pruebas/test_blindaje_p3.sql' - correr con
+  mariadb --force (continua tras los SIGNAL esperados). Cubre B1-B5, B4b,
+  H, las dos demos de la bandera y la linea base. Ejecutado 07/10/2026:
+  todo OK, residuos 0 (VENTAS 0, DETALLES 0, HIST 0, stock 8).
+
+================================================================================
+18. PARTE 4 (07/10/2026) - CANCELACION Y ANULACION DE PAGOS (DOCUMENTACION)
+================================================================================
+- Documentacion (patron A2): +24 lineas, 0 SQL - nota en SP_CANCELAR_VENTA
+  (21- VENTAS.sql) con la cadena de 5 pasos y su relacion con el candado,
+  y nota en SP_ANULAR_PAGO (24- PAGOS.sql) con el patron de transaccion
+  propia y el ciclo bono/reabrir.
+- SP_CANCELAR_VENTA: valida dueno + EN_PROCESO + cero pagos -> repone el
+  stock -> ENTRADA en bitacora -> fila en HISTORIAL_MOVIMIENTOS_PRODUCTO
+  (STOCK_ANTERIOR = actual - devuelto) -> cierra con la bandera
+  @VENTAS_INTERNO. Es la UNICA puerta al estado CANCELADA; el paso 3
+  duplica la regla del candado pero con mensaje amigable. Ojo: reponer
+  stock puede disparar la alerta de stock minimo (trigger 17).
+- SP_ANULAR_PAGO: patron de transaccion propia (@@in_transaction = 0 ->
+  START TRANSACTION + COMMIT; si esta anidada no la toca) con
+  EXIT HANDLER FOR SQLEXCEPTION -> ROLLBACK solo si la transaccion es
+  suya + RESIGNAL. Al borrar el pago, si la venta deja de estar cobrada
+  al 100%: reabre EN_PROCESO y borra el bono del 1% PENDIENTE (si ya
+  esta APROBADO se deja, lo resuelve nomina). Con la venta reaberta y
+  sin pagos ya califica para SP_CANCELAR_VENTA.
+- Pruebas (todo en ROLLBACK, residuos 0):
+  * C1 cancelar con detalle: stock 7->8, fila ENTRADA en bitacora,
+    historial 7->8, 2 filas en HISTORIAL_ESTADOS_VENTA.
+  * C2 con pagos: 'ERROR: LA VENTA TIENE PAGOS REGISTRADOS, NO SE PUEDE
+    CANCELAR.' (y ojo: pagar sobre TOTAL=0 corta antes el freno del 24).
+  * C3 REALIZADA: 'ERROR: SOLO SE PUEDEN CANCELAR VENTAS EN PROCESO.'
+  * C4 cadena completa: pago 100 -> REALIZADA + bono 1 -> SP_ANULAR_PAGO
+    -> 'PAGO #241 ANULADO ... COBRADO: 0.00' -> EN_PROCESO con bono 0 ->
+    SP_CANCELAR_VENTA -> CANCELADA.
+- OBSERVACION: el trabajo de "reabrir + quitar bono" lo hacen TANTO el
+  paso 6 de SP_ANULAR_PAGO COMO el trigger AFTER DELETE
+  (TR_RECALCULAR_ESTADO_PAGO_BORRADO). El trigger corre primero, por eso
+  el mensaje del SP a veces sale SIN el sufijo ' - SE RETIRO EL BONO'
+  (el ROW_COUNT del DELETE da 0 porque el trigger ya lo borro). Ambos
+  caminos dejan el mismo resultado (idempotente); el sufijo es cosmético.
+
+================================================================================
+19. PARTE 5 (07/10/2026) - DEVOLUCIONES Y GARANTIAS (DOCUMENTACION)
+================================================================================
+- Documentacion (patron A2): +33 lineas, 0 SQL - en 25- DEVOLUCIONES.sql
+  (+17: notas en SP_REGISTRAR_DEVOLUCION y 25_SP_PROCESAR_DEVOLUCION) y
+  26- GARANTIAS.sql (+16: notas en SP_REGISTRAR_GARANTIA,
+  26_SP_RECHAZAR_DEVOLUCION y TR_VALIDAR_FECHAS_GARANTIA). Ambos son
+  CRLF puro (verificado antes de escribir; 21.5 no lo era).
+- El flujo es de DOS tiempos: registrar solo deja la devolucion PENDIENTE
+  (sin tocar stock ni dinero); el stock lo devuelve el trigger al
+  aprobarla con 25_SP_PROCESAR_DEVOLUCION. La cuota anti-sobre-devolucion
+  suma PENDIENTE + APROBADA + REEMBOLSADA (las RECHAZADAS no cuentan) y
+  es la MISMA cuenta que repite TR_BLOQUEAR_CAMBIO al editar cantidad.
+- Orden de triggers de DEVOLUCIONES (ACTION_ORDER verificado): BEFORE
+  UPDATE TR_BLOQUEAR_CAMBIO(1); AFTER UPDATE REINTEGRAR_STOCK(1) ->
+  MARCAR_VENTA_DEVUELTA(2) -> TR_HISTORIAL_DEVOLUCION(3, archivo 32).
+  El (3) lee el stock YA sumado por el (1): el orden importa.
+  TR_HISTORIAL_DEVOLUCION NO esta en el 25: vive en 32 (su version vieja
+  sobre la tabla inexistente DETALLES_DEVOLUCION queda comentada alli).
+- Pruebas (todo en ROLLBACK, residuos 0: DEVOLUCIONES 0, GARANTIAS 0,
+  VENTAS 0, stock 8, bitacora 2, HIST_PROD 2, HIST_ESTADOS 0):
+  * T1 cadena completa: venta de 2u + pago -> REALIZADA -> 1a devol
+    APROBADA (stock 6->7, la venta sigue REALIZADA: devolucion parcial)
+    -> 2a devol APROBADA (stock 7->8, venta DEVUELTA, historial de
+    estados con 'REALIZADA -> DEVUELTA', bitacora TIPO 'DEVOLUCION').
+    PAGOS siguen = 1: aprobar devuelve MERCANCIA, no dinero (el
+    reembolso esta fuera del alcance de la BD).
+  * T2 bateria de 7 blindajes (--force): sobre-devolucion, garantia de
+    otro detalle, procesar 2 veces, editar fila procesada a pelo, borrar
+    aprobada a pelo, garantia duplicada, rechazar ya procesada - cada
+    uno con su mensaje exacto.
+  * T3 rechazo (26_SP_RECHAZAR_DEVOLUCION): concatena
+    'no me gusto | RECHAZO: cliente mintio', stock intacto (7) y la
+    cuota se libera (se pudo registrar otra devolucion).
+- HALLAZGO: 26_SP_RECHAZAR_DEVOLUCION hace CONCAT(MOTIVO, ' | RECHAZO:',
+  ...). Si el motivo original era NULL, CONCAT da NULL y el rechazo se
+  PIERDE (el motivo queda NULL, sin evidencia de quien rechazo ni por
+  que). DEMOSTRADO en T4 (MOTIVO_PERDIDO_POR_NULL = 1). Riesgo bajo
+  (campo opcional) pero es el unico caso donde un candado "olvida" datos.
+- OBSERVACION: TR_VALIDAR_FECHAS_GARANTIA es el UNICO candado silencioso
+  del flujo: no senala, autocorrige FECHA_INICIO a hoy (los demas cortan
+  con SIGNAL).
+
+================================================================================
+20. PARTE 7 (07/10/2026) - REPORTES Y CIERRE DE CAJA (SQL REAL)
+================================================================================
+- Alcance recortado a solo SQL: conectar Pagina_Web/app.js (hoy genera
+  ventas con Math.random()) queda FUERA DE ALCANCE, igual que el C++ de
+  la Parte 6.
+- Archivo NUEVO 'modulos/37- REPORTES_VENTAS.sql' (CRLF puro, 127 lineas,
+  4 bloques /* */ balanceados, estilo del repo). A diferencia de las
+  partes 2-5 esto NO es documentacion: es SQL operativo (1 vista + 2 SP),
+  todo de SOLO LECTURA. Cargado en BALBU_TECH sin errores.
+- VW_REPORTE_VENTAS: la version REAL del ejemplo que solo existia en la
+  documentacion (.vscode/prompts y skill de estilo) - 1 fila por venta
+  con EMPLEADO, CLIENTE, FACTURA, TOTAL, PAGADO (SUM de PAGOS por venta)
+  y SALDO. Saldo bruto: para lo cobrable existe
+  VISTA_VENTAS_PENDIENTES_PAGO (excluye CANCELADA/DEVUELTA).
+- SP_REPORTE_VENTAS(fecha_inicio, fecha_fin): el mismo resumen filtrado
+  por rango inclusivo a nivel dia (FECHA < fin + INTERVAL 1 DAY, para no
+  perder la fecha final), ordenado mas reciente primero. Senala si el
+  rango viene invertido.
+- SP_CIERRE_CAJA(fecha): 3 result sets seguidos - (1) resumen:
+  VENTAS_DEL_DIA, MONTO_REALIZADO (solo ESTADO=REALIZADA, para no
+  inflar con canceladas), COBRADO real de PAGOS; (2) ventas agrupadas
+  por estado; (3) cobrado por metodo de pago. Senala si la fecha es NULL.
+  El resumen usa subconsultas correlacionadas en vez de JOIN entre
+  VENTAS y PAGOS (el JOIN multiplicaria el TOTAL por cada pago).
+- Pruebas (datos dentro de ROLLBACK, residuos 0: VENTAS 0, PAGOS 0,
+  stock 8):
+  * T1 ruta feliz: venta 200 con pago parcial 50 -> vista y listado
+    muestran PAGADO 50.00 / SALDO 150.00; cierre: 1 venta EN_PROCESO
+    (200), COBRADO 50.00 todo en EFECTIVO.
+  * T2 rango invertido -> 'ERROR: LA FECHA INICIAL NO PUEDE SER MAYOR A
+    LA FINAL.'
+  * T3 SP_CIERRE_CAJA(NULL) -> 'ERROR: INGRESE LA FECHA DEL CIERRE.'
+  * T4 dia sin datos -> conteos y montos en 0 (sin errores).
+- Los objetos DDL (vista + 2 SP) quedan INSTALADOS en BALBU_TECH tras
+  el ROLLBACK: son el entregable de la parte; los datos de prueba no.
+
+================================================================================
+21. P11 + P12 (07/10/2026) - FIXES OPERATIVOS (CODIGO, NO SOLO DOCS)
+================================================================================
+- P11 bandera @VENTAS_INTERNO: DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  (SET @VENTAS_INTERNO = 0 + RESIGNAL) en SP_CANCELAR_VENTA (21) y en
+  TR_ACTUALIZAR_TOTAL_VENTA (23). Mecanismo verificado en repro aislado
+  (TMP_P11: UPDATE con FK que falla dentro del trigger -> bandera vuelve
+  a 0 y el error se propaga con RESIGNAL).
+- OJO recarga de triggers: CREATE OR REPLACE mueve el trigger al FINAL
+  de su cola (demostrado en TMP_ORD: o2 paso de orden 2 a 3). Por eso se
+  recrearon TR_ACTUALIZAR_TOTAL_VENTA (nuevo) + TR_HISTORIAL_VENTA (igual)
+  en orden, y se verifico ACTION_ORDER 1,2,3 (auditoria -> total ->
+  historial). Los SP se recargan con DROP + CREATE sin problema de orden.
+- Regresion P11 (ROLLBACK, residuos 0): venta + detalle + cancelar deja
+  la bandera en 0 en ambos puntos y la cancelacion sigue funcionando.
+- P12 motivo NULL: 26_SP_RECHAZAR_DEVOLUCION ahora usa
+  CONCAT(IFNULL(CONCAT(MOTIVO,' | '),''),'RECHAZO: ', motivo). Con motivo
+  NULL guarda 'RECHAZO: sin motivo previo' (antes quedaba NULL y se
+  perdia quien/por que); con motivo conserva 'llego tarde | RECHAZO:
+  fuera de plazo'. Ambos casos probados en ROLLBACK, residuos 0.
+- Compras (pregunta del usuario): NO esta acabado como flujo. Existe el
+  codigo (19/22/19.5/19.6) y contextos parciales (pagos y devolucion de
+  compra), y de hecho SP_CANCELAR_COMPRA ya trae el handler de P11
+  (19- COMPRAS.sql:159-166), pero no hay plan/pendientes ni pruebas de
+  extremo a extremo como los de ventas.

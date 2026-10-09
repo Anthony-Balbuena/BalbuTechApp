@@ -120,6 +120,8 @@ Asi el total queda actualizado sin calcularlo a mano.
 CREATE TRIGGER TR_ACTUALIZAR_TOTAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
+-- (09/10/2026) Orden fijo: despues de la auditoria (antes dependia del orden de creacion).
+FOLLOWS TR_AUDITORIA_MOVIMIENTO_VENTA
 BEGIN
     -- P11 (07/10/2026): si el UPDATE falla, apagar la bandera antes
     -- de propagar el error (las variables de usuario no se revierten

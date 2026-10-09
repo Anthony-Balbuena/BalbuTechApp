@@ -1,0 +1,67 @@
+CONTEXTO DE DOCUMENTACION - TABLA HISTORIAL_ESTADOS_PRODUCTO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/18- HISTORIAL_ESTADOS_PRODUCTO.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 18- HISTORIAL_ESTADOS_PRODUCTO.sql (7 bloques)
+================================================================================
+TABLA
+  - HISTORIAL_ESTADOS_PRODUCTO . bitacora de cambios de estado de productos
+
+INDICES (3)
+  - HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO .. ordena el historial por fecha
+  - IX_HISTORIAL_ESTADO_ACTUAL .............. busca cambios por estado actual
+  - IX_HISTORIAL_ESTADO_ANTERIOR ............ busca cambios por estado anterior
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 18_SP_CAMBIAR_ESTADO_PRODUCTO .. cambia el estado y deja constancia
+
+TRIGGER (1)
+  - TR_LOG_CAMBIO_ESTADO_PRODUCTO ... registra el cambio en la bitacora
+
+VISTA (1)
+  - VISTA_ULTIMOS_MOVIMIENTOS ....... 10 cambios de estado mas recientes
+
+FUNCION (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay funcion que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que la tabla INVENTARIO.
+- La seccion [FUNTION} vacia (linea 106) se dejo intacta, sin inventar nada.
+- Se conservaron los comentarios "-- 1. Estructura de la Tabla" y
+  "-- 2. Indices para optimizar consultas de auditoria" originales.
+- No se tocaron: DELIMITER, DROP, UPDATE ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 28 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~22 archivos con CREATE INDEX sin documentar (~47 indices en total).
+- ~87 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/18- HISTORIAL_ESTADOS_PRODUCTO.sql" -> solo debe mostrar
+  lineas agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

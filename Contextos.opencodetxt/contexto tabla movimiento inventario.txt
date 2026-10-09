@@ -1,0 +1,118 @@
+CONTEXTO DE DOCUMENTACION - TABLA MOVIMIENTOS_INVENTARIO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/20- MOVIMIENTOS_INVENTARIO.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 20- MOVIMIENTOS_INVENTARIO.sql (8 bloques)
+================================================================================
+TABLA
+  - MOVIMIENTOS_INVENTARIO . bitacora de entradas, salidas, ajustes y
+                              devoluciones de stock
+
+INDICES (3)
+  - IX_MOVIMIENTO_PRODUCTO .. movimientos de un producto en concreto
+  - IX_CANTIDAD_MOVIINVENTORIO .. busqueda de movimientos por cantidad
+  - IX_MOVIMIENTO_FECHA ..... reportes por fecha: el cierre del dia y el
+                              listado del dia recorrian la bitacora entera
+                              (04/10/2026, fase 1+2)
+
+PROCEDIMIENTO ALMACENADO (1)
+  - 20_SP_REGISTRAR_AJUSTE_INVENTARIO .. valida producto/empleado/cantidad > 0,
+                                          crea la fila en INVENTARIO si falta,
+                                          no deja stock negativo, anota el
+                                          movimiento en la bitacora Y su fila
+                                          en el historial del producto (04/10)
+
+TRIGGERS (3)
+  - TR_AUDITORIA_MOVIMIENTO_COMPRA .. anota la ENTRADA al comprar
+  - TR_AUDITORIA_BORRADO_COMPRA .... anota la SALIDA al quitar una linea
+                                     de una compra (paquetito F)
+  - TR_AUDITORIA_MOVIMIENTO_VENTA ... descuenta stock y anota la SALIDA
+
+VISTAS (0)
+  - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservo el comentario original "-- Tu indice para rastrear que paso con
+  cada producto" y el "-- <--- AQUI ESTABA EL ERROR" de la linea 89.
+- Secciones [VIEW} (linea 119) y [FUNTION} (linea 124) vacias: no se invento
+  ningun objeto.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * Linea 119: una "V" suelta antes del separador de seccion [VIEW}.
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 26 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~19 archivos con CREATE INDEX sin documentar (~43 indices en total).
+- ~84 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/20- MOVIMIENTOS_INVENTARIO.sql" -> solo debe mostrar
+  lineas agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_AUDITORIA_MOVIMIENTO_VENTA confirmado como UNICO descuento de stock de la
+  venta (ademas registra la SALIDA en MOVIMIENTOS_INVENTARIO). El duplicado
+  TR_PROCESAR_VENTA del archivo 21 fue eliminado hoy.
+- Limpiada la linea "V----..." del separador de secciones [VIEW] del archivo,
+  que rompia la carga del archivo completo.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - 20_SP_CON_BITACORA_E_HISTORIAL (paquetito A)
+================================================================================
+- 20_SP_REGISTRAR_AJUSTE_INVENTARIO ahora:
+    1) valida producto, empleado y cantidad > 0 (antes solo existencia);
+    2) crea la fila en INVENTARIO si falta (antes el UPDATE no matcheaba y
+       quedaba un movimiento anotado con el stock sin cambiar);
+    3) no deja bajar el stock de 0 para SALIDA/AJUSTE (SIGNAL de stock
+       insuficiente);
+    4) escribe su propia fila en HISTORIAL_MOVIMIENTOS_PRODUCTO con el stock
+       antes y despues (antes dependia de los triggers genericos, que fueron
+       eliminados hoy).
+- Con esto la regla de la BD es: TODO cambio de stock deja 1 fila en
+  MOVIMIENTOS_INVENTARIO (quien) y 1 fila en el historial (cuanto antes/despues),
+  escritas por quien hace el movimiento. Ningun trigger generico mas.
+- Verificado: /tmp/opencode/test_paquetito_a.sql 12/12 PASS con ROLLBACK
+  (04/10/2026).
+
+================================================================================
+ACTUALIZACION 04/10/2026 - SALIDA AL QUITAR LINEA (paquetito F)
+================================================================================
+- Nuevo TR_AUDITORIA_BORRADO_COMPRA (AFTER DELETE sobre DETALLE_COMPRA):
+  cuando se quita una linea de una compra anota la SALIDA con el empleado
+  de la compra, con observacion 'Producto quitado de la compra ID: N'.
+- Verificado: checks F1 y F12 de test_paquetito_f.sql (14/14 PASS con
+  ROLLBACK, 04/10/2026).

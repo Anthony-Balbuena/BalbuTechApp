@@ -1,0 +1,57 @@
+CONTEXTO DE DOCUMENTACION - TABLA CATEGORIAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/1- CATEGORIAS.sql
+LOTE A (archivos 1 a 4) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Reemplazar la documentacion vieja de los archivos 1 a 16 por el mismo estilo
+usado en los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas coloquiales
+que solo expliquen la funcion de cada objeto, sin listados de campos ni de
+parametros.
+
+Reglas aplicadas:
+- Se ELIMINO el texto viejo (DESCRIPCION DEL MODULO, ESTRUCTURA DE LA TABLA,
+  DESCRIPCION DE SP con lista de parametros) y se puso el bloque nuevo.
+- Se CONSERVARON: separadores ----[Store procedure}----, comentarios cortos
+  "-- 1. INSERTAR", "--ACTUALIZAR", etc. y todo el SQL.
+- El SQL operativo NO se modifico: solo cambiaron comentarios.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 1- CATEGORIAS.sql (8 bloques)
+================================================================================
+TABLA
+  - CATEGORIAS ............. categorias de productos (nombre unico)
+
+INDICE (1)
+  - IX_NOMBRE_CATEGORIA .... busqueda de categorias por nombre
+    (antes no tenia bloque, se agrego)
+
+PROCEDIMIENTOS ALMACENADOS (6)
+  - SP_INSERTAR_CATEGORIA ....... da de alta una categoria
+  - SP_ACTUALIZAR_CATEGORIA ..... cambia nombre, descripcion o icono
+  - SP_TOGGLE_ESTADO_CATEGORIA .. activa o desactiva
+  - SP_BUSCAR_CATEGORIAS ........ busqueda por nombre o descripcion
+  - 1_SP_CATEGORIAS_POR_FECHA ... filtra por periodo
+  - 1_SP_VERIFICAR_CATEGORIA_EXISTE .. revisa si el nombre ya existe
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- El archivo tenia DOS bloques de tabla (el detallado con listado de campos
+  y uno corto duplicado): se elimino el detallado y se dejo UN bloque nuevo.
+- Se elimino el listado de campos y restricciones del bloque viejo (regla
+  del estilo minimalista).
+- Corregida la anomalia final del archivo (dia 04/10/2026): se agrego el
+  DELIMITER // que faltaba antes de SP_BUSCAR_CATEGORIAS y se elimino la
+  consulta final rota (SELECT * FROM `EMPLEADOS, comilla invertida sin cerrar).
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 8 objetos CREATE / 8 bloques con bloque previo.
+- /* balanceados: 8 / 8.
+- SQL identico al original al quitar los comentarios (solo difieren lineas
+  en blanco).

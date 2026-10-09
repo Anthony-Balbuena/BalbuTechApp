@@ -314,3 +314,30 @@ SELECT
 FROM EMPLEADOS E
 LEFT JOIN BONOS_EMPLEADOS B ON E.ID_EMPLEADO = B.ID_EMPLEADO
 GROUP BY E.ID_EMPLEADO;
+
+-----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------[TRIGGER]------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_CAMBIO_BONO ;
+/*
+TR_BLOQUEAR_CAMBIO_BONO (09/10/2026)
+El bono PAGADO o ANULADO no cambia (monto, tipo, empleado ni estado): el monto
+alimenta el cierre y lo ya pagado es historia. Solo un PENDIENTE se mueve
+(PAGADO/ANULADO por sus SPs).
+*/
+CREATE TRIGGER TR_BLOQUEAR_CAMBIO_BONO
+BEFORE UPDATE ON BONOS_EMPLEADOS
+FOR EACH ROW
+BEGIN
+    IF OLD.ESTADO <> 'PENDIENTE' THEN
+        IF NEW.ESTADO <> OLD.ESTADO
+           OR NEW.MONTO <> OLD.MONTO
+           OR NEW.TIPO_BONO <> OLD.TIPO_BONO
+           OR NEW.ID_EMPLEADO <> OLD.ID_EMPLEADO THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: EL BONO PAGADO O ANULADO NO CAMBIA.';
+        END IF;
+    END IF;
+END //
+DELIMITER ;

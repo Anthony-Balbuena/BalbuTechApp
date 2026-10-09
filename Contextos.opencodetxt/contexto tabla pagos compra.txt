@@ -1,0 +1,286 @@
+CONTEXTO DE DOCUMENTACION - TABLA PAGOS_COMPRA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/19.5- PAGOS_COMPRA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19.5- PAGOS_COMPRA.sql (5 bloques)
+================================================================================
+TABLA
+  - PAGOS_COMPRA .......... pagos a proveedores por una compra: cuanto,
+                            cuando y con que metodo (parciales o totales)
+
+INDICE (2)
+  - IX_PAGOS_COMPRA_COMPRA  pagos de una compra concreta, para ver como se
+                            fue saldando
+  - IX_PAGOS_COMPRA_FECHA .. pagos por fecha: reportes del dia y cierre de
+                            caja (04/10/2026, fase 1+2)
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - SP_REGISTRAR_PAGO_COMPRA .. registra un pago parcial o total; valida
+                                 compra ABIERTA, metodo, monto > 0 y que no
+                                 exceda el total
+  - SP_ANULAR_PAGO_COMPRA ..... borra un pago registrado por error; si la
+                                 compra deja de estar saldada vuelve a
+                                 ABIERTA (valvula de escape)
+  - SP_REGISTRAR_NOTA_CREDITO_COMPRA .. mete una nota de credito (MONTO
+                                 negativo) que baja lo pagado y reabre la
+                                 compra (fase J)
+
+TRIGGERS (7)
+  - TR_AUTOCOMPLETAR_EMPLEADO_PAGO .. si el pago no trae empleado se queda
+                               con el dueno de la compra (fase J)
+  - TR_VALIDAR_PAGO_COMPRA .. BEFORE INSERT: misma validacion que el SP para
+                               INSERT directos (no exceder el total)
+  - TR_AUTO_RECIBIR_COMPRA .. AFTER INSERT: si el pago cubrio el total deja
+                               la compra RECIBIDA (equivalente a REALIZADA
+                               en ventas; sin bonos, esos son de ventas)
+  - TR_VALIDAR_BORRADO_PAGO_COMPRA .. un pago de compra CANCELADA o
+                               DEVUELTA no se borra (fase H)
+  - TR_RECALCULAR_ESTADO_PAGO_COMPRA .. al borrar un pago vuelve a sumar y
+                               mueve RECIBIDA / ABIERTA (fase J)
+  - TR_VALIDAR_UPDATE_PAGO_COMPRA .. BEFORE UPDATE: el pago no cambia de
+                               compra, no cambia de signo (el PAGO entra y
+                               la NOTA sale) y no se pasa del total; las
+                               compras CANCELADA o DEVUELTA no admiten
+                               cambios (04/10/2026, fase 1+2)
+  - TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE .. AFTER UPDATE: si alguien le
+                               cambia el monto o el tipo a un pago se vuelve
+                               a sumar y se mueve el estado, igual que al
+                               insertar o al anular (04/10/2026, fase 1+2)
+
+VISTAS (2)  (agregadas el 04/10/2026, paquetito E)
+  - VISTA_RESUMEN_PAGOS_COMPRA .... pagos a proveedores con el nombre del
+                                     metodo (espejo de VISTA_RESUMEN_PAGOS
+                                     de ventas)
+  - VISTA_COMPRAS_PENDIENTES_PAGO . deuda visible: TOTAL, PAGADO y SALDO
+                                     por compra (saldo negativo = exceso
+                                     pagado a favor); excluye CANCELADAS
+
+FUNCIONES (0)
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Tabla propia PAGOS_COMPRA (no se reuso PAGOS de ventas): cada uno con su
+  FK a su cabecera (COMPRAS vs VENTAS) y asi ningun trigger de ventas se
+  dispara sobre pagos de compra ni viceversa.
+- Pagos PARCIALES permitidos: la suma de PAGOS_COMPRA siempre se calcula con
+  SUM(MONTO), asi que borrar o agregar una fila hace cuadrar totales y
+  estados solos (mismo modelo que PAGOS de ventas).
+- ESTADO 'RECIBIDA' de COMPRAS significa "saldada al 100%", no confirmacion
+  fisica de la mercancia. Si se anula un pago, la compra vuelve a ABIERTA.
+- Sin bonos: el bono del 1% es por ventas a clientes, no por compras.
+- Compra con pagos no se cancela: primero se anulan los pagos
+  (SP_ANULAR_PAGO_COMPRA) y recien ahi SP_CANCELAR_COMPRA la deja pasar.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- Devolucion de compra a proveedor (siguiente tema de compras).
+- ~85 procedimientos almacenados sin bloque de descripcion en otros archivos.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/19.5- PAGOS_COMPRA.sql" -> debe contener la tabla, el
+  indice, los 2 SPs y los 2 triggers completos.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 04/10/2026 - PAGOS DE COMPRAS (paquetito C)
+================================================================================
+- Nueva tabla PAGOS_COMPRA (ID_PAGO_COMPRA, ID_COMPRA, ID_METODO_PAGO,
+  MONTO CHECK > 0, FECHA) con FK a COMPRAS y METODOS_PAGO, indice por
+  ID_COMPRA.
+- Nuevo SP_REGISTRAR_PAGO_COMPRA(P_ID_COMPRA, P_ID_METODO_PAGO, P_MONTO):
+  valida compra existente y ABIERTA (ni CANCELADA ni RECIBIDA), metodo
+  existente, monto > 0 y que suma anterior + monto no exceda el TOTAL.
+- Nuevo SP_ANULAR_PAGO_COMPRA(P_ID_PAGO_COMPRA, P_ID_EMPLEADO): valida
+  empleado y pago, rechaza si la compra esta CANCELADA, borra la fila y, si
+  la compra deja de estar saldada, la devuelve a ABIERTA.
+- Nuevos TR_VALIDAR_PAGO_COMPRA (BEFORE, mismas validaciones para INSERT
+  directos) y TR_AUTO_RECIBIR_COMPRA (AFTER, pasa a RECIBIDA al cubrir el
+  total; sin bonos).
+- Integraciones: SP_CANCELAR_COMPRA ahora rechaza compras con pagos
+  ('ANULELOS ANTES DE CANCELAR'); TR_BLOQUEAR_COMPRA_CANCELADA se renombro a
+  TR_BLOQUEAR_COMPRA_CERRADA (RECIBIDA tambien deja de aceptar productos);
+  22_SP_AGREGAR_DETALLE_COMPRA exige compra ABIERTA.
+- Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
+  ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
+  (9 + 10 + 12 + 13 = 44 checks).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - CAMBIO A SU PROPIO ARCHIVO
+================================================================================
+- Todo lo de PAGOS_COMPRA (tabla, indice, SP_REGISTRAR_PAGO_COMPRA,
+  SP_ANULAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y TR_AUTO_RECIBIR_COMPRA)
+  se mudo de 19- COMPRAS.sql al nuevo archivo 19.5- PAGOS_COMPRA.sql.
+- En el 19 solo quedo la guarda de 'no cancelar una compra con pagos'
+  (dentro de SP_CANCELAR_COMPRA) y el TR_BLOQUEAR_COMPRA_CERRADA, que es
+  logica de COMPRAS/DETALLE_COMPRA, no de la tabla de pagos.
+- El orden de carga sigue bien: 19 -> 19.5 -> 20 (el loader ordena por
+  numero) y la FK de PAGOS_COMPRA apunta a COMPRAS (19) y METODOS_PAGO (4).
+- Sin cambios en la BD en vivo: los objetos son identicos, solo cambio el
+  archivo que los contiene. Verificado con arena + paridad y 63 checks.
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - EL NUEVO ESTADO DEVUELTA (paquetito D)
+================================================================================
+- COMPRAS.ESTADO gano 'DEVUELTA' (devolvio toda la mercancia al proveedor,
+  ver 19.6- DEVOLUCION_COMPRA.sql) y aqui se blindo el dinero:
+  * SP_REGISTRAR_PAGO_COMPRA: DEVUELTA rechaza pagos ('ERROR: LA COMPRA
+    ESTA DEVUELTA.'), ademas de CANCELADA y RECIBIDA.
+  * TR_VALIDAR_PAGO_COMPRA: igual para INSERT directos.
+  * SP_ANULAR_PAGO_COMPRA: DEVUELTA no admite cambios de pago (el dinero
+    ya quedo cerrado con la devolucion).
+- Si se devuelve mercancia de una compra saldada, lo pagado de mas queda
+  a favor y se ve en la vista de pendientes de pago (paquetito E).
+- Verificado en vivo: checks D14 de test_devolucion_compra.sql (18/18
+  PASS, 04/10/2026).
+
+================================================================================
+9. ACTUALIZACION 04/10/2026 - VISTAS DE DEUDA (paquetito E)
+================================================================================
+- VISTA_RESUMEN_PAGOS_COMPRA: los pagos a proveedores con el nombre del
+  metodo de pago, espejo de la VISTA_RESUMEN_PAGOS de ventas.
+- VISTA_COMPRAS_PENDIENTES_PAGO: la deuda visible por compra con TOTAL,
+  PAGADO y SALDO (= TOTAL - PAGADO). Muestra toda compra que deba o
+  tenga de mas menos las CANCELADAS (esas nunca se pagaron). Un SALDO
+  negativo no es error: es el exceso pagado a favor tras una devolucion
+  (paquetito D), visible en vez de crear pagos negativos.
+- Ambas viven en este archivo porque son pura contabilidad de pagos.
+- Verificado en vivo: checks E0-E6 de /tmp/opencode/test_paquetito_e.sql
+  (7/7 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+10. ACTUALIZACION 04/10/2026 - SEGUROS SOBRE EL BORRADO DE PAGOS (fase H)
+================================================================================
+- TR_VALIDAR_BORRADO_PAGO_COMPRA (BEFORE DELETE ON PAGOS_COMPRA): no deja
+  borrar un pago de una compra CANCELADA ni DEVUELTA (ahi la plata ya quedo
+  resuelta). Es la misma regla que aplica SP_ANULAR_PAGO_COMPRA, ahora
+  hecha valer tambien cuando el borrado viene a pelo.
+- TR_RECALCULAR_ESTADO_PAGO_COMPRA (AFTER DELETE ON PAGOS_COMPRA): al
+  desaparecer un pago vuelve a sumar lo pagado; si la compra dejo de estar
+  saldada le quita la RECIBIDA y la deja otra vez en ABIERTA. Hace el mismo
+  calculo que el paso 6 de SP_ANULAR_PAGO_COMPRA, pero sirve tambien si el
+  borrado no paso por el SP.
+- Verificado: checks H6 y H7 de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).
+================================================================================
+11. ACTUALIZACION 04/10/2026 - TRANSACCION EN SP_ANULAR_PAGO_COMPRA (fase I)
+================================================================================
+- SP_ANULAR_PAGO_COMPRA abre su propia transaccion solo si nadie la abrio
+  antes (@@in_transaction = 0). Si algo truena despues de borrar el pago
+  (por ejemplo el UPDATE que deja la compra en ABIERTA), el manejador
+  EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y re-lanza el error con
+  RESIGNAL: no se puede borrar el pago y dejar la compra en RECIBIDA.
+- Si la transaccion la abrio el llamador, el SP no la toca (ni COMMIT ni
+  ROLLBACK) y el error se propaga.
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (6/6 PASS,
+  04/10/2026).
+================================================================================
+12. ACTUALIZACION 04/10/2026 - QUIEN PAGA Y NOTAS DE CREDITO (fase J)
+================================================================================
+- PAGOS_COMPRA quedo con: ID_EMPLEADO NOT NULL (+ FK a EMPLEADOS), TIPO
+  ENUM('PAGO','NOTA_CREDITO') por defecto PAGO, OBSERVACION (el motivo de la
+  nota; los pagos normales no llevan), ID_METODO_PAGO ahora anulable (una
+  nota de credito no mueve plata por ningun metodo) y CHK_PAGOS_COMPRA_MONTO
+  (MONTO <> 0; antes era > 0). El archivo trae ademas la migracion
+  (ADD COLUMN IF NOT EXISTS, backfill del dueno de la compra a los pagos
+  viejos y DROP del check viejo): en una base recien creada no hace nada, en
+  la real deja la tabla al dia.
+- SP_REGISTRAR_PAGO_COMPRA recibe al empleado en un cuarto parametro
+  opcional (IN P_ID_EMPLEADO INT DEFAULT NULL). Si no viene, la tabla le pone
+  al dueno de la compra; si viene y no existe corta con 'ERROR: EL EMPLEADO
+  NO EXISTE.' Por eso las suites viejas que llaman con 3 argumentos siguen
+  corriendo igual.
+- SP_REGISTRAR_NOTA_CREDITO_COMPRA (nuevo): le anota un descuento o una
+  devolucion a la compra. Pide el monto en positivo y el motivo en
+  OBSERVACION (obligatorio: sin motivo no hay nota) y guarda la fila con
+  MONTO negativo, asi el SUM(MONTO) de las vistas netea solo.
+- TR_AUTOCOMPLETAR_EMPLEADO_PAGO (nuevo, BEFORE INSERT): si la fila entra sin
+  ID_EMPLEADO (INSERT directo o llamado viejo) le pone al dueno de la compra;
+  si la compra no existe corta con error. Ningun pago se queda sin
+  responsable.
+- TR_VALIDAR_PAGO_COMPRA: el MONTO ya no puede ser cero (antes: no podia ser
+  negativo), el signo tiene que concordar con el TIPO (un PAGO entra y una
+  NOTA sale) y la compra RECIBIDA solo rechaza los pagos positivos: la nota
+  si entra, porque es plata que vuelve.
+- TR_AUTO_RECIBIR_COMPRA: si la nota dejo la compra a medias (pagado < total)
+  la reabre sola, de RECIBIDA a ABIERTA.
+- TR_RECALCULAR_ESTADO_PAGO_COMPRA: ademas de lo de siempre, si al borrar
+  una fila quedo todo saldado la vuelve a marcar RECIBIDA.
+- VISTA_RESUMEN_PAGOS_COMPRA: trae ahora TIPO, ID_EMPLEADO y OBSERVACION, y
+  el metodo de pago paso a LEFT JOIN (las notas no tienen metodo).
+- Verificado: checks J0-J11 de /tmp/opencode/test_fase_j.sql (13/13 PASS con
+  ROLLBACK, 04/10/2026).
+================================================================================
+13. ACTUALIZACION 04/10/2026 - SINCRONIA DE LA BD REAL (tras la mudanza al 21.5)
+================================================================================
+- Al recargar todos los modulos en BALBU_TECH (para validar la mudanza de
+  HISTORIAL_ESTADOS_VENTA al archivo 21.5) salio a la luz que la BD real
+  estaba atrasada respecto a este archivo, y el test_fase_j daba 2 FAIL:
+  * Faltaba FK_PAGO_COMPRA_EMPLEADO: el CREATE TABLE no corre en la real
+    ('table already exists') y el archivo no tenia ningun ALTER que lo
+    agregara, asi que nunca se habia creado. Agregado con ADD CONSTRAINT.
+  * El CHECK viejo MONTO > 0 seguia vivo y rechazaba las notas de credito
+    negativas (ERROR 4025). La linea DROP CONSTRAINT IF EXISTS MONTO no
+    servia: esta version de MariaDB la ejecuta sin error pero no borra nada
+    (y DROP CHECK ni siquiera compila).
+- Arreglo en el archivo (migracion, en el bloque 'Deja al dia una BD que ya
+  tenia esta tabla'):
+  * El DROP CONSTRAINT se reemplazo por MODIFY COLUMN MONTO DECIMAL(10,2)
+    NOT NULL: al redefinir la columna sin el CHECK inline el check viejo se
+    va solo. Idempotente: en BDs limpias no cambia nada.
+  * Se agrego ADD CONSTRAINT FK_PAGO_COMPRA_EMPLEADO (el indice lo crea sola).
+    Si ya existe tira ERROR 1826 'Duplicate FOREIGN KEY constraint name', que
+    es inofensivo, mismo criterio que los ERROR 1050/1061 de toda la carga.
+- Verificado en vivo (BALBU_TECH): constraints = CHK_PAGOS_COMPRA_MONTO
+  (MONTO <> 0) unica, FK_PAGO_COMPRA_EMPLEADO presente, test_fase_j 13/13
+  PASS con ROLLBACK y residuos 0. Regresion completa en verde:
+  paquetito_j 8/8, paquetito_k 14/14, fase_h 14/14, smoke 10/10.
+- Respaldo previo a toda la sesion: /tmp/opencode/backup/pre_215_2109.sql
+  (ahi se ve que la real no tenia ni las 3 columnas extra antes de cargar).
+
+================================================================================
+14. ACTUALIZACION 04/10/2026 - EL PAGO TAMBIEN SE EDITA BAJO CONTROL
+    (fases 1+2)
+================================================================================
+- Hasta ahora un UPDATE directo a PAGOS_COMPRA pasaba sin mas: se podia
+  mover un pago a otra compra, pasarle el signo al revés o subirlo hasta
+  pasar del total, y nadie recalculaba el estado de la compra.
+- TR_VALIDAR_UPDATE_PAGO_COMPRA (BEFORE UPDATE) tapa eso:
+  * el pago se queda en su compra (ID_COMPRA inmutable);
+  * el signo tiene que ver con el tipo (PAGO positivo, NOTA_CREDITO negativo)
+    y MONTO no puede ser cero;
+  * la suma con el cambio aplicado no puede exceder el TOTAL de la compra;
+  * compras CANCELADA o DEVUELTA no admiten cambios de pago (mismo seguro
+    que ya existia en el borrado, fase H).
+- TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE (AFTER UPDATE) es el espejo exacto
+  de TR_AUTO_RECIBIR_COMPRA: si el monto o el tipo cambio, vuelve a sumar lo
+  pagado y mueve ABIERTA <-> RECIBIDA, para que un UPDATE directo no deje la
+  compra mintiendo sobre si esta saldada.
+- Indice nuevo: IX_PAGOS_COMPRA_FECHA (FECHA), para el cierre del dia.
+- La lista de la seccion 2 se reordenó completa: hoy el archivo 19.5 tiene
+  2 indices, 3 SPs y 7 triggers (antes decia 1 / 2 / 2 y dejaba fuera lo de
+  las fases H, I y J, que solo vivia en las secciones de actualizacion).
+- Verificado: /tmp/opencode/test_blindaje.sql checks B4, B5 y B18 (pago que
+  excede, pago editado que recalcula y pago de compra DEVUELTA que no se
+  borra), todo PASS en BALBU_TECH con ROLLBACK (04/10/2026).
