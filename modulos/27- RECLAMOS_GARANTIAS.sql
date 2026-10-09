@@ -189,3 +189,25 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
+
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------[TRIGERR}---------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+/*
+TR_BLOQUEAR_BORRADO_RECLAMO
+Un reclamo procesado (APROBADO, RECHAZADO o CERRADO) no se borra ni con DELETE
+directo: ya movio garantia/stock o cerro el caso. Solo un PENDIENTE (error de
+carga) se puede eliminar. Espejo de TR_BLOQUEAR_BORRADO_DEVOLUCION.
+*/
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_RECLAMO ;
+CREATE TRIGGER TR_BLOQUEAR_BORRADO_RECLAMO
+BEFORE DELETE ON RECLAMOS_GARANTIAS
+FOR EACH ROW
+BEGIN
+    IF OLD.ESTADO <> 'PENDIENTE' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: EL RECLAMO PROCESADO NO SE BORRA; USE LOS SPS DE CIERRE.';
+    END IF;
+END //
+DELIMITER ;

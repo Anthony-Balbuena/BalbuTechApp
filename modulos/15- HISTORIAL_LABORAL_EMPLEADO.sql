@@ -68,6 +68,8 @@ DROP TRIGGER IF EXISTS TR_AUDITORIA_PERFIL_EMPLEADO ;
 CREATE TRIGGER TR_AUDITORIA_PERFIL_EMPLEADO
 AFTER UPDATE ON EMPLEADOS
 FOR EACH ROW
+-- Orden fijo: despues de desactivar usuario post-liquidacion.
+FOLLOWS TR_DESACTIVAR_USUARIO_POST_LIQUIDACION
 BEGIN
     -- Comparamos si cambió el salario, el cargo o el estado del empleado
     IF OLD.SALARIO <> NEW.SALARIO OR 
