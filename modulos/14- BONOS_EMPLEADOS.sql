@@ -5,7 +5,7 @@ Guarda los bonos, horas extra y bonificaciones de los empleados: fecha,
 tipo (DOBLE_SUELDO, HORAS_EXTRA o BONIFICACION), monto y estado
 (PENDIENTE, PAGADO o ANULADO). El monto tiene que ser mayor a cero y el
 bono siempre pertenece a un empleado existente.
-*/
+*/ ----
 CREATE TABLE BONOS_EMPLEADOS (
     ID_BONO INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
