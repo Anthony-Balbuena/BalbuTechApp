@@ -31,9 +31,6 @@ CREATE TABLE PRODUCTOS (
     CONSTRAINT FK_PRODUCTO_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
 ) ENGINE = InnoDB;
 
-SELECT * FROM `MARCAS`; 
-
-SELECT * from PRODUCTOS;
 
 /*
 INDICE IX_PRODUCTOS_MARCA
@@ -67,8 +64,6 @@ el precio sea mayor a cero y que la descripcion tenga al menos 10
 caracteres. Si algo falla no guarda nada.
 */
 DROP PROCEDURE IF EXISTS SP_INSERTAR_PRODUCTO ;
-
-
 CREATE PROCEDURE SP_INSERTAR_PRODUCTO(
     IN P_NOMBRE        VARCHAR(100),
     IN P_DESCRIPCION   VARCHAR(255),
@@ -149,11 +144,7 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: PRODUCTO "', v_nombre_limpio, '" REGISTRADO CORRECTAMENTE.') AS MENSAJE;
 
 END //
-
 DELIMITER ;
-
-DESCRIBE PRODUCTOS;
-
 --2. ACTUALIZAR
 
 DELIMITER //
@@ -202,6 +193,13 @@ proc_label: BEGIN
 
     IF P_DESCRIPCION IS NOT NULL THEN
         SET v_desc_limpia = REGEXP_REPLACE(TRIM(P_DESCRIPCION), '[[:space:]]+', ' ');
+        -- (09/10/2026) P8: mismo minimo del alta (>= 10). Vacio = omitir (conserva la anterior).
+        IF v_desc_limpia = '' THEN
+            SET v_desc_limpia = NULL;
+        ELSEIF CHAR_LENGTH(v_desc_limpia) < 10 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: DESCRIPCION DEMASIADO CORTA (MINIMO 10 CARACTERES).';
+            LEAVE proc_label;
+        END IF;
     END IF;
 
     IF P_CODIGO IS NOT NULL THEN
@@ -287,7 +285,7 @@ CREATE PROCEDURE SP_TOGGLE_ESTADO_PRODUCTOS(
     IN P_ID_PRODUCTO INT
 )
 proc_label: BEGIN
-    -- 1. Variables para capturar la info actual
+    -- 1. Variables para capturar la info actual~
     DECLARE v_NOMBRE VARCHAR(100);
     DECLARE v_ESTADO_ACTUAL VARCHAR(20);
     DECLARE v_NUEVO_ESTADO VARCHAR(20);

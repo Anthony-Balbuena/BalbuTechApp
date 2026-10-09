@@ -112,3 +112,13 @@ Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 e
 ## 📝 Flujo registrar producto — detalles a corregir (09/10/2026)
 
 → Mudado a su archivo propio: `Flujos/Flujo - Registrar producto.md` (flujo + P1–P4 ejecutados ✅).
+
+## 📋 Plan SQL (09/10/2026) — solo SQL, sin C++ ni web
+
+- [ ] **P9 — vuelto**: lógica en `24_SP_REGISTRAR_PAGO` (aceptar monto > total con `P_MONTO_RECIBIDO`, calcular vuelto y definir dónde se registra).
+- [ ] **E2E SQL Partes 2/4/5**: suites reproducibles estilo `test_blindaje_p3.sql` para cobro/cierre, cancelación y devoluciones/garantías.
+- [ ] **`ACTION_ORDER`**: verificar `DEVOLUCIONES` (×3 AFTER UPDATE) y `EMPLEADOS` (×2); poner `FOLLOWS` donde falte, como en `DETALLES_VENTA`.
+- [ ] **Params `VARCHAR(255)` vs hash PBKDF2**: `USUARIOS.CONTRASENA` es 512 pero los params de SPs que la tocan están en 255 → trunca el hash. Revisar y unificar.
+- [ ] **Gemelos**: decidir duplicados (`SP_HISTORIAL_PERMISOS_EMPLEADO`, `27_` vs `35_SP_FINALIZAR_RECLAMO_TOTAL`, etc.).
+- [ ] **Endurecimiento** (por tandas): transacciones/handlers en SPs multi-statement, CHECKs/ENUMs (`HISTORIAL_ESTADOS_*`, `ESTADO_AVANCE`), BEFOREs faltantes, `PROVEEDORES` UNIQUE anulables.
+- [ ] **Seeds de catálogo**: `CATEGORIAS` importa vacía (upstream quitó los seeds). Restaurar en `.sql` o extender `seed-admin.sh`.
