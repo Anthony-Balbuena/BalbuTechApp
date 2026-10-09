@@ -29,12 +29,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Planes/Pendientes - Flujo de ventas.md",
+                "file": "Planes/Pendientes - Flujo de compras.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Pendientes - Flujo de ventas"
+              "title": "Pendientes - Flujo de compras"
             }
           }
         ],
@@ -208,8 +208,11 @@
   },
   "active": "1dcd94f4ab15ea01",
   "lastOpenFiles": [
-    "Planes/Plan - Flujo de Ventas.md",
+    "Planes/Auditoría BD general - 08-10-2026.md",
+    "Planes/Pendientes - Flujo de compras.md",
     "Planes/Pendientes - Flujo de ventas.md",
+    "Planes/Plan - Flujo de Compras.md",
+    "Planes/Plan - Flujo de Ventas.md",
     "Planes/Prueba.md",
     "Planes",
     "Bienvenido.md"
