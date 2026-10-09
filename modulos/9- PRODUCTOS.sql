@@ -19,11 +19,16 @@ CREATE TABLE PRODUCTOS (
     ID_MARCA INT NOT NULL,
     ID_CATEGORIA INT NOT NULL,
     ID_PROVEEDOR INT NOT NULL,
-    IMAGEN_URL VARCHAR(255),
+    -- (09/10/2026) P4. La columna se llama IMAGEN en la BD viva (nadie la usa);
+    -- se unifica aqui para que las BD nuevas nazcan igual.
+    IMAGEN VARCHAR(255),
     PRIMARY KEY (ID_PRODUCTO),
     CONSTRAINT UQ_PRODUCTO_NOMBRE_MARCA UNIQUE (NOMBRE, ID_MARCA),
     CONSTRAINT FK_PRODUCTO_MARCA FOREIGN KEY (ID_MARCA) REFERENCES MARCAS (ID_MARCA),
-    CONSTRAINT FK_PRODUCTO_CATEGORIA FOREIGN KEY (ID_CATEGORIA) REFERENCES CATEGORIAS (ID_CATEGORIA)
+    CONSTRAINT FK_PRODUCTO_CATEGORIA FOREIGN KEY (ID_CATEGORIA) REFERENCES CATEGORIAS (ID_CATEGORIA),
+    -- (09/10/2026) FK que faltaba: la BD viva ya lo tiene (FK_PRODUCTO_PROVEEDOR);
+    -- se agrega aqui para que las BD nuevas (Docker) nazcan con el.
+    CONSTRAINT FK_PRODUCTO_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
 ) ENGINE = InnoDB;
 
 SELECT * FROM `MARCAS`; 
@@ -71,7 +76,10 @@ CREATE PROCEDURE SP_INSERTAR_PRODUCTO(
     IN P_CODIGO        VARCHAR(20),
     IN P_ID_MARCA      INT,
     IN P_ID_CATEGORIA  INT,
-    IN P_ID_PROVEEDOR  INT
+    IN P_ID_PROVEEDOR  INT,
+    -- (09/10/2026) P6. La app (productos.cpp) manda la imagen como 8vo
+    -- parametro; sin esto el alta desde la app fallaba (nro. de args).
+    IN P_IMAGEN        VARCHAR(255)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(100);
@@ -110,9 +118,22 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- (09/10/2026) P1. Nombre repetido en la misma marca (amable en vez del 1062 del UNIQUE).
+    IF EXISTS (SELECT 1 FROM PRODUCTOS AS Prod WHERE Prod.NOMBRE = v_nombre_limpio AND Prod.ID_MARCA = P_ID_MARCA) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: YA EXISTE UN PRODUCTO CON ESE NOMBRE EN ESA MARCA.';
+        LEAVE proc_label;
+    END IF;
+
     -- Precio válido
-    IF P_PRECIO <= 0 THEN
+    -- (09/10/2026) P2. IFNULL: el NULL pasaba el <= 0 y reventaba con 1048.
+    IF IFNULL(P_PRECIO, 0) <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRECIO DEBE SER MAYOR A CERO.';
+        LEAVE proc_label;
+    END IF;
+
+    -- (09/10/2026) P3. Nombre vacío tras limpiar.
+    IF CHAR_LENGTH(v_nombre_limpio) = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE NO PUEDE ESTAR VACÍO.';
         LEAVE proc_label;
     END IF;
 
@@ -122,8 +143,8 @@ proc_label: BEGIN
     END IF;
 
     -- 3) Inserción (requiere proveedor explícito)
-    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR)
-    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR);
+    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR, IMAGEN)
+    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR, P_IMAGEN);
 
     SELECT CONCAT('EXITO: PRODUCTO "', v_nombre_limpio, '" REGISTRADO CORRECTAMENTE.') AS MENSAJE;
 
@@ -153,7 +174,11 @@ CREATE PROCEDURE SP_ACTUALIZAR_PRODUCTOS(
     IN P_PRECIO       DECIMAL(10, 2),
     IN P_CODIGO       VARCHAR(20),
     IN P_ID_MARCA     INT,
-    IN P_ID_CATEGORIA INT
+    IN P_ID_CATEGORIA INT,
+    -- (09/10/2026) P7. La app (productos.cpp) manda proveedor e imagen
+    -- (9 args en total); sin estos el UPDATE desde la app fallaba.
+    IN P_ID_PROVEEDOR INT,
+    IN P_IMAGEN       VARCHAR(255)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(100); 
@@ -206,6 +231,21 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    IF P_ID_PROVEEDOR IS NOT NULL AND NOT EXISTS (SELECT 1 FROM PROVEEDORES WHERE ID_PROVEEDOR = P_ID_PROVEEDOR) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PROVEEDOR NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- (09/10/2026) P5. Nombre duplicado en la marca con los valores efectivos
+    -- (lo que venga NULL queda como esta); se excluye la propia fila.
+    IF EXISTS (SELECT 1 FROM PRODUCTOS
+                WHERE NOMBRE = COALESCE(v_nombre_limpio, (SELECT NOMBRE FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO))
+                  AND ID_MARCA = COALESCE(P_ID_MARCA, (SELECT ID_MARCA FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO))
+                  AND ID_PRODUCTO <> P_ID_PRODUCTO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: YA EXISTE OTRO PRODUCTO CON ESE NOMBRE EN ESA MARCA.';
+        LEAVE proc_label;
+    END IF;
+
     -- 3. ACTUALIZACIÓN DINÁMICA (Simplificada y segura)
     UPDATE PRODUCTOS 
     SET 
@@ -214,7 +254,9 @@ proc_label: BEGIN
         PRECIO       = COALESCE(P_PRECIO, PRECIO), -- Ya validado arriba
         CODIGO       = COALESCE(v_codigo_limpio, CODIGO),
         ID_MARCA     = COALESCE(P_ID_MARCA, ID_MARCA),
-        ID_CATEGORIA = COALESCE(P_ID_CATEGORIA, ID_CATEGORIA)
+        ID_CATEGORIA = COALESCE(P_ID_CATEGORIA, ID_CATEGORIA),
+        ID_PROVEEDOR = COALESCE(P_ID_PROVEEDOR, ID_PROVEEDOR),
+        IMAGEN       = COALESCE(P_IMAGEN, IMAGEN)
     WHERE ID_PRODUCTO = P_ID_PRODUCTO;
 
     -- 4. MENSAJE DE RETORNO (Estilo BALBU_TECH)

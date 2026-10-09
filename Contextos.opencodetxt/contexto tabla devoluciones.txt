@@ -1,0 +1,147 @@
+CONTEXTO DE DOCUMENTACION - TABLA DEVOLUCIONES
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/25- DEVOLUCIONES.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 25- DEVOLUCIONES.sql (9 bloques)
+================================================================================
+TABLA
+  - DEVOLUCIONES .......... devoluciones con motivo, condicion, monto y estado
+
+INDICES (3)
+  - IX_DEVOLUCION_VENTA .... devoluciones de una venta
+  - IX_DEVOLUCION_GARANTIA . devoluciones ligadas a una garantia
+  - IX_DEVOLUCION_ESTADO_FECHA .. reporte de pendientes del dia
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - SP_REGISTRAR_DEVOLUCION ..... registra devolucion validando garantia
+                                  y tope de unidades
+  - 25_SP_PROCESAR_DEVOLUCION ... aprueba, rechaza o reembolsa lo pendiente
+
+TRIGGERS (4)
+  - TR_REINTEGRAR_STOCK_DEVOLUCION .. al aprobar, devuelve stock y anota
+                                       el movimiento con tipo DEVOLUCION
+                                       (se crea primero)
+  - TR_MARCAR_VENTA_DEVUELTA ..... al aprobar o reembolsar, deja la venta
+                                     en estado DEVUELTA
+  - TR_BLOQUEAR_CAMBIO_DEVOLUCION .. una devolucion que salio de PENDIENTE
+                                       no se edita mas; mientras sigue
+                                       PENDIENTE la cantidad si se puede
+                                       tocar pero volviendo a validar la
+                                       cuota de lo comprado (04/10/2026)
+  - TR_BLOQUEAR_BORRADO_DEVOLUCION .. la APROBADA o REEMBOLSADA no se
+                                       borra (ya movio stock y venta);
+                                       PENDIENTE y RECHAZADA si se pueden
+                                       descartar (04/10/2026)
+
+VISTA (1)
+  - VISTA_REPORTES_DEVOLUCIONES .. devoluciones agrupadas por producto
+                                     y motivo
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los comentarios originales "-- 1.", "-- 2." y "-- 3." de los
+  indices; solo se agregaron bloques.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * El trigger TR_REINTEGRAR_STOCK_DEVOLUCION inserta en
+    MOVIMIENTOS_INVENTARIO sin el campo ID_EMPLEADO (NOT NULL en esa tabla).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 16 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~12 archivos con indices sin documentar.
+- ~64 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/25- DEVOLUCIONES.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_REINTEGRAR_STOCK_DEVOLUCION ahora inserta NEW.ID_EMPLEADO en
+  MOVIMIENTOS_INVENTARIO al aprobar (antes omitia la columna y el registro de
+  la ENTRADA fallaba junto con el reintegro de stock).
+- Comportamiento verificado: PENDIENTE -> APROBADA reintegra stock una vez y
+  registra la entrada con el empleado; REEMBOLSADA no vuelve a reintegrar.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+- TR_MARCAR_VENTA_DEVUELTA (nuevo): hasta hoy NADA escribia el estado
+  DEVUELTA de VENTAS (grep = 0), asi que una venta devuelta quedaba
+  REALIZADA para siempre. Se crea DESPUES de TR_REINTEGRAR_STOCK_DEVOLUCION
+  para que el reintegro corra primero (orden de creacion = orden de ejecucion).
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - TIPO REAL EN BITACORA E HISTORIAL (paquetito A)
+================================================================================
+- TR_REINTEGRAR_STOCK_DEVOLUCION anota ahora el movimiento con tipo
+  DEVOLUCION en MOVIMIENTOS_INVENTARIO (antes decia ENTRADA; nadie filtraba
+  por TIPO_MOVIMIENTO, verificado con grep).
+- TR_HISTORIAL_DEVOLUCION (archivo 32) anota con tipo DEVOLUCION en el
+  historial (antes AJUSTE).
+- OJO: el orden de creacion entre los dos triggers importa. Si se recrean,
+  va PRIMERO TR_REINTEGRAR (25) y DESPUES TR_HISTORIAL (32); al reves el
+  historial lee el stock antes del reintegro y anota mal antes/despues
+  (el 04/10/2026 se recrearon mal y se corrigio con la prueba H4).
+- Verificado: /tmp/opencode/test_paquetito_a.sql H4/H5 PASS (04/10/2026).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - LA VENTA SE CIERRA AL 100% DEVUELTO (paquetito K)
+================================================================================
+- TR_MARCAR_VENTA_DEVUELTA corregido: antes marcaba la venta entera en
+  DEVUELTA con UNA sola devolucion aprobada aunque la venta tuviera 5 lineas.
+  Ahora solo la marca cuando NO queda ni una unidad por devolver en ninguna
+  linea (SUM de devoluciones APROBADA/REEMBOLSADA por linea >= CANTIDAD).
+- Una devolucion parcial deja la venta como estaba (REALIZADA): la mercancia
+  que no volvio sigue siendo venta buena. Las RECHAZADAS no cuentan.
+- Verificado: /tmp/opencode/test_paquetito_k.sql checks K9b/K10/K11 y
+  smoke_fase1.sql T7/T7b (141 PASS / 0 FAIL en la regresion, 04/10/2026).
+
+================================================================================
+9. ACTUALIZACION 04/10/2026 - LA DEVOLUCION NO SE TOCA NI SE BORRA
+    (fases 1+2)
+================================================================================
+- Mismo hueco que en las devoluciones de compra (19.6), ahora del lado de
+  ventas: un UPDATE directo podia pasar una devolucion de APROBADA a
+  RECHAZADA cuando el stock, la venta y el tope de unidades ya estaban
+  aplicados, y un DELETE borraba la prueba de todo eso. En garantias (26)
+  ademas se podia sacar la validacion que exige PENDIENTE.
+- TR_BLOQUEAR_CAMBIO_DEVOLUCION (BEFORE UPDATE): una vez fuera de
+  PENDIENTE la fila queda congelada (APROBADA, RECHAZADA, REEMBOLSADA).
+  Mientras sigue PENDIENTE la cantidad si se puede editar, recontando lo ya
+  devuelto y lo pendiente de ese detalle, igual que al registrar.
+- TR_BLOQUEAR_BORRADO_DEVOLUCION (BEFORE DELETE): APROBADA y REEMBOLSADA no
+  se borran; PENDIENTE y RECHAZADA si se pueden descartar.
+- Los rechazos que vienen de SP_APROBAR_GARANTIA solo dejan la fila en
+  PENDIENTE, asi que el candado del UPDATE los deja pasar (señalan PENDIENTE
+  -> RECHAZADA, que es justamente el unico salto que se permite ahi).
+- Verificado: /tmp/opencode/test_blindaje.sql checks B15 a B17 y
+  test_devolucion_compra 18/18 en BALBU_TECH con ROLLBACK (04/10/2026).

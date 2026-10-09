@@ -1,0 +1,47 @@
+CONTEXTO DE DOCUMENTACION - TABLA ROLES
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/3- ROLES.sql
+LOTE A (archivos 1 a 4) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Reemplazar la documentacion vieja de los archivos 1 a 16 por el mismo estilo
+usado en los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas coloquiales
+que solo expliquen la funcion de cada objeto, sin listados de campos ni de
+parametros.
+
+Reglas aplicadas:
+- Se ELIMINO el texto viejo y se puso el bloque nuevo en su lugar.
+- Se CONSERVARON: separadores ----[Store procedure}----, comentarios cortos
+  "--INSERTAR", "--ACTUALIZAR", etc. y todo el SQL.
+- El SQL operativo NO se modifico: solo cambiaron comentarios.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 3- ROLES.sql (6 bloques)
+================================================================================
+TABLA
+  - ROLES .................. roles del sistema (nombre unico)
+
+INDICE (1)
+  - IX_ROLES_NOMBRE ........ busqueda y listados de roles por nombre
+
+PROCEDIMIENTOS ALMACENADOS (4)
+  - SP_INSERTAR_ROL ......... crea un rol nuevo
+  - SP_ACTUALIZAR_ROL ....... cambia el nombre de un rol
+  - SP_BUSCAR_ROLES ......... busqueda por nombre parcial
+  - SP_LISTAR_ROLES ......... lista todos los roles ordenados
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se elimino el bloque "DESCRIPCION DEL MODULO ROLES" con listado de campos
+  y restricciones, y el bloque de parametros de cada SP.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 6 objetos CREATE / 6 bloques con bloque previo.
+- /* balanceados: 6 / 6.
+- SQL identico al original al quitar los comentarios (sin diferencias).

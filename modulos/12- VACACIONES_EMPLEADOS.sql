@@ -313,3 +313,40 @@ SP_ACTUALIZAR_VACACIONES
 
 
 
+
+
+-----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------[TRIGGER]------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VALIDAR_LIMITE_VACACIONES_UPDATE //
+/*
+TR_VALIDAR_LIMITE_VACACIONES_UPDATE (09/10/2026)
+Gemelo del BEFORE INSERT para el UPDATE directo y SP_ACTUALIZAR_VACACIONES:
+la misma cuenta de 15 dias sin contar la propia fila que se edita.
+*/
+CREATE TRIGGER TR_VALIDAR_LIMITE_VACACIONES_UPDATE
+BEFORE UPDATE ON VACACIONES_EMPLEADOS
+FOR EACH ROW
+BEGIN
+    DECLARE v_dias_acumulados INT;
+    DECLARE v_nuevos_dias INT;
+    DECLARE v_anio_solicitado INT;
+
+    SET v_anio_solicitado = YEAR(NEW.FECHA_INICIO);
+
+    SELECT IFNULL(SUM(DATEDIFF(FECHA_FIN, FECHA_INICIO) + 1), 0)
+    INTO v_dias_acumulados
+    FROM VACACIONES_EMPLEADOS
+    WHERE ID_EMPLEADO = NEW.ID_EMPLEADO
+      AND YEAR(FECHA_INICIO) = v_anio_solicitado
+      AND ID_VACACION <> NEW.ID_VACACION;
+
+    SET v_nuevos_dias = DATEDIFF(NEW.FECHA_FIN, NEW.FECHA_INICIO) + 1;
+
+    IF (v_dias_acumulados + v_nuevos_dias) > 15 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: VACACIONES DENEGADAS. EL EMPLEADO EXCEDERÍA EL LÍMITE DE 15 DÍAS ANUALES.';
+    END IF;
+END //
+DELIMITER ;

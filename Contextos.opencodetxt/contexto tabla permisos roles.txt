@@ -1,0 +1,63 @@
+CONTEXTO DE DOCUMENTACION - TABLAS PERMISOS Y ROL_PERMISO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/36- PERMISOS_ROLES.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 36- PERMISOS_ROLES.sql (5 bloques)
+================================================================================
+TABLAS (2)
+  - PERMISOS .............. acciones que se pueden permitir en el sistema
+  - ROL_PERMISO ........... une cada rol con sus permisos (clave compuesta)
+
+PROCEDIMIENTOS ALMACENADOS (2)
+  - SP_ASIGNAR_PERMISO_A_ROL .... da de alta un permiso para un rol
+  - SP_LISTAR_PERMISOS_POR_ROL .. lista los permisos de un rol
+
+FUNCION (1)
+  - FN_TIENE_PERMISO ...... dice si un usuario puede hacer una accion
+
+INDICES (0), TRIGGERS (0), VISTAS (0)
+  - El archivo no define estos objetos (los indices estan como claves
+    primarias o restricciones dentro de las tablas).
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron los encabezados originales con "-- ===..." y los comentarios
+  "-- ADMIN: acceso total", "-- RRHH: ...", "-- EMPLEADO: ..." y los que
+  preceden a cada SP y la funcion.
+- NO se tocaron los INSERT de permisos base ni la asignacion por rol.
+- No se tocaron: DELIMITER, DROP, INSERT, SELECT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 6 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~9 archivos con indices sin documentar.
+- ~51 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/36- PERMISOS_ROLES.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

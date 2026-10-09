@@ -1,0 +1,120 @@
+CONTEXTO DE DOCUMENTACION - TABLA DETALLES_VENTA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/23- DETALLE_VENTA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 23- DETALLE_VENTA.sql (9 bloques)
+================================================================================
+TABLA
+  - DETALLES_VENTA ........ productos de cada venta con subtotal automatico
+
+INDICES (2)
+  - IX_CLIENTE_NOMBRE ..... busqueda de clientes por nombre (sobre CLIENTES)
+  - IX_VENTAS_FECHA ....... ventas por fecha (sobre VENTAS)
+
+PROCEDIMIENTOS ALMACENADOS (1)
+  - SP_AGREGAR_DETALLE_VENTA ...... valida venta, empleado dueño y stock,
+                                    toma el precio actual y agrega la linea
+
+TRIGGERS (5)
+  - TR_ACTUALIZAR_TOTAL_VENTA .... suma subtotales al TOTAL de la venta;
+                                    es uno de los 2 unicos que pueden
+                                    tocar el TOTAL: levanta
+                                    @VENTAS_INTERNO para pasarle el
+                                    candado de cabecera (04/10/2026)
+  - TR_BLOQUEAR_VENTA_FINALIZADA . no deja agregar productos a una venta
+                                    ya realizada
+  - TR_VALIDAR_STOCK_DETALLE_VENTA .. BEFORE INSERT: no deja vender mas de lo
+                                    que hay en INVENTARIO (aunque el INSERT
+                                    no pase por el SP) y tampoco deja pasar
+                                    productos sin fila de inventario
+  - TR_BLOQUEAR_UPDATE_DETALLE_VENTA .. un renglon de venta cerrada no se
+                                    edita (BEFORE UPDATE, fase H)
+  - TR_BLOQUEAR_BORRADO_DETALLE_VENTA .. un renglon de venta cerrada no se
+                                    borra tampoco (BEFORE DELETE, fase H)
+
+VISTAS (0)
+  - La seccion [VIEW} del archivo esta vacia, no hay nada que documentar.
+
+FUNCIONES (0)
+  - La seccion [FUNTION} del archivo esta vacia, no hay nada que documentar.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Anomalias corregidas en la sesion del 02/10/2026 (ver seccion 6):
+  * Existian 2 procedimientos casi iguales; hoy queda uno solo
+    SP_AGREGAR_DETALLE_VENTA (version completa, 4 parametros).
+  * Los indices IX_CLIENTE_NOMBRE e IX_VENTAS_FECHA estan definidos sobre
+    CLIENTES y VENTAS, no sobre DETALLES_VENTA (sin tocar).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 18 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~14 archivos con indices sin documentar.
+- ~67 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/23- DETALLE_VENTA.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 02/10/2026 - CORRECCION DE LA LOGICA DE VENTA
+================================================================================
+Cambios aplicados hoy (ya cargados a la BD real BALBU_TECH):
+- TR_BLOQUEAR_VENTA_FINALIZADA ahora bloquea REALIZADA, CANCELADA y DEVUELTA
+  (antes solo REALIZADA; una venta cancelada aceptaba agregar productos).
+- TR_ACTUALIZAR_TOTAL_VENTA confirmado como UNICO sumador del TOTAL de la venta
+  (el duplicado TR_CALCULAR_TOTAL_VENTA del archivo 21 fue eliminado).
+- SP duplicado eliminado: el archivo tenia 2 veces el nombre
+  SP_AGREGAR_DETALLE_VENTA (uno bajo [Store procedure} y otro copiado dentro
+  de [TRIGERR}); el segundo DROP+CREATE pisaba al primero y dejaba la version
+  corta de 3 parametros sin validar empleado ni venta. Queda un solo SP con
+  4 parametros (valida venta existente, empleado dueño y stock). La version
+  corta NO se usa en ningun lado (ni app C++, ni otros SQL, ni tests).
+- Cerrado el tema del duplicado de afuera: 21_SP_AGREGAR_PRODUCTO_VENTA
+  (archivo 21) hacia lo mismo sin validar el dueño de la venta y tambien
+  fue eliminado, asi que este archivo queda con el UNICO camino de alta
+  de detalle.
+- TR_VALIDAR_STOCK_DETALLE_VENTA (nuevo, 3ro de la tabla): valida el stock
+  tambien en INSERT directos. Motivo: 5 de los 6 productos no tienen fila en
+  INVENTARIO, el SELECT del SP devolia NULL y la validacion se saltaba.
+- SP_AGREGAR_DETALLE_VENTA ahora usa IFNULL(V_STOCK,0) en la validacion de
+  stock por la misma razon.
+- Verificado: pruebas 29/29 en arena y smoke en vivo 8/8 PASS (02/10/2026).
+================================================================================
+7. ACTUALIZACION 04/10/2026 - NO SE EDITAN NI SE BORRAN RENGLONES (fase H)
+================================================================================
+- TR_BLOQUEAR_UPDATE_DETALLE_VENTA (BEFORE UPDATE): un renglon de venta no se
+  edita a pelo, ni siquiera estando EN_PROCESO: el TOTAL y la cantidad que
+  salio del inventario quedan siempre igual a lo que se cobro.
+- TR_BLOQUEAR_BORRADO_DETALLE_VENTA (BEFORE DELETE): tampoco se borran
+  renglones. A diferencia de las compras aqui NO existe un SP que quite
+  lineas, y borrarla a pelo dejaria el TOTAL y el stock sin devolver. Si algo
+  salio mal se cancela la venta completa con SP_CANCELAR_VENTA.
+- Verificado: checks H8a y H8b de /tmp/opencode/test_fase_h.sql
+  (14/14 PASS con ROLLBACK, 04/10/2026).

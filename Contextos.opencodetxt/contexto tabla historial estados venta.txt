@@ -1,0 +1,85 @@
+CONTEXTO DE DOCUMENTACION - TABLA HISTORIAL_ESTADOS_VENTA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 04/10/2026
+Archivo trabajado: modulos/21.5- HISTORIAL_ESTADOS_VENTA.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 21.5- HISTORIAL_ESTADOS_VENTA.sql (4 bloques)
+================================================================================
+TABLA (1)
+  - HISTORIAL_ESTADOS_VENTA ... quien, cuando y como cambio el estado de
+                                cada venta; una fila por cambio (paquetito J)
+
+INDICE (1)
+  - IX_HIST_ESTADO_VENTA_FECHA .. historial de estados por fecha, para los
+                                reportes (por venta ya lo cubre el FK)
+
+TRIGGERS (2)
+  - TR_HISTORIAL_ESTADO_VENTA .. AFTER INSERT ON VENTAS: la primera fila del
+                                historial al nacer la venta (ESTADO_ANTERIOR
+                                queda NULL, motivo "Venta iniciada")
+  - TR_CAMBIO_ESTADO_VENTA .... AFTER UPDATE ON VENTAS: anota cada cambio de
+                                estado con el antes y el despues y motivo
+                                "Estado: X -> Y"
+
+PROCEDIMIENTOS (0), VISTAS (0), FUNCIONES (0)
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Desde el 04/10/2026 lo de HISTORIAL_ESTADOS_VENTA vive en su propio
+  archivo 21.5 (se mudo sin cambiar una coma: mismos CREATE, mismos
+  comentarios; ver seccion 12 del contexto de ventas y commit de la mudanza).
+- Este contexto se creo junto con el gemelo de HISTORIAL_ESTADOS_COMPRA, para
+  que las dos cabeceras tengan su propia ficha.
+- Ambas tablas tienen la misma forma a proposito: se leen igual, menos la FK,
+  que apunta a su cabecera.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- Nada pendiente de este archivo: la tabla, su indice y sus 2 triggers ya
+  estan documentados y probados (paquetito J, 8/8 PASS).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- grep -n "HISTORIAL_ESTADOS_VENTA" modulos/21.5-\ HISTORIAL_ESTADOS_VENTA.sql
+  -> aparecen el CREATE TABLE, el indice y los 2 triggers con su bloque.
+- Recarga con load_modules.py (2 pasadas) y correr
+  /tmp/opencode/test_paquetito_j.sql con ROLLBACK; ademas smoke_fase1.sql.
+
+================================================================================
+6. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS (paquetito J) Y MUDANZA
+================================================================================
+- La tabla guarda una fila por cada cambio de estado de venta:
+  ESTADO_ANTERIOR puede ser NULL (nacimiento), ESTADO_NUEVO es obligatorio,
+  ID_EMPLEADO dice quien lo firma y MOTIVO explica el por que.
+- Se llena sola: TR_HISTORIAL_ESTADO_VENTA anota el nacimiento y
+  TR_CAMBIO_ESTADO_VENTA cada movimiento posterior, tambien si el cambio
+  viene de un UPDATE directo sobre VENTAS.
+- Interaccion con el candado nuevo (fases 1+2): TR_VALIDAR_ACTUALIZACION
+  VENTA ahora filtra antes lo que llega a VENTAS, asi que al historial solo
+  le llegan cambios legitimos (bandera de SP_CANCELAR_VENTA o del trigger del
+  total, o transiciones validas). Un intento de cambiar estado a pelo no
+  genera fila: ni el UPDATE pasa, ni el trigger de historia corre.
+- Estados terminales: CANCELADA y DEVUELTA no salen de ahi, asi que el
+  historial de una venta cerrada no vuelve a crecer.
+- Verificado: /tmp/opencode/test_paquetito_j.sql (J0 tabla, J0b triggers, J1
+  nacimiento, J2 cobrada, J3 cancelada, J4 reabierta, J5 cierre por cobro,
+  J6 indice) y test_blindaje B11-B17 en BALBU_TECH con ROLLBACK (04/10/2026).

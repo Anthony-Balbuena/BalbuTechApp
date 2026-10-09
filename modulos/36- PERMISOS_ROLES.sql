@@ -22,12 +22,19 @@ Une cada rol con los permisos que tiene. La clave compuesta evita repetir
 permisos, y el rol tiene que ser ADMIN, RRHH o EMPLEADO.
 */
 CREATE TABLE IF NOT EXISTS ROL_PERMISO (
-    ROL_NOMBRE VARCHAR(30) NOT NULL,
+    -- (09/10/2026) VARCHAR(50) para igualar ROLES.NOMBRE_ROL y poder atar el FK;
+    -- antes VARCHAR(30) impedia la FK (los tipos deben coincidir).
+    -- ROL_NOMBRE VARCHAR(30) NOT NULL,
+    ROL_NOMBRE VARCHAR(50) NOT NULL,
     ID_PERMISO INT NOT NULL,
     PRIMARY KEY (ROL_NOMBRE, ID_PERMISO),
     CONSTRAINT FK_ROL_PERMISO_PERMISO FOREIGN KEY (ID_PERMISO)
         REFERENCES PERMISOS(ID_PERMISO)
         ON DELETE CASCADE,
+    -- (09/10/2026) FK al rol: los nombres de aqui deben existir en ROLES
+    -- (alineados con el C++: ADMIN/RRHH/EMPLEADO).
+    CONSTRAINT FK_ROL_PERMISO_ROL FOREIGN KEY (ROL_NOMBRE)
+        REFERENCES ROLES(NOMBRE_ROL),
     CONSTRAINT CHK_ROL_NOMBRE CHECK (
         ROL_NOMBRE IN ('ADMIN', 'RRHH', 'EMPLEADO')
     )

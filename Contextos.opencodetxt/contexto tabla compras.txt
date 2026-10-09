@@ -1,0 +1,844 @@
+CONTEXTO DE DOCUMENTACION - TABLA COMPRAS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/19- COMPRAS.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 19- COMPRAS.sql
+   (2 tablas, 5 indices, 3 SPs, 9 triggers, 2 vistas, 1 funcion)
+   [Lo de PAGOS_COMPRA se mudo al archivo 19.5- PAGOS_COMPRA.sql]
+================================================================================
+TABLA (2)
+  - COMPRAS ................ cabecera de cada compra a proveedor
+                              (columna ESTADO: ABIERTA / RECIBIDA /
+                               CANCELADA / DEVUELTA, agregadas el
+                               04/10/2026; FACTURA desde el paquetito F)
+  - HISTORIAL_ESTADOS_COMPRA  quien, cuando y como cambio el estado de
+                              cada compra; una fila por cambio (G)
+
+INDICES (5)
+  - IX_COMPRA_FECHA ......... reportes por fecha (cierres de caja)
+  - IX_COMPRA_TOTAL ......... analisis de gastos por monto
+  - UQ_COMPRA_FACTURA ....... factura unica por proveedor (F)
+  - IX_HIST_ESTADO_FECHA .... historial de estados por fecha (G)
+  - IX_COMPRA_EMPLEADO ...... compras por empleado, para reportes de
+                              quien compra que (04/10/2026, ver seccion 18)
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - 19_SP_INICIAR_COMPRA .... abre una compra y devuelve su ID
+  - SP_CANCELAR_COMPRA ...... cancela una compra ABIERTA y revierte el
+                               stock (valida dueno, que no tenga pagos -
+                               ver 19.5 - y que la mercancia siga en el
+                               almacen). Es el UNICO camino a CANCELADA:
+                               levanta @COMPRAS_INTERNO para que el
+                               candado deje pasar ese UPDATE (seccion 18)
+  - SP_ASIGNAR_FACTURA_COMPRA ..... le pone la factura del proveedor
+                                    (unica por proveedor; ver seccion 13;
+                                    hoy rechaza CANCELADA y DEVUELTA,
+                                    seccion 18)
+
+TRIGGERS (9)
+  - TR_ACTUALIZAR_STOCK_COMPRA .. suma el stock al comprar
+  - TR_BLOQUEAR_COMPRA_CERRADA .. una compra RECIBIDA o CANCELADA no
+                               acepta mas productos (BEFORE INSERT sobre
+                               DETALLE_COMPRA; renombrado desde
+                               TR_BLOQUEAR_COMPRA_CANCELADA el 04/10/2026)
+  - TR_BLOQUEAR_BORRADO_COMPRA_CERRADA .. lo mismo pero al BORRAR una
+                               linea: estado ABIERTA + stock alcanzante
+                               (BEFORE DELETE, paquetito F)
+  - TR_ACTUALIZAR_STOCK_BORRADO_COMPRA .. baja el stock al quitar linea
+                               y escribe el historial antes/despues en el
+                               MISMO trigger (F; orden a prueba de balas)
+  - TR_HISTORIAL_ESTADO_COMPRA .. primera fila del historial de estados
+                               al nacer la compra (AFTER INSERT, G)
+  - TR_CAMBIO_ESTADO_COMPRA .. anota cada cambio de estado con antes y
+                               despues (AFTER UPDATE, tambien en UPDATE
+                               directo, paquetito G)
+  - TR_BLOQUEAR_UPDATE_DETALLE_COMPRA .. una linea de compra cerrada no
+                               se edita (BEFORE UPDATE sobre
+                               DETALLE_COMPRA, fase H)
+  - TR_BLOQUEAR_BORRADO_COMPRA .. las compras no se borran: de ahi
+                               cuelgan sus lineas, pagos y bitacora
+                               (BEFORE DELETE, fase H; ver seccion 15)
+  - TR_VALIDAR_ACTUALIZACION_COMPRA .. EL CANDADO de la cabecera: no
+                               deja cambiar ESTADO ni TOTAL con un UPDATE
+                               a pelo (BEFORE UPDATE, 04/10/2026; ver
+                               seccion 18)
+  (TR_CALCULAR_TOTAL_COMPRA se muevo a 22-DETALLE_COMPRA.sql, ver seccion 6)
+  (Tabla PAGOS_COMPRA, IX_PAGOS_COMPRA_COMPRA, SP_REGISTRAR_PAGO_COMPRA,
+   SP_ANULAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y TR_AUTO_RECIBIR_COMPRA
+   viven en 19.5- PAGOS_COMPRA.sql, ver seccion 9)
+  (La devolucion a proveedor vive en 19.6- DEVOLUCION_COMPRA.sql, ver
+   seccion 11 y su propio contexto)
+
+VISTA (2)
+  - VISTA_REPORTE_COMPRAS ... compras con proveedor, fecha, total, factura
+                              y estado
+  - VISTA_GASTOS_PROVEEDOR .. cuanto le compramos a cada proveedor en total
+                              (canceladas no cuentan; paquetito E)
+
+FUNCION (1)
+  - FN_CONTAR_ITEMS_COMPRA .. cuenta los productos de una compra
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que INVENTARIO y
+  HISTORIAL_ESTADOS_PRODUCTO.
+- Se conservaron los comentarios originales "-- Para reportes de compras...",
+  "-- Para analisis de gastos...", "-- Trigger: Actualiza Inventario..." y
+  "-- Trigger: Actualiza Total..."; solo se agregaron bloques.
+- NO se tocaron las anomalias existentes (solo informativas):
+  * Linea 95: una "V" suelta antes del separador de seccion [VIEW}.
+  * Los triggers usan "END //" pero el DELIMITER se cerro antes con ";",
+    el script tal como esta daria error al ejecutarse completo
+    (resuelto: desde el 04/10/2026 todo el repo paso a "END ; /
+    DELIMITER ;", ver seccion 10).
+- No se tocaron: DELIMITER, DROP, UPDATE, INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES
+================================================================================
+- 27 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~20 archivos con CREATE INDEX sin documentar (~45 indices en total).
+- ~85 procedimientos almacenados sin bloque de descripcion (112 en total).
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/19- COMPRAS.sql" -> solo debe mostrar lineas agregadas
+  con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.
+
+================================================================================
+6. ACTUALIZACION 03/10/2026 - LIMPIEZA DE REDUNDANCIAS (FASE A COMPRA)
+================================================================================
+- TR_CALCULAR_TOTAL_COMPRA eliminada de este archivo: estaba duplicada con
+  22-DETALLE_COMPRA.sql. Vive solo en el 22 (ya cargada en la BD).
+- DELIMITER reparado: tras el borrado quedaba un "DELIMITER //" sin cerrar
+  despues del END // del trigger; ahora va "END // / DELIMITER ;" y la vista
+  se crea con normalidad. (04/10/2026: el repo unifico a "END ; /
+  DELIMITER ;", ver seccion 10.)
+- FN_CONTAR_ITEMS_COMPRA: se agrego DROP FUNCTION IF EXISTS antes del CREATE
+  (antes el archivo daba ERROR 1304 al recargarse).
+- La anomalia "V" suelta de la seccion [VIEW} ya no existe (borrada junto con
+  el bloque duplicado).
+- Verificado recargando el archivo en la arena BALBU_TECH_TEST: solo errores
+  1050/1061 ("ya existe" de tabla/indices), cero errores de sintaxis.
+
+================================================================================
+7. ACTUALIZACION 04/10/2026 - CIERRE DE COMPRAS (paquetito B)
+================================================================================
+- Nueva columna COMPRAS.ESTADO ENUM('ABIERTA','RECIBIDA','CANCELADA')
+  DEFAULT 'ABIERTA'. ABIERTA recibe productos; RECIBIDA queda reservada para
+  la fase de pagos de compras; CANCELADA no recibe mas productos. Se agrego
+  ahora porque es mas molesto de alterar despues (y asi no hay que volver a
+  tocar la estructura cuando entre el pago).
+- Nuevo SP_CANCELAR_COMPRA(P_ID_COMPRA, P_ID_EMPLEADO): valida empleado,
+  que la compra exista, que sea el dueno, que siga ABIERTA y que la
+  mercancia siga en el almacen (si algun producto ya se consumio en ventas
+  rechaza ANTES de tocar nada, sin cambios parciales). Si todo esta bien:
+  anota la SALIDA en MOVIMIENTOS_INVENTARIO, baja el stock, escribe UNA fila
+  en HISTORIAL_MOVIMIENTOS_PRODUCTO (antes/despues) y deja la compra
+  CANCELADA. El detalle y el TOTAL se conservan como evidencia (igual que
+  en ventas: cancelar no borra, solo revierte).
+- Nuevo TR_BLOQUEAR_COMPRA_CANCELADA (BEFORE INSERT sobre DETALLE_COMPRA):
+  una compra cancelada no acepta productos ni con INSERT directo, mismo
+  patron que TR_BLOQUEAR_VENTA_FINALIZADA.
+- VISTA_REPORTE_COMPRAS ahora incluye ESTADO.
+- Verificado en vivo: /tmp/opencode/test_paquetito_b.sql 14/14 PASS con
+  ROLLBACK (residuos 0) + regresion de las 3 suites anteriores en verde
+  (04/10/2026).
+
+================================================================================
+8. ACTUALIZACION 04/10/2026 - PAGOS DE COMPRAS (paquetito C)
+================================================================================
+- Nueva tabla PAGOS_COMPRA (mas sus SPs y triggers) documentada en detalle en
+  "contexto tabla pagos compra.txt": pagos parciales o totales a proveedores,
+  y RECIBIDA pasa a significar "saldada al 100%" (se activo el uso que en la
+  seccion 7 quedo reservado).
+- SP_CANCELAR_COMPRA: nueva validacion 5 - una compra con pagos no se
+  cancela; hay que anularlos primero con SP_ANULAR_PAGO_COMPRA (asi nunca se
+  queda dinero colgado y se respeta el patron de ventas).
+- TR_BLOQUEAR_COMPRA_CANCELADA renombrado a TR_BLOQUEAR_COMPRA_CERRADA: el
+  bloqueo ahora es "solo compras ABIERTAS aceptan productos" (cubre RECIBIDA
+  ademas de CANCELADA). Mismo mensaje para los dos casos.
+- Afecta tambien a 22-DETALLE_COMPRA.sql (ver su seccion 8).
+- Verificado en vivo: /tmp/opencode/test_paquetito_c.sql 19/19 PASS con
+  ROLLBACK (residuos 0) + regresion de las 4 suites anteriores en verde
+  (9 + 10 + 12 + 13 = 44 checks, 04/10/2026).
+
+================================================================================
+9. ACTUALIZACION 04/10/2026 - PAGOS_COMPRA SE MUDO AL ARCHIVO 19.5
+================================================================================
+- Todo lo de la tabla PAGOS_COMPRA (tabla, indice, 2 SPs y 2 triggers) se
+  extrajo de este archivo al nuevo 19.5- PAGOS_COMPRA.sql, para que la
+  compra (COMPRAS + detalle + cancelacion) y su dinero (pagos) no vivan
+  todos juntos en el 19.
+- Aqui solo quedo la guarda de SP_CANCELAR_COMPRA que rechaza compras con
+  pagos (logica de la compra) y el TR_BLOQUEAR_COMPRA_CERRADA (logica de
+  DETALLE_COMPRA); ambos referencian el 19.5 en sus comentarios.
+- Carga: 19 -> 19.5 -> 20 (el loader ordena por numero). Sin cambios en la
+  BD en vivo: mismo esquema, otro archivo. Verificado con arena + paridad
+  y 63 checks en verde (04/10/2026).
+
+================================================================================
+10. ACTUALIZACION 04/10/2026 - ESTILO UNICO: END ; / DELIMITER ;
+================================================================================
+- Todo el repo paso de "END // / DELIMITER ;" a "END ; / DELIMITER ;": se
+  convirtieron los 18 bloques que quedaban en // (11 archivos) y ya era el
+  estilo de otros 93 bloques. Motivo: con "END //" VS Code no puede
+  ejecutar los SP; con "END ;" si.
+- Se cerraron de paso los huecos de lineas en blanco entre END y
+  DELIMITER ; que el loader no alcanzaba a normalizar (4 sitios en los
+  archivos 9, 17 y 19).
+- El loader (load_modules.py) convierte el "END ;" adyacente a
+  "DELIMITER ;" en "END //" al cargar, asi que la terminal mysql recibe
+  exactamente lo mismo de siempre y la BD en vivo no cambio nada.
+- Verificado: arena reconstruida con paridad (mismas 16 diferencias
+  legacy), misma cantidad de errores de carga que el baseline y 63 checks
+  en verde (04/10/2026).
+
+================================================================================
+11. ACTUALIZACION 04/10/2026 - ESTADO DEVUELTA (paquetito D)
+================================================================================
+- COMPRAS.ESTADO gana 'DEVUELTA' (ENUM('ABIERTA','RECIBIDA','CANCELADA',
+  'DEVUELTA')): se activa sola cuando una devolucion de compra (19.6)
+  baja el TOTAL a 0. Significa que toda la mercancia volvio al proveedor.
+- Cascada de validaciones actualizada para cubrir el nuevo estado:
+  * SP_CANCELAR_COMPRA y TR_BLOQUEAR_COMPRA_CERRADA: mensajes dicen
+    'YA FUE RECIBIDA, CANCELADA O DEVUELTA'.
+  * SP_REGISTRAR_PAGO_COMPRA, TR_VALIDAR_PAGO_COMPRA y
+    SP_ANULAR_PAGO_COMPRA (19.5): DEVUELTA rechaza pagos y anulaciones.
+  * 22_SP_AGREGAR_DETALLE_COMPRA: mismo mensaje unificado.
+- El resto del flujo no cambia: 'no ABIERTA' ya cerraba DEVUELTA sola
+  (detalle y bloqueadores).
+- Verificado en vivo: test_devolucion_compra.sql 18/18 PASS + regresion
+  63 checks en verde, residuos 0 (04/10/2026).
+
+================================================================================
+12. ACTUALIZACION 04/10/2026 - VISTA GASTOS POR PROVEEDOR (paquetito E)
+================================================================================
+- VISTA_GASTOS_PROVEEDOR: por proveedor, cuantas compras llevamos y el
+  gasto total (suma de TOTAL actual). Las CANCELADAS no cuentan como
+  gasto y una devolucion baja el gasto sola porque reduce el TOTAL.
+  Para rangos de fechas se filtra en la consulta sobre
+  VISTA_REPORTE_COMPRAS (la vista no recibe parametros).
+- Verificado en vivo: check E6 de test_paquetito_e.sql (7/7 PASS con
+  ROLLBACK, 04/10/2026).
+
+================================================================================
+13. ACTUALIZACION 04/10/2026 - FACTURA + QUITAR LINEA (paquetito F)
+================================================================================
+- Nueva columna COMPRAS.FACTURA VARCHAR(30) NULL (opcional) con indice
+  unico UQ_COMPRA_FACTURA (ID_PROVEEDOR, FACTURA): el mismo numero solo
+  una vez por proveedor; distintos proveedores pueden repetir y las
+  compras sin factura (NULL) no chocan.
+- SP_ASIGNAR_FACTURA_COMPRA: valida vacia, compra existente, no CANCELADA
+  y repetida del mismo proveedor (el indice es la red de seguridad ante
+  UPDATE directo). VIVE en este archivo.
+- VISTA_REPORTE_COMPRAS ahora muestra FACTURA.
+- Triggers de DELETE sobre DETALLE_COMPRA en este archivo:
+  TR_BLOQUEAR_BORRADO_COMPRA_CERRADA (BEFORE: estado + stock) y
+  TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (AFTER: baja stock + historial).
+  Ver seccion 9 del contexto de detalle compra.
+- Verificado: checks F0-F12 de test_paquetito_f.sql (14/14 PASS con
+  ROLLBACK) + regresion 88 checks en verde (04/10/2026).
+
+================================================================================
+14. ACTUALIZACION 04/10/2026 - HISTORIAL DE ESTADOS (paquetito G)
+================================================================================
+- Nueva tabla HISTORIAL_ESTADOS_COMPRA: ID_COMPRA, ESTADO_ANTERIOR
+  (NULL al nacer), ESTADO_NUEVO, ID_EMPLEADO, MOTIVO y FECHA. Una fila
+  por cada cambio, con indice por fecha.
+- Escrita por 2 triggers en vez de por los SPs: TR_HISTORIAL_ESTADO_COMPRA
+  (AFTER INSERT: 'Compra iniciada') y TR_CAMBIO_ESTADO_COMPRA (AFTER
+  UPDATE: 'Estado: A -> B' solo si el estado cambio). Asi tambien cuenta
+  si alguien lo cambia con un UPDATE directo y no se duplica filas.
+- El empleado anotado es el dueno de la compra (los pagos no traen
+  empleado propio; para el detalle de pagos esta 19.5). Cambios de TOTAL
+  sin cambio de estado no anotan nada.
+- Verificado: checks G0-G6 de test_paquetito_g.sql (9/9 PASS con
+  ROLLBACK) + regresion 102 checks en verde (04/10/2026).
+================================================================================
+15. ACTUALIZACION 04/10/2026 - LA COMPRA NO SE BORRA (fase H)
+================================================================================
+- TR_BLOQUEAR_BORRADO_COMPRA (BEFORE DELETE ON COMPRAS): todo DELETE directo
+  sobre COMPRAS corta con 'ERROR: LA COMPRA NO SE PUEDE BORRAR; USE
+  SP_CANCELAR_COMPRA PARA ANULARLA.' - de la compra cuelgan sus pagos, su
+  detalle, sus devoluciones y su historial de estados.
+- Queda el trio de blindaje de la compra: INSERT (TR_BLOQUEAR_COMPRA_CERRADA),
+  UPDATE de linea (TR_BLOQUEAR_UPDATE_DETALLE_COMPRA, en 22-) y DELETE.
+- Verificado: check H4 de /tmp/opencode/test_fase_h.sql (14/14 PASS con
+  ROLLBACK, 04/10/2026).
+================================================================================
+16. ACTUALIZACION 04/10/2026 - TRANSACCIONES EN LOS SPs (fase I)
+================================================================================
+- SP_CANCELAR_COMPRA ahora abre su propia transaccion solo si nadie la abrio
+  antes (@@in_transaction = 0). Si algo falla en el camino, el manejador
+  EXIT HANDLER FOR SQLEXCEPTION hace ROLLBACK y vuelve a tirar el error con
+  RESIGNAL: nunca quedan a medias la SALIDA de stock, el historial de
+  producto, la bitacora y el estado de la compra.
+- Si la transaccion la abrio el llamador (por ejemplo un cierre de caja que
+  agrupa varias operaciones), el SP no la toca: ni COMMIT ni ROLLBACK, y el
+  error se propaga para que el que llama decida que hacer.
+- Mismo patron en 22_SP_AGREGAR_DETALLE_COMPRA, SP_QUITAR_DETALLE_COMPRA,
+  SP_MODIFICAR_LINEA_COMPRA (archivo 22), SP_ANULAR_PAGO_COMPRA (19.5) y
+  SP_ANULAR_PAGO (24): 6 SPs en total.
+- Verificado: checks I0, I2, I3 de /tmp/opencode/test_fase_i.sql (6/6 PASS,
+  04/10/2026).
+================================================================================
+17. ACTUALIZACION 04/10/2026 - LA NOTA DE CREDITO REABRE LA COMPRA (fase J)
+================================================================================
+- Cada fila de PAGOS_COMPRA lleva ahora el empleado que la firmo
+  (ID_EMPLEADO NOT NULL) y puede ser una nota de credito con MONTO negativo
+  (detalle en 19.5- PAGOS_COMPRA.sql).
+- Con eso el estado de la compra se mueve en las dos direcciones:
+  * TR_AUTO_RECIBIR_COMPRA: pagado >= total -> RECIBIDA;
+    pagado < total (porque entro una nota) -> vuelve a ABIERTA.
+  * TR_RECALCULAR_ESTADO_PAGO_COMPRA (al borrar una fila): lo mismo, en los
+    dos sentidos.
+- Traducido: si el proveedor hace un descuento o se devuelve mercancia que ya
+  estaba paga, la compra vuelve a aceptar productos sola, sin tener que tocar
+  el estado a mano. Los pagos que quedan pendientes siguen visibles en
+  VISTA_COMPRAS_PENDIENTES_PAGO (SUM(MONTO) ya netea las notas).
+- Verificado: checks J7a, J7b y J10 de /tmp/opencode/test_fase_j.sql
+  (13/13 PASS con ROLLBACK, 04/10/2026).
+
+================================================================================
+18. ACTUALIZACION 04/10/2026 - CANDADO DE CABECERA Y BLINDAJE (fases 1+2)
+================================================================================
+- Nuevo TR_VALIDAR_ACTUALIZACION_COMPRA (BEFORE UPDATE ON COMPRAS): ya nadie
+  cambia el ESTADO ni el TOTAL de una compra con un UPDATE a pelo.
+  * TOTAL: solo lo tocan TR_CALCULAR_TOTAL_COMPRA, TR_RECALCULAR_TOTAL_COMPRA
+    y TR_PROCESAR_DEVOLUCION_COMPRA, que levantan @COMPRAS_INTERNO mientras
+    corre su UPDATE (sin la bandera: "EL TOTAL SOLO CAMBIA CON SU DETALLE O
+    SU DEVOLUCION").
+  * RECIBIDA exige estar saldada al 100%; ABIERTA solo sale de RECIBIDA
+    (anulacion de pago o nota de credito); DEVUELTA solo desde RECIBIDA y
+    con el TOTAL ya en cero.
+  * CANCELADA solo la pone SP_CANCELAR_COMPRA (bandera + compra vieja +
+    sin pagos), asi nadie se salta la reversión del stock. CANCELADA y
+    DEVUELTA son terminales: una compra ahi ya no vuelve a cambiar jamas.
+- SP_ASIGNAR_FACTURA_COMPRA ahora rechaza CANCELADA y DEVUELTA (antes solo
+  CANCELADA, hueco H-8): una compra devuelta no deberia llevar factura.
+- Indices nuevos: IX_COMPRA_EMPLEADO (compras por empleado) en este archivo
+  e IX_PAGOS_COMPRA_FECHA (pagos por fecha, para el cierre) en 19.5.
+- La lista TRIGGERS de la seccion 2 paso de 6 a 9: ademas del candado de
+  arriba, ya figuraban en las secciones 15 pero no en la lista los dos de la
+  fase H (TR_BLOQUEAR_UPDATE_DETALLE_COMPRA y TR_BLOQUEAR_BORRADO_COMPRA).
+- Verificado: /tmp/opencode/test_blindaje.sql 21/21 PASS, test_fase_h 14/14,
+  test_paquetito_g 8/8 y test_paquetito_b 13/13 en BALBU_TECH, todo con
+  START TRANSACTION ... ROLLBACK (04/10/2026).
+
+19. ACTUALIZACION 07/10/2026 - BLINDAJE TOTAL DE LOS SPs (P11C + P12C)
+================================================================================
+Archivos tocados: 19, 19.5, 19.6 y 22 (9 objetos recargados en BALBU_TECH).
+
+- P11C (bandera sin handler, el riesgo demostrado en ventas): EXIT HANDLER FOR
+  SQLEXCEPTION con SET @COMPRAS_INTERNO = 0 + RESIGNAL ahora tambien en
+  TR_CALCULAR_TOTAL_COMPRA, TR_RECALCULAR_TOTAL_COMPRA (22) y
+  TR_PROCESAR_DEVOLUCION_COMPRA (19.6, que prende la bandera en su paso 4):
+  si el UPDATE de TOTAL falla, la bandera se apaga antes de propagar (las
+  variables de usuario no se revierten con ROLLBACK).
+
+- B1+B2 transaccion propia (patron de la fase I) en los 5 SPs que no la
+  tenian: SP_REGISTRAR_PAGO_COMPRA, SP_REGISTRAR_NOTA_CREDITO_COMPRA,
+  SP_REGISTRAR_DEVOLUCION_COMPRA, SP_PROCESAR_DEVOLUCION_COMPRA y
+  SP_ASIGNAR_FACTURA_COMPRA. Cada uno: DECLARE V_PROPIA_TRANSACCION + EXIT
+  HANDLER (ROLLBACK solo si la abrio el SP, luego RESIGNAL) + COMMIT final.
+  Sin esto, un error deja la transaccion del SP colgada abierta.
+
+- SP_ASIGNAR_FACTURA_COMPRA ademas traduce el choque con UQ_COMPRA_FACTURA:
+  si dos sesiones asignan la misma factura a la vez, la validacion del paso 4
+  pasa en ambas y el indice corta con el error tecnico 1062; con GET
+  DIAGNOSTICS + SQLSTATE 23000 devuelve "ERROR: ESA FACTURA YA EXISTE PARA
+  ESTE PROVEEDOR." (probado con 2 sesiones reales: una sostiene la transaccion,
+  la otra choca y recibe el 1644 amigable).
+
+- FOR UPDATE en las validaciones que podian perder una carrera: pago y nota
+  congelan la fila de COMPRAS (dos pagos simultaneos no exceden el total),
+  registrar devolucion congela detalle+compra (no se devuelve de mas) y
+  procesar congela la fila de la devolucion (el doble proceso se serializa).
+
+- P12C (el rechazo dejaba la devolucion sin rastro): SP_PROCESAR_DEVOLUCION_COMPRA
+  gana el parametro P_MOTIVO_RECHAZO VARCHAR(200) DEFAULT NULL. Al RECHAZAR
+  anota en MOTIVO el original + " | RECHAZO: " + el motivo del rechazo
+  (IFNULL -> "NO ESPECIFICADO"; LEFT 200 porque MOTIVO es VARCHAR(200)).
+  Los llamados viejos de 2 argumentos siguen valiendo y a PROCESADA no se le
+  toca el MOTIVO. TR_BLOQUEAR_CAMBIO no lo impide: su candado solo cubre
+  ESTADO, CANTIDAD, SUBTOTAL_DEVUELTO e ID_DETALLE_COMPRA.
+
+- Recarga con orden: TR_CALCULAR_TOTAL_COMPRA y TR_HISTORIAL_COMPRA se
+  recrearon juntos para conservar el ACTION_ORDER original (INSERT: stock 1,
+  auditoria 2, total 3, historial 4) - la misma leccion del P11 de ventas - y
+  el historial tomo su definicion del SHOW CREATE respaldado. Dos tropiezos
+  resueltos: ERROR 1337 (en MariaDB las variables se declaran ANTES que los
+  handlers: TR_PROCESAR traia el handler primero) y el extractor macheaba el
+  CREATE comentado que dejo el P12C (marcador anclado a inicio de linea).
+
+Pruebas 07/10/2026 (BALBU_TECH, todas con residuos verificados):
+- Fase A /tmp/opencode/test_blindaje_compras_A.sql: ruta feliz completa
+  (iniciar -> detalle -> pago -> nota de credito -> 3 devoluciones) dentro de
+  START TRANSACTION...ROLLBACK: P12C con motivo ('MERCANCIA DEFECTUOSA |
+  RECHAZO: LLEGO ROTO'), P12C sin motivo con la firma vieja de 2 argumentos
+  ('... | RECHAZO: NO ESPECIFICADO'), PROCESADA con MOTIVO intacto y stock /
+  total / bitacora movidos, doble proceso rechazado, bandera 0. 100%.
+- Fase B test_blindaje_compras_B.sql: los 5 SPs con transaccion propia
+  fallando en validacion y @@in_transaction volviendo a 0 tras cada error
+  (el handler hizo ROLLBACK); sin residuos. 100%.
+- T5: carrera real a 2 sesiones para el 1062 (ver arriba). OK.
+- Residuos finales = linea base exacta: COMPRAS 2 (#426/#464 intactas y sin
+  factura), DETALLE 2, PAGOS 0, DEVOLUCIONES 0, stock prod 20 = 8, bitacora 2,
+  historial 2, @COMPRAS_INTERNO = 0, ninguna transaccion abierta.
+
+Respaldos: /tmp/opencode/backup/show_pre_blindaje_sp.txt y show_pre_blindaje_tr.txt
+(SHOW CREATE previo), pre_blindaje_<archivo>.sql (copias de los 4 .sql) y
+load_blindaje.sql (script de recarga).
+
+20. ACTUALIZACION 07/10/2026 - HISTORIAL_ESTADOS_COMPRA A SU PROPIO ARCHIVO
+================================================================================
+- La tabla HISTORIAL_ESTADOS_COMPRA, su indice IX_HIST_ESTADO_FECHA y los dos
+  triggers que la alimentan (TR_HISTORIAL_ESTADO_COMPRA del nacimiento y
+  TR_CAMBIO_ESTADO_COMPRA de los cambios) salieron de 19- COMPRAS.sql y ahora
+  viven en 19.1- HISTORIAL_ESTADOS_COMPRA.sql, replicando el patron de
+  21.5- HISTORIAL_ESTADOS_VENTA.sql (asi el homologo de ventas ya vivia
+  separado y los dos flujos quedan simetricos).
+- En 19- COMPRAS.sql quedaron3 punteros -- en los lugares donde estaba el
+  codigo (tabla, trigger de nacimiento, trigger de cambio), mismo estilo que
+  dejo 21- VENTAS.sql cuando extrajo su homologo. Nada mas se toco en 19:
+  el historial lo escriben los triggers, no los SPs.
+- Solo cambio de archivos: NADA en la BD (tabla y triggers intactos, con su
+  ACTION_ORDER original: COMPRAS INSERT orden1 = nacimiento, COMPRAS UPDATE
+  orden1 = cambio). Si se recarga desde cero: 19 -> 19.1 -> 19.5 -> 19.6.
+- Registrado tambien en contexto tabla historial estados compra.txt (seccion 7)
+  y en el Plan de compras (tabla de la seccion 1).
+- Respaldo: /tmp/opencode/backup/pre_mov_hist_19-COMPRAS.sql.
+
+21. ACTUALIZACION 07/10/2026 - PARTE 1 DEL PLAN: NUCLEO (rutas felices)
+================================================================================
+- Alcance: 19_SP_INICIAR_COMPRA + 22_SP_AGREGAR_DETALLE_COMPRA + la cadena
+  sobre DETALLE_COMPRA (BEFORE TR_BLOQUEAR_COMPRA_CERRADA; AFTER por orden:
+  TR_ACTUALIZAR_STOCK_COMPRA(1), TR_AUDITORIA_MOVIMIENTO_COMPRA(2),
+  TR_CALCULAR_TOTAL_COMPRA(3), TR_HISTORIAL_COMPRA(4)) mas el nacimiento en
+  HISTORIAL_ESTADOS_COMPRA. Solo pruebas: NINGUN objeto se toco.
+
+- Comportamiento verificado (/tmp/opencode/test_p1_nucleo_compras.sql, todo
+  dentro de START TRANSACTION ... ROLLBACK):
+  * Iniciar: valida proveedor (existe y ACTIVO) y empleado; INSERT simple y
+    atomico; el trigger de nacimiento deja la fila 'ABIERTA' en el historial
+    de estados y el TOTAL nace en 0.
+  * Agregar linea: valida compra ABIERTA, producto existe/ACTIVO, cantidad y
+    precio > 0 y que el producto no este ya en la compra. La cola AFTER
+    INSERT corre stock -> bitacora -> total -> historial: prod20 4 uds @10
+    dejo TOTAL 40, stock 8->12, ENTRADA en la bitacora, historial 8->12 y
+    @COMPRAS_INTERNO = 0.
+  * Producto SIN fila de INVENTARIO (prod 1): el ON DUPLICATE KEY del
+    TR_ACTUALIZAR_STOCK_COMPRA crea la fila (stock = comprado, STOCK_MINIMO
+    5, ALMACEN_PRINCIPAL) y 22_SP_AGREGAR avisa cuando el precio de compra
+    >= precio de venta (13000 >= 12000 mostro la advertencia de margen).
+  * 7 errores amigables sin escritura parcial: proveedor inexistente,
+    empleado inexistente, compra inexistente, producto inexistente,
+    cantidad 0, precio 0 y producto ya agregado.
+  * Puerta de compra cerrada: con la compra RECIBIDA (pago completo) un
+    INSERT directo a DETALLE cae con "LA COMPRA NO ESTA ABIERTA..." y ni el
+    stock ni el total se mueven.
+
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS
+  2, stock prod20 = 8, INVENTARIO 2 filas, bitacora 2, historial 2, bandera 0,
+  ninguna transaccion abierta).
+- Prueba: /tmp/opencode/test_p1_nucleo_compras.sql (correr con mariadb --force).
+- Obsidian: Pendientes marca Parte 1 como cerrada; el Plan pasa a decir que
+  la siguiente es la Parte 2 (Cobro).
+
+22. ACTUALIZACION 07/10/2026 - PARTE 2 DEL PLAN: COBRO Y RECEPCION AUTOMATICA
+================================================================================
+- Alcance probado (SOLO pruebas: NINGUN objeto se toco): SP_REGISTRAR_PAGO_COMPRA,
+  SP_ANULAR_PAGO_COMPRA, SP_REGISTRAR_NOTA_CREDITO_COMPRA y la maquina de
+  estados de PAGOS_COMPRA: TR_AUTO_RECIBIR_COMPRA (AFTER INSERT),
+  TR_RECALCULAR_ESTADO_PAGO_COMPRA (AFTER DELETE),
+  TR_RECALCULAR_ESTADO_PAGO_COMPRA_UPDATE (AFTER UPDATE) y
+  TR_CAMBIO_ESTADO_COMPRA (el que escribe el historial de estados).
+
+- Comportamiento verificado (/tmp/opencode/test_p2_cobro_compras.sql, todo
+  dentro de START TRANSACTION ... ROLLBACK):
+  * Pago parcial (15 de 40): el monto queda en PAGOS_COMPRA, la compra sigue
+    ABIERTA y NO nace fila nueva en el historial (el estado no cambio).
+  * Pago que cubre el total: TR_AUTO_RECIBIR la pasa a RECIBIDA sola y el
+    mensaje del SP avisa "... - COMPRA SALDADA (RECIBIDA)."; historial +1.
+  * Nota de credito: se guarda SIEMPRE con MONTO NEGATIVO (-ABS), metodo NULL
+    y observacion obligatoria; baja lo pagado y, si la compra estaba RECIBIDA,
+    TR_AUTO_RECIBIR la REABRIO sola a ABIERTA (vuelve a aceptar pagos).
+  * SP_ANULAR_PAGO_COMPRA borra el pago, recalcula lo pagado y reabre si dejo
+    de estar saldada (hace lo mismo que el trigger de DELETE: doble seguro).
+  * UPDATE y DELETE directos sobre PAGOS_COMPRA a pelo tambien recalculan el
+    estado: un UPDATE nunca deja la compra mintiendo.
+  * 10 errores amigables (1644) sin escritura: pago a compra/metodo/empleado
+    inexistentes, monto 0, monto que excede el total, nota con monto <= 0,
+    nota sin observacion, pago a compra YA RECIBIDA ("YA ESTA RECIBIDA
+    (SALDADA)"), anular pago inexistente y anular con empleado inexistente.
+  * El FOR UPDATE del cierre de carreras (no exceder el total) ya estaba
+    instalado en el blindaje de la fase previa - ver seccion 19.
+
+- Historial de estados al final de la suite: 11 filas = 2 de la linea base +
+  nacimiento de la compra de la prueba + 4 idas a RECIBIDA + 4 reaperturas a
+  ABIERTA. Todo lo anota TR_CAMBIO_ESTADO_COMPRA (solo cuando el estado
+  cambia de verdad).
+
+- Pendientes cruzados (se prueban en las partes que crean esos estados):
+  TR_VALIDAR_BORRADO_PAGO_COMPRA (borrar a pelo un pago de compra
+  CANCELADA/DEVUELTA) y el rechazo de pagos a una compra CANCELADA - van con
+  la Parte 4 (cancelacion) y la Parte 5 (devoluciones).
+
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS 2,
+  stock prod20 = 8, INVENTARIO 2 filas, bitacora 2, historial 2, bandera 0,
+  ninguna transaccion abierta).
+- Prueba: /tmp/opencode/test_p2_cobro_compras.sql (correr con mariadb --force).
+  Leccion de la suite: el monto "que salda" se calcula contra la suma actual
+  de PAGOS_COMPRA (15 -> faltaban 25, no 35); una corrida previa fallo por
+  eso y se corrigio la prueba (el codigo estaba bien).
+- Obsidian: Pendientes marca Parte 2 como cerrada; el Plan pasa a decir que la
+  siguiente es la Parte 3 (Blindajes).
+
+23. ACTUALIZACION 07/10/2026 - PARTE 3 DEL PLAN: BLINDAJES (candados y bandera)
+================================================================================
+- Alcance probado (SOLO pruebas: NINGUN objeto se toco): TR_VALIDAR_ACTUALIZACION_COMPRA
+  (el candado de cabecera de COMPRAS), el apagado/prendido de @COMPRAS_INTERNO,
+  los candados de DETALLE/PAGOS/DELETE, el ACTION_ORDER real de los triggers
+  y la escritura del historial de estados.
+- Comportamiento verificado (/tmp/opencode/test_p3_blindajes_compras.sql, todo
+  dentro de START TRANSACTION ... ROLLBACK):
+  * TOTAL a pelo: "EL TOTAL ... SOLO CAMBIA CON SU DETALLE O SU DEVOLUCION."
+    (solo lo escriben los triggers internos con la bandera prendida).
+  * ESTADO a pelo desde ABIERTA: RECIBIDA sin pagar -> "SOLO SE MARCA RECIBIDA
+    UNA COMPRA PAGADA AL 100%"; CANCELADA -> "USE SP_CANCELAR_COMPRA";
+    DEVUELTA -> "SOLO SE MARCA DEVUELTA UNA COMPRA RECIBIDA". Un valor raro
+    (ej. 'VOLANDO') ni siquiera llega al trigger: la columna ESTADO lo
+    rechaza sola (ERROR 1265 Data truncated) - doble capa.
+  * Borrar compra a pelo -> "LA COMPRA NO SE PUEDE BORRAR; USE
+    SP_CANCELAR_COMPRA"; editar linea de detalle a pelo -> "USE
+    SP_MODIFICAR_LINEA_COMPRA" (por eso SP_MODIFICAR_LINEA_COMPRA trabaja
+    con DELETE + INSERT, evitando el candado de UPDATE).
+  * Borrar linea con stock insuficiente -> "EL STOCK ACTUAL NO ALCANZA..."
+    (segunda capa de TR_BLOQUEAR_BORRADO_COMPRA_CERRADA). Truco de la prueba:
+    el stock se baja junto con STOCK_MINIMO en el MISMO UPDATE para no
+    disparar 17_TR_VALIDAR_STOCK_MINIMO ni dejar filas en LOG_USUARIOS.
+  * PAGOS a pelo: INSERT que excede -> rechazado por TR_VALIDAR_PAGO_COMPRA;
+    UPDATE de ID_COMPRA / MONTO 0 / signo vs TIPO / exceso de suma -> los 4
+    errores amigables de TR_VALIDAR_UPDATE_PAGO_COMPRA.
+  * Capas internas del candado de ESTADO probadas prendiendo la bandera a mano
+    (SET @COMPRAS_INTERNO=1): CANCELADA -> "SOLO SE CANCELA UNA COMPRA
+    ABIERTA" y DEVUELTA -> "NO ESTA DEVUELTA ENTERA" (capas que exigen el SP);
+    apagada otra vez, el mismo UPDATE cae en "USE SP_CANCELAR_COMPRA".
+    La bandera ABRE Y CIERRA el candado de TOTAL: con 1 el UPDATE pasa, con 0
+    se rechaza (y siempre vuelve a 0: P11C).
+  * Reapertura directa RECIBIDA -> ABIERTA (camino permitido sin bandera) y
+    TR_CAMBIO_ESTADO_COMPRA la anota en HISTORIAL_ESTADOS_COMPRA con
+    "Estado: RECIBIDA -> ABIERTA" (11 -> 5 filas en la suite: nacimiento,
+    RECIBIDA automatica y reapertura).
+  * SP_QUITAR_DETALLE_COMPRA al final: TR_RECALCULAR_TOTAL_COMPRA (AFTER
+    DELETE, con bandera 1 -> 0 y handler P11C) puso TOTAL = 0, el stock
+    regreso 12 -> 8, bitacora e historial anotaron la SALIDA y la bandera
+    quedo apagada.
+- ACTION_ORDER verificado en information_schema.TRIGGERS (el real de la BD):
+  * DETALLE_COMPRA INSERT AFTER: stock(0) -> bitacora(1) -> total(2) -> historial(3).
+  * DETALLE_COMPRA DELETE AFTER: stock(0) -> bitacora(1) -> total(2) - la
+    bitacora de borrado es TR_AUDITORIA_BORRADO_COMPRA, que vive en el
+    archivo 20- MOVIMIENTOS_INVENTARIO.sql (hallazgo de la prueba: eran 3
+    triggers, no 2; se corrigio la asercion, no el codigo).
+  * Conteos: COMPRAS UPDATE 1 antes + 1 despues; PAGOS INSERT 2 antes + 1
+    despues; DETALLE INSERT 1 antes, UPDATE 1, DELETE 1 antes.
+- Ramas que no se pudieron ejercitar aqui (llegan con otros estados):
+  "LA COMPRA YA ESTA CANCELADA O DEVUELTA; ESE ESTADO NO CAMBIA" - se prueba
+  en las Partes 4 y 5, que son las que crean esos estados.
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS 2,
+  stock prod20 = 8, STOCK_MINIMO 5, INVENTARIO 2 filas, bitacora 2,
+  historial 2, LOG_USUARIOS 12, bandera 0, ninguna transaccion abierta).
+- Prueba: /tmp/opencode/test_p3_blindajes_compras.sql (con mariadb --force).
+- Obsidian: Pendientes marca Parte 3 como cerrada; el Plan pasa a decir que
+  la siguiente es la Parte 4 (Cancelacion).
+
+24. ACTUALIZACION 07/10/2026 - PARTE 4 DEL PLAN: CANCELACION Y REVERSION DE STOCK
+================================================================================
+- Alcance probado (SOLO pruebas: NINGUN objeto se toco): SP_CANCELAR_COMPRA
+  (archivo 19) y todos los guards que protegen una compra ya CANCELADA
+  (los pendientes cruzados que dejaron abiertos las Partes 2 y 3).
+- Como funciona SP_CANCELAR_COMPRA (verificado en corrida):
+  * Validaciones ANTES de tocar nada, en orden: empleado existe, compra
+    existe, el empleado ES el dueno de la compra, la compra sigue ABIERTA,
+    NO tiene pagos (si tiene, primero SP_ANULAR_PAGO_COMPRA - asi nunca
+    queda dinero colgado) y el stock actual alcanza para revertir TODA la
+    linea (si no, "YA HUBO VENTAS"). Un rechazo no deja cambios a medias.
+  * Si todo pasa: bitacora SALIDA por linea -> baja el stock -> historial del
+    producto con antes/desprs (UNA fila por linea) -> prende
+    @COMPRAS_INTERNO y UPDATE ESTADO='CANCELADA' (pasa el candado de
+    TR_VALIDAR_ACTUALIZACION_COMPRA) -> apaga la bandera -> COMMIT ->
+    "EXITO: COMPRA #x CANCELADA Y MERCANCIA REVERTIDA."
+  * El detalle NO se borra: queda como evidencia. El TOTAL tampoco se toca.
+  * Lleva EXIT HANDLER de la fase I: ROLLBACK si abrio la transaccion y
+    siempre apaga @COMPRAS_INTERNO antes de RESIGNAL.
+- Comportamiento verificado (/tmp/opencode/test_p4_cancelacion_compras.sql,
+  todo dentro de START TRANSACTION ... ROLLBACK):
+  * T4.1 errores tempranos: compra inexistente, empleado inexistente y
+    empleado que no es el dueno (empleado 1 contra compra hecha por 22) -
+    ninguno toca nada.
+  * T4.2 con pagos: "LA COMPRA TIENE PAGOS REGISTRADOS; ANULELOS ANTES" y
+    tras SP_ANULAR_PAGO la cuenta queda en 0 y ya se puede cancelar.
+  * T4.3 stock insuficiente: rechazo ANTES de escribir (sin SALIDA parciales,
+    stock y bitacora intactos). Truco: stock y STOCK_MINIMO se bajan en el
+    MISMO UPDATE para no disparar 17_TR_VALIDAR_STOCK_MINIMO.
+  * T4.4 cancelacion feliz: CANCELADA, TOTAL 40 intacto, detalle conservado,
+    stock 12 -> 8, bitacora +1 SALIDA, historial del producto 12 -> 8 con
+    "Compra cancelada ID: ...", historial de estados +1 (ABIERTA -> CANCELADA)
+    y bandera en 0.
+  * T4.5 doble cancelacion y T4.6 cancelar una RECIBIDA: rechazadas.
+  * T4.7 (9 blindajes sobre la CANCELADA, cerrando los pendientes de P2/P3):
+    UPDATE de ESTADO -> "LA COMPRA YA ESTA CANCELADA O DEVUELTA; ESE ESTADO
+    NO CAMBIA" (la rama OLD CANCELADA/DEVUELTA que faltaba ejercitar),
+    UPDATE de TOTAL -> candado del detalle, SP de pago -> "LA COMPRA ESTA
+    CANCELADA", SP de nota de credito -> "NO ADMITE NOTAS", INSERT directo
+    de PAGOS a pelo -> TR_VALIDAR_PAGO_COMPRA la bloquea (por eso
+    TR_VALIDAR_BORRADO_PAGO_COMPRA no se alcanza desde aqui: ya hay una
+    capa antes que impide nacer el pago; se ejercitara con una DEVUELTA en
+    la Parte 5), SP de agregar linea, INSERT y DELETE directos de DETALLE
+    (evidencia blindada) y DELETE de la compra -> todo rechazado con 1644
+    amigables y la compra queda exactamente igual.
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS 2,
+  stock prod20 = 8, STOCK_MINIMO 5, INVENTARIO 2 filas, bitacora 2,
+  historial 2, LOG_USUARIOS 12, bandera 0, ninguna transaccion abierta).
+- Prueba: /tmp/opencode/test_p4_cancelacion_compras.sql (con mariadb --force).
+- Obsidian: Pendientes marca Parte 4 como cerrada; el Plan pasa a decir que
+  la siguiente es la Parte 5 (Devoluciones).
+
+25. ACTUALIZACION 08/10/2026 - PARTE 5 DEL PLAN: DEVOLUCIONES A PROVEEDOR
+================================================================================
+- Alcance probado (SOLO pruebas: NINGUN objeto se toco): SP_REGISTRAR_DEVOLUCION_COMPRA,
+  SP_PROCESAR_DEVOLUCION_COMPRA (PROCESADA y RECHAZADA con P12C),
+  TR_PROCESAR_DEVOLUCION_COMPRA, TR_BLOQUEAR_CAMBIO_DEVOLUCION_COMPRA,
+  TR_BLOQUEAR_BORRADO_DEVOLUCION_COMPRA y la compra DEVUELTA blindada
+  (incluye TR_VALIDAR_BORRADO_PAGO_COMPRA, el pendiente que dejo la Parte 4).
+- Como funciona (verificado en corrida):
+  * Solo se devuelve de una compra RECIBIDA (de una ABIERTA se cancela);
+    lo PENDIENTE + PROCESADO cuenta contra lo comprado (no se devuelve de mas).
+  * Registrar deja la fila PENDIENTE con SUBTOTAL_DEVUELTO = cantidad x precio.
+  * PROCESADA dispara el trigger: valida compra RECIBIDA, stock suficiente y
+    subtotal <= total; luego baja el stock, bitacora SALIDA, historial
+    DEVOLUCION con antes/despues, baja el TOTAL con la bandera prendida y si
+    el TOTAL llega a 0 la compra pasa a DEVUELTA (pasa el candado porque
+    OLD=RECIBIDA y NEW.TOTAL=0).
+  * RECHAZADA anota "original | RECHAZO: motivo" en MOTIVO (P12C; sin motivo
+    pone NO ESPECIFICADO) y NO mueve stock, total ni estado.
+  * La PROCESADA no se reprocesa, no se le cambia CANTIDAD/SUBTOTAL/DETALLE/
+    ESTADO ni se borra; el MOTIVO si se puede corregir (P12C).
+- Comportamiento verificado (/tmp/opencode/test_p5_devoluciones_compras.sql,
+  todo dentro de START TRANSACTION ... ROLLBACK):
+  * T5.1 4 errores al registrar (compra ABIERTA, detalle/empleado
+    inexistentes, cantidad 0) sin escribir nada.
+  * T5.3 devolucion 1 PENDIENTE con SUBTOTAL 10; T5.4 exceso (1+4>4) rechazado.
+  * T5.5 procesada parcial: TOTAL 40 -> 30, stock 12 -> 11, bitacora e
+    historial +1 (DEVOLUCION 12 -> 11), la compra SIGUE RECIBIDA y el
+    historial de estados NO crece (el estado no cambio).
+  * T5.6 doble proceso, UPDATE de CANTIDAD y DELETE de la PROCESADA
+    rechazados; UPDATE de MOTIVO permitido ("nota corregida").
+  * T5.7 resto procesado: TOTAL 30 -> 0, stock 11 -> 8, compra DEVUELTA y el
+    historial de estados anota RECIBIDA -> DEVUELTA.
+  * T5.8 rechazos P12C en compra B: con motivo deja "falla de fabrica |
+    RECHAZO: proveedor no acepta" y sin motivo "rayado | RECHAZO:
+    NO ESPECIFICADO"; ni el TOTAL, ni el stock ni el estado se mueven.
+  * T5.9 9 blindajes sobre la DEVUELTA: UPDATE de ESTADO (rama OLD DEVUELTA),
+    TOTAL, pago, nota, DELETE directo del pago (dispara
+    TR_VALIDAR_BORRADO_PAGO_COMPRA - cierra el pendiente de la Parte 4),
+    SP_ANULAR_PAGO, registrar otra devolucion, agregar linea y DELETE de la
+    compra -> todo rechazado con 1644 amigables.
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS 2,
+  stock prod20 = 8, STOCK_MINIMO 5, INVENTARIO 2 filas, bitacora 2,
+  historial 2, LOG_USUARIOS 12, bandera 0, ninguna transaccion abierta).
+- Prueba: /tmp/opencode/test_p5_devoluciones_compras.sql (con mariadb --force).
+- Obsidian: Pendientes marca Parte 5 como cerrada; el Plan pasa a decir que
+  la siguiente es la Parte 7 (Reportes). La Parte 6 (C++) queda fuera de
+  alcance: no se toca.
+
+26. ACTUALIZACION 08/10/2026 - PARTE 7 DEL PLAN: REPORTES
+================================================================================
+- Alcance probado (SOLO lectura: NINGUN objeto se toco): VISTA_REPORTE_COMPRAS
+  y VISTA_GASTOS_PROVEEDOR (archivo 19), VISTA_RESUMEN_PAGOS_COMPRA y
+  VISTA_COMPRAS_PENDIENTES_PAGO (archivo 19.5) y la convivencia con
+  SP_CIERRE_CAJA (archivo 37). No existe SP_REPORTE_COMPRAS: los reportes de
+  compras SON estas 4 vistas.
+- Comportamiento verificado (/tmp/opencode/test_p7_reportes_compras.sql,
+  todo dentro de START TRANSACTION ... ROLLBACK):
+  * VISTA_REPORTE_COMPRAS muestra la compra con su proveedor, fecha, total,
+    factura y estado; la primera fila es la mas reciente (MAX(FECHA)).
+  * VISTA_COMPRAS_PENDIENTES_PAGO: compra ABIERTA de 40 con 0 pagado sale
+    con SALDO 40; tras pagar 15 el SALDO baja a 25; saldada (SALDO 0) la
+    compra DESAPARECE de la vista; la CANCELADA tampoco sale (filtro de
+    estado). Metodo de pago 1 = EFECTIVO.
+  * VISTA_RESUMEN_PAGOS_COMPRA lista cada pago con su tipo, monto y metodo.
+  * VISTA_GASTOS_PROVEEDOR: proveedor 25 paso de (2, 80.00) a (3, 120.00)
+    con la compra de la prueba; la CANCELADA no suma ni cuenta (sigue 3).
+  * SP_CIERRE_CAJA(CURDATE()) corrio con actividad de compras presente sin
+    tocarla: es de ventas por diseno (solo lee VENTAS y PAGOS) y no hay que
+    integrarle nada; con NULL devuelve "INGRESE LA FECHA DEL CIERRE.".
+- Resultado: TODAS las casillas en 1 y residuos = linea base exacta tras el
+  ROLLBACK (las vistas vuelven solas a (2, 80.00) porque leen las tablas
+  base; COMPRAS 2, DETALLE 2, PAGOS 0, DEVOLUCIONES 0, HISTORIAL_ESTADOS 2,
+  stock prod20 = 8, bitacora 2, historial 2, bandera 0, sin transacciones).
+- Prueba: /tmp/opencode/test_p7_reportes_compras.sql (con mariadb --force).
+- Obsidian: Pendientes marca Parte 7 como cerrada. Solo queda la decision
+  sobre los residuos #426/#464 (la Parte 6/C++ queda fuera de alcance).
+
+27. ACTUALIZACION 08/10/2026 - RESIDUOS #426/#464 CANCELADOS (cambio real en BD)
+================================================================================
+- Decision del usuario: CANCELAR las dos (no dejarlas). Respaldo de datos
+  previo en /tmp/opencode/backup/pre_residuos_datos.sql (mysqldump de las 8
+  tablas del flujo) + ensayo en START TRANSACTION ... ROLLBACK antes de
+  ejecutar de verdad.
+- Ejecucion: CALL SP_CANCELAR_COMPRA(426, 22); CALL SP_CANCELAR_COMPRA(464, 22);
+  (empleado 22 = dueno de ambas). Las dos quedaron CANCELADA con su TOTAL 40
+  y su detalle como evidencia; el stock de prod20 regreso 8 -> 0.
+- Efectos colaterales previstos: bitacora +2 SALIDA ("Compra cancelada ID:
+  ..."), historial del producto +2 (8 -> 4 y 4 -> 0), historial de estados +2
+  (ABIERTA -> CANCELADA) y LOG_USUARIOS 12 -> 14 (las 2 alertas de
+  17_TR_VALIDAR_STOCK_MINIMO al cruzar el minimo, por diseno: solo alerta).
+- NUEVA LINEA BASE (vale desde el 08/10/2026; la vieja con stock 8 queda
+  obsoleta): COMPRAS 2 (ambas CANCELADA), DETALLE 2, PAGOS 0, DEVOLUCIONES 0,
+  HISTORIAL_ESTADOS 4, stock prod20 = 0, STOCK_MINIMO 5, INVENTARIO 2 filas,
+  bitacora 4, historial 4, LOG_USUARIOS 14, bandera 0, sin transacciones.
+  Las suites P1-P5 y P7 que esperan stock 8 habra que ajustarlas si se
+  recorren (parten de agregar linea: el stock sube desde 0).
+- Obsidian: Pendientes marca Residuos como cerrado (flujo completo salvo
+  C++); el Plan queda en estado COMPLETO.
+
+28. ACTUALIZACION 08/10/2026 - AUDITORIA GENERAL DE LA BD (solo lectura)
+================================================================================
+- Se audito la BD completa (39 tablas, ~130 rutinas, 66 triggers, 19 vistas)
+  con 3 agentes en paralelo + verificacion en vivo. No se toco nada.
+- Informe completo en Obsidian: "Proyecto manejo inventario/Planes/
+  Auditoria BD general - 08-10-2026.md".
+- Resumen: 8 errores reales (SPs que fallan siempre: toggles de MARCAS y
+  METODOS_PAGO, tecnico de reclamos, permiso-a-rol/fn_permiso, asistencia,
+  finalizar-reclamo-27, log_accesos, obtener_categorias_marcas); 2 pares de
+  gemelos IDENTICOS + 3 DIFERENTES + 1 probable muerto; mejoras (SPs sin
+  txn, FKs y CHECKs faltantes, hash truncado a 255, triggers sin orden,
+  tablas sin BEFORE); sano: 0 huerfanos/duplicados/precios/stock negativo,
+  0 triggers fantasma, compras+ventas blindados.
+- Decision del usuario: solo guardar el informe (no corregir todavia).
+
+29. ACTUALIZACION 09/10/2026 - PULL DEL TRABAJO (2 commits) E INTEGRACION
+================================================================================
+- El usuario trabajo desde otra maquina y subio 2 commits: bfebc87 ("Docker
+  hibrido + schema 0 errores + seed admin PBKDF2") y 2de6732 ("Trabajo").
+  Se hizo git pull --ff-only (sin divergencia). Unico conflicto:
+  workspace.json (layout de Obsidian) -> se resolvio con la version local y
+  se commiteo como ee3324d (falta push: sin credenciales aqui, lo hace el
+  usuario).
+- Lo que trajo el trabajo: docker-compose/Dockerfile/.env.example/build.sh,
+  db/import.sh + seed-admin.sh + check-app-sps.sh + normalize-sql.ps1,
+  renombres 25->26, borrado de Mejoras_extras.sql (el roto), .gitattributes
+  (LF para .sh) y normalizacion de saltos de linea en muchos archivos.
+- REORGANIZACION que nos toca: los objetos se mudaron de archivo (misma
+  logica): triggers de DETALLE (19) + tabla/triggers de DEVOLUCION (19.6) +
+  triggers de auditoria (20) -> todo a 22-DETALLE_COMPRA.sql; los 2 triggers
+  del historial volvieron de 19.1 a 19 (19.1 queda con tabla+indice).
+  Verificado objeto por objeto (19 total, lógica normalizada archivo vs BD):
+  EL BLINDAJE ESTA INTACTO (P11C, P12C, FOR UPDATE, txn propia, handlers).
+  Solo recortaron comentarios/duplicados (ALTER FK duplicado en 19.5 era
+  seguro: el FK vive en el CREATE TABLE).
+- Unico cambio conductual: 19.5 perdio los DEFAULT NULL en P_ID_EMPLEADO
+  (pago y nota) -> llamar con 3 args ahora falla; en el repo no hay llamadas
+  afectadas (C++/web no usan esos SPs).
+- Tablas archivos<->BD: 40/40 exactas, cero deriva. La BD local no se toco.
+- OJO para futuro: las secciones 19-28 de este contexto citan ubicaciones
+  viejas (ej. "TR_PROCESAR_DEVOLUCION_COMPRA (19.6)", "19.1 con triggers");
+  la logica vale, las rutas de archivo cambiaron segun lo de arriba.
+
+30. ACTUALIZACION 09/10/2026 - REVISION DE LOS 8 ARREGLOS DEL TRABAJO
+================================================================================
+- Se revisaron en los archivos traidos por el pull los 8 errores del informe
+  de auditoria: LOS 8 ESTAN BIEN CORREGIDOS (veredicto en el vault:
+  "Auditoria BD general - 08-10-2026.md", seccion Revision 09/10/2026).
+- Barrido nuevo: 0 referencias rotas, ENUMs consistentes, tablas 40/40.
+- Quedaron 4 mejoras anotadas para realizar (misma seccion del informe).
+- OJO: los arreglos estan en ARCHIVOS; la BD local sigue con lo viejo
+  (el usuario pidio solo pull, sin cargar a BD todavia).
+
+31. ACTUALIZACION 09/10/2026 - MEJORAS 1-4a + CARGUE DE ARREGLOS (archivos + BD)
+================================================================================
+- Mejoras del informe ejecutadas con respaldo (/tmp/opencode/backup/
+  pre_mejoras_*) y pruebas en ROLLBACK: #1 tecnico (empleado + doble
+  asignacion), #2 asistencia (doble ENTRADA y SALIDA sin ENTRADA amables),
+  #3 DROP sp_obtener_categorias_marcas, #4a contrasena 512 (CREATE + 2 SPs,
+  probado con hash de 512).
+- Arreglos del trabajo cargados a la BD local (6 rutinas + columna ESTADO en
+  METODOS_PAGO con backfill ACTIVO) y verificados con t_workfixes.sql.
+- Extra: 27_SP_FINALIZAR blindado a fase I + guard de reclamo inexistente.
+- PENDIENTE (decision del usuario): #4b nombres de roles (ROL_PERMISO con
+  ADMIN/RRHH/EMPLEADO vs ROLES con ROLE_*): la FN da 0 siempre y el SP de
+  asignar no puede tener exito. Detalle en el informe de auditoria.
+
+32. ACTUALIZACION 09/10/2026 - #4b ROLES ALINEADOS CON EL C++ (archivos + BD)
+================================================================================
+- El C++ compara ADMIN/RRHH/EMPLEADO (listas hardcodeadas = datos de
+  ROL_PERMISO): se renombro ROLES (ROLE_ADMIN->ADMIN, ROLE_GERENTE->RRHH,
+  ROLE_VENDEDOR->EMPLEADO; ROLE_INV_AUDITOR queda para despues) y se ato
+  ROL_PERMISO.ROL_NOMBRE VARCHAR(50) + FK a ROLES (archivo 36 y BD viva).
+- FN_TIENE_PERMISO paso de 0 a 1 en vivo; SP asigna altas reales; usuario
+  abalbuena cae en rama ADMIN del menu. Pruebas en t_roles_dry/fin.sql.
+- Cierre mejoras 1-4: todo realizado y verificado. Detalle en el informe.
+
+33. ACTUALIZACION 09/10/2026 - PLAN 1 PARCIAL (sin rol): 6 DROPs + FK en archivo
+================================================================================
+- Borradas de la BD las 6 rutinas muertas (verificado: 0 llamadas en rutinas,
+  triggers, C++ y web; respaldo en pre_mejoras_rutinas.sql).
+- 1.3 resulto al reves: la BD YA tenia FK_PRODUCTO_PROVEEDOR (muerde: 1452
+  verificado); se agrego al CREATE TABLE de 9- PRODUCTOS.sql para las BD
+  nuevas. Sin cambios en BD.
+- 1.2 (ROLE_INV_AUDITOR) pendiente a pedido. Detalle en el informe.
+
+34. ACTUALIZACION 09/10/2026 - PLAN 2 CERRADO (fase I + 5 BEFORE + fix fecha)
+================================================================================
+- 2.1: fase I a SP_FINALIZAR_RECLAMO (+guards), SP_REGISTRAR_LIQUIDACION y
+  20_SP_REGISTRAR_AJUSTE (suite t_p21 verde); los 3 de 1 escritura no se
+  tocaron (atomicos).
+- 2.2: 5 triggers BEFORE nuevos y probados (reclamos, cuota devoluciones,
+  vacaciones UPDATE, bonos, liquidaciones x2). Para probar la cuota hubo que
+  armar cadena VENTAS+DETALLE temporal (el trigger de stock de ventas la
+  exige); el 1048 inicial revelo que la auditoria de venta necesita
+  empleado (diseno correcto, no bug).
+- 2.3: NEW.FECHA en el trigger (probado). Incidente: un replaceAll toco 2
+  lineas del SP donde CURDATE() estaba bien; se detecto y revertio.
+- Todo con respaldo pre_p2plan_* y residuos 0. Detalle en el informe.
+
+35. ACTUALIZACION 09/10/2026 - PLAN 3 CERRADO (FOLLOWS + CHECKs + ENUM)
+================================================================================
+- 3.2: CHECKs en HISTORIAL_ESTADOS_COMPRA/VENTA (4025 verificado, nacimiento
+  convive) + ENUM en DETALLE_REPARACIONES.ESTADO_AVANCE + validacion amable
+  en SP_REGISTRAR_AVANCE (suite t_p32 verde). NOT NULL de proveedores
+  descartado a proposito (molesta mas de lo que cuida).
+- 3.1: FOLLOWS en 4 triggers (cadenas de venta y devolucion fijas en 1-2-3);
+  recreados sueltos vuelven solos a su puesto; flujo de venta verificado
+  (TOTAL 400, stock 10->6, historial 10->6). Leccion: contar la precarga en
+  las sumas (+1/+1). Suites t_p31 verdes, residuos 0.
+- Auditoria general: planes 1-3 y mejoras 1-4 cerrados. Detalle en el informe.

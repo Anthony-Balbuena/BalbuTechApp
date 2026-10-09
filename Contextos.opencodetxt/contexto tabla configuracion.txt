@@ -1,0 +1,55 @@
+CONTEXTO DE DOCUMENTACION - TABLA CONFIGURACION
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/33- CONFIGURACION.sql
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Documentar los objetos de la base de datos con bloques de comentarios /* ... */
+en lenguaje coloquial, corto (4 a 6 lineas) y que solo expliquen la funcion
+de cada objeto.
+
+Estilo acordado (hibrido minimalista):
+- Tablas: bloque de 4-6 lineas que diga que guarda y como se usa. NO se listan
+  campo por campo (regla de .vscode/prompts/descipcion_modulos.prompt.md).
+- SPs, vistas, funciones y triggers: bloque de 4-6 lineas coloquiales que
+  explique solo su funcion.
+- El SQL operativo NO se modifica: solo se agregan comentarios.
+- Se conserva el motor InnoDB, claves, indices y restricciones existentes.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 33- CONFIGURACION.sql (1 bloque)
+================================================================================
+TABLA
+  - CONFIGURACION ......... ajustes del sistema como clave/valor (ITBIS,
+                             dias de garantia, nombre de la tienda)
+
+INDICES (0), SPs (0), TRIGGERS (0), VISTAS (0), FUNCIONES (0)
+  - El archivo solo contiene la tabla y un INSERT de datos iniciales.
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Estilo de comentario: hibrido minimalista, igual que las tablas anteriores.
+- Se conservaron el comentario "-- Active:" y el "-- Ejemplo de datos
+  iniciales" originales.
+- NO se toco el INSERT de datos iniciales (ITBIS, DIAS_GARANTIA,
+  NOMBRE_TIENDA).
+- No se tocaron: INSERT ni ninguna sentencia SQL.
+
+================================================================================
+4. PENDIENTES PARA LAS SIGUIENTES FASES (cifras aproximadas)
+================================================================================
+- 9 archivos .sql todavia sin bloque de descripcion de tabla.
+- ~10 archivos con indices sin documentar.
+- ~56 procedimientos almacenados sin bloque de descripcion.
+- README.md del proyecto C++ (no existe).
+
+================================================================================
+5. COMO SE VERIFICA EL TRABAJO
+================================================================================
+- git diff "modulos/33- CONFIGURACION.sql" -> solo debe mostrar lineas
+  agregadas con /* ... */, cero lineas de SQL eliminadas o modificadas.
+- Verificar que los delimitadores de comentario /* y */ quedan balanceados.
+- Recompilar no es necesario: el archivo es SQL puro, se carga en MariaDB.

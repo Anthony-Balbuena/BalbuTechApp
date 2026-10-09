@@ -1,0 +1,54 @@
+CONTEXTO DE DOCUMENTACION - TABLA AUDITORIA_SISTEMA
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/6- AUDITORIA_SISTEMA.sql
+LOTE B (archivos 5 a 8) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 6- AUDITORIA_SISTEMA.sql (9 bloques AGREGADOS)
+================================================================================
+Este archivo NO tenia ningun bloque de documentacion: se crearon los 9.
+
+TABLA
+  - AUDITORIA_SISTEMA ...... bitacora de cambios (tabla, registro, accion,
+    usuario, valores antes/despues)
+
+INDICES (2)
+  - IX_AUDITORIA_FECHA ..... busquedas por fecha y hora
+  - IX_AUDITORIA_TABLA ..... rastreo por tabla afectada
+
+PROCEDIMIENTOS ALMACENADOS (3)
+  - 6_SP_LISTAR_AUDITORIA_GENERAL ..... lista con filtros de tabla y fechas
+  - 6_SP_CONSULTAR_HISTORIAL_REGISTRO . historial de un registro concreto
+  - 6_SP_LIMPIAR_AUDITORIA ............ limpieza por antiguedad en dias
+
+TRIGGERS (3)
+  - TR_AUDIT_PROVEEDORES_INSERT ... audita altas de proveedores
+  - TR_AUDIT_PROVEEDORES_UPDATE ... audita cambios de proveedores
+  - TR_AUDITORIA_PRODUCTOS_UPDATE . audita cambios de PRECIO_VENTA
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Al no haber texto viejo, solo se AGREGARON bloques antes de cada objeto,
+  respetando los comentarios cortos "--LISTAR", "--CONSULTAR",
+  "-- TRIGGER PARA AUDITAR INSERT", etc.
+- NOTA (no tocada, es SQL raro del archivo original): hay un "DELIMITER //"
+  suelto sin cuerpo cerca de la linea 110 original. NO se modifico porque
+  el SQL debe quedar identico.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 9 objetos CREATE / 9 bloques con bloque previo.
+- /* balanceados: 9 / 9.
+- SQL identico al original al quitar los comentarios (solo se agregan lineas
+  en blanco propias de los bloques nuevos; cero sentencias cambiadas).

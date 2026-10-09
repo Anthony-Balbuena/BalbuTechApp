@@ -1,0 +1,69 @@
+CONTEXTO DE DOCUMENTACION - TABLA USUARIOS
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/10- USUARIOS.sql
+LOTE C (archivos 9 a 12) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo de este archivo: un bloque "TABLA: USUARIOS — Descripcion
+detallada" y muchos comentarios "-- SP_X / -- Descripcion: / -- Parametros:"
+en formato de lineas sueltas.
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 10- USUARIOS.sql (14 bloques)
+================================================================================
+TABLA
+  - USUARIOS ................ cuentas de acceso (usuario unico, 1:1 con
+    EMPLEADO, contrasena en hash, FK a ROLES)
+
+INDICE (1)
+  - IX_USER ................. busquedas y login por nombre de usuario
+    (BLOQUE AGREGADO)
+
+PROCEDIMIENTOS ALMACENADOS (11)
+  - SP_GET_USUARIO_LOGIN ..... trae hash y rol para el login (AGREGADO)
+  - SP_INSERTAR_USUARIO ...... alta de cuenta validando empleado y usuario
+  - SP_ACTUALIZAR_USUARIO .... cambia usuario/rol/empleado (no clave)
+  - SP_TOGGLE_ESTADO_USUARIO . activa o desactiva cuenta
+  - SP_BUSCAR_USUARIOS_FILTRADO . lista con filtro de usuario/empleado
+  - SP_CAMBIAR_CONTRASENA .... cambio de clave validando la actual
+  - SP_LOGIN_USUARIO ......... valida credenciales y devuelve rol
+  - PARA_INSERTAR_USUARIOS ... datos para formulario de alta
+  - PARA_ACTUALIZAR_USUARIOS . datos para formulario de edicion
+  - PARA_ACT_DESAC_USUARIOS .. lista para activar/desactivar
+
+FUNCION (1)
+  - FN_TIENE_PERMISO ......... TRUE/FALSE segun el rol permita la accion
+
+TRIGGER (1)
+  - TR_DESACTIVAR_USUARIO_POST_LIQUIDACION . al liquidar un empleado
+    desactiva su cuenta y la registra en LOG_USUARIOS
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se ELIMIN un bloque "-- SP_TOGGLE_ESTADO_USUARIO / -- Descripcion:"
+  que estaba PEGADO POR ERROR dentro del cuerpo de SP_INSERTAR_USUARIO
+  (entre el INSERT y su SELECT final): era una copia duplicada del que ya
+  existe delante de SP_TOGGLE_ESTADO_USUARIO. Solo se borraron comentarios,
+  el SQL no cambio.
+- 2 bloques se AGREGARON donde no habia documentacion (IX_USER y
+  SP_GET_USUARIO_LOGIN).
+- Se conservo la migracion ALTER de CONTRASENA y los CALL de prueba.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 14 objetos CREATE / 14 bloques con bloque previo.
+- /* balanceados: 14/14.
+- Estilo viejo restante: 0.
+- SQL identico al original al quitar los comentarios y los comentarios
+  "--": cero sentencias cambiadas (solo se borraron lineas "--" de
+  documentacion vieja y quedan lineas en blanco).

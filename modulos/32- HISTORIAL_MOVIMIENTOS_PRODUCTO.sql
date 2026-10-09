@@ -43,6 +43,8 @@ stock es TR_AUDITORIA_MOVIMIENTO_VENTA (20), que corre antes.
 CREATE TRIGGER TR_HISTORIAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
 FOR EACH ROW
+-- (09/10/2026) Orden fijo: despues del total (lee el stock ya descontado y sumado).
+FOLLOWS TR_ACTUALIZAR_TOTAL_VENTA
 BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
@@ -154,6 +156,8 @@ crea primero y por eso corre antes (los triggers van en orden de creacion).
 CREATE TRIGGER TR_HISTORIAL_DEVOLUCION
 AFTER UPDATE ON DEVOLUCIONES
 FOR EACH ROW
+-- (09/10/2026) Orden fijo: despues de marcar la venta (usa el stock ya reintegrado).
+FOLLOWS TR_MARCAR_VENTA_DEVUELTA
 BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;

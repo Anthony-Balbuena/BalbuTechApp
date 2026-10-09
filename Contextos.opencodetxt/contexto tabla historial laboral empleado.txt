@@ -1,0 +1,45 @@
+CONTEXTO DE DOCUMENTACION - TABLA HISTORIAL_LABORAL_EMPLEADO
+Proyecto: BalbuTechApp (base de datos BALBU_TECH)
+Fecha: 01/10/2026
+Archivo trabajado: modulos/15- HISTORIAL_LABORAL_EMPLEADO.sql
+LOTE D (archivos 13 a 16) - reemplazo de estilo de documentacion
+
+================================================================================
+1. OBJETIVO DE LA SESION
+================================================================================
+Seguir el plan de reemplazar la documentacion vieja de los archivos 1 a 16
+por el estilo de los archivos 17 a 36: bloques /* ... */ de 4 a 6 lineas
+coloquiales que solo expliquen la funcion de cada objeto, sin listados de
+campos ni de parametros.
+
+Estilo viejo: "DESCRIPCION DEL MODULO DE HISTORIAL_LABORAL_EMPLEADO" y
+"DESCRIPCION DEL TRIGGER TR_AUDITORIA_PERFIL_EMPLEADO".
+
+================================================================================
+2. OBJETOS DOCUMENTADOS EN 15- HISTORIAL_LABORAL_EMPLEADO.sql (5 bloques)
+================================================================================
+TABLA
+  - HISTORIAL_LABORAL_EMPLEADO . antes y despues de cargo/salario/estado
+
+INDICES (3) - BLOQUES AGREGADOS (antes solo un comentario "--" de seccion):
+  - IX_HISTORIAL_EMPLEADO_ID ... historial por empleado
+  - IX_HISTORIAL_EMPLEADO_FECHA. reportes por fecha de cambio
+  - IX_HISTORIAL_EMPLEADO_TIPO . reportes por tipo de cambio
+
+TRIGGER (1)
+  - TR_AUDITORIA_PERFIL_EMPLEADO . al actualizar EMPLEADOS guarda el antes
+    y despues si cambio salario, cargo o estado
+
+================================================================================
+3. DECISIONES TOMADAS EN ESTA SESION
+================================================================================
+- Se conservo el comentario corto "-- Indices para busquedas rapidas...".
+- Se conservo el SELECT final del archivo.
+
+================================================================================
+4. VERIFICACION
+================================================================================
+- 5 objetos CREATE / 5 bloques con bloque previo.
+- /* balanceados: 5/5.
+- Estilo viejo restante: 0.
+- SQL real identico al original (cero sentencias cambiadas).
