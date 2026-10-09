@@ -9,6 +9,9 @@ CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
 ) ENGINE = InnoDB; 
+-- Semillas base: los roles que la app compara tal cual (roles.cpp: ADMIN/RRHH/EMPLEADO).
+-- Sin estas filas fallan los seeds de ROL_PERMISO (FK) y el login. Idempotente.
+INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('ADMIN'), ('RRHH'), ('EMPLEADO');
 /*
 INDICE IX_ROLES_NOMBRE
 Indice no unico sobre NOMBRE_ROL que acelera las busquedas y listados
