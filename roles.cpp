@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
 #include <limits>
 #include <vector>
@@ -16,6 +17,7 @@
 #include "marcas.h"
 #include "productos.h"
 #include "proveedores.h"
+#include "metodos_pago.h"
 #include "empleados.h"
 #include "clientes.h"
 #include "usuarios.h"
@@ -36,6 +38,7 @@ vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
             "GESTIONAR_CATEGORIAS",
             "GESTIONAR_MARCAS",
             "GESTIONAR_PRODUCTOS",
+            "GESTIONAR_METODOS_PAGO",
             "GESTIONAR_INVENTARIO",
             "GESTIONAR_VENTAS",
             "GESTIONAR_COMPRAS",
@@ -82,14 +85,14 @@ bool tienePermiso(const string& accion) {
             pstmt->setString(1, sesionActual.username);
             pstmt->setString(2, accion);
 
-            sql::ResultSet *res = pstmt->executeQuery();
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
             bool permitido = false;
 
             if (res->next()) {
                 permitido = res->getInt("PERMISO") == 1;
             }
 
-            delete res;
+            drenarResultados(pstmt);
             delete pstmt;
             return permitido;
         } catch (const exception&) {
@@ -130,8 +133,9 @@ void mostrarMenuSegunRol() {
         cout << "6. Categorias" << endl;
         cout << "7. Marcas" << endl;
         cout << "8. Productos" << endl;
-        cout << "9. Ver permisos" << endl;
-        cout << "10. Cerrar sesión" << endl;
+        cout << "9. Metodos de pago" << endl;
+        cout << "10. Ver permisos" << endl;
+        cout << "11. Cerrar sesión" << endl;
     } else if (sesionActual.nombreRol == "RRHH") {
         cout << "1. Empleados" << endl;
         cout << "2. Roles" << endl;
@@ -177,50 +181,57 @@ void ejecutarMenuSegunRol() {
                     break;
                 case 3:
                     if (tienePermiso("GESTIONAR_EMPLEADOS")) {
-                        mostrarMenuEmpleados();
+                        ejecutarSubmenuEmpleados();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar empleados." << RESET << endl;
                     }
                     break;
                 case 4:
                     if (tienePermiso("GESTIONAR_CLIENTES")) {
-                        mostrarMenuClientes();
+                        ejecutarSubmenuClientes();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar clientes." << RESET << endl;
                     }
                     break;
                 case 5:
                     if (tienePermiso("GESTIONAR_PROVEEDORES")) {
-                        mostrarMenuProveedores();
+                        ejecutarSubmenuProveedores();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar proveedores." << RESET << endl;
                     }
                     break;
                 case 6:
                     if (tienePermiso("GESTIONAR_CATEGORIAS")) {
-                        mostrarMenuCategorias();
+                        ejecutarSubmenuCategorias();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar categorias." << RESET << endl;
                     }
                     break;
                 case 7:
                     if (tienePermiso("GESTIONAR_MARCAS")) {
-                        mostrarMenuMarcas();
+                        ejecutarSubmenuMarcas();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar marcas." << RESET << endl;
                     }
                     break;
                 case 8:
                     if (tienePermiso("GESTIONAR_PRODUCTOS")) {
-                        mostrarMenuProductos();
+                        ejecutarSubmenuProductos();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar productos." << RESET << endl;
                     }
                     break;
                 case 9:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_METODOS_PAGO")) {
+                        ejecutarSubmenuMetodosPago();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar metodos de pago." << RESET << endl;
+                    }
                     break;
                 case 10:
+                    mostrarPermisosActuales();
+                    break;
+                case 11:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
@@ -233,7 +244,7 @@ void ejecutarMenuSegunRol() {
             switch (opcion) {
                 case 1:
                     if (tienePermiso("GESTIONAR_EMPLEADOS")) {
-                        mostrarMenuEmpleados();
+                        ejecutarSubmenuEmpleados();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar empleados." << RESET << endl;
                     }
@@ -254,7 +265,7 @@ void ejecutarMenuSegunRol() {
                     break;
                 case 4:
                     if (tienePermiso("GESTIONAR_CLIENTES")) {
-                        mostrarMenuClientes();
+                        ejecutarSubmenuClientes();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar clientes." << RESET << endl;
                     }
@@ -275,7 +286,7 @@ void ejecutarMenuSegunRol() {
             switch (opcion) {
                 case 1:
                     if (tienePermiso("CONSULTAR_PRODUCTOS")) {
-                        mostrarMenuProductos();
+                        ejecutarSubmenuProductos();
                     } else {
                         cout << ROJO << "No tienes permiso para consultar productos." << RESET << endl;
                     }
@@ -321,15 +332,15 @@ void registrarRol() {
     try {
         string nombreRol = leerDatoSeguro("Nombre del rol: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_ROL(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_ROL(?)"));
         pstmt->setString(1, nombreRol);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -346,18 +357,18 @@ void actualizarRol() {
 
         string nombre = leerDatoSeguro("Nuevo nombre del rol: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_ROL(?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_ROL(?, ?)"));
         pstmt->setInt(1, idRol);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
         else pstmt->setString(2, nombre);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -373,10 +384,10 @@ void buscarRol() {
     try {
         string busqueda = leerDatoSeguro("Ingrese nombre del rol o Enter para ver todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_ROLES(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_BUSCAR_ROLES(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         string separator = string(50, '-');
         cout << "\n" << separator << endl;
         printf("%-5s | %-30s\n", "ID", "NOMBRE DEL ROL");
@@ -395,8 +406,7 @@ void buscarRol() {
         }
         cout << separator << endl;
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -408,8 +418,8 @@ void buscarRol() {
 void listarRoles() {
     cout << "\n--- LISTADO DE ROLES ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE DEL ROL" << endl;
         bool encontrado = false;
@@ -423,8 +433,7 @@ void listarRoles() {
             cout << "\n[!] No hay roles registrados." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar roles: " << e.what() << endl;
     }
@@ -462,3 +471,4 @@ void ejecutarSubmenuRoles() {
         }
     } while (opcion != 5);
 }
+

@@ -7,5 +7,6 @@ void actualizarProveedor();
 void cambiarEstadoProveedor();
 void buscarProveedor();
 void listarProveedores();
+void ejecutarSubmenuProveedores();
 
 #endif

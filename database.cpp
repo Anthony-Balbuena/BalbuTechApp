@@ -34,21 +34,43 @@ void inicializarConexion() {
 string Recogermensaje(sql::PreparedStatement *pstmt) {
     string mensaje = "";
     try {
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         if (res && res->next()) {
             mensaje = res->getString("MENSAJE");
         }
-        delete res; 
+        drenarResultados(pstmt);
     } catch (sql::SQLException &e) {
         mensaje = "Error DB: " + string(e.what());
     }
     return mensaje;
 }
 
+// El CALL deja un result-set de cola; sin drenarlo, la proxima query
+// del programa falla con "Commands out of sync".
+void drenarResultados(sql::PreparedStatement *pstmt) {
+    try {
+        while (pstmt->getMoreResults()) {
+            std::unique_ptr<sql::ResultSet> extra(pstmt->getResultSet());
+        }
+    } catch (...) {
+        // Sin mas resultados: listo.
+    }
+}
+
+void drenarResultados(sql::Statement *stmt) {
+    try {
+        while (stmt->getMoreResults()) {
+            std::unique_ptr<sql::ResultSet> extra(stmt->getResultSet());
+        }
+    } catch (...) {
+        // Sin mas resultados: listo.
+    }
+}
+
 void mostrarCategoriasYMarcas() {
     try {
-        sql::Statement *stmt = globalCon->createStatement();
-        sql::ResultSet *resCat = stmt->executeQuery("SELECT ID_CATEGORIA, NOMBRE FROM CATEGORIAS;");
+        std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
+        std::unique_ptr<sql::ResultSet> resCat(stmt->executeQuery("SELECT ID_CATEGORIA, NOMBRE FROM CATEGORIAS;"));
         
         cout << "\n--- CATEGORÍAS DISPONIBLES ---" << endl;
         cout << "ID\tNombre" << endl;
@@ -56,17 +78,16 @@ void mostrarCategoriasYMarcas() {
         while (resCat->next()) {
             cout << resCat->getInt("ID_CATEGORIA") << "\t" << resCat->getString("NOMBRE") << endl;
         }
-        delete resCat;
+        drenarResultados(stmt.get());
 
-        sql::ResultSet *resMar = stmt->executeQuery("SELECT ID_MARCA, NOMBRE FROM MARCAS;");
+        std::unique_ptr<sql::ResultSet> resMar(stmt->executeQuery("SELECT ID_MARCA, NOMBRE FROM MARCAS;"));
         cout << "\n--- MARCAS DISPONIBLES ---" << endl;
         cout << "ID\tNombre" << endl;
         cout << "--------------------------" << endl;
         while (resMar->next()) {
             cout << resMar->getInt("ID_MARCA") << "\t" << resMar->getString("NOMBRE") << endl;
         }
-        delete resMar;
-        delete stmt;
+        drenarResultados(stmt.get());
     } catch (sql::SQLException &e) {
         cout << "Error al cargar categorías o marcas: " << e.what() << endl;
     }

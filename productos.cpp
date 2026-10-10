@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
@@ -27,40 +29,37 @@ void registrarProducto() {
     cout << "\n---- REGISTRO DE PRODUCTO ---" << endl;
 
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL PARA_INSERTAR_PRODUCTO()");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL PARA_INSERTAR_PRODUCTO()"));
         bool results = pstmt->execute();
 
         if (results) {
-            sql::ResultSet *res = pstmt->getResultSet();
+            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
             cout << CIAN << "\n--- CATEGORIAS DISPONIBLES ---\n" << RESET;
             while (res->next()) {
                 cout << CIAN << " | ID: " << RESET << res->getInt("ID_CATEGORIA")
                      << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
             }
-            delete res;
         }
 
         if (pstmt->getMoreResults()) {
-            sql::ResultSet *res = pstmt->getResultSet();
+            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
             cout << CIAN << "\n--- MARCAS DISPONIBLES ---\n" << RESET;
             while (res->next()) {
                 cout << CIAN << "ID: " << RESET << res->getInt("ID_MARCA")
                      << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
             }
-            delete res;
         }
 
         if (pstmt->getMoreResults()) {
-            sql::ResultSet *res = pstmt->getResultSet();
+            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
             cout << CIAN << "\n--- PROVEEDORES DISPONIBLES ---\n" << RESET;
             while (res->next()) {
                 cout << CIAN << "ID: " << RESET << res->getInt("ID_PROVEEDOR")
                      << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
             }
-            delete res;
         }
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const sql::SQLException &e) {
         cerr << ROJO << "Error al mostrar las listas: " << RESET << e.what() << endl;
     }
@@ -84,7 +83,7 @@ void registrarProducto() {
 
         string imagen = leerDatoSeguro("\nImagen (ruta o URL, presione Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, descripcion);
         pstmt->setDouble(3, precio);
@@ -99,12 +98,12 @@ void registrarProducto() {
             pstmt->setString(8, imagen);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -118,11 +117,11 @@ void actualizarProducto() {
     cout << "\n--- ACTUALIZAR DATOS DE PRODUCTO ---" << endl;
 
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL PARA_ACTUALIZARDATOS()");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL PARA_ACTUALIZARDATOS()"));
         bool results = pstmt->execute();
 
         if (results) {
-            sql::ResultSet *res = pstmt->getResultSet();
+            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
             cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORÍAS Y MARCAS ---\n" << RESET;
 
             while (res->next()) {
@@ -134,10 +133,9 @@ void actualizarProducto() {
                      << CIAN << "\n | ID Marca : " << RESET << res->getInt("ID_MARCA")
                      << CIAN << "\n | Marca: " << RESET << res->getString("MARCA") << endl;
             }
-            delete res;
         }
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const sql::SQLException &e) {
         cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
     }
@@ -156,7 +154,7 @@ void actualizarProducto() {
         string marcaRaw = leerDatoSeguro("Nueva Marca (ID NUMERO): ");
         string categoriaRaw = leerDatoSeguro("Nueva Categoria (ID NUMERO): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idProducto);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -185,12 +183,12 @@ void actualizarProducto() {
         if (imagenRaw.empty()) pstmt->setNull(9, sql::DataType::VARCHAR);
         else pstmt->setString(9, imagenRaw);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -204,21 +202,20 @@ void cambiarEstadoProducto() {
     cout << "\n --- DESACTIVAR/ACTIVAR ESTADO DEL PRODUCTO ---" << endl;
 
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL PARA_ACTIVARODESACTIVAR_PROC()");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL PARA_ACTIVARODESACTIVAR_PROC()"));
         bool results = pstmt->execute();
 
         if (results) {
-            sql::ResultSet *res = pstmt->getResultSet();
+            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
             cout << CIAN << "\n--- LISTADO DE LOS PRODUCTOS Y SU ESTADO ---\n" << RESET << endl;
             while (res->next()) {
                 cout << CIAN << "\n | ID Producto: " << RESET << res->getInt("ID_PRODUCTO")
                      << CIAN << "\n | Nombre: " << RESET << res->getString("Nombre")
                      << CIAN << "\n | Estado: " << RESET << res->getString("ESTADO") << endl;
             }
-            delete res;
         }
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const sql::SQLException &e) {
         cerr << ROJO << "Error al mostrar la lista: " << RESET << e.what() << endl;
     }
@@ -227,15 +224,15 @@ void cambiarEstadoProducto() {
         string idStr = leerDatoSeguro("Ingrese el ID del producto (NUMERO): ");
         int idProducto = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)"));
         pstmt->setInt(1, idProducto);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -251,10 +248,10 @@ void buscarProducto() {
     try {
         string busqueda = leerDatoSeguro("Ingrese (NOMBRE O CODIGO DEL PRODUCTO) o Enter para todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\n----------------------------------------------------------------------------------------------------" << endl;
         cout << "ID | CODIGO | NOMBRE | MARCA | CATEGORIA | PRECIO | ESTADO" << endl;
@@ -278,8 +275,7 @@ void buscarProducto() {
         }
         cout << "----------------------------------------------------------------------------------------------------" << endl;
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -296,10 +292,10 @@ void consultarInventario() {
         cout << "Ingrese término de búsqueda (Código, Nombre o Categoría)\n";
         string busqueda = leerDatoSeguro("[Presione Enter para listar todo el inventario]: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_CONSULTAR_INVENTARIO(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_CONSULTAR_INVENTARIO(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         int cont = 0;
         cout << "\nID | CODIGO | PRODUCTO | CATEGORIA | MARCA | STOCK | MINIMO | PRECIO | ESTATUS" << endl;
@@ -323,8 +319,7 @@ void consultarInventario() {
             cout << "\n[+] Total de filas mostradas: " << cont << "\n";
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -339,8 +334,8 @@ void reporteStockCritico() {
     cout << " Listando productos que están en o por debajo de su mínimo:\n\n";
 
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_REPORTE_STOCK_CRITICO()");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_REPORTE_STOCK_CRITICO()"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         bool encontrado = false;
         int contador = 0;
@@ -362,15 +357,49 @@ void reporteStockCritico() {
             cout << "\n [!] Alerta: Se encontraron " << contador << " productos que requieren reabastecimiento." << endl;
         }
 
-        delete res;
 
-        while (pstmt->getMoreResults()) {
-            sql::ResultSet *extra = pstmt->getResultSet();
-            delete extra;
-        }
-
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const sql::SQLException &e) {
         cout << "\n [!] ERROR DE BASE DE DATOS AL GENERAR REPORTE: " << e.what() << endl;
     }
 }
+
+// Submenú de productos: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuProductos() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuProductos();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarProducto();
+                break;
+            case 2:
+                actualizarProducto();
+                break;
+            case 3:
+                cambiarEstadoProducto();
+                break;
+            case 4:
+                buscarProducto();
+                break;
+            case 5:
+                consultarInventario();
+                break;
+            case 6:
+                reporteStockCritico();
+                break;
+            case 7:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 7);
+}
+

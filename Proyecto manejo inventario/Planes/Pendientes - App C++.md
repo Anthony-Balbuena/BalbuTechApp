@@ -6,13 +6,13 @@
 
 - [x] Roles ✅ (09/10)
 - [x] Usuarios ✅ (09/10)
-- [ ] Empleados
-- [ ] Clientes
-- [ ] Proveedores
-- [ ] Categorías
-- [ ] Marcas
-- [ ] Productos
-- [ ] Métodos de pago~
+- [x] Empleados ✅ (10/10)
+- [x] Clientes ✅ (10/10)
+- [x] Proveedores ✅ (10/10, hecho en otro chat y revisado)
+- [x] Categorías ✅ (10/10)
+- [x] Marcas ✅ (10/10)
+- [x] Productos ✅ (10/10)
+- [x] Métodos de pago ✅ (10/10: permiso + opción 9 + loop, probado corriendo)~
 
 ## Métodos de pago huérfano
 
@@ -29,3 +29,5 @@
 ## Calidad (no rompe, después)
 
 - [ ] `delete pstmt` se saltea en excepciones (fuga chica, varios módulos)
+- [ ] **Refactor a `unique_ptr` (plan):** reemplazar `new`/`delete` manuales por punteros inteligentes, un módulo por vez con prueba. Piloto sugerido: marcas.
+- [x] Drenar result-sets pendientes ✅ (10/10: helper central + 50+ sitios; corrida completa de 9 submenús sin "out of sync")

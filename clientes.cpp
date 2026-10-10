@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -29,7 +32,7 @@ void registrarCliente() {
         string email = leerDatoSeguro("Email: ");
         string direccion = leerDatoSeguro("Direccion (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_CLIENTES(?,?,?,?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_CLIENTES(?,?,?,?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, telefono);
         pstmt->setString(3, email);
@@ -40,12 +43,12 @@ void registrarCliente() {
             pstmt->setString(4, direccion);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -64,7 +67,7 @@ void actualizarCliente() {
         string email = leerDatoSeguro("Nuevo email (Enter para omitir): ");
         string direccion = leerDatoSeguro("Nueva direccion (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_CLIENTES(?, ?, ?, ?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_CLIENTES(?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idCliente);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR); else pstmt->setString(2, nombre);
@@ -72,12 +75,12 @@ void actualizarCliente() {
         if (email.empty()) pstmt->setNull(4, sql::DataType::VARCHAR); else pstmt->setString(4, email);
         if (direccion.empty()) pstmt->setNull(5, sql::DataType::VARCHAR); else pstmt->setString(5, direccion);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -93,15 +96,15 @@ void cambiarEstadoCliente() {
         string idStr = leerDatoSeguro("ID del cliente: ");
         int idCliente = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CLIENTES(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CLIENTES(?)"));
         pstmt->setInt(1, idCliente);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -116,13 +119,13 @@ void buscarCliente() {
     try {
         string filtro = leerDatoSeguro("Ingrese nombre, email o telefono o Enter para ver todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES WHERE (? = '' OR NOMBRE LIKE ? OR EMAIL LIKE ? OR TELEFONO LIKE ?) ORDER BY ID_CLIENTE");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES WHERE (? = '' OR NOMBRE LIKE ? OR EMAIL LIKE ? OR TELEFONO LIKE ?) ORDER BY ID_CLIENTE"));
         pstmt->setString(1, filtro);
         pstmt->setString(2, "%" + filtro + "%");
         pstmt->setString(3, "%" + filtro + "%");
         pstmt->setString(4, "%" + filtro + "%");
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool encontrado = false;
 
         cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
@@ -139,8 +142,7 @@ void buscarCliente() {
             cout << "\n[!] No se encontraron clientes con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -151,8 +153,8 @@ void buscarCliente() {
 void listarClientes() {
     cout << "\n--- LISTADO DE CLIENTES ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
         bool encontrado = false;
@@ -169,9 +171,45 @@ void listarClientes() {
             cout << "\n[!] No hay clientes registrados." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar clientes: " << e.what() << endl;
     }
 }
+
+// Submenú de clientes: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuClientes() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuClientes();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarCliente();
+                break;
+            case 2:
+                actualizarCliente();
+                break;
+            case 3:
+                cambiarEstadoCliente();
+                break;
+            case 4:
+                buscarCliente();
+                break;
+            case 5:
+                listarClientes();
+                break;
+            case 6:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 6);
+}
+

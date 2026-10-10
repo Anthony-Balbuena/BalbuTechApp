@@ -2,6 +2,7 @@
 #define MARCAS_H
 
 void mostrarMenuMarcas();
+void ejecutarSubmenuMarcas();
 void registrarMarca();
 void actualizarMarca();
 void cambiarEstadoMarca();

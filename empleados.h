@@ -2,6 +2,7 @@
 #define EMPLEADOS_H
 
 void mostrarMenuEmpleados();
+void ejecutarSubmenuEmpleados();
 void registrarEmpleado();
 void actualizarEmpleado();
 void despedirEmpleado();

@@ -1,13 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
-//#include "colores.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -27,15 +29,15 @@ void registrarMetodoPago() {
     try {
         string nombre = leerDatoSeguro("Nombre del metodo: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_METODO_PAGO (?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_METODO_PAGO (?)"));
         pstmt->setString(1, nombre);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -51,18 +53,18 @@ void actualizarMetodoPago() {
 
         string nombre = leerDatoSeguro("Nuevo nombre: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_METODO_PAGO (?,?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_METODO_PAGO (?,?)"));
         pstmt->setInt(1, idMetodo);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
         else pstmt->setString(2, nombre);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -78,15 +80,15 @@ void cambiarEstadoMetodoPago() {
         string idStr = leerDatoSeguro("Ingrese el ID del metodo de pago: ");
         int idMetodo = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_METODO_PAGO(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_METODO_PAGO(?)"));
         pstmt->setInt(1, idMetodo);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -101,10 +103,10 @@ void buscarMetodoPago() {
     try {
         string busqueda = leerDatoSeguro("Ingrese el nombre o presione Enter para ver todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_METODOS_PAGO(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_BUSCAR_METODOS_PAGO(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         cout << "\n" << string(50, '-') << endl;
         printf("%-8s | %-35s\n", "ID", "METODO DE PAGO");
         cout << string(50, '-') << endl;
@@ -122,8 +124,7 @@ void buscarMetodoPago() {
         }
         cout << string(50, '-') << endl;
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -134,8 +135,8 @@ void buscarMetodoPago() {
 void listarMetodosPago() {
     cout << "\n--- LISTADO DE METODOS DE PAGO ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_METODO_PAGO, NOMBRE, ESTADO FROM METODOS_PAGO ORDER BY ID_METODO_PAGO");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_METODO_PAGO, NOMBRE, ESTADO FROM METODOS_PAGO ORDER BY ID_METODO_PAGO"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | ESTADO" << endl;
         bool encontrado = false;
@@ -150,9 +151,45 @@ void listarMetodosPago() {
             cout << "\n[!] No hay metodos de pago registrados." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar metodos de pago: " << e.what() << endl;
     }
 }
+
+// Submenú de métodos de pago: muestra el menú, lee la opción y llama a la acción.
+// (Antes el módulo estaba huérfano: con menú pero sin entrada desde ningún lado.)
+void ejecutarSubmenuMetodosPago() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuMetodosPago();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarMetodoPago();
+                break;
+            case 2:
+                actualizarMetodoPago();
+                break;
+            case 3:
+                cambiarEstadoMetodoPago();
+                break;
+            case 4:
+                buscarMetodoPago();
+                break;
+            case 5:
+                listarMetodosPago();
+                break;
+            case 6:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 6);
+}
+
