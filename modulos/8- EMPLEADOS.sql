@@ -112,11 +112,14 @@ DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_EMPLEADO ;
 CREATE OR REPLACE PROCEDURE SP_ACTUALIZAR_EMPLEADO(
     IN P_ID_EMPLEADO INT,
     IN P_NOMBRE      VARCHAR(100),
-    IN P_CEDULA      VARCHAR(20),  -- Nuevo parámetro
+    IN P_CEDULA      VARCHAR(20),
+    -- (09/10/2026) C3. Orden igual al C++ (empleados.cpp): email, cargo,
+    -- telefono, salario. Antes venia permutado y corrompia datos
+    -- (el email caia en cargo, el cargo en salario y el salario en email).
+    IN P_EMAIL       VARCHAR(100),
     IN P_CARGO       VARCHAR(50),
-    IN P_SALARIO     DECIMAL(10, 2),
     IN P_TELEFONO    VARCHAR(20),
-    IN P_EMAIL       VARCHAR(100)
+    IN P_SALARIO     DECIMAL(10, 2)
 )
 proc_label: BEGIN
     -- Variables para limpieza

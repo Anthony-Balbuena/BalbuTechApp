@@ -842,3 +842,24 @@ load_blindaje.sql (script de recarga).
   (TOTAL 400, stock 10->6, historial 10->6). Leccion: contar la precarga en
   las sumas (+1/+1). Suites t_p31 verdes, residuos 0.
 - Auditoria general: planes 1-3 y mejoras 1-4 cerrados. Detalle en el informe.
+
+36. ACTUALIZACION 09/10/2026 - CONTRATO C++-SQL + VENTAS (todo solo-BD hecho)
+================================================================================
+- C1/C2: DEFAULT NULL en SPs de categoria (1 y 2 args de la app funcionan).
+- C3: firma de SP_ACTUALIZAR_EMPLEADO al orden del C++ (fin de la corrupcion;
+  cada columna verificada). Solo llamador: empleados.cpp.
+- V1: SP_CANCELAR_VENTA con fase I + FOR UPDATE (cancela y restituye OK).
+- V2: factura venta con traduccion 1062 (espejo de compras; carrera no
+  reproducible en prueba simple, codigo revisado linea por linea).
+- V3: 5to param con DEFAULT NULL (4 y 5 args verificados).
+- V4: 8 guards amables (detalle x4, pago x2, garantia, devolucion x2,
+  trigger venta inexistente) + reorden precio-antes-que-stock para mensaje
+  preciso. Suites t_todo*.sql verdes, residuos 0.
+- Restrante: C4-C5 (solo C++). Detalle en el informe.
+
+37. ACTUALIZACION 10/10/2026 - LOGIN: ERA EL CONECTOR, NO LA CLAVE
+================================================================================
+- libmysqlcppconn 7.1.1.9 corrompe lecturas >64 bytes (binario). Fix:
+  Connector 8.4.0 en ~/conectores + build.sh actualizado + output/app
+  recompilado. Login y submenu de Roles verificados punta a punta.
+- Detalle en el informe de auditoria (seccion Login).

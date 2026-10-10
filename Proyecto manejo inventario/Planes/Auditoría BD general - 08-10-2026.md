@@ -122,3 +122,40 @@ Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 e
 - [x] **Gemelos**: decidir duplicados (`SP_HISTORIAL_PERMISOS_EMPLEADO`, `27_` vs `35_SP_FINALIZAR_RECLAMO_TOTAL`, etc.). ✅ Hecho 09/10: verificado en BD viva + repo — solo existe la versión canónica de cada uno (`13_`, `35_`, `1_SP_*`, `5_SP_*` y `VERANTESDEINSERT` no están ni en archivos ni en BD). Nada que borrar.
 - [x] **Endurecimiento** (por tandas): transacciones/handlers en SPs multi-statement, CHECKs/ENUMs (`HISTORIAL_ESTADOS_*`, `ESTADO_AVANCE`), BEFOREs faltantes, `PROVEEDORES` UNIQUE anulables. ✅ Tanda 1 (transacciones) 09/10: 3/7 ya los trae casa con TX+HANDLER (`SP_FINALIZAR_RECLAMO`, `SP_REGISTRAR_LIQUIDACION`, `20_SP_REGISTRAR_AJUSTE_INVENTARIO`); los 4 restantes hacen **un solo write** (atómicos, sin TX). ✅ Tanda 2 (ENUMs) 09/10: `HISTORIAL_ESTADOS_COMPRA/VENTA.ESTADO_*` → ENUM del dominio (`DETALLE_REPARACIONES.ESTADO_AVANCE` ya era ENUM); CREATE + migración re-ejecutable; probado (basura → 1265, válido → inserta). ✅ Tanda 3 (BEFOREs) 09/10: `DEVOLUCIONES`/`VACACIONES`/`BONOS`/`LIQUIDACIONES` ya cubiertos de casa; creado `TR_BLOQUEAR_BORRADO_RECLAMO` en `27-` (solo `PENDIENTE` se borra, espejo de devoluciones); probado ambos caminos. ✅ Tanda 4 (UNIQUES) 09/10: NULL-múltiple es diseño correcto (opcional + `''` rechazado + duplicado real con SIGNAL amistoso); probado en vivo. Sin cambios.
 - [x] **Seeds de catálogo**: `CATEGORIAS` importa vacía (upstream quitó los seeds). Restaurar en `.sql` o extender `seed-admin.sh`. ✅ Hecho 09/10: nuevo `db/seed-catalogo.sh` opt-in e idempotente (4 categorías, 10 marcas, 4 métodos); probado 2 corridas.
+
+## 🔌 Contrato C++↔SQL — hallazgos 09/10/2026 (verificados línea por línea)
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| C1 | `SP_INSERTAR_CATEGORIA` 1 vs 3 args | ✅ hecho 09/10 (`DEFAULT NULL`; suite `t_todo.sql`) |
+| C2 | `SP_ACTUALIZAR_CATEGORIA` 2 vs 4 args | ✅ hecho 09/10 (`DEFAULT NULL`; suite `t_todo.sql`) |
+| C3 | `SP_ACTUALIZAR_EMPLEADO` permutado (corrompe datos) | ✅ hecho 09/10 (firma al orden del C++; cada dato verificado en su columna) |
+| C4 | `usuarios.cpp:242` `NOMBRE_USUARIO` | ✅ hecho 09/10 (SELECT + 2 getters a `USUARIO`; el de :96 era alias válido y no se tocó) |
+| C5 | `database.cpp:51,61` `CATEGORIA`/`MARCA` singular | ✅ hecho 09/10 (plural; sintaxis verificada con g++ c++14) |
+| V1 | `SP_CANCELAR_VENTA` sin txn ni `FOR UPDATE` | ✅ hecho 09/10 (fase I + `FOR UPDATE`; cancela y restituye, residuos 0) |
+| V2 | `SP_ASIGNAR_FACTURA_VENTA` sin traducir 1062 | ✅ hecho 09/10 (handler `GET DIAGNOSTICS` espejo de compras; pre-check verificado) |
+| V3 | `24_SP_REGISTRAR_PAGO` exige 5 args | ✅ hecho 09/10 (`DEFAULT NULL`; llamada de 4 y de 5 verificadas) |
+| V4 | ~8 errores técnicos sin traducir en ventas | ✅ hecho 09/10 (guards en detalle/pago/garantía/devolución/trigger; todos amables verificados) |
+| FALSO | Vistas GROUP BY | descartado: corren bien (PK); solo `SUM`/`VUELTO` NULL cosméticos |
+
+## ✅ Contrato + ventas cerrado 09/10/2026
+
+C1–C3, V1–V4 ejecutados en archivos + BD y probados (`t_todo*.sql`), residuos 0. Quedan solo C4–C5 (exigen C++).
+
+## ✅ C++ cerrado 09/10/2026 (se levantó la restricción solo-SQL)
+
+- C4/C5 corregidos y verificados por sintaxis. `ROLE_INV_AUDITOR` **borrado** de la BD (0 usuarios, 0 permisos; menús C++ dinámicos) → ROLES queda con los 3 del C++.
+- ⚠️ Hallazgo nuevo (no tocado): el build completo falla por toolchain — el conector MySQL usa `throw()` dinámicos que C++17 prohíbe (`build.sh` fuerza `-std=c++17`). Con `-std=c++14` los archivos compilan. Decidir: bajar el estándar o actualizar el conector.
+
+## 🔑 Login admin 09/10/2026
+
+- Causa: `CONTRASENA` en texto plano (`Pedro0110`), el C++ espera SHA256-hex legacy (y rehashea a PBKDF2 al entrar).
+- Fix: `UPDATE ... SET CONTRASENA = SHA2('Pedro0110',256)` (misma clave, 64 chars, coincide ✅). Al primer login exitoso la app la pasa a PBKDF2 sola.
+
+## 🔑 Login 10/10/2026 — causa raíz: el conector (no la clave)
+
+- La clave en BD estaba perfecta (PBKDF2 válido, verificado con Python).
+- El culpable: **libmysqlcppconn 7.1.1.9 corrompe al LEER strings de más de 64 bytes** por protocolo binario (probado: `REPEAT('A',100)` vuelve roto, texto plano limpio, `getBlob` también roto). Por eso el hash (83 chars) nunca coincidía.
+- Fix: **Connector/C++ 8.4.0** descargado a `~/conectores` (sin sudo), `build.sh` actualizado (usa el 8 con fallback al sistema), `output/app` recompilado con C++17.
+- Verificado punta a punta: login → menú ADMIN → submenú Roles → listar (los 3 roles) → volver → cerrar sesión.
+- Ojo: el build viejo con C++17 fallaba por headers del conector 1.1 (preexistente); con el 8 compila limpio. Binarios viejos (`./main`) quedan obsoletos: usar `output/app`.

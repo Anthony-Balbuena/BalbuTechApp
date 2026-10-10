@@ -82,20 +82,44 @@ proc_label: BEGIN
     END IF;
 
     -- Opcional: Validar que el empleado sea el mismo que inició la venta
+    -- (09/10/2026) V4. NULL burlaba el <> (da NULL y pasa): se rechaza antes.
+    IF P_ID_EMPLEADO IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
     IF V_ID_VENTA_EMPLEADO <> P_ID_EMPLEADO THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO COINCIDE CON EL DE LA VENTA.';
         LEAVE proc_label;
     END IF;
 
-    -- 2. Validar stock (si el producto no esta en INVENTARIO, cuenta como 0)
+    -- (09/10/2026) V4. Cantidad invalida (NULL/0/negativa pasaba el stock y reventaba 1048).
+    IF IFNULL(P_CANTIDAD, 0) <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD DEBE SER MAYOR A CERO.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 2. Obtener precio (antes que el stock: un producto inexistente no
+    -- tiene fila y el mensaje debe decirlo, no "STOCK INSUFICIENTE")
+    SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
+    -- (09/10/2026) V4. Producto inexistente (NULL reventaba 1048).
+    IF V_PRECIO IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. Validar stock (si el producto no esta en INVENTARIO, cuenta como 0)
     SELECT STOCK_ACTUAL INTO V_STOCK_DISPONIBLE FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO;
     IF IFNULL(V_STOCK_DISPONIBLE, 0) < P_CANTIDAD THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: STOCK INSUFICIENTE.';
         LEAVE proc_label;
     END IF;
 
-    -- 3. Obtener precio
-    SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+    -- (09/10/2026) V4. Duplicado en la misma venta (1062 del UQ_VENTA_PRODUCTO).
+    IF EXISTS (SELECT 1 FROM DETALLES_VENTA WHERE ID_VENTA = P_ID_VENTA AND ID_PRODUCTO = P_ID_PRODUCTO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO YA ESTA EN ESTA VENTA.';
+        LEAVE proc_label;
+    END IF;
 
     -- 4. Insertar
     INSERT INTO DETALLES_VENTA (ID_VENTA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO)
@@ -231,6 +255,12 @@ FOR EACH ROW
 BEGIN
     DECLARE V_ESTADO VARCHAR(20);
     SELECT ESTADO INTO V_ESTADO FROM VENTAS WHERE ID_VENTA = NEW.ID_VENTA;
+
+    -- (09/10/2026) V4. Venta inexistente (NULL pasaba y reventaba 1452).
+    IF V_ESTADO IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
+    END IF;
     
     IF V_ESTADO IN ('REALIZADA', 'CANCELADA', 'DEVUELTA') THEN
         SIGNAL SQLSTATE '45000' 

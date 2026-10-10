@@ -82,9 +82,15 @@ proc_label: BEGIN
     DECLARE V_GARANTIA_DETALLE INT;
 
     -- 1. Validar que la cantidad sea positiva
-    IF P_CANTIDAD <= 0 THEN
+    -- (09/10/2026) V4. IFNULL (el NULL pasaba) + empleado inexistente (1452).
+    IF IFNULL(P_CANTIDAD, 0) <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CANTIDAD DEBE SER MAYOR A 0.';
         LEAVE proc_label; 
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
     END IF;
 
     -- 2. Validar existencia del detalle de venta y obtener datos básicos

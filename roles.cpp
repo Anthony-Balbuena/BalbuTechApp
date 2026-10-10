@@ -163,14 +163,14 @@ void ejecutarMenuSegunRol() {
             switch (opcion) {
                 case 1:
                     if (tienePermiso("GESTIONAR_ROLES")) {
-                        mostrarMenuRoles();
+                        ejecutarSubmenuRoles();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar roles." << RESET << endl;
                     }
                     break;
                 case 2:
                     if (tienePermiso("GESTIONAR_USUARIOS")) {
-                        mostrarMenuUsuarios();
+                        ejecutarSubmenuUsuarios();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar usuarios." << RESET << endl;
                     }
@@ -240,14 +240,14 @@ void ejecutarMenuSegunRol() {
                     break;
                 case 2:
                     if (tienePermiso("GESTIONAR_ROLES")) {
-                        mostrarMenuRoles();
+                        ejecutarSubmenuRoles();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar roles." << RESET << endl;
                     }
                     break;
                 case 3:
                     if (tienePermiso("GESTIONAR_USUARIOS")) {
-                        mostrarMenuUsuarios();
+                        ejecutarSubmenuUsuarios();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar usuarios." << RESET << endl;
                     }
@@ -428,4 +428,37 @@ void listarRoles() {
     } catch (const exception &e) {
         cout << "\n[!] Error al listar roles: " << e.what() << endl;
     }
+}
+
+// Submenú de roles: lee la opción y llama a la acción (antes el menú
+// solo se mostraba y volvía sin hacer nada).
+void ejecutarSubmenuRoles() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuRoles();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarRol();
+                break;
+            case 2:
+                actualizarRol();
+                break;
+            case 3:
+                buscarRol();
+                break;
+            case 4:
+                listarRoles();
+                break;
+            case 5:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 5);
 }

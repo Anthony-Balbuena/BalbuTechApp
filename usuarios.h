@@ -2,6 +2,7 @@
 #define USUARIOS_H
 
 void mostrarMenuUsuarios();
+void ejecutarSubmenuUsuarios();
 void registrarUsuario();
 void actualizarUsuario();
 void cambiarEstadoUsuario();

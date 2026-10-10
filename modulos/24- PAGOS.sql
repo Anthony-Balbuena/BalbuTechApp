@@ -132,7 +132,9 @@ CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
     IN P_ID_METODO_PAGO INT,
     IN P_MONTO DECIMAL(10, 2),
     IN P_ID_EMPLEADO INT, -- El empleado que procesa el pago (P8)
-    IN P_MONTO_RECIBIDO DECIMAL(10, 2) -- Lo que entrego el cliente; NULL = no aplica (P9)
+    -- (09/10/2026) V3. DEFAULT NULL: el cuerpo ya lo maneja (vuelto 0);
+    -- sin esto las llamadas viejas de 4 args fallaban por aridad.
+    IN P_MONTO_RECIBIDO DECIMAL(10, 2) DEFAULT NULL -- Lo que entrego el cliente; NULL = no aplica (P9)
 )
 proc_label: BEGIN
     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
@@ -149,6 +151,17 @@ proc_label: BEGIN
     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
     IF V_NOMBRE_EMPLEADO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- (09/10/2026) V4. Metodo inexistente (1452) y monto nulo o no positivo (1048/3819).
+    IF NOT EXISTS (SELECT 1 FROM METODOS_PAGO WHERE ID_METODO_PAGO = P_ID_METODO_PAGO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL METODO DE PAGO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    IF IFNULL(P_MONTO, 0) <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO DEBE SER MAYOR A CERO.';
         LEAVE proc_label;
     END IF;
 
