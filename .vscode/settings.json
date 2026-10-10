@@ -1,3 +1,7 @@
 {
-    "chat.byokUtilityModelDefault": "mainAgent"
-}
+    "chat.byokUtilityModelDefault": "mainAgent",
+    "code-runner.saveFileBeforeRun": true,
+    "code-runner.runInTerminal": true,
+    "code-runner.executorMap": {
+        "cpp": "cd $dir && bash build.sh && ./output/app"
+    }

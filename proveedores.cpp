@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -29,7 +32,7 @@ void registrarProveedor() {
         string email = leerDatoSeguro("Email: ");
         string direccion = leerDatoSeguro("Direccion (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_PROVEEDOR(?,?,?,?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PROVEEDOR(?,?,?,?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, telefono);
         pstmt->setString(3, email);
@@ -40,12 +43,12 @@ void registrarProveedor() {
             pstmt->setString(4, direccion);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -66,7 +69,7 @@ void actualizarProveedor() {
         string email = leerDatoSeguro("Nuevo email (Enter para omitir): ");
         string direccion = leerDatoSeguro("Nueva direccion (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_PROVEEDOR(?,?,?,?,?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PROVEEDOR(?,?,?,?,?)"));
         pstmt->setInt(1, idProveedor);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR); else pstmt->setString(2, nombre);
@@ -74,12 +77,12 @@ void actualizarProveedor() {
         if (email.empty()) pstmt->setNull(4, sql::DataType::VARCHAR); else pstmt->setString(4, email);
         if (direccion.empty()) pstmt->setNull(5, sql::DataType::VARCHAR); else pstmt->setString(5, direccion);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -95,15 +98,15 @@ void cambiarEstadoProveedor() {
         string idStr = leerDatoSeguro("ID del proveedor: ");
         int idProveedor = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PROVEEDOR(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PROVEEDOR(?)"));
         pstmt->setInt(1, idProveedor);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -118,10 +121,10 @@ void buscarProveedor() {
     try {
         string filtro = leerDatoSeguro("Ingrese nombre o telefono o Enter para ver todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_LISTAR_PROVEEDORES(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_PROVEEDORES(?)"));
         pstmt->setString(1, filtro);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
         bool encontrado = false;
@@ -139,8 +142,7 @@ void buscarProveedor() {
             cout << "\n[!] No se encontraron resultados con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -151,8 +153,8 @@ void buscarProveedor() {
 void listarProveedores() {
     cout << "\n--- LISTADO DE PROVEEDORES ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
         bool encontrado = false;
@@ -170,9 +172,43 @@ void listarProveedores() {
             cout << "\n[!] No hay proveedores registrados." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar proveedores: " << e.what() << endl;
     }
 }
+
+void ejecutarSubmenuProveedores() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuProveedores();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarProveedor();
+                break;
+            case 2:
+                actualizarProveedor();
+                break;
+            case 3:
+                cambiarEstadoProveedor();
+                break;
+            case 4:
+                buscarProveedor();
+                break;
+            case 5:
+                listarProveedores();
+                break;
+            case 6:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 6);
+}
+

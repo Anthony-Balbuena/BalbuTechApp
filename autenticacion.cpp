@@ -1,4 +1,5 @@
 #include "seguridad.h"
+#include "database.h"
 #include <iostream>
 #include <mysql_connection.h>
 #include <cppconn/driver.h>
@@ -25,10 +26,10 @@ string iniciarSesion() {
         sql::Connection *con = driver->connect("tcp://127.0.0.1:3306", "tu_usuario", "tu_clave");
         con->setSchema("BALBU_TECH");
 
-        sql::PreparedStatement *pstmt = con->prepareStatement("CALL SP_GET_USUARIO_LOGIN(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("CALL SP_GET_USUARIO_LOGIN(?)"));
         pstmt->setString(1, username);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         if (res->next()) {
             string hash_guardado = res->getString("CONTRASENA");
@@ -43,8 +44,7 @@ string iniciarSesion() {
             cout << "\n[!] Usuario no encontrado o inactivo." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
         delete con;
 
     } catch (sql::SQLException &e) {
@@ -53,3 +53,4 @@ string iniciarSesion() {
 
     return rolObtenido;
 }
+

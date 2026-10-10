@@ -863,3 +863,11 @@ load_blindaje.sql (script de recarga).
   Connector 8.4.0 en ~/conectores + build.sh actualizado + output/app
   recompilado. Login y submenu de Roles verificados punta a punta.
 - Detalle en el informe de auditoria (seccion Login).
+
+38. ACTUALIZACION 10/10/2026 - UNIQUE_PTR COMPLETO (con lecciones)
+================================================================================
+- Migracion completa de punteros crudos a unique_ptr en 12 .cpp (~90 sitios).
+  En el medio se rompio CRLF, parentesis y scopes; todo detectado por build,
+  diff y runtime; diff final 591+/274- solo con lo intencionado.
+- Verificado: 0 doble-free, tour 9 submenus 0 errores, alta real OK.
+  Detalle en el informe.

@@ -5,6 +5,7 @@
 
 // Declaración de las funciones del módulo de productos
 void mostrarMenuProductos();
+void ejecutarSubmenuProductos();
 void registrarProducto();
 void actualizarProducto();
 void cambiarEstadoProducto();

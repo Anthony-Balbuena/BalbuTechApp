@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -33,7 +36,7 @@ void registrarEmpleado() {
         string telefono = leerDatoSeguro("Telefono: ");
         string email = leerDatoSeguro("Email: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, cedula);
         pstmt->setString(3, cargo);
@@ -41,12 +44,12 @@ void registrarEmpleado() {
         pstmt->setString(5, telefono);
         pstmt->setString(6, email);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -70,7 +73,7 @@ void actualizarEmpleado() {
         string salStr = leerDatoSeguro("Nuevo salario (0 para omitir): ");
         double salario = salStr.empty() ? 0 : stod(salStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_EMPLEADO(?, ?, ?, ?, ?, ?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_EMPLEADO(?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idEmpleado);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR); else pstmt->setString(2, nombre);
@@ -80,12 +83,12 @@ void actualizarEmpleado() {
         if (telefono.empty()) pstmt->setNull(6, sql::DataType::VARCHAR); else pstmt->setString(6, telefono);
         if (salario <= 0) pstmt->setNull(7, sql::DataType::DOUBLE); else pstmt->setDouble(7, salario);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -103,7 +106,7 @@ void despedirEmpleado() {
 
         string fecha = leerDatoSeguro("Fecha (YYYY-MM-DD) o Enter para hoy: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_DESPEDIR_EMPLEADO(?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_DESPEDIR_EMPLEADO(?, ?)"));
         pstmt->setInt(1, idEmpleado);
 
         if (fecha.empty()) {
@@ -112,12 +115,12 @@ void despedirEmpleado() {
             pstmt->setString(2, fecha);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -135,16 +138,16 @@ void reactivarEmpleado() {
         string salStr = leerDatoSeguro("Nuevo salario: ");
         double nuevoSalario = stod(salStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_REACTIVAR_EMPLEADO(?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_REACTIVAR_EMPLEADO(?, ?)"));
         pstmt->setInt(1, idEmpleado);
         pstmt->setDouble(2, nuevoSalario);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -159,13 +162,13 @@ void buscarEmpleado() {
     try {
         string filtro = leerDatoSeguro("Ingrese nombre, cédula o cargo o Enter para ver todos: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS WHERE (? = '' OR NOMBRE LIKE ? OR CEDULA LIKE ? OR CARGO LIKE ?) ORDER BY ID_EMPLEADO");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS WHERE (? = '' OR NOMBRE LIKE ? OR CEDULA LIKE ? OR CARGO LIKE ?) ORDER BY ID_EMPLEADO"));
         pstmt->setString(1, filtro);
         pstmt->setString(2, "%" + filtro + "%");
         pstmt->setString(3, "%" + filtro + "%");
         pstmt->setString(4, "%" + filtro + "%");
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool encontrado = false;
 
         cout << "\nID | NOMBRE | CEDULA | CARGO | ESTADO" << endl;
@@ -182,8 +185,7 @@ void buscarEmpleado() {
             cout << "\n[!] No se encontraron empleados con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -194,8 +196,8 @@ void buscarEmpleado() {
 void listarEmpleados() {
     cout << "\n--- LISTADO DE EMPLEADOS ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS ORDER BY ID_EMPLEADO");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS ORDER BY ID_EMPLEADO"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | CEDULA | CARGO | ESTADO" << endl;
         bool encontrado = false;
@@ -212,9 +214,48 @@ void listarEmpleados() {
             cout << "\n[!] No hay empleados registrados." << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar empleados: " << e.what() << endl;
     }
 }
+
+// Submenú de empleados: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuEmpleados() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuEmpleados();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarEmpleado();
+                break;
+            case 2:
+                actualizarEmpleado();
+                break;
+            case 3:
+                despedirEmpleado();
+                break;
+            case 4:
+                reactivarEmpleado();
+                break;
+            case 5:
+                buscarEmpleado();
+                break;
+            case 6:
+                listarEmpleados();
+                break;
+            case 7:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 7);
+}
+

@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -26,15 +29,15 @@ void registrarCategoria() {
     try {
         string nombre = leerDatoSeguro("Nombre de la categoria: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?)"));
         pstmt->setString(1, nombre);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -50,7 +53,7 @@ void actualizarCategoria() {
 
         string nombre = leerDatoSeguro("Nuevo nombre (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?)"));
         pstmt->setInt(1, idCategoria);
 
         if (nombre.empty()) {
@@ -59,12 +62,12 @@ void actualizarCategoria() {
             pstmt->setString(2, nombre);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -80,15 +83,15 @@ void cambiarEstadoCategoria() {
         string idStr = leerDatoSeguro("ID de la categoria: ");
         int idCategoria = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CATEGORIA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_CATEGORIA(?)"));
         pstmt->setInt(1, idCategoria);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -103,10 +106,10 @@ void buscarCategoria() {
     try {
         string busqueda = leerDatoSeguro("Ingrese nombre de la categoria o Enter para ver todas: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_CATEGORIA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_BUSCAR_CATEGORIA(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | ESTADO" << endl;
         bool encontrado = false;
@@ -122,8 +125,7 @@ void buscarCategoria() {
             cout << "\n[!] No se encontraron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -134,8 +136,8 @@ void buscarCategoria() {
 void listarCategorias() {
     cout << "\n--- LISTADO DE CATEGORIAS ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_LISTAR_CATEGORIAS()");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_CATEGORIAS()"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | ESTADO" << endl;
         while (res->next()) {
@@ -144,9 +146,45 @@ void listarCategorias() {
                  << res->getString("ESTADO") << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar categorias: " << e.what() << endl;
     }
 }
+
+// Submenú de categorías: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuCategorias() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuCategorias();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarCategoria();
+                break;
+            case 2:
+                actualizarCategoria();
+                break;
+            case 3:
+                cambiarEstadoCategoria();
+                break;
+            case 4:
+                buscarCategoria();
+                break;
+            case 5:
+                listarCategorias();
+                break;
+            case 6:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 6);
+}
+

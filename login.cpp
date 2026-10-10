@@ -24,7 +24,7 @@ bool intentarLogin(const string& usuario, const string& password) {
             "WHERE U.USUARIO = ?"
         );
         pSelect->setString(1, usuario);
-        sql::ResultSet *rsel = pSelect->executeQuery();
+        std::unique_ptr<sql::ResultSet> rsel(pSelect->executeQuery());
 
         if (rsel->next()) {
             string storedHash = rsel->getString("CONTRASENA");
@@ -52,13 +52,11 @@ bool intentarLogin(const string& usuario, const string& password) {
                 }
 
                 guardarSesion(idUsuario, usuario, rol, estadoCuenta);
-                delete rsel;
                 delete pSelect;
                 return true;
             }
         }
 
-        delete rsel;
         delete pSelect;
 
         // No fallback SP: autenticación manejada por PBKDF2/legacy rehash arriba
@@ -69,3 +67,4 @@ bool intentarLogin(const string& usuario, const string& password) {
         return false;
     }
 }
+

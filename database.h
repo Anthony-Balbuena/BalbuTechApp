@@ -14,4 +14,9 @@ void inicializarConexion();
 std::string Recogermensaje(sql::PreparedStatement *pstmt);
 void mostrarCategoriasYMarcas();
 
+// Drena los result-sets que deja pendiente un CALL (si no, la proxima
+// query falla con "Commands out of sync"). Inofensivo en SELECTs simples.
+void drenarResultados(sql::PreparedStatement *pstmt);
+void drenarResultados(sql::Statement *stmt);
+
 #endif

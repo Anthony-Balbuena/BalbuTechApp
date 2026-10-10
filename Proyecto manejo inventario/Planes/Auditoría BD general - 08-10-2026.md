@@ -159,3 +159,28 @@ C1–C3, V1–V4 ejecutados en archivos + BD y probados (`t_todo*.sql`), residuo
 - Fix: **Connector/C++ 8.4.0** descargado a `~/conectores` (sin sudo), `build.sh` actualizado (usa el 8 con fallback al sistema), `output/app` recompilado con C++17.
 - Verificado punta a punta: login → menú ADMIN → submenú Roles → listar (los 3 roles) → volver → cerrar sesión.
 - Ojo: el build viejo con C++17 fallaba por headers del conector 1.1 (preexistente); con el 8 compila limpio. Binarios viejos (`./main`) quedan obsoletos: usar `output/app`.
+
+## ✅ Métodos de pago 10/10/2026 (huérfano rescatado)
+
+- BD: permiso `GESTIONAR_METODOS_PAGO` + asignado al ADMIN.
+- C++: agregado a la lista hardcodeada del ADMIN, opción 9 en su menú (10/11 renumerados), `ejecutarSubmenuMetodosPago()` + include faltante + `colores.h` descomentado.
+- Probado corriendo: 9 → 5 listar (EFECTIVO ACTIVO) → 6 → 11 salir. Submenús C++: 9/9.
+
+## ✅ Out-of-sync 10/10/2026 (bug sistémico C++, resuelto)
+
+- Causa: cada `CALL` deja un result-set de cola; sin drenarlo, la próxima query falla. Los `SELECT` directos eran inmunes (por eso algunos listados andaban).
+- Fix: helper `drenarResultados()` (2 overloads) + en `Recogermensaje` (cubre todas las escrituras) + 50+ sitios de lectura. `database.cpp` plural ya lo había arreglado otro chat.
+- Verificado: corrida completa de 9 submenús con **0 errores** y cierre limpio.
+
+## ⚠️ Fuga pstmt 10/10/2026 — intentado y REVERTIDO (lección)
+
+- Se intentó refactornullptr+delete-en-catch por script en ~43 funciones: el script rompió fin de línea (CRLF→LF), comió paréntesis, puso deletes fuera del catch (doble-free = crash) y tipó mal 2 vars. Se detectó por build + diff antes de correr.
+- Reparado a mano lo dañado, verificado build OK + corrida 9 submenús con 0 errores y salida limpia. Queda solo el drenaje (que sí era correcto y necesario).
+- Decisión: la fuga (~100 bytes por operación fallida) se acepta como deuda técnica; el refactor manual queda para otro día, función por función y con prueba.
+
+## ✅ unique_ptr 10/10/2026 (migración completa, con tropiezos honestos)
+
+- ~90 declaraciones a `unique_ptr` + ~90 `delete` manuales fuera, `#include <memory>`, `.get()` solo donde hay propiedad.
+- En el camino se rompió fin de línea, paréntesis y scopes (3 rondas); se detectó todo por build + diff + runtime y quedó limpio (diff 591+/274-).
+- Verificado: build OK, auditoría anti-doble-free en 0, tour 9 submenús en 0 errores, alta real desde la app (producto 33, luego borrado).
+- Quirk conocido (no tocado): `leerDatoSeguro` se come líneas vacías (omitir = doble Enter).

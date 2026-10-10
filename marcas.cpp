@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "colores.h"
 
 using namespace std;
 
@@ -26,15 +29,15 @@ void registrarMarca() {
     try {
         string nombre = leerDatoSeguro("Nombre de la marca: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_INSERTAR_MARCA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_MARCA(?)"));
         pstmt->setString(1, nombre);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -50,7 +53,7 @@ void actualizarMarca() {
 
         string nombre = leerDatoSeguro("Nuevo nombre (Enter para omitir): ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_ACTUALIZAR_MARCA(?, ?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_MARCA(?, ?)"));
         pstmt->setInt(1, idMarca);
 
         if (nombre.empty()) {
@@ -59,12 +62,12 @@ void actualizarMarca() {
             pstmt->setString(2, nombre);
         }
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -80,15 +83,15 @@ void cambiarEstadoMarca() {
         string idStr = leerDatoSeguro("ID de la marca: ");
         int idMarca = stoi(idStr);
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_MARCA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_MARCA(?)"));
         pstmt->setInt(1, idMarca);
 
-        string respuesta = Recogermensaje(pstmt);
+        string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
         cout << "--------------------------------------------" << endl;
 
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -103,10 +106,10 @@ void buscarMarca() {
     try {
         string busqueda = leerDatoSeguro("Ingrese nombre de la marca o Enter para ver todas: ");
 
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_BUSCAR_MARCA(?)");
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_BUSCAR_MARCA(?)"));
         pstmt->setString(1, busqueda);
 
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | ESTADO" << endl;
         bool encontrado = false;
@@ -122,8 +125,7 @@ void buscarMarca() {
             cout << "\n[!] No se encontraron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -134,8 +136,8 @@ void buscarMarca() {
 void listarMarcas() {
     cout << "\n--- LISTADO DE MARCAS ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("CALL SP_LISTAR_MARCAS()");
-        sql::ResultSet *res = pstmt->executeQuery();
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_MARCAS()"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\nID | NOMBRE | ESTADO" << endl;
         while (res->next()) {
@@ -144,9 +146,45 @@ void listarMarcas() {
                  << res->getString("ESTADO") << endl;
         }
 
-        delete res;
-        delete pstmt;
+        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar marcas: " << e.what() << endl;
     }
 }
+
+// Submenú de marcas: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuMarcas() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuMarcas();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarMarca();
+                break;
+            case 2:
+                actualizarMarca();
+                break;
+            case 3:
+                cambiarEstadoMarca();
+                break;
+            case 4:
+                buscarMarca();
+                break;
+            case 5:
+                listarMarcas();
+                break;
+            case 6:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 6);
+}
+

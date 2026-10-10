@@ -2,6 +2,7 @@
 #define CLIENTES_H
 
 void mostrarMenuClientes();
+void ejecutarSubmenuClientes();
 void registrarCliente();
 void actualizarCliente();
 void cambiarEstadoCliente();
