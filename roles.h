@@ -11,6 +11,7 @@ void mostrarMenuSegunRol();
 void ejecutarMenuSegunRol();
 
 void mostrarMenuRoles();
+void ejecutarSubmenuRoles();
 void registrarRol();
 void actualizarRol();
 void buscarRol();

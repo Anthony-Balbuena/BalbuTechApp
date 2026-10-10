@@ -134,17 +134,34 @@ proc_label: BEGIN
     DECLARE V_ESTADO VARCHAR(20);
     -- P11 (07/10/2026): si algo falla despues de levantar la bandera,
     -- se apaga aqui antes de propagar el error.
+    -- V1 (09/10/2026, patron fase I como SP_CANCELAR_COMPRA): 3 escrituras
+    -- atadas + FOR UPDATE contra doble cancel concurrente.
+    -- DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    -- BEGIN
+    --     SET @VENTAS_INTERNO = 0;
+    --     RESIGNAL;
+    -- END;
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
         SET @VENTAS_INTERNO = 0;
         RESIGNAL;
     END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
 
     -- 1. Validar que la venta exista y sea del empleado
     SELECT ID_EMPLEADO, ESTADO INTO V_ID_VENTA_EMPLEADO, V_ESTADO
     FROM VENTAS
-    WHERE ID_VENTA = P_ID_VENTA;
+    WHERE ID_VENTA = P_ID_VENTA
+    FOR UPDATE;
 
     IF V_ID_VENTA_EMPLEADO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
@@ -198,6 +215,10 @@ proc_label: BEGIN
     UPDATE VENTAS SET ESTADO = 'CANCELADA' WHERE ID_VENTA = P_ID_VENTA;
     SET @VENTAS_INTERNO = 0;
 
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
+
     SELECT CONCAT('EXITO: VENTA #', P_ID_VENTA, ' CANCELADA Y STOCK RESTITUIDO.') AS MENSAJE;
 END //
 DELIMITER ;
@@ -220,6 +241,33 @@ proc_label: BEGIN
     DECLARE V_ID_CLIENTE INT;
     DECLARE V_ESTADO VARCHAR(20);
     DECLARE V_FACTURA_LIMPIA VARCHAR(30);
+    DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
+
+    -- V2 (09/10/2026, espejo de SP_ASIGNAR_FACTURA_COMPRA): transaccion
+    -- propia + traduccion del choque con UQ_VENTA_FACTURA (carrera de
+    -- 2 sesiones = 1062 tecnico; aqui sale el mensaje amigable).
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        DECLARE V_ESTADO_SQL CHAR(5) DEFAULT '';
+
+        GET DIAGNOSTICS CONDITION 1 V_ESTADO_SQL = RETURNED_SQLSTATE;
+
+        IF V_PROPIA_TRANSACCION = 1 THEN
+            ROLLBACK;
+        END IF;
+
+        IF V_ESTADO_SQL = '23000' THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'ERROR: ESA FACTURA YA EXISTE PARA ESTE CLIENTE.';
+        END IF;
+
+        RESIGNAL;
+    END;
+
+    IF @@in_transaction = 0 THEN
+        START TRANSACTION;
+        SET V_PROPIA_TRANSACCION = 1;
+    END IF;
 
     -- 1. La factura no puede venir vacia
     SET V_FACTURA_LIMPIA = TRIM(IFNULL(P_FACTURA, ''));
@@ -257,6 +305,10 @@ proc_label: BEGIN
 
     -- 5. Asignar
     UPDATE VENTAS SET FACTURA = V_FACTURA_LIMPIA WHERE ID_VENTA = P_ID_VENTA;
+
+    IF V_PROPIA_TRANSACCION = 1 THEN
+        COMMIT;
+    END IF;
 
     SELECT CONCAT('EXITO: FACTURA ', V_FACTURA_LIMPIA,
                   ' ASIGNADA A LA VENTA #', P_ID_VENTA, '.') AS MENSAJE;

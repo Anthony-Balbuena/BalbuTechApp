@@ -48,7 +48,7 @@ string Recogermensaje(sql::PreparedStatement *pstmt) {
 void mostrarCategoriasYMarcas() {
     try {
         sql::Statement *stmt = globalCon->createStatement();
-        sql::ResultSet *resCat = stmt->executeQuery("SELECT ID_CATEGORIA, NOMBRE FROM CATEGORIA;");
+        sql::ResultSet *resCat = stmt->executeQuery("SELECT ID_CATEGORIA, NOMBRE FROM CATEGORIAS;");
         
         cout << "\n--- CATEGORÍAS DISPONIBLES ---" << endl;
         cout << "ID\tNombre" << endl;
@@ -58,7 +58,7 @@ void mostrarCategoriasYMarcas() {
         }
         delete resCat;
 
-        sql::ResultSet *resMar = stmt->executeQuery("SELECT ID_MARCA, NOMBRE FROM MARCA;");
+        sql::ResultSet *resMar = stmt->executeQuery("SELECT ID_MARCA, NOMBRE FROM MARCAS;");
         cout << "\n--- MARCAS DISPONIBLES ---" << endl;
         cout << "ID\tNombre" << endl;
         cout << "--------------------------" << endl;

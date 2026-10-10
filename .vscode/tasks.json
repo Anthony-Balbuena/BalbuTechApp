@@ -26,6 +26,18 @@
         },
         {
             "type": "shell",
+            "label": "Nativo: compilar con build.sh (Linux)",
+            "command": "bash",
+            "args": ["build.sh"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "type": "shell",
             "label": "Docker: levantar (app + MariaDB 10.11)",
             "command": "docker",
             "args": ["compose", "up", "--build", "-d"],

@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Ejecutar BalbuTechApp",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/output/app",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "Nativo: compilar con build.sh (Linux)"
+        }
+    ]
+}

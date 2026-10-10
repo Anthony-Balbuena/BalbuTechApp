@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <limits>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
@@ -191,7 +192,7 @@ void buscarUsuario() {
         while (res->next()) {
             encontrado = true;
             cout << res->getInt("ID_USUARIO") << " | "
-                 << res->getString("NOMBRE_USUARIO") << " | "
+                 << res->getString("USUARIO") << " | "
                  << res->getString("ESTADO") << endl;
         }
 
@@ -239,7 +240,7 @@ void cambiarClaveUsuario() {
 void listarUsuarios() {
     cout << "\n--- LISTADO DE USUARIOS ---" << endl;
     try {
-        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_USUARIO, NOMBRE_USUARIO, ESTADO FROM USUARIOS ORDER BY ID_USUARIO");
+        sql::PreparedStatement *pstmt = globalCon->prepareStatement("SELECT ID_USUARIO, USUARIO, ESTADO FROM USUARIOS ORDER BY ID_USUARIO");
         sql::ResultSet *res = pstmt->executeQuery();
 
         cout << "\nID | USUARIO | ESTADO" << endl;
@@ -247,7 +248,7 @@ void listarUsuarios() {
         while (res->next()) {
             encontrado = true;
             cout << res->getInt("ID_USUARIO") << " | "
-                 << res->getString("NOMBRE_USUARIO") << " | "
+                 << res->getString("USUARIO") << " | "
                  << res->getString("ESTADO") << endl;
         }
 
@@ -260,4 +261,43 @@ void listarUsuarios() {
     } catch (const exception &e) {
         cout << "\n[!] Error al listar usuarios: " << e.what() << endl;
     }
+}
+
+// Submenú de usuarios: muestra el menú, lee la opción y llama a la acción.
+// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+void ejecutarSubmenuUsuarios() {
+    int opcion = 0;
+
+    do {
+        mostrarMenuUsuarios();
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        switch (opcion) {
+            case 1:
+                registrarUsuario();
+                break;
+            case 2:
+                actualizarUsuario();
+                break;
+            case 3:
+                cambiarEstadoUsuario();
+                break;
+            case 4:
+                buscarUsuario();
+                break;
+            case 5:
+                cambiarClaveUsuario();
+                break;
+            case 6:
+                listarUsuarios();
+                break;
+            case 7:
+                break;
+            default:
+                cout << ROJO << "Opcion no valida." << RESET << endl;
+                break;
+        }
+    } while (opcion != 7);
 }
