@@ -1,33 +1,33 @@
 # Pendientes — App C++
 
-> Creado 10/10/2026. Solo C++ (la BD quedó cerrada). Nada ejecutado todavía.
+> Submenús 9/9, métodos rescatado, drenaje y unique_ptr: hechos ✅ (10/10). Push: lo hace el usuario.
 
-## Submenús (mismo patrón de Roles/Usuarios: bucle + cableado)
-
-- [x] Roles ✅ (09/10)
-- [x] Usuarios ✅ (09/10)
-- [x] Empleados ✅ (10/10)
-- [x] Clientes ✅ (10/10)
-- [x] Proveedores ✅ (10/10, hecho en otro chat y revisado)
-- [x] Categorías ✅ (10/10)
-- [x] Marcas ✅ (10/10)
-- [x] Productos ✅ (10/10)
-- [x] Métodos de pago ✅ (10/10: permiso + opción 9 + loop, probado corriendo)~
-
-## Métodos de pago huérfano
-
-- [ ] Crear permiso `GESTIONAR_METODOS_PAGO` (BD) y dárselo al ADMIN
-- [ ] Opción 9 en el menú ADMIN + renumerar (10 Ver permisos, 11 Cerrar)
-- [ ] Su loop de submenú
-
-## Limpieza / verificación
-
-- [ ] Borrar binario viejo `./main` (vale `output/app`)
-- [ ] Probar todos los submenús corriendo (solo Roles probado)
 - [ ] `git push origin main` (sin credenciales en esta máquina; lo hace el usuario)
 
-## Calidad (no rompe, después)
+## C++ críticos (barrido 10/10, verificados)
 
-- [ ] `delete pstmt` se saltea en excepciones (fuga chica, varios módulos)
-- [ ] **Refactor a `unique_ptr` (plan):** reemplazar `new`/`delete` manuales por punteros inteligentes, un módulo por vez con prueba. Piloto sugerido: marcas.
-- [x] Drenar result-sets pendientes ✅ (10/10: helper central + 50+ sitios; corrida completa de 9 submenús sin "out of sync")
+- [ ] Menú muerto resto-2: llama `mostrarMenuClientes()` en vez del submenú (`roles.cpp:294-302`)
+- [ ] `seguridad.h:21` declara `base64_encode` que no existe (el `.cpp:66` define otro `static`)
+- [ ] Submenús sin validar `failbit`: una letra = loop infinito (todos los loops)
+- [ ] `login.cpp` + `roles.cpp:82-96` con `new` crudo fugan en excepción (quedó fuera del unique_ptr)
+- [ ] `sesion.cpp:22-23` guarda `idRol=0` siempre
+
+## BD medios (barrido 10/10, con línea)
+
+- [ ] Vacaciones-update con una sola fecha puede violar su `CHECK` (`12-`)
+- [ ] `P_TIPO_BONO` / `P_MOTIVO` sin validar contra su `ENUM` (`14-`/`16-`)
+- [ ] `SP_ACTUALIZAR_BONO` sin validar monto (`14-`)
+- [ ] Mensaje "30 DÍAS" vs código de 60 (`14-`)
+- [ ] Cambio solo-estado etiquetado `CAMBIO_PUESTO` (`15-`)
+- [ ] `ON DELETE CASCADE` en bitácora de permisos (`30-`)
+- [ ] `SP_LIMPIAR_AUDITORIA` con días ≤0 borra todo (`6-`)
+- [ ] SALIDA sobrescribe SALIDA; ENTRADA nunca graba `TARDE` (`11-`)
+- [ ] Auditoría laboral trunca cargos VARCHAR(30 vs 50) (`15-`)
+- [ ] Solape de permisos incompleto (`13-`)
+- [ ] `SP_LIMPIAR_LOGS_ANTIGUOS` sin `DROP` (`28-`)
+
+## Web / Docker (barrido 10/10)
+
+- [ ] `Pagina_Web` es mock (`Math.random()`); CDN sin SRI
+- [ ] Sin `.env`; seed `admin/admin123` en plano e inyectable
+- [ ] `.devcontainer` abandonado; labels de tasks desactualizados
