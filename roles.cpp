@@ -79,9 +79,9 @@ bool tienePermiso(const string& accion) {
 
     if (globalCon != nullptr) {
         try {
-            sql::PreparedStatement *pstmt = globalCon->prepareStatement(
+            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
                 "SELECT IFNULL(FN_TIENE_PERMISO(?, ?), 0) AS PERMISO"
-            );
+            ));
             pstmt->setString(1, sesionActual.username);
             pstmt->setString(2, accion);
 
@@ -92,8 +92,7 @@ bool tienePermiso(const string& accion) {
                 permitido = res->getInt("PERMISO") == 1;
             }
 
-            drenarResultados(pstmt);
-            delete pstmt;
+            drenarResultados(pstmt.get());
             return permitido;
         } catch (const exception&) {
             return false;
@@ -161,7 +160,13 @@ void ejecutarMenuSegunRol() {
         mostrarMenuSegunRol();
         cout << AZUL << "Seleccione una opcion: " << RESET;
         cin >> opcion;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            opcion = -1;
+        } else {
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
 
         if (sesionActual.nombreRol == "ADMIN") {
             switch (opcion) {
@@ -293,7 +298,7 @@ void ejecutarMenuSegunRol() {
                     break;
                 case 2:
                     if (tienePermiso("CONSULTAR_CLIENTES")) {
-                        mostrarMenuClientes();
+                        ejecutarSubmenuClientes();
                     } else {
                         cout << ROJO << "No tienes permiso para consultar clientes." << RESET << endl;
                     }
@@ -448,7 +453,13 @@ void ejecutarSubmenuRoles() {
         mostrarMenuRoles();
         cout << AZUL << "Seleccione una opcion: " << RESET;
         cin >> opcion;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            opcion = -1;
+        } else {
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
 
         switch (opcion) {
             case 1:
@@ -469,6 +480,7 @@ void ejecutarSubmenuRoles() {
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
+        if (opcion != 5) pausar();
     } while (opcion != 5);
 }
 

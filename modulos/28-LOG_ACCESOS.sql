@@ -51,16 +51,27 @@ BEGIN
 END //
 DELIMITER ;
 
-----eliminar no usar
+----limpieza (en uso): borra intentos de más de 120 días
 /*
 SP_LIMPIAR_LOGS_ANTIGUOS
-Borra los intentos de acceso de mas de 90 dias para no llenar la tabla.
+Limpieza de mantenimiento: conserva los últimos 120 días contando desde
+el día que se ejecuta y borra del día 121 para allá. Sin parámetro usa
+120. Responde cuántos borró.
 */
 DELIMITER //
-CREATE PROCEDURE SP_LIMPIAR_LOGS_ANTIGUOS()
+DROP PROCEDURE IF EXISTS SP_LIMPIAR_LOGS_ANTIGUOS //
+CREATE PROCEDURE SP_LIMPIAR_LOGS_ANTIGUOS(IN P_DIAS INT DEFAULT 120)
 BEGIN
-    DELETE FROM LOG_ACCESOS 
-    WHERE FECHA_ACCESO < DATE_SUB(NOW(), INTERVAL 90 DAY);
+    DECLARE V_BORRADOS INT;
+    -- (10/10/2026) Días positivos: con 0 o negativo el corte es hoy/futuro
+    -- y borraría todo.
+    IF IFNULL(P_DIAS, 0) <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LOS DIAS DEBEN SER MAYORES A CERO.';
+    END IF;
+    DELETE FROM LOG_ACCESOS
+    WHERE FECHA_ACCESO < CURDATE() - INTERVAL P_DIAS DAY;
+    SET V_BORRADOS = ROW_COUNT();
+    SELECT CONCAT('LIMPIEZA COMPLETADA: ', V_BORRADOS, ' REGISTROS DE MAS DE ', P_DIAS, ' DIAS ELIMINADOS.') AS MENSAJE;
 END//
 DELIMITER ;
 

@@ -7,14 +7,17 @@ tipo de cambio y la fecha. Si se borra el empleado se borra su historial.
 CREATE TABLE HISTORIAL_LABORAL_EMPLEADO (
     ID_HISTORIAL_EMPLEADO INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
-    CARGO_ANTERIOR VARCHAR(30) NOT NULL,
-    CARGO_NUEVO VARCHAR(30) NOT NULL,
+    -- (10/10/2026) 50 como EMPLEADOS.CARGO (con 30 reventaba 1406).
+    CARGO_ANTERIOR VARCHAR(50) NOT NULL,
+    CARGO_NUEVO VARCHAR(50) NOT NULL,
     SALARIO_ANTERIOR DECIMAL(10, 2) NOT NULL,
     SALARIO_NUEVO DECIMAL(10, 2) NOT NULL,
     TIPO_CAMBIO ENUM(
         'AUMENTO',
         'PROMOCION',
         'CAMBIO_PUESTO',
+        -- (10/10/2026) Etiqueta honesta para bajas/reactivaciones (antes caían en CAMBIO_PUESTO).
+        'CAMBIO_ESTADO',
         'AJUSTE'
     ) NOT NULL,
     ESTADO_ANTERIOR VARCHAR(20),
@@ -92,7 +95,8 @@ BEGIN
             CASE 
                 WHEN NEW.CARGO <> OLD.CARGO THEN 'PROMOCION'
                 WHEN NEW.SALARIO > OLD.SALARIO THEN 'AUMENTO'
-                WHEN NEW.ESTADO <> OLD.ESTADO THEN 'CAMBIO_PUESTO'
+                -- (10/10/2026) Solo-estado ya no miente CAMBIO_PUESTO.
+                WHEN NEW.ESTADO <> OLD.ESTADO THEN 'CAMBIO_ESTADO'
                 ELSE 'AJUSTE'
             END,
             CONCAT('Cambio automático: Cargo(', OLD.CARGO, '->', NEW.CARGO, ') Estado(', OLD.ESTADO, '->', NEW.ESTADO, ')')

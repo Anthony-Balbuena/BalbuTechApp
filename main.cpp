@@ -8,7 +8,7 @@
 #include <cppconn/prepared_statement.h>
 
 #include "database.h"
-#include "seguridad.h"
+//#include "seguridad.h"
 #include "colores.h"
 #include "login.h"
 #include "sesion.h"

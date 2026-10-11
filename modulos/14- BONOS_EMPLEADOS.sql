@@ -96,6 +96,12 @@ proc_label: BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO EXCEDE EL LÍMITE PERMITIDO.';
         LEAVE proc_label;
     END IF;
+
+    -- (10/10/2026) 2b. Tipo válido (antes caía al 1265 del ENUM).
+    IF P_TIPO_BONO NOT IN ('DOBLE_SUELDO', 'HORAS_EXTRA', 'BONIFICACION') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: TIPO DE BONO DESCONOCIDO.';
+        LEAVE proc_label;
+    END IF;
  
     -- 3. Insertar
     INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION)
@@ -130,6 +136,17 @@ proc_label: BEGIN
     END IF;
 
     -- 2. Aplicar actualización
+    -- (10/10/2026) Monto válido: NULL/≤0/>100000 con mensaje (antes 1048/3819
+    -- técnico o entraba sin tope). Mismo tope del alta.
+    IF IFNULL(P_NUEVO_MONTO, 0) <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO DEBE SER MAYOR A CERO.';
+        LEAVE proc_label;
+    END IF;
+
+    IF P_NUEVO_MONTO > 100000 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO EXCEDE EL LÍMITE PERMITIDO.';
+        LEAVE proc_label;
+    END IF;
     UPDATE BONOS_EMPLEADOS 
     SET MONTO = P_NUEVO_MONTO,
         DESCRIPCION = P_NUEVA_DESCRIPCION
@@ -273,13 +290,16 @@ asi. Trabaja en automatico.
 */
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_VALIDAR_FECHA_BONO;
+-- (10/10/2026) Se dio de baja en BD el huérfano 14_TR_VALIDAR_FECHA_BONO
+-- (no existe en archivos; imponía 30 días y tapaba a este). Respaldo en
+-- /tmp/opencode/backup/pre_drop_14trig.txt.
 CREATE TRIGGER TR_VALIDAR_FECHA_BONO
 BEFORE INSERT ON BONOS_EMPLEADOS
 FOR EACH ROW
 BEGIN 
-    -- No permitir bonos con fechas de más de 30 días atrás
+    -- No permitir bonos con fechas de más de 60 días atrás
     IF NEW.FECHA < DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 30 DÍAS.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO SE PUEDEN REGISTRAR BONOS DE HACE MÁS DE 60 DÍAS.';
     END IF;
 END//
 DELIMITER ;

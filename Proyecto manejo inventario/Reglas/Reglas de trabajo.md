@@ -15,8 +15,8 @@
 - **Orquestador:** agentes en paralelo, para barridos grandes y rápidos.
 - El plan dice qué modo se va a usar; él puede cambiarlo por tarea ("hazlo directo" / "repartilo").
 
-## 3. Explicar como aprendiz
+## 3. Explicar como aprendiz (siempre, sin que lo pida)
 
-- Formato de explicación cuando se pide entender código.
+- Formato Explicar_codigo en cada explicación: para qué sirve, paso a paso,
+  ejemplo, detalle a vigilar y una sola pregunta final.
 - Explicar el porqué, por partes, como si no supiera nada.
-- Una sola pregunta de comprensión al final.

@@ -15,12 +15,12 @@ void inicializarSesion() {
     sesionActual.estadoCuenta = "";
 }
 
-void guardarSesion(int idUsuario, const string& username, const string& rol, const string& estadoCuenta) {
+void guardarSesion(int idUsuario, const string& username, int idRol, const string& rol, const string& estadoCuenta) {
     sesionActual.activa = true;
     sesionActual.idUsuario = idUsuario;
     sesionActual.username = username;
     sesionActual.nombreUsuario = username;
-    sesionActual.idRol = 0;
+    sesionActual.idRol = idRol;
     sesionActual.nombreRol = rol;
     sesionActual.estadoCuenta = estadoCuenta;
 }
