@@ -95,12 +95,13 @@ DROP PROCEDURE IF EXISTS SP_INSERTAR_VACACIONES ;
     END //
     DELIMITER ;
 
-    /*
+/*
 SP_ACTUALIZAR_VACACIONES
-    Cambia las fechas de unas vacaciones. Revisa que el registro exista y
-    que no hayan terminado, y si vienen fechas nuevas valida que no esten
-    invertidas; lo que llegue en NULL se queda como estaba.
+Cambia las fechas de unas vacaciones. Revisa que el registro exista y
+que no hayan terminado, y si vienen fechas nuevas valida que no esten
+invertidas; lo que llegue en NULL se queda como estaba.
     */
+
     DELIMITER //
     DROP PROCEDURE IF EXISTS SP_ACTUALIZAR_VACACIONES ;
     CREATE PROCEDURE SP_ACTUALIZAR_VACACIONES(

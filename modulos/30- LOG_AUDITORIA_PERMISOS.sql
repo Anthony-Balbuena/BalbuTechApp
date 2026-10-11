@@ -10,7 +10,9 @@ CREATE TABLE LOG_AUDITORIA_PERMISOS (
     ESTADO_NUEVO VARCHAR(20),
     FECHA_CAMBIO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT FK_LOG_PERMISO FOREIGN KEY (ID_PERMISO) 
-        REFERENCES PERMISOS_EMPLEADOS(ID_PERMISO) ON DELETE CASCADE
+        -- (10/10/2026) SET NULL en vez de CASCADE: borrar un permiso no debe
+        -- destruir su bitácora (la columna admite NULL a propósito).
+        REFERENCES PERMISOS_EMPLEADOS(ID_PERMISO) ON DELETE SET NULL
 ) ENGINE = InnoDB;
 
 -- Trigger que registra cada vez que se gestiona un permiso

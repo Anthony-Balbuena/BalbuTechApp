@@ -18,7 +18,7 @@ extern SesionActual sesionActual;
 void inicializarSesion();
 void cerrarSesion();
 bool sesionActiva();
-void guardarSesion(int idUsuario, const std::string& username, const std::string& rol, const std::string& estadoCuenta);
+void guardarSesion(int idUsuario, const std::string& username, int idRol, const std::string& rol, const std::string& estadoCuenta);
 void mostrarSesionActual();
 
 #endif

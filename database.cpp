@@ -92,3 +92,8 @@ void mostrarCategoriasYMarcas() {
         cout << "Error al cargar categorías o marcas: " << e.what() << endl;
     }
 }
+
+void pausar() {
+    cout << "\nPresione Enter para volver...";
+    cin.get();
+}

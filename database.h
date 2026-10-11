@@ -19,4 +19,8 @@ void mostrarCategoriasYMarcas();
 void drenarResultados(sql::PreparedStatement *pstmt);
 void drenarResultados(sql::Statement *stmt);
 
+// Pausa "Presione Enter para volver": para leer el resultado antes de
+// que el submenú se redibuje.
+void pausar();
+
 #endif

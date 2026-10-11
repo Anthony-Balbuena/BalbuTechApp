@@ -98,15 +98,6 @@ static string base64_encode(const unsigned char* input, int length) {
     return out;
 }
 
-// split helper
-static vector<string> split_impl(const string& s, char delimiter) {
-    vector<string> parts;
-    string token;
-    istringstream iss(s);
-    while (getline(iss, token, delimiter)) parts.push_back(token);
-    return parts;
-}
-
 // wrapper expected name
 bool verificar_password_pbkdf2(const std::string &password, const std::string &stored) {
     return verificarPassword(password, stored, nullptr);

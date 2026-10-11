@@ -161,7 +161,13 @@ void ejecutarSubmenuCategorias() {
         mostrarMenuCategorias();
         cout << AZUL << "Seleccione una opcion: " << RESET;
         cin >> opcion;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            opcion = -1;
+        } else {
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
 
         switch (opcion) {
             case 1:
@@ -185,6 +191,7 @@ void ejecutarSubmenuCategorias() {
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
+        if (opcion != 6) pausar();
     } while (opcion != 6);
 }
 

@@ -19,8 +19,8 @@
                   "iconI18nKey": "asset:generic.documentations.readme-icon"
                 }
               },
-              "icon": "file-question",
-              "title": "Readme"
+              "icon": "lucide-ghost",
+              "title": "terminal:documentation"
             }
           },
           {
@@ -29,12 +29,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Flujos/Flujo - Registrar producto.md",
+                "file": "file:/home/balbuena/Desktop/BalbuTechApp/.agents/skills-main/Explicar_codigo.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Flujo - Registrar producto"
+              "title": "Explicar_codigo"
             }
           }
         ],
@@ -63,7 +63,7 @@
                 "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
-              "title": "Explorador de archivos"
+              "title": "Files"
             }
           },
           {
@@ -196,20 +196,19 @@
   },
   "left-ribbon": {
     "hiddenItems": {
-      "switcher:Abrir selector rápido": false,
-      "graph:Abrir vista gráfica": false,
-      "canvas:Crear nuevo lienzo": false,
-      "daily-notes:Abrir la nota de hoy": false,
-      "templates:Insertar plantilla": false,
-      "command-palette:Abrir paleta de comandos": false,
-      "bases:Crear nueva base": false,
-      "terminal:Open terminal": false
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
     }
   },
   "active": "1dcd94f4ab15ea01",
   "lastOpenFiles": [
-    "Flujos/Flujos - Base de Datos.md",
     "Flujos/Flujo - Registrar producto.md",
+    "Flujos/Flujos - Base de Datos.md",
     "Planes/Auditoría BD general - 08-10-2026.md",
     "Planes/Pendientes - Flujo de ventas.md",
     "Planes/Pendientes - Flujo de compras.md",

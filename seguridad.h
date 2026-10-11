@@ -18,7 +18,8 @@ string leerDatoSeguro(const string& mensaje);
 string aplicarHash(const string& input);
 
 // Necesitarás implementar o incluir utilidades para Base64
-std::string base64_encode(const unsigned char* buffer, size_t length);
+// (09/10/2026) Se quitó base64_encode(buffer, size_t): no existía (la del
+// .cpp es static con int); dejarla mentía al linker.
 std::vector<unsigned char> base64_decode(const std::string& input);
 
 // PBKDF2 helpers
