@@ -64,16 +64,6 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 
 ## Progreso
 
-- [x] Parte 1 (11/10/2026): botón global + submenú cascarón + ver con IVA. Compila.
-- [x] Parte 2 (11/10/2026): carrito en memoria por código/ID/nombre, agrupa xN, valida stock, parcial sin IVA. Compila.
-- [x] Parte 3 (11/10/2026): cierre con ticket y cancelación automática. Compila.
-- [x] Parte 4 (11/10/2026): métodos + pago por BRUTO + estado REALIZADA. Compila. Triggers y app alineados.
-- [x] Extra stock (11/10/2026): `inventario.h/cpp` solo con `20_SP_REGISTRAR_AJUSTE_INVENTARIO` (ENTRADA/SALIDA) + `11. Inventario` en ADMIN. Compila.
-- [x] Fix cierre (11/10/2026): consumir el MENSAJE del `CALL` antes de leer `@nv` (evita "Commands out of sync"), error real en pantalla y precio del listado con cast a `double`.
-- [x] Factura por línea (11/10/2026): `mostrarFactura()` con columnas Nombre/ITBIS/Subtotal/Total por línea + fila TOTAL; se usa al cerrar y en el visor.
-- [x] Filtro total/nombre/ID (11/10/2026): `SP_CONSULTAR_PRODUCTOS_FILTRADO` ahora también matchea `ID_PRODUCTO` numérico (`''` trae todo igual). Probado en TEST y TECH. Archivo `modulos/9- PRODUCTOS.sql`.
-- [x] Stock con lista (11/10/2026): `SP_CONSULTAR_INVENTARIO` también filtra por ID; `inventario.cpp` lista ID/CODIGO/NOMBRE/STOCK (Enter = todos) antes de pedir el ajuste. Probado en TEST y TECH. Compila.
-- [x] Cancelar/anular (11/10/2026): `3. Cancelar venta` (`SP_CANCELAR_VENTA`, repone stock) + `4. Anular pago` (`SP_ANULAR_PAGO`, reabre y quita bono). Compila.
 
 ## Archivos tocados
 

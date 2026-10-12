@@ -84,18 +84,11 @@ Barrido nuevo completo: **cero referencias rotas** a tablas/vistas en ningún `.
 ## 📋 Plan de mejoras (09/10/2026) — pendiente de ejecución
 
 ### Plan 1 — Rápido y seguro
-- [x] 1.1 Borrar 6 rutinas muertas ✅ **Hecho 09/10/2026** (0 llamadas en BD/C++/web; respaldo `pre_mejoras_rutinas.sql`) en BD (`1_SP_BUSCAR_CATEGORIAS`, `1_SP_TOGGLE_ESTADO_CATEGORIA`, `13_SP_HISTORIAL_PERMISOS_EMPLEADO`, `5_SP_TOGGLE_ESTADO_PROVEEDOR`, `35_SP_FINALIZAR_RECLAMO_TOTAL`, `VERANTESDEINSERT`). Nadie las llama (C++/web); hay respaldo.
 - ⏭️ ~~1.2 Destino de `ROLE_INV_AUDITOR`~~ → **DIFERIDO a la etapa C++ por orden del usuario (09/10/2026)** — no es tarea de BD.
-- [x] 1.3 FK `PRODUCTOS.ID_PROVEEDOR` ✅ **Hecho 09/10/2026** (la BD ya lo tenía y muerde —1452 verificado—; se agregó al `CREATE TABLE` del archivo para BD nuevas) (0 huérfanos verificados).
 
 ### Plan 2 — Blindaje mediano
-- [x] 2.1 Patrón fase I ✅ **Hecho 09/10/2026** (`SP_FINALIZAR_RECLAMO` + guards, `SP_REGISTRAR_LIQUIDACION`, `20_SP_REGISTRAR_AJUSTE`; los otros 3 son de 1 escritura = atómicos, sin cambios; suite `t_p21.sql` verde) multi-statement (`SP_FINALIZAR_RECLAMO`, `SP_REGISTRAR_LIQUIDACION`, `20_SP_REGISTRAR_AJUSTE_INVENTARIO`, `SP_REGISTRAR_GARANTIA`, `26_SP_RECHAZAR_DEVOLUCION`, `SP_REGISTRAR_AVANCE_REPARACION`).
-- [x] 2.2 BEFORE faltantes ✅ **Hecho 09/10/2026** (5 triggers nuevos: `TR_VALIDAR_CAMBIO_RECLAMO`, `TR_VALIDAR_CUOTA_DEVOLUCION`, `TR_VALIDAR_LIMITE_VACACIONES_UPDATE`, `TR_BLOQUEAR_CAMBIO_BONO`, `TR_VALIDAR_LIQUIDACION` + `TR_BLOQUEAR_CAMBIO_LIQUIDACION`; suites `t_p22*.sql` verdes, residuos 0) (`RECLAMOS_GARANTIAS`, `DEVOLUCIONES` al INSERT, `VACACIONES`/`BONOS`/`LIQUIDACIONES` al UPDATE).
-- [x] 2.3 `TR_BLOQUEAR_ASISTENCIA_INAPROPIADA` ✅ **Hecho 09/10/2026** (`NEW.FECHA`; probado: fecha pasada en vacaciones bloquea, hoy pasa; se revirtió un `replaceAll` que tocó el SP — ahí `CURDATE()` está bien): usar `NEW.FECHA` en vez de `CURDATE()`.
 
 ### Plan 3 — Diseño (después)
-- [x] 3.1 `ACTION_ORDER` explícito ✅ **Hecho 09/10/2026** (FOLLOWS en 4 triggers: total e historial de venta, marcar e historial de devolución; recreados sueltos vuelven a su puesto 2/3 solos; flujo de venta verificado 10→6; suites `t_p31.sql`) en cadenas de ventas/devoluciones.
-- [x] 3.2 Candados chicos ✅ **Hecho 09/10/2026** (CHECKs en los 2 historiales de estados + ENUM en `DETALLE_REPARACIONES.ESTADO_AVANCE` + validación amable en su SP; suite `t_p32.sql`; NOT NULL de proveedores **descartado** a propósito) de proveedores + `CHECK` en historiales de estados.
 
 ## ✅ Plan 1 parcial 09/10/2026 (sin 1.2, a pedido)
 
@@ -117,11 +110,6 @@ Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 e
 
 - [ ] **P9 — vuelto**: lógica en `24_SP_REGISTRAR_PAGO` (aceptar monto > total con `P_MONTO_RECIBIDO`, calcular vuelto y definir dónde se registra).
 - [ ] **E2E SQL Partes 2/4/5**: suites reproducibles estilo `test_blindaje_p3.sql` para cobro/cierre, cancelación y devoluciones/garantías.
-- [x] **`ACTION_ORDER`**: verificar `DEVOLUCIONES` (×3 AFTER UPDATE) y `EMPLEADOS` (×2); poner `FOLLOWS` donde falte, como en `DETALLES_VENTA`. ✅ Hecho 09/10: los 2 de devoluciones ya los traía casa; agregado `TR_AUDITORIA_PERFIL_EMPLEADO FOLLOWS TR_DESACTIVAR_USUARIO_POST_LIQUIDACION`. Orden verificado: devoluciones 1→2→3, empleados 1→2.
-- [x] **Params `VARCHAR(255)` vs hash PBKDF2**: `USUARIOS.CONTRASENA` es 512 pero los params de SPs que la tocan están en 255 → trunca el hash. Revisar y unificar. ✅ Hecho 09/10: `SP_LOGIN_USUARIO.P_PASSWORD_HASH` y `SP_CAMBIAR_CLAVE_USUARIO.P_HASH` a 512 (los otros 3 ya venían bien); import 0 errores.
-- [x] **Gemelos**: decidir duplicados (`SP_HISTORIAL_PERMISOS_EMPLEADO`, `27_` vs `35_SP_FINALIZAR_RECLAMO_TOTAL`, etc.). ✅ Hecho 09/10: verificado en BD viva + repo — solo existe la versión canónica de cada uno (`13_`, `35_`, `1_SP_*`, `5_SP_*` y `VERANTESDEINSERT` no están ni en archivos ni en BD). Nada que borrar.
-- [x] **Endurecimiento** (por tandas): transacciones/handlers en SPs multi-statement, CHECKs/ENUMs (`HISTORIAL_ESTADOS_*`, `ESTADO_AVANCE`), BEFOREs faltantes, `PROVEEDORES` UNIQUE anulables. ✅ Tanda 1 (transacciones) 09/10: 3/7 ya los trae casa con TX+HANDLER (`SP_FINALIZAR_RECLAMO`, `SP_REGISTRAR_LIQUIDACION`, `20_SP_REGISTRAR_AJUSTE_INVENTARIO`); los 4 restantes hacen **un solo write** (atómicos, sin TX). ✅ Tanda 2 (ENUMs) 09/10: `HISTORIAL_ESTADOS_COMPRA/VENTA.ESTADO_*` → ENUM del dominio (`DETALLE_REPARACIONES.ESTADO_AVANCE` ya era ENUM); CREATE + migración re-ejecutable; probado (basura → 1265, válido → inserta). ✅ Tanda 3 (BEFOREs) 09/10: `DEVOLUCIONES`/`VACACIONES`/`BONOS`/`LIQUIDACIONES` ya cubiertos de casa; creado `TR_BLOQUEAR_BORRADO_RECLAMO` en `27-` (solo `PENDIENTE` se borra, espejo de devoluciones); probado ambos caminos. ✅ Tanda 4 (UNIQUES) 09/10: NULL-múltiple es diseño correcto (opcional + `''` rechazado + duplicado real con SIGNAL amistoso); probado en vivo. Sin cambios.
-- [x] **Seeds de catálogo**: `CATEGORIAS` importa vacía (upstream quitó los seeds). Restaurar en `.sql` o extender `seed-admin.sh`. ✅ Hecho 09/10: nuevo `db/seed-catalogo.sh` opt-in e idempotente (4 categorías, 10 marcas, 4 métodos); probado 2 corridas.
 
 ## 🔌 Contrato C++↔SQL — hallazgos 09/10/2026 (verificados línea por línea)
 
