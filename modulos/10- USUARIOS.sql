@@ -34,7 +34,8 @@ CREATE INDEX IX_USER ON USUARIOS (USUARIO);
 
 -- Migration: Aumentar tamaño de la columna CONTRASENA para almacenar hashes PBKDF2.
 -- IMPORTANTE: HAZ BACKUP ANTES DE EJECUTAR.
-USE BALBU_TECH;
+-- (11/10/2026) Sin USE hardcodeado: la BD la gobierna --database del import.
+-- USE BALBU_TECH;
 
 -- Ver estado actual (opcional):
 -- SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS

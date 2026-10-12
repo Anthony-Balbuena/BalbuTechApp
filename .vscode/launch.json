@@ -10,6 +10,7 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
+            "envFile": "${env:HOME}/.balbuenv",
             "externalConsole": false,
             "MIMode": "gdb",
             "preLaunchTask": "Nativo: compilar con build.sh (Linux)"

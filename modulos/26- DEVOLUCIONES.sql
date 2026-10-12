@@ -16,6 +16,8 @@ CREATE TABLE DEVOLUCIONES (
     CONDICION_PRODUCTO ENUM('BUENO', 'DANADO', 'USADO') NOT NULL DEFAULT 'BUENO',
     -- Valor por defecto en 0 para evitar errores de inserción inicial
     SUBTOTAL_REEMBOLSADO DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    -- (11/10/2026) ITBIS reembolsado con la tasa vigente al registrar.
+    MONTO_ITBIS_REEMBOLSADO DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     ESTADO ENUM('PENDIENTE', 'APROBADA', 'RECHAZADA', 'REEMBOLSADA') NOT NULL DEFAULT 'PENDIENTE',
     
     PRIMARY KEY (ID_DEVOLUCION),
@@ -79,6 +81,9 @@ proc_label: BEGIN
     DECLARE V_CANTIDAD_YA_DEVUELTA INT;
     DECLARE V_CANTIDAD_MAX_PERMITIDA INT;
     DECLARE V_SUBTOTAL_REEMBOLSADO DECIMAL(10,2);
+    -- (11/10/2026) ITBIS reembolsado con tasa vigente.
+    DECLARE V_TASA_TXT VARCHAR(100);
+    DECLARE V_TASA DECIMAL(5, 2);
     DECLARE V_GARANTIA_DETALLE INT;
 
     -- 1. Validar que la cantidad sea positiva
@@ -137,6 +142,14 @@ proc_label: BEGIN
     -- 5. Calcular el subtotal que se va a reembolsar
     SET V_SUBTOTAL_REEMBOLSADO = P_CANTIDAD * V_PRECIO_UNITARIO;
 
+    -- (11/10/2026) ITBIS con la tasa vigente (foto histórica).
+    SELECT VALOR INTO V_TASA_TXT FROM CONFIGURACION WHERE CLAVE = 'ITBIS';
+    IF V_TASA_TXT IS NULL OR V_TASA_TXT + 0 <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.';
+        LEAVE proc_label;
+    END IF;
+    SET V_TASA = V_TASA_TXT + 0;
+
     -- 6. Insertar el registro con todos los campos calculados y requeridos
     INSERT INTO DEVOLUCIONES (
         ID_DETALLE_VENTA, 
@@ -147,6 +160,7 @@ proc_label: BEGIN
         MOTIVO, 
         CONDICION_PRODUCTO, 
         SUBTOTAL_REEMBOLSADO, 
+        MONTO_ITBIS_REEMBOLSADO,
         ESTADO
     )
     VALUES (
@@ -158,6 +172,7 @@ proc_label: BEGIN
         P_MOTIVO, 
         IFNULL(P_CONDICION_PRODUCTO, 'BUENO'), 
         V_SUBTOTAL_REEMBOLSADO, 
+        ROUND(V_SUBTOTAL_REEMBOLSADO * V_TASA / 100, 2),
         'PENDIENTE'
     );
 

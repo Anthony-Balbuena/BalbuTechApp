@@ -184,3 +184,22 @@ C1–C3, V1–V4 ejecutados en archivos + BD y probados (`t_todo*.sql`), residuo
 - En el camino se rompió fin de línea, paréntesis y scopes (3 rondas); se detectó todo por build + diff + runtime y quedó limpio (diff 591+/274-).
 - Verificado: build OK, auditoría anti-doble-free en 0, tour 9 submenús en 0 errores, alta real desde la app (producto 33, luego borrado).
 - Quirk conocido (no tocado): `leerDatoSeguro` se come líneas vacías (omitir = doble Enter).
+
+## ✅ TEST montado 11/10/2026 (regla: probar aquí, no en TECH)
+
+- `BALBU_TECH_TEST` cargado con `import.sh` (40T/124R/72TR/19V) + seed admin.
+- Fix duradero: neutralizados los 3 `USE BALBU_TECH;` hardcodeados (1-/10-/27-) que fugaban objetos a TECH.
+- Seed de TEST: MARCAS 10, METODOS 4, PERMISOS 16, ROL_PERMISO 25, ROLES 2, USUARIOS 1 (admin), CLIENTES 1, CONFIG 3, AUDITORIA 1; resto 0.
+- Smoke test (`t_smoke_test.sql`, ROLLBACK): RECIBIDA + TOTAL/stock/bitácora/historial/bandera en 1; residuos 0 (ojo: aserciones contra seeds, no contra 0).
+
+## ⚠️ Lección 11/10/2026: otro commit pisó 2 archivos
+
+- `b421d91` reescribió `12-` y `15-` sin mis fixes (P1 vacaciones, #5 etiqueta). La BD TECH no sufrió (rutinas intactas); TEST sí (importó lo pisado).
+- Re-aplicado + recargado en TEST + probado (suite `t_reaplica.sql` verde).
+- Regla: antes de editar, `git pull`; después, commit propio. El diff manda.
+
+## ✅ ITBIS 11/10/2026 (opción A: por línea)
+
+- `MONTO_ITBIS` en DETALLE_COMPRA/DETALLES_VENTA + snapshots en devoluciones, tasa de CONFIGURACION al registrar, TOTAL bruto intacto, 2 vistas con IVA.
+- Suites `t_iva*.sql` verdes en TEST y TECH (incluye sin-tasa y devoluciones); residuos 0.
+- Lecciones: aritmética del test (90 vs 36), asserts contra seeds/demo, `-e` sin ROLLBACK no se usa.
