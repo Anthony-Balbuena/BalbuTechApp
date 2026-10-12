@@ -7,6 +7,6 @@ void registrarCategoria();
 void actualizarCategoria();
 void cambiarEstadoCategoria();
 void buscarCategoria();
-void listarCategorias();
+// void listarCategorias(); // (11/10/2026) Comentada: buscar-con-Enter cubre lo mismo.
 
 #endif

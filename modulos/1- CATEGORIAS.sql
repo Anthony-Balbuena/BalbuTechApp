@@ -6,6 +6,9 @@ Solo puede haber una categoria con cada nombre y todas arrancan ACTIVAS.
 Se usa para agrupar los productos en el catalogo.
 */
 
+select * from DETALLES_VENTA
+
+SELECT * FROM `PAGOS`;
 
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
@@ -39,14 +42,16 @@ todo esta bien la guarda y devuelve su ID.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CATEGORIA ;
 CREATE PROCEDURE SP_INSERTAR_CATEGORIA(
-    IN P_NOMBRE VARCHAR(50),
+    IN P_NOMBRE VARCHAR(200),
     -- (09/10/2026) C1. DEFAULTs: la app manda solo el nombre (1 arg).
-    IN P_DESCRIPCION VARCHAR(100) DEFAULT NULL,
-    IN P_ICONO VARCHAR(255) DEFAULT NULL
+    -- (11/10/2026) Tipos anchos: el texto largo debe ENTRAR para que las
+    -- validaciones lo rechacen amable (param chico = 1406 en la puerta).
+    IN P_DESCRIPCION VARCHAR(500) DEFAULT NULL,
+    IN P_ICONO VARCHAR(500) DEFAULT NULL
 )
 proc_label: BEGIN
-    DECLARE v_nombre_limpio VARCHAR(50);
-    DECLARE v_desc_limpia   VARCHAR(100);
+    DECLARE v_nombre_limpio VARCHAR(200);
+    DECLARE v_desc_limpia   VARCHAR(500);
 
     -- 0. LIMPIEZA
     SET v_nombre_limpio = REGEXP_REPLACE(TRIM(P_NOMBRE), '[[:space:]]+', ' ');
@@ -55,6 +60,23 @@ proc_label: BEGIN
     -- 1. VALIDACIÓN NOMBRE
     IF v_nombre_limpio = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE ES OBLIGATORIO.';
+        LEAVE proc_label;
+    END IF;
+
+    -- (11/10/2026) Largos máximos con mensaje (antes: nombre se truncaba en
+    -- silencio y descripción reventaba 1406 técnico).
+    IF CHAR_LENGTH(v_nombre_limpio) > 50 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE NO PUEDE PASAR DE 50 CARACTERES.';
+        LEAVE proc_label;
+    END IF;
+
+    IF CHAR_LENGTH(v_desc_limpia) > 100 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA DESCRIPCION NO PUEDE PASAR DE 100 CARACTERES.';
+        LEAVE proc_label;
+    END IF;
+
+    IF CHAR_LENGTH(P_ICONO) > 255 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL ICONO NO PUEDE PASAR DE 255 CARACTERES.';
         LEAVE proc_label;
     END IF;
 
@@ -85,13 +107,13 @@ DROP PROCEDURE if EXISTS SP_ACTUALIZAR_CATEGORIA ;
 CREATE PROCEDURE SP_ACTUALIZAR_CATEGORIA(
     IN P_ID_CATEGORIA INT,
     -- (09/10/2026) C2. DEFAULTs: la app manda solo id + nombre (2 args).
-    IN P_NOMBRE       VARCHAR(50) DEFAULT NULL,
-    IN P_DESCRIPCION  VARCHAR(100) DEFAULT NULL,
-    IN P_ICONO        VARCHAR(255) DEFAULT NULL
+    IN P_NOMBRE       VARCHAR(200) DEFAULT NULL,
+    IN P_DESCRIPCION  VARCHAR(500) DEFAULT NULL,
+    IN P_ICONO        VARCHAR(500) DEFAULT NULL
 )
 proc_label: BEGIN
-    DECLARE v_nombre_limpio VARCHAR(50);
-    DECLARE v_desc_limpia   VARCHAR(100);
+    DECLARE v_nombre_limpio VARCHAR(200);
+    DECLARE v_desc_limpia   VARCHAR(500);
 
     IF NOT EXISTS (SELECT 1 FROM CATEGORIAS WHERE ID_CATEGORIA = P_ID_CATEGORIA) THEN 
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA CATEGORÍA NO EXISTE.';
@@ -107,10 +129,26 @@ proc_label: BEGIN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE NOMBRE YA ESTÁ EN USO.';
             LEAVE proc_label;
         END IF;
+        -- (11/10/2026) Largo máximo (antes se truncaba en silencio).
+        IF CHAR_LENGTH(v_nombre_limpio) > 50 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE NO PUEDE PASAR DE 50 CARACTERES.';
+            LEAVE proc_label;
+        END IF;
     END IF;
 
     IF P_DESCRIPCION IS NOT NULL THEN
         SET v_desc_limpia = REGEXP_REPLACE(TRIM(P_DESCRIPCION), '[[:space:]]+', ' ');
+        -- (11/10/2026) Largo máximo (antes 1406 técnico).
+        IF CHAR_LENGTH(v_desc_limpia) > 100 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA DESCRIPCION NO PUEDE PASAR DE 100 CARACTERES.';
+            LEAVE proc_label;
+        END IF;
+    END IF;
+
+    -- (11/10/2026) Largo máximo del icono.
+    IF P_ICONO IS NOT NULL AND CHAR_LENGTH(P_ICONO) > 255 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL ICONO NO PUEDE PASAR DE 255 CARACTERES.';
+        LEAVE proc_label;
     END IF;
 
     UPDATE CATEGORIAS 
@@ -220,7 +258,8 @@ BEGIN
 END //
 DELIMITER ;
 
-USE BALBU_TECH;
+-- (11/10/2026) Sin USE hardcodeado: la BD la gobierna --database del import.
+-- USE BALBU_TECH;
 
 -----------------------------------------------------------------------------------------------------------------------
 --- SP requerido por la app C++ (categorias.cpp:listarCategorias).
@@ -234,3 +273,7 @@ END //
 DELIMITER ;
 
 
+
+
+
+select * from PRODUCTOS;;

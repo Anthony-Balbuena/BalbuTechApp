@@ -16,10 +16,8 @@ string leerDatoSeguro(const string& mensaje) {
     string entrada;
     cout << mensaje;
     cin.clear();
-    if (cin.peek() == '\n') {
-        cin.ignore(); 
-    }
-    
+    // (10/10/2026) Sin peek/ignore: se comía la línea vacía y el Enter
+    // para "ver todos/omitir" pedía dos veces. Los menús ya limpian solos.
     getline(cin, entrada);
 
     if (entrada == "xxx") {

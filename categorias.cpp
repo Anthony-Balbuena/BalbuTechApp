@@ -19,8 +19,9 @@ void mostrarMenuCategorias() {
     cout << "2. Actualizar Categoria" << endl;
     cout << "3. Activar/Desactivar Categoria" << endl;
     cout << "4. Buscar Categoria" << endl;
-    cout << "5. Listar Categorias" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    // (11/10/2026) Listar comentado: buscar-con-Enter cubre lo mismo.
+    // cout << "5. Listar Categorias" << endl;
+    cout << "5. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
 
@@ -28,9 +29,23 @@ void registrarCategoria() {
     cout << "\n--- REGISTRO DE CATEGORIA ---" << endl;
     try {
         string nombre = leerDatoSeguro("Nombre de la categoria: ");
+        string descripcion = leerDatoSeguro("Descripcion (Enter para omitir): ");
+        string icono = leerDatoSeguro("Icono (Enter para omitir): ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?)"));
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_CATEGORIA(?, ?, ?)"));
         pstmt->setString(1, nombre);
+
+        if (descripcion.empty()) {
+            pstmt->setNull(2, sql::DataType::VARCHAR);
+        } else {
+            pstmt->setString(2, descripcion);
+        }
+
+        if (icono.empty()) {
+            pstmt->setNull(3, sql::DataType::VARCHAR);
+        } else {
+            pstmt->setString(3, icono);
+        }
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -52,14 +67,28 @@ void actualizarCategoria() {
         int idCategoria = stoi(idStr);
 
         string nombre = leerDatoSeguro("Nuevo nombre (Enter para omitir): ");
+        string descripcion = leerDatoSeguro("Nueva descripcion (Enter para omitir): ");
+        string icono = leerDatoSeguro("Nuevo icono (Enter para omitir): ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?)"));
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_CATEGORIA(?, ?, ?, ?)"));
         pstmt->setInt(1, idCategoria);
 
         if (nombre.empty()) {
             pstmt->setNull(2, sql::DataType::VARCHAR);
         } else {
             pstmt->setString(2, nombre);
+        }
+
+        if (descripcion.empty()) {
+            pstmt->setNull(3, sql::DataType::VARCHAR);
+        } else {
+            pstmt->setString(3, descripcion);
+        }
+
+        if (icono.empty()) {
+            pstmt->setNull(4, sql::DataType::VARCHAR);
+        } else {
+            pstmt->setString(4, icono);
         }
 
         string respuesta = Recogermensaje(pstmt.get());
@@ -111,14 +140,16 @@ void buscarCategoria() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | ESTADO" << endl;
+        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
+        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
         bool encontrado = false;
 
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_CATEGORIA") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-5d | %-30.30s | %-8s\n",
+                   res->getInt("ID_CATEGORIA"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("ESTADO").c_str());
         }
 
         if (!encontrado) {
@@ -133,17 +164,27 @@ void buscarCategoria() {
     }
 }
 
+// (11/10/2026) Función comentada: buscar-con-Enter cubre lo mismo.
+#if 0
 void listarCategorias() {
     cout << "\n--- LISTADO DE CATEGORIAS ---" << endl;
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_CATEGORIAS()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | ESTADO" << endl;
+        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
+        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
+        bool encontrado = false;
         while (res->next()) {
-            cout << res->getInt("ID_CATEGORIA") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("ESTADO") << endl;
+            encontrado = true;
+            printf("%-5d | %-30.30s | %-8s\n",
+                   res->getInt("ID_CATEGORIA"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("ESTADO").c_str());
+        }
+
+        if (!encontrado) {
+            cout << "\n[!] No hay categorias registradas." << endl;
         }
 
         drenarResultados(pstmt.get());
@@ -151,6 +192,7 @@ void listarCategorias() {
         cout << "\n[!] Error al listar categorias: " << e.what() << endl;
     }
 }
+#endif
 
 // Submenú de categorías: muestra el menú, lee la opción y llama a la acción.
 // (Antes el menú solo se imprimía y volvía sin hacer nada.)
@@ -182,16 +224,17 @@ void ejecutarSubmenuCategorias() {
             case 4:
                 buscarCategoria();
                 break;
+            // (11/10/2026) Listar comentado: ver arriba.
+            // case 5:
+            //     listarCategorias();
+            //     break;
             case 5:
-                listarCategorias();
-                break;
-            case 6:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        if (opcion != 5) pausar();
+    } while (opcion != 5);
 }
 

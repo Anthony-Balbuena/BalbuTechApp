@@ -128,12 +128,13 @@ invertidas; lo que llegue en NULL se queda como estaba.
             LEAVE proc_label;
         END IF;
 
-        -- 3. VALIDACIÓN DE LÓGICA (Si vienen nuevas fechas, validarlas)
-        IF P_NUEVA_INICIO IS NOT NULL AND P_NUEVA_FIN IS NOT NULL THEN
-            IF P_NUEVA_FIN < P_NUEVA_INICIO THEN
-                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA FECHA DE FIN NO PUEDE SER MENOR A LA DE INICIO.';
-                LEAVE proc_label;
-            END IF;
+        -- 3. VALIDACIÓN DE LÓGICA con las fechas EFECTIVAS (10/10/2026):
+        -- cubre los 3 casos (solo inicio, solo fin, ambas); antes solo
+        -- validaba si venían ambas y el resto caía al CHECK técnico.
+        IF COALESCE(P_NUEVA_FIN, (SELECT FECHA_FIN FROM VACACIONES_EMPLEADOS WHERE ID_VACACION = P_ID_VACACION))
+         < COALESCE(P_NUEVA_INICIO, (SELECT FECHA_INICIO FROM VACACIONES_EMPLEADOS WHERE ID_VACACION = P_ID_VACACION)) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA FECHA DE FIN NO PUEDE SER MENOR A LA DE INICIO.';
+            LEAVE proc_label;
         END IF;
 
         -- 4. ACTUALIZACIÓN DINÁMICA

@@ -1,15 +1,19 @@
 # Pendientes — App C++
 
-> Submenús 9/9, métodos rescatado, drenaje, unique_ptr y pausa: hechos ✅ (10/10). Push: lo hace el usuario.
+> Submenús 9/9, métodos rescatado, drenaje, unique_ptr, pausa y autologin pruebas: hechos ✅ (10-11/10). Push: lo hace el usuario.
 
 - [x] `git push origin main` ✅ (10/10, pusheado desde terminal del usuario)
 
 ## C++ críticos (barrido 10/10, verificados)
 
+- [x] `leerDatoSeguro` comía el Enter (doble Enter para omitir) ✅ (10/10: fuera peek/ignore; 1 Enter muestra todo, prompts en orden)
+
 - [x] Menú muerto resto-2 ✅ (10/10: ahora abre el submenú; probado con usuario EMPLEADO real + limpieza)
 - [x] `seguridad.h:21` fantasma ✅ (10/10: línea borrada, build + login OK)
 - [x] Submenús sin validar `failbit` ✅ (10/10: guardia en 10 loops; letra = 1 aviso sin loop)
 - [x] `login.cpp` + `roles.cpp:82-96` con `new` crudo ✅ (10/10: a `unique_ptr` a mano + build + login OK)
+- [x] Autologin SOLO PRUEBAS ✅ (11/10: `BALBU_USER`/`BALBU_PASS` entran directo; sin vars, login normal; clave jamás en repo; `~/.balbuenv` + `envFile` en launch + `~/.bashrc` para Run/Code Runner)
+- [x] Listar categorías comentado ✅ (11/10: buscar-con-Enter lo cubre; menú 1-4 + 5 volver, probado corriendo)
 - [x] `sesion.cpp:22-23` guarda `idRol=0` ✅ (10/10: `ID_ROL` viaja del login a la sesión; login OK)
 
 ## BD medios (barrido 10/10, con línea)
@@ -27,6 +31,8 @@
 - [x] `SP_LIMPIAR_LOGS_ANTIGUOS` sin `DROP` ✅ (10/10: rehabilitado con default 120 + validación; viejo se va, reciente queda, residuos 0)
 
 ## Web / Docker (barrido 10/10)
+
+- [x] 4 SPs llamados por la app que no existían en BD ✅ (11/10: `SP_BUSCAR_CATEGORIA/MARCA/USUARIOS` + `SP_CAMBIAR_CLAVE_USUARIO` cargados de archivos y probados)
 
 - [ ] `Pagina_Web` es mock (`Math.random()`); CDN sin SRI
 - [ ] Sin `.env`; seed `admin/admin123` en plano e inyectable

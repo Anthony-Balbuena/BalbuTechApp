@@ -21,6 +21,8 @@
 #include "empleados.h"
 #include "clientes.h"
 #include "usuarios.h"
+#include "ventas.h"
+#include "inventario.h"
 
 using namespace std;
 
@@ -50,12 +52,14 @@ vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
             "GESTIONAR_ROLES",
             "GESTIONAR_USUARIOS",
             "GESTIONAR_CLIENTES",
+            "GESTIONAR_VENTAS",
             "CONSULTAR_REPORTES"
         };
     } else if (rol == "EMPLEADO") {
         permisos = {
             "CONSULTAR_PRODUCTOS",
             "CONSULTAR_CLIENTES",
+            "GESTIONAR_VENTAS",
             "REGISTRAR_ASISTENCIA",
             "SOLICITAR_PERMISO"
         };
@@ -133,20 +137,24 @@ void mostrarMenuSegunRol() {
         cout << "7. Marcas" << endl;
         cout << "8. Productos" << endl;
         cout << "9. Metodos de pago" << endl;
-        cout << "10. Ver permisos" << endl;
-        cout << "11. Cerrar sesión" << endl;
+        cout << "10. Ventas" << endl;
+        cout << "11. Inventario" << endl;
+        cout << "12. Ver permisos" << endl;
+        cout << "13. Cerrar sesión" << endl;
     } else if (sesionActual.nombreRol == "RRHH") {
         cout << "1. Empleados" << endl;
         cout << "2. Roles" << endl;
         cout << "3. Usuarios" << endl;
         cout << "4. Clientes" << endl;
-        cout << "5. Ver permisos" << endl;
-        cout << "6. Cerrar sesión" << endl;
+        cout << "5. Ventas" << endl;
+        cout << "6. Ver permisos" << endl;
+        cout << "7. Cerrar sesión" << endl;
     } else {
         cout << "1. Productos" << endl;
         cout << "2. Clientes" << endl;
-        cout << "3. Ver permisos" << endl;
-        cout << "4. Cerrar sesión" << endl;
+        cout << "3. Ventas" << endl;
+        cout << "4. Ver permisos" << endl;
+        cout << "5. Cerrar sesión" << endl;
     }
 
     cout << "----------------------------------------" << endl;
@@ -234,9 +242,23 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 10:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_VENTAS")) {
+                        ejecutarSubmenuVentas();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
+                    }
                     break;
                 case 11:
+                    if (tienePermiso("GESTIONAR_INVENTARIO")) {
+                        ejecutarSubmenuInventario();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar inventario." << RESET << endl;
+                    }
+                    break;
+                case 12:
+                    mostrarPermisosActuales();
+                    break;
+                case 13:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
@@ -276,9 +298,16 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 5:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_VENTAS")) {
+                        ejecutarSubmenuVentas();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
+                    }
                     break;
                 case 6:
+                    mostrarPermisosActuales();
+                    break;
+                case 7:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
@@ -304,9 +333,16 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 3:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_VENTAS")) {
+                        ejecutarSubmenuVentas();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
+                    }
                     break;
                 case 4:
+                    mostrarPermisosActuales();
+                    break;
+                case 5:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
