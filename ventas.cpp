@@ -1,4 +1,5 @@
 #include <cctype>
+#include <cstdio>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -27,7 +28,10 @@ void mostrarMenuVentas() {
     cout << "2. Ver venta con IVA" << endl;
     cout << "3. Cancelar venta" << endl;
     cout << "4. Anular pago" << endl;
-    cout << "5. Volver al Menu Principal" << endl;
+    cout << "5. Devolucion de venta" << endl;
+    cout << "6. Reporte por rango" << endl;
+    cout << "7. Cierre de caja" << endl;
+    cout << "8. Volver al Menu Principal" << endl;
     cout << "========================" << endl;
 }
 
@@ -440,6 +444,31 @@ static void mostrarFactura(int idVenta) {
     }
 }
 
+static void verPagosDeVenta(int idVenta) {
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "SELECT ID_PAGO, NOMBRE_METODO, MONTO, MONTO_RECIBIDO, NOMBRE_EMPLEADO "
+            "FROM VISTA_RESUMEN_PAGOS WHERE ID_VENTA = ? ORDER BY ID_PAGO"));
+        pl->setInt(1, idVenta);
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        printf("\n%-7s | %-12s | %-10s | %-10s | %-15s\n", "ID_PAGO", "METODO", "MONTO", "RECIBIDO", "EMPLEADO");
+        bool hay = false;
+        while (rl->next()) {
+            hay = true;
+            printf("%-7d | %-12.12s | %-10.2f | %-10.2f | %-15.15s\n",
+                   rl->getInt("ID_PAGO"),
+                   rl->getString("NOMBRE_METODO").c_str(),
+                   (double)rl->getDouble("MONTO"),
+                   (double)rl->getDouble("MONTO_RECIBIDO"),
+                   rl->getString("NOMBRE_EMPLEADO").c_str());
+        }
+        if (!hay) cout << "[!] La venta no tiene pagos." << endl;
+        drenarResultados(pl.get());
+    } catch (const exception &) {
+        cout << ROJO << "No se pudieron ver los pagos." << RESET << endl;
+    }
+}
+
 static void verVentaConIVA() {
     cout << "\n--- VENTAS REGISTRADAS ---" << endl;
 
@@ -456,6 +485,14 @@ static void verVentaConIVA() {
             return;
         }
         for (int id : ids) mostrarFactura(id);
+        string vPagos = leerDatoSeguro("Ver pagos de una venta? ID (Enter = omitir): ");
+        if (!vPagos.empty()) {
+            if (!esNumerico(vPagos)) {
+                cout << ROJO << "ID invalido." << RESET << endl;
+            } else {
+                verPagosDeVenta(stoi(vPagos));
+            }
+        }
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
@@ -545,6 +582,199 @@ static void anularPagoUI() {
     }
 }
 
+static bool fechaValida(const string &s) {
+    if (s.size() != 10 || s[4] != '-' || s[7] != '-') return false;
+    int y = 0, m = 0, d = 0;
+    if (sscanf(s.c_str(), "%d-%d-%d", &y, &m, &d) != 3) return false;
+    return y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+}
+
+static void cierreCajaUI() {
+    cout << "\n--- CIERRE DE CAJA ---" << endl;
+    try {
+        string fecha = leerDatoSeguro("Fecha (AAAA-MM-DD): ");
+        if (!fechaValida(fecha)) {
+            cout << ROJO << "Formato invalido. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_CIERRE_CAJA(?)"));
+        pstmt->setString(1, fecha);
+        // Result set 1: resumen del dia.
+        std::unique_ptr<sql::ResultSet> r1(pstmt->executeQuery());
+        if (r1->next()) {
+            printf("\nFecha: %s | Ventas: %d | Realizado: $%.2f | Cobrado: $%.2f\n",
+                   r1->getString("FECHA").c_str(),
+                   r1->getInt("VENTAS_DEL_DIA"),
+                   (double)r1->getDouble("MONTO_REALIZADO"),
+                   (double)r1->getDouble("COBRADO"));
+        }
+        // Result sets 2 y 3: por estado y por metodo.
+        if (pstmt->getMoreResults()) {
+            std::unique_ptr<sql::ResultSet> r2(pstmt->getResultSet());
+            printf("\n%-12s | %-8s | %-10s\n", "ESTADO", "CANT", "MONTO");
+            while (r2 && r2->next()) {
+                printf("%-12s | %-8d | %-10.2f\n",
+                       r2->getString("ESTADO").c_str(),
+                       r2->getInt("CANTIDAD"),
+                       (double)r2->getDouble("MONTO"));
+            }
+        }
+        if (pstmt->getMoreResults()) {
+            std::unique_ptr<sql::ResultSet> r3(pstmt->getResultSet());
+            printf("\n%-12s | %-8s | %-10s\n", "METODO", "OPS", "COBRADO");
+            while (r3 && r3->next()) {
+                printf("%-12.12s | %-8d | %-10.2f\n",
+                       r3->getString("METODO").c_str(),
+                       r3->getInt("OPERACIONES"),
+                       (double)r3->getDouble("COBRADO"));
+            }
+        }
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo generar el cierre." << RESET << endl;
+    }
+}
+
+static void reporteVentasUI() {
+    cout << "\n--- REPORTE DE VENTAS ---" << endl;
+    try {
+        string ini = leerDatoSeguro("Fecha inicio (AAAA-MM-DD): ");
+        string fin = leerDatoSeguro("Fecha fin (AAAA-MM-DD): ");
+        if (!fechaValida(ini) || !fechaValida(fin)) {
+            cout << ROJO << "Formato invalido. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_REPORTE_VENTAS(?, ?)"));
+        pstmt->setString(1, ini);
+        pstmt->setString(2, fin);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-6s | %-10s | %-10s | %-15s | %-20s | %-10s | %-10s | %-10s\n",
+               "ID", "FECHA", "ESTADO", "EMPLEADO", "CLIENTE", "TOTAL", "PAGADO", "SALDO");
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            printf("%-6d | %-10s | %-10s | %-15.15s | %-20.20s | %-10.2f | %-10.2f | %-10.2f\n",
+                   res->getInt("ID_VENTA"),
+                   res->getString("FECHA").c_str(),
+                   res->getString("ESTADO").c_str(),
+                   res->getString("EMPLEADO").c_str(),
+                   res->getString("CLIENTE").c_str(),
+                   (double)res->getDouble("TOTAL"),
+                   (double)res->getDouble("PAGADO"),
+                   (double)res->getDouble("SALDO"));
+        }
+        if (!hay) cout << "[!] Sin ventas en el rango." << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo generar el reporte." << RESET << endl;
+    }
+}
+
+static void devolucionVentaUI() {
+    cout << "\n--- DEVOLUCION DE VENTA ---" << endl;
+    cout << "Registra la devolucion PENDIENTE y luego aprueba o rechaza." << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "SELECT DV.ID_DETALLE_VENTA, DV.ID_VENTA, P.NOMBRE, DV.CANTIDAD "
+            "FROM DETALLES_VENTA DV JOIN PRODUCTOS P ON P.ID_PRODUCTO = DV.ID_PRODUCTO "
+            "ORDER BY DV.ID_DETALLE_VENTA DESC LIMIT 20"));
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        printf("\n%-8s | %-6s | %-25s | %-4s\n", "ID_DET", "VENTA", "PRODUCTO", "CANT");
+        while (rl->next()) {
+            printf("%-8d | %-6d | %-25.25s | %-4d\n",
+                   rl->getInt("ID_DETALLE_VENTA"),
+                   rl->getInt("ID_VENTA"),
+                   rl->getString("NOMBRE").c_str(),
+                   rl->getInt("CANTIDAD"));
+        }
+        drenarResultados(pl.get());
+
+        string dStr = leerDatoSeguro("ID detalle: ");
+        string eStr = leerDatoSeguro("ID empleado: ");
+        string cStr = leerDatoSeguro("Cantidad: ");
+        if (!esNumerico(dStr) || !esNumerico(eStr) || !esNumerico(cStr) || stoi(cStr) <= 0) {
+            cout << ROJO << "IDs/cantidad invalidos." << RESET << endl;
+            return;
+        }
+        string motivo = leerDatoSeguro("Motivo: ");
+        if (motivo.empty()) {
+            cout << ROJO << "El motivo es obligatorio." << RESET << endl;
+            return;
+        }
+        string gStr = leerDatoSeguro("ID garantia (Enter = sin garantia): ");
+        if (!gStr.empty() && !esNumerico(gStr)) {
+            cout << ROJO << "ID garantia invalido." << RESET << endl;
+            return;
+        }
+        string condStr = leerDatoSeguro("Condicion [BUENO/DANADO/USADO] (Enter = BUENO): ");
+        string cond = "BUENO";
+        if (!condStr.empty()) {
+            if (condStr != "BUENO" && condStr != "DANADO" && condStr != "USADO") {
+                cout << ROJO << "Condicion invalida." << RESET << endl;
+                return;
+            }
+            cond = condStr;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> pr(globalCon->prepareStatement(
+            "CALL SP_REGISTRAR_DEVOLUCION(?, ?, ?, ?, ?, ?)"));
+        pr->setInt(1, stoi(dStr));
+        if (gStr.empty()) pr->setNull(2, sql::DataType::INTEGER);
+        else pr->setInt(2, stoi(gStr));
+        pr->setInt(3, stoi(eStr));
+        pr->setInt(4, stoi(cStr));
+        pr->setString(5, motivo);
+        pr->setString(6, cond);
+        cout << "\n--------------------------------------------" << endl;
+        cout << ">>> " << Recogermensaje(pr.get()) << " <<<" << endl;
+        cout << "--------------------------------------------" << endl;
+        drenarResultados(pr.get());
+
+        std::unique_ptr<sql::PreparedStatement> pi(globalCon->prepareStatement(
+            "SELECT ID_DEVOLUCION FROM DEVOLUCIONES WHERE ID_DETALLE_VENTA = ? "
+            "ORDER BY ID_DEVOLUCION DESC LIMIT 1"));
+        pi->setInt(1, stoi(dStr));
+        std::unique_ptr<sql::ResultSet> ri(pi->executeQuery());
+        int idDev = 0;
+        if (ri->next()) idDev = ri->getInt("ID_DEVOLUCION");
+        drenarResultados(pi.get());
+        if (idDev <= 0) return;
+
+        string dec = leerDatoSeguro("Aprobar / Rechazar / Enter deja PENDIENTE [a/r/Enter]: ");
+        if (dec == "a" || dec == "A") {
+            std::unique_ptr<sql::PreparedStatement> pa(globalCon->prepareStatement(
+                "CALL 25_SP_PROCESAR_DEVOLUCION(?, 'APROBADA')"));
+            pa->setInt(1, idDev);
+            cout << ">>> " << Recogermensaje(pa.get()) << " <<<" << endl;
+            drenarResultados(pa.get());
+        } else if (dec == "r" || dec == "R") {
+            string mot2 = leerDatoSeguro("Motivo del rechazo: ");
+            if (mot2.empty()) {
+                cout << ROJO << "El motivo es obligatorio." << RESET << endl;
+                return;
+            }
+            std::unique_ptr<sql::PreparedStatement> pr2(globalCon->prepareStatement(
+                "CALL 26_SP_RECHAZAR_DEVOLUCION(?, ?)"));
+            pr2->setInt(1, idDev);
+            pr2->setString(2, mot2);
+            cout << ">>> " << Recogermensaje(pr2.get()) << " <<<" << endl;
+            drenarResultados(pr2.get());
+        } else {
+            cout << "Queda PENDIENTE." << endl;
+        }
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo registrar la devolucion." << RESET << endl;
+    }
+}
+
 void ejecutarSubmenuVentas() {
     int opcion = 0;
     do {
@@ -572,11 +802,20 @@ void ejecutarSubmenuVentas() {
                 anularPagoUI();
                 break;
             case 5:
+                devolucionVentaUI();
+                break;
+            case 6:
+                reporteVentasUI();
+                break;
+            case 7:
+                cierreCajaUI();
+                break;
+            case 8:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 5) pausar();
-    } while (opcion != 5);
+        if (opcion != 8) pausar();
+    } while (opcion != 8);
 }
