@@ -39,90 +39,7 @@ CREATE INDEX IX_PAGOS_FECHA ON PAGOS (FECHA);
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS 24_SP_REGISTRAR_PAGO;
-/*
-24_SP_REGISTRAR_PAGO
-Registra un pago de una venta con su metodo de pago.
-Revisa que la venta exista, guarda el pago y devuelve un mensaje
-confirmando el monto con el nombre del empleado que lo proceso.
-NOTA P8 (06/10/2026): ahora guarda ID_EMPLEADO en PAGOS (quien cobro) y
-valida que el empleado exista; antes seguia igual aunque no existiera,
-poniendo 'DESCONOCIDO' unicamente en el mensaje.
-NOTA (Parte 2, 07/10/2026): este SP es la PUERTA DE ENTRADA de una cadena
-de tres. Su INSERT dispara en el mismo movimiento a TR_VALIDAR_MONTO_PAGO
-(BEFORE: el freno) y a TR_AUTO_FINALIZAR_VENTA (AFTER: el cierre + bono).
-El SP valida lo suyo (venta, empleado y vuelto); lo demas lo resuelven los
-triggers, incluso si el pago llega a pelo sin pasar por aqui.
-*/
--- ============================================================
--- VERSION ANTERIOR (guardada para revision, NO se ejecuta)
--- ============================================================
--- CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
---     IN P_ID_VENTA INT,
---     IN P_ID_METODO_PAGO INT,
---     IN P_MONTO DECIMAL(10, 2),
---     IN P_ID_EMPLEADO INT -- Recibimos el ID del empleado que procesa el pago
--- )
--- proc_label: BEGIN
---     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
---     DECLARE V_NOMBRE_EMPLEADO VARCHAR(100);
---
---     -- 1. Validar venta
---     SELECT TOTAL INTO V_TOTAL_VENTA FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
---     IF V_TOTAL_VENTA IS NULL THEN
---         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
---         LEAVE proc_label;
---     END IF;
---
---     -- 2. Obtener nombre del empleado para el mensaje
---     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
---
---     -- Si el empleado no existe, ponemos uno genérico o lanzamos error
---     IF V_NOMBRE_EMPLEADO IS NULL THEN
---         SET V_NOMBRE_EMPLEADO = 'DESCONOCIDO';
---     END IF;
---
---     -- 3. Insertar el pago
---     INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO)
---     VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO);
---
---     -- 4. Mensaje personalizado
---     SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
--- END ;
 
--- ============================================================
--- VERSION P8 (guardada para revision, NO se ejecuta)
--- ============================================================
--- CREATE PROCEDURE 24_SP_REGISTRAR_PAGO(
---     IN P_ID_VENTA INT,
---     IN P_ID_METODO_PAGO INT,
---     IN P_MONTO DECIMAL(10, 2),
---     IN P_ID_EMPLEADO INT -- El empleado que procesa el pago (P8)
--- )
--- proc_label: BEGIN
---     DECLARE V_TOTAL_VENTA DECIMAL(10, 2);
---     DECLARE V_NOMBRE_EMPLEADO VARCHAR(100);
---
---     -- 1. Validar venta
---     SELECT TOTAL INTO V_TOTAL_VENTA FROM VENTAS WHERE ID_VENTA = P_ID_VENTA;
---     IF V_TOTAL_VENTA IS NULL THEN
---         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA VENTA NO EXISTE.';
---         LEAVE proc_label;
---     END IF;
---
---     -- 2. Validar el empleado que cobra (P8): si no existe, no se guarda
---     SELECT NOMBRE INTO V_NOMBRE_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
---     IF V_NOMBRE_EMPLEADO IS NULL THEN
---         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
---         LEAVE proc_label;
---     END IF;
---
---     -- 3. Insertar el pago con quien lo cobro (P8)
---     INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO, ID_EMPLEADO)
---     VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO, P_ID_EMPLEADO);
---
---     -- 4. Mensaje personalizado
---     SELECT CONCAT('EXITO: PAGO DE ', P_MONTO, ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
--- END ;
 
 -- ============================================================
 -- VERSION NUEVA (la que se crea) - P9
@@ -176,11 +93,11 @@ proc_label: BEGIN
     INSERT INTO PAGOS (ID_VENTA, ID_METODO_PAGO, MONTO, ID_EMPLEADO, MONTO_RECIBIDO)
     VALUES (P_ID_VENTA, P_ID_METODO_PAGO, P_MONTO, P_ID_EMPLEADO, IFNULL(P_MONTO_RECIBIDO, P_MONTO));
 
-    -- 5. Mensaje personalizado (con vuelto si lo hay)
-    SELECT CONCAT('EXITO: PAGO DE ', P_MONTO,
-                  IF(IFNULL(P_MONTO_RECIBIDO, P_MONTO) > P_MONTO,
-                     CONCAT(' (VUELTO ', IFNULL(P_MONTO_RECIBIDO, P_MONTO) - P_MONTO, ')'), ''),
-                  ' REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
+    -- 5. Mensaje personalizado (12/10/2026: a pagar/recibido/devuelto).
+    SELECT CONCAT('EXITO: A PAGAR ', P_MONTO,
+                  ', RECIBIDO ', IFNULL(P_MONTO_RECIBIDO, P_MONTO),
+                  ', DEVUELTO ', IFNULL(P_MONTO_RECIBIDO, P_MONTO) - P_MONTO,
+                  '. REGISTRADO POR EL EMPLEADO: ', V_NOMBRE_EMPLEADO) AS MENSAJE;
 END //
 DELIMITER ;
 
@@ -667,3 +584,145 @@ HAVING SALDO <> 0;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------
+-----------------------------------------[REPORTES_VENTAS: movido del 37}----------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------
+/*
+MOVIDO del archivo 37- REPORTES_VENTAS.sql el 12/10/2026: los reportes leen
+PAGOS (cobros por metodo, saldos), asi que viven en este flujo y no en un
+archivo suelto. Nombres de SP/vista intactos: la app no se toca.
+CAMBIO 12/10/2026: SALDO y MONTO_REALIZADO van a BRUTO
+(SUBTOTAL + ITBIS - ITBIS devuelto), porque desde el 11/10 se cobra el bruto
+y con TOTAL el saldo quedaba negativo en ventas pagadas.
+*/
+
+/*
+VW_REPORTE_VENTAS
+Resumen consolidado: UNA fila por venta con el empleado que la atendio,
+el cliente, el total, lo efectivamente cobrado (SUM sobre PAGOS) y el
+saldo que falta (a BRUTO). Ojo con CANCELADA/DEVUELTA: a esas ya no se les
+cobra, el saldo se muestra tal cual (quien solo quiera lo cobrable usa
+VISTA_VENTAS_PENDIENTES_PAGO, que las excluye).
+*/
+CREATE OR REPLACE VIEW VW_REPORTE_VENTAS AS
+SELECT
+    V.ID_VENTA,
+    V.FECHA,
+    V.ESTADO,
+    E.NOMBRE AS EMPLEADO,
+    C.NOMBRE AS CLIENTE,
+    V.FACTURA,
+    V.TOTAL,
+    IFNULL(PG.PAGADO, 0) AS PAGADO,
+    ROUND(V.TOTAL
+        + IFNULL((SELECT SUM(DV2.MONTO_ITBIS) FROM DETALLES_VENTA DV2 WHERE DV2.ID_VENTA = V.ID_VENTA), 0)
+        - IFNULL((SELECT SUM(DV.MONTO_ITBIS_REEMBOLSADO) FROM DEVOLUCIONES DV
+                  JOIN DETALLES_VENTA DD ON DD.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+                  WHERE DD.ID_VENTA = V.ID_VENTA AND DV.ESTADO IN ('APROBADA', 'REEMBOLSADA')), 0)
+        - IFNULL(PG.PAGADO, 0), 2) AS SALDO
+FROM VENTAS V
+JOIN EMPLEADOS E ON E.ID_EMPLEADO = V.ID_EMPLEADO
+JOIN CLIENTES  C ON C.ID_CLIENTE  = V.ID_CLIENTE
+LEFT JOIN (SELECT ID_VENTA, SUM(MONTO) AS PAGADO
+             FROM PAGOS
+            GROUP BY ID_VENTA) PG ON PG.ID_VENTA = V.ID_VENTA;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_REPORTE_VENTAS ;
+/*
+SP_REPORTE_VENTAS
+Listado de ventas por rango de fechas (ambos dias incluidos, a nivel de
+dia completo). Devuelve las mismas columnas que VW_REPORTE_VENTAS pero
+filtrado por el rango y ordenado del mas reciente al mas viejo. Corta con
+error si el rango viene invertido.
+*/
+CREATE PROCEDURE SP_REPORTE_VENTAS(
+    IN P_FECHA_INICIO DATE,
+    IN P_FECHA_FIN    DATE
+)
+proc_label: BEGIN
+    -- 1. El rango tiene sentido
+    IF P_FECHA_INICIO > P_FECHA_FIN THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA FECHA INICIAL NO PUEDE SER MAYOR A LA FINAL.';
+    END IF;
+
+    -- 2. Listado (la fecha final entra completa: se suma 1 dia al tope)
+    SELECT *
+      FROM VW_REPORTE_VENTAS
+     WHERE FECHA >= P_FECHA_INICIO
+       AND FECHA <  P_FECHA_FIN + INTERVAL 1 DAY
+     ORDER BY FECHA DESC, ID_VENTA DESC;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_CIERRE_CAJA ;
+/*
+SP_CIERRE_CAJA
+Cierre de caja de un dia: primero el resumen general (ventas, monto en
+REALIZADAS a BRUTO y cobro real), despues las ventas agrupadas por estado
+(montos a BRUTO) y por ultimo lo cobrado desglosado por metodo de pago.
+Son 3 result sets seguidos. Solo lectura.
+*/
+CREATE PROCEDURE SP_CIERRE_CAJA(IN P_FECHA DATE)
+proc_label: BEGIN
+    -- 1. La fecha no puede faltar
+    IF P_FECHA IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: INGRESE LA FECHA DEL CIERRE.';
+    END IF;
+
+    -- 2. Resumen general del dia
+    SELECT
+        P_FECHA AS FECHA,
+        (SELECT COUNT(*) FROM VENTAS
+          WHERE FECHA >= P_FECHA AND FECHA < P_FECHA + INTERVAL 1 DAY)
+            AS VENTAS_DEL_DIA,
+        (SELECT IFNULL(SUM(V2.TOTAL
+              + IFNULL(D.ITBIS, 0) - IFNULL(DV.DEV, 0)), 0)
+           FROM VENTAS V2
+           LEFT JOIN (SELECT ID_VENTA, SUM(MONTO_ITBIS) AS ITBIS
+                        FROM DETALLES_VENTA GROUP BY ID_VENTA) D
+             ON D.ID_VENTA = V2.ID_VENTA
+           LEFT JOIN (SELECT DD.ID_VENTA, SUM(DV2.MONTO_ITBIS_REEMBOLSADO) AS DEV
+                        FROM DEVOLUCIONES DV2
+                        JOIN DETALLES_VENTA DD ON DD.ID_DETALLE_VENTA = DV2.ID_DETALLE_VENTA
+                       WHERE DV2.ESTADO IN ('APROBADA', 'REEMBOLSADA')
+                       GROUP BY DD.ID_VENTA) DV
+             ON DV.ID_VENTA = V2.ID_VENTA
+          WHERE V2.FECHA >= P_FECHA AND V2.FECHA < P_FECHA + INTERVAL 1 DAY
+            AND V2.ESTADO = 'REALIZADA')
+            AS MONTO_REALIZADO,
+        (SELECT IFNULL(SUM(MONTO), 0) FROM PAGOS
+          WHERE FECHA >= P_FECHA AND FECHA < P_FECHA + INTERVAL 1 DAY)
+            AS COBRADO;
+
+    -- 3. Las ventas del dia agrupadas por estado (montos a BRUTO)
+    SELECT V.ESTADO,
+           COUNT(*) AS CANTIDAD,
+           IFNULL(SUM(V.TOTAL + IFNULL(D.ITBIS, 0) - IFNULL(DV.DEV, 0)), 0) AS MONTO
+      FROM VENTAS V
+      LEFT JOIN (SELECT ID_VENTA, SUM(MONTO_ITBIS) AS ITBIS
+                   FROM DETALLES_VENTA GROUP BY ID_VENTA) D
+        ON D.ID_VENTA = V.ID_VENTA
+      LEFT JOIN (SELECT DD.ID_VENTA, SUM(DV2.MONTO_ITBIS_REEMBOLSADO) AS DEV
+                   FROM DEVOLUCIONES DV2
+                   JOIN DETALLES_VENTA DD ON DD.ID_DETALLE_VENTA = DV2.ID_DETALLE_VENTA
+                  WHERE DV2.ESTADO IN ('APROBADA', 'REEMBOLSADA')
+                  GROUP BY DD.ID_VENTA) DV
+        ON DV.ID_VENTA = V.ID_VENTA
+     WHERE V.FECHA >= P_FECHA AND V.FECHA < P_FECHA + INTERVAL 1 DAY
+     GROUP BY V.ESTADO;
+
+    -- 4. Lo cobrado del dia por metodo de pago
+    SELECT MP.NOMBRE AS METODO,
+           COUNT(*) AS OPERACIONES,
+           IFNULL(SUM(P.MONTO), 0) AS COBRADO
+      FROM PAGOS P
+      JOIN METODOS_PAGO MP ON MP.ID_METODO_PAGO = P.ID_METODO_PAGO
+     WHERE P.FECHA >= P_FECHA AND P.FECHA < P_FECHA + INTERVAL 1 DAY
+     GROUP BY MP.ID_METODO_PAGO, MP.NOMBRE
+     ORDER BY COBRADO DESC;
+END //
+DELIMITER ;

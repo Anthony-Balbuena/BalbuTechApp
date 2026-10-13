@@ -13,6 +13,9 @@ CREATE TABLE PRODUCTOS (
     NOMBRE VARCHAR(100) NOT NULL,
     DESCRIPCION VARCHAR(255) NOT NULL,
     PRECIO DECIMAL(10, 2) NOT NULL CHECK (PRECIO > 0),
+    -- (12/10/2026) Precio de compra. En BD fresca nace en 0 = pendiente de
+    -- cargar el real (ver Obsidian: estimados de prueba, reemplazar por factura).
+    P_COMPRA DECIMAL(10, 2) NOT NULL DEFAULT 0.00 CHECK (P_COMPRA >= 0),
     CODIGO VARCHAR(20) NOT NULL UNIQUE,
     ESTADO ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     FECHA_CREACION TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -163,7 +166,9 @@ CREATE PROCEDURE SP_ACTUALIZAR_PRODUCTOS(
     -- (09/10/2026) P7. La app (productos.cpp) manda proveedor e imagen
     -- (9 args en total); sin estos el UPDATE desde la app fallaba.
     IN P_ID_PROVEEDOR INT,
-    IN P_IMAGEN       VARCHAR(255)
+    IN P_IMAGEN       VARCHAR(255),
+    -- (12/10/2026) Costo de compra (NULL = conservar; 0 permitido).
+    IN P_COSTO        DECIMAL(10, 2)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(100); 
@@ -212,6 +217,12 @@ proc_label: BEGIN
         END IF;
     END IF;
 
+    -- (12/10/2026) El precio de compra puede ser 0 (regalo/bonificacion), nunca negativo.
+    IF P_COSTO IS NOT NULL AND P_COSTO < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRECIO DE COMPRA NO PUEDE SER NEGATIVO.';
+        LEAVE proc_label;
+    END IF;
+
     -- Validar FKs si se intentan cambiar
     IF P_ID_MARCA IS NOT NULL AND NOT EXISTS (SELECT 1 FROM MARCAS WHERE ID_MARCA = P_ID_MARCA) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA MARCA NO EXISTE.';
@@ -244,6 +255,8 @@ proc_label: BEGIN
         NOMBRE       = COALESCE(v_nombre_limpio, NOMBRE),
         DESCRIPCION  = COALESCE(v_desc_limpia, DESCRIPCION),
         PRECIO       = COALESCE(P_PRECIO, PRECIO), -- Ya validado arriba
+        -- (12/10/2026) NULL conserva el precio de compra vigente.
+        P_COMPRA     = COALESCE(P_COSTO, P_COMPRA),
         CODIGO       = COALESCE(v_codigo_limpio, CODIGO),
         ID_MARCA     = COALESCE(P_ID_MARCA, ID_MARCA),
         ID_CATEGORIA = COALESCE(P_ID_CATEGORIA, ID_CATEGORIA),
@@ -338,13 +351,20 @@ BEGIN
         M.NOMBRE AS MARCA,
         C.NOMBRE AS CATEGORIA,
         P.PRECIO,
-        P.ESTADO
+        -- (12/10/2026) Precio de compra visible para la app.
+        P.P_COMPRA,
+        P.ESTADO,
+        -- (13/10/2026) Stock via JOIN a inventario (LEFT: sin fila igual lista).
+        I.STOCK_ACTUAL AS STOCK
     FROM PRODUCTOS P
     INNER JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
     INNER JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
+    LEFT JOIN INVENTARIO I ON I.ID_PRODUCTO = P.ID_PRODUCTO
     WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = '' 
            OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%') 
-           OR P.CODIGO = P_BUSQUEDA)
+           OR P.CODIGO = P_BUSQUEDA
+           -- (13/10/2026) Tambien por ID numerico.
+           OR (P_BUSQUEDA REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_BUSQUEDA AS UNSIGNED)))
     ORDER BY P.ID_PRODUCTO ASC; -- <-- CAMBIADO AQUÍ (Ordena 1, 2, 3...)
 END //
 DELIMITER ;
@@ -372,6 +392,8 @@ BEGIN
         I.STOCK_MINIMO,
         I.UBICACION,
         P.PRECIO,
+        -- (12/10/2026) Costo visible para la columna de compra.
+        P.P_COMPRA,
         -- CONTROL DE ALERTAS CON MÚLTIPLES CONDICIONES (Else If)
         CASE 
             WHEN I.STOCK_ACTUAL = 0 THEN 'AGOTADO'
@@ -386,7 +408,9 @@ BEGIN
     WHERE (P_FILTRO IS NULL OR P_FILTRO = '' 
            OR P.NOMBRE LIKE CONCAT('%', P_FILTRO, '%') 
            OR P.CODIGO LIKE CONCAT('%', P_FILTRO, '%')
-           OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%'))
+           OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%')
+           -- (13/10/2026) Tambien por ID numerico (repuesto: se habia perdido).
+           OR (P_FILTRO REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_FILTRO AS UNSIGNED)))
       AND P.ESTADO = 'ACTIVO'
     ORDER BY P.ID_PRODUCTO ASC; -- Ordenado numéricamente por ID de producto
 END //
@@ -582,3 +606,8 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
+
+
+
+
+SELECT * FROM `PRODUCTOS`;

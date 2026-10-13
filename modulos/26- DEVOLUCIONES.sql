@@ -18,6 +18,8 @@ CREATE TABLE DEVOLUCIONES (
     SUBTOTAL_REEMBOLSADO DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     -- (11/10/2026) ITBIS reembolsado con la tasa vigente al registrar.
     MONTO_ITBIS_REEMBOLSADO DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    -- (12/10/2026) Ganancia devuelta proporcional al margen de la venta.
+    MONTO_GANANCIA_REEMBOLSADA DECIMAL(10, 2) NULL,
     ESTADO ENUM('PENDIENTE', 'APROBADA', 'RECHAZADA', 'REEMBOLSADA') NOT NULL DEFAULT 'PENDIENTE',
     
     PRIMARY KEY (ID_DEVOLUCION),
@@ -84,6 +86,10 @@ proc_label: BEGIN
     -- (11/10/2026) ITBIS reembolsado con tasa vigente.
     DECLARE V_TASA_TXT VARCHAR(100);
     DECLARE V_TASA DECIMAL(5, 2);
+    -- (12/10/2026) Ganancia devuelta proporcional al margen de la venta.
+    DECLARE V_CANT_LINEA INT;
+    DECLARE V_GAN_LINEA DECIMAL(10, 2);
+    DECLARE V_GAN_DEVUELTA DECIMAL(10, 2);
     DECLARE V_GARANTIA_DETALLE INT;
 
     -- 1. Validar que la cantidad sea positiva
@@ -150,6 +156,15 @@ proc_label: BEGIN
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
 
+    -- (12/10/2026) Margen proporcional de la linea vendida (foto historica).
+    SELECT CANTIDAD, MONTO_GANANCIA INTO V_CANT_LINEA, V_GAN_LINEA
+      FROM DETALLES_VENTA WHERE ID_DETALLE_VENTA = P_ID_DETALLE_VENTA;
+    IF V_GAN_LINEA IS NULL OR IFNULL(V_CANT_LINEA, 0) <= 0 THEN
+        SET V_GAN_DEVUELTA = NULL;
+    ELSE
+        SET V_GAN_DEVUELTA = ROUND(V_GAN_LINEA * P_CANTIDAD / V_CANT_LINEA, 2);
+    END IF;
+
     -- 6. Insertar el registro con todos los campos calculados y requeridos
     INSERT INTO DEVOLUCIONES (
         ID_DETALLE_VENTA, 
@@ -161,6 +176,7 @@ proc_label: BEGIN
         CONDICION_PRODUCTO, 
         SUBTOTAL_REEMBOLSADO, 
         MONTO_ITBIS_REEMBOLSADO,
+        MONTO_GANANCIA_REEMBOLSADA,
         ESTADO
     )
     VALUES (
@@ -173,6 +189,7 @@ proc_label: BEGIN
         IFNULL(P_CONDICION_PRODUCTO, 'BUENO'), 
         V_SUBTOTAL_REEMBOLSADO, 
         ROUND(V_SUBTOTAL_REEMBOLSADO * V_TASA / 100, 2),
+        V_GAN_DEVUELTA,
         'PENDIENTE'
     );
 

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <limits>
@@ -75,8 +76,20 @@ void registrarProducto() {
         string categoriaStr = leerDatoSeguro("\nCategoria del Producto (ID-NUMERO): ");
         int idCategoria = stoi(categoriaStr);
 
-        string precioStr = leerDatoSeguro("\nPrecio del Producto $: ");
+        string precioStr = leerDatoSeguro("\nPrecio del Producto $ (sin ITBIS): ");
         double precio = stod(precioStr);
+        try {
+            std::unique_ptr<sql::PreparedStatement> pt(globalCon->prepareStatement(
+                "SELECT VALOR FROM CONFIGURACION WHERE CLAVE = 'ITBIS'"));
+            std::unique_ptr<sql::ResultSet> rt(pt->executeQuery());
+            double tasa = 18.0;
+            if (rt->next()) {
+                try { tasa = stod(rt->getString("VALOR")); } catch (...) {}
+            }
+            drenarResultados(pt.get());
+            cout << CIAN << "El cliente pagara: $" << (long long)llround(precio * (100.0 + tasa) / 100.0)
+                 << " (ITBIS incluido)" << RESET << endl;
+        } catch (...) {}
 
         string proveedorStr = leerDatoSeguro("\nID del Proveedor (ID-NUMERO): ");
         int idProveedor = stoi(proveedorStr);
@@ -154,7 +167,7 @@ void actualizarProducto() {
         string marcaRaw = leerDatoSeguro("Nueva Marca (ID NUMERO): ");
         string categoriaRaw = leerDatoSeguro("Nueva Categoria (ID NUMERO): ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idProducto);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -182,6 +195,10 @@ void actualizarProducto() {
         string imagenRaw = leerDatoSeguro("Nueva Imagen (ruta o URL, Enter para omitir): ");
         if (imagenRaw.empty()) pstmt->setNull(9, sql::DataType::VARCHAR);
         else pstmt->setString(9, imagenRaw);
+
+        string costoRaw = leerDatoSeguro("Precio de compra $ (Enter para omitir): ");
+        if (costoRaw.empty()) pstmt->setNull(10, sql::DataType::DOUBLE);
+        else pstmt->setDouble(10, stod(costoRaw));
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -254,18 +271,24 @@ void buscarProducto() {
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         cout << "\n----------------------------------------------------------------------------------------------------" << endl;
-        cout << "ID | CODIGO | NOMBRE | MARCA | CATEGORIA | PRECIO | ESTADO" << endl;
+        cout << "ID | CODIGO | NOMBRE | MARCA | CATEGORIA | PRECIO | P.COMPRA | ESTADO" << endl;
         cout << "----------------------------------------------------------------------------------------------------" << endl;
 
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
+            string costoStr;
+            try {
+                double costo = res->getDouble("P_COMPRA");
+                costoStr = res->wasNull() ? "---" : ("$" + to_string((long long)llround(costo)));
+            } catch (...) { costoStr = "---"; }
             cout << res->getInt("ID_PRODUCTO") << " | "
                  << res->getString("CODIGO") << " | "
                  << res->getString("NOMBRE") << " | "
                  << res->getString("MARCA") << " | "
                  << res->getString("CATEGORIA") << " | $"
                  << res->getDouble("PRECIO") << " | "
+                 << costoStr << " | "
                  << res->getString("ESTADO") << endl;
         }
 
