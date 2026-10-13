@@ -23,3 +23,9 @@ mysql-connector-c++-26.7.0-winx64/
 *.odt
 *.tmp
 .~lock.*#
+
+# Helper local (no subir)
+entrar-local.ps1
+
+# Basura de Code Runner (Windows)
+tempCodeRunnerFile.cpp

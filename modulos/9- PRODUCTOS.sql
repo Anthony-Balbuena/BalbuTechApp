@@ -64,12 +64,14 @@ DROP PROCEDURE IF EXISTS SP_INSERTAR_PRODUCTO ;
 CREATE PROCEDURE SP_INSERTAR_PRODUCTO(
     IN P_NOMBRE        VARCHAR(100),
     IN P_DESCRIPCION   VARCHAR(255),
+    -- (14/10/2026) Precio de compra antes del precio de venta.
+    IN P_COMPRA        DECIMAL(10, 2),
     IN P_PRECIO        DECIMAL(10, 2),
     IN P_CODIGO        VARCHAR(20),
     IN P_ID_MARCA      INT,
     IN P_ID_CATEGORIA  INT,
     IN P_ID_PROVEEDOR  INT,
-    -- (09/10/2026) P6. La app (productos.cpp) manda la imagen como 8vo
+    -- (09/10/2026) P6. La app (productos.cpp) manda la imagen como 9no
     -- parametro; sin esto el alta desde la app fallaba (nro. de args).
     IN P_IMAGEN        VARCHAR(255)
 )
@@ -123,6 +125,12 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- (14/10/2026) Precio de compra antes del precio: NULL = 0, nunca negativo.
+    IF IFNULL(P_COMPRA, 0) < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRECIO DE COMPRA NO PUEDE SER NEGATIVO.';
+        LEAVE proc_label;
+    END IF;
+
     -- (09/10/2026) P3. Nombre vacío tras limpiar.
     IF CHAR_LENGTH(v_nombre_limpio) = 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL NOMBRE NO PUEDE ESTAR VACÍO.';
@@ -135,8 +143,8 @@ proc_label: BEGIN
     END IF;
 
     -- 3) Inserción (requiere proveedor explícito)
-    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR, IMAGEN)
-    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR, P_IMAGEN);
+    INSERT INTO PRODUCTOS (NOMBRE, DESCRIPCION, PRECIO, P_COMPRA, CODIGO, ID_MARCA, ID_CATEGORIA, ID_PROVEEDOR, IMAGEN)
+    VALUES (v_nombre_limpio, v_desc_limpia, P_PRECIO, COALESCE(P_COMPRA, 0), v_codigo_limpio, P_ID_MARCA, P_ID_CATEGORIA, P_ID_PROVEEDOR, P_IMAGEN);
 
     SELECT CONCAT('EXITO: PRODUCTO "', v_nombre_limpio, '" REGISTRADO CORRECTAMENTE.') AS MENSAJE;
 
