@@ -76,6 +76,9 @@ void registrarProducto() {
         string categoriaStr = leerDatoSeguro("\nCategoria del Producto (ID-NUMERO): ");
         int idCategoria = stoi(categoriaStr);
 
+        string compraStr = leerDatoSeguro("\nPrecio de compra $: ");
+        double compra = compraStr.empty() ? 0 : stod(compraStr);
+
         string precioStr = leerDatoSeguro("\nPrecio del Producto $ (sin ITBIS): ");
         double precio = stod(precioStr);
         try {
@@ -96,19 +99,20 @@ void registrarProducto() {
 
         string imagen = leerDatoSeguro("\nImagen (ruta o URL, presione Enter para omitir): ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?)"));
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?,?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, descripcion);
-        pstmt->setDouble(3, precio);
-        pstmt->setString(4, codigo);
-        pstmt->setInt(5, idMarca);
-        pstmt->setInt(6, idCategoria);
-        pstmt->setInt(7, idProveedor);
+        pstmt->setDouble(3, compra);
+        pstmt->setDouble(4, precio);
+        pstmt->setString(5, codigo);
+        pstmt->setInt(6, idMarca);
+        pstmt->setInt(7, idCategoria);
+        pstmt->setInt(8, idProveedor);
 
         if (imagen.empty()) {
-            pstmt->setNull(8, sql::DataType::VARCHAR);
+            pstmt->setNull(9, sql::DataType::VARCHAR);
         } else {
-            pstmt->setString(8, imagen);
+            pstmt->setString(9, imagen);
         }
 
         string respuesta = Recogermensaje(pstmt.get());

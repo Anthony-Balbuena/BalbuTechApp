@@ -1,2 +1,0 @@
-
-#include <cppconn/resultset.h>
