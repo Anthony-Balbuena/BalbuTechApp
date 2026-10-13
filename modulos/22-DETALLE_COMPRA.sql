@@ -854,3 +854,42 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------[COSTO: ultima compra}----------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_ACTUALIZAR_COSTO_COMPRA ;
+/*
+TR_ACTUALIZAR_COSTO_COMPRA (12/10/2026)
+Cada linea de compra que entra deja su precio como COSTO del producto
+(ultima compra manda). Corre al final (orden por creacion) y solo toca
+PRODUCTOS.P_COMPRA: no interfiere con total, stock ni auditoria.
+*/
+CREATE TRIGGER TR_ACTUALIZAR_COSTO_COMPRA
+AFTER INSERT ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    UPDATE PRODUCTOS SET P_COMPRA = NEW.PRECIO_UNITARIO
+     WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_COSTO_BORRADO_COMPRA ;
+/*
+TR_RECALCULAR_COSTO_BORRADO_COMPRA (12/10/2026)
+Si se quita la ultima linea comprada, el COSTO vuelve a la compra anterior
+que quede (o NULL si nunca se compro). Asi una compra cancelada no deja un
+costo fantasma.
+*/
+CREATE TRIGGER TR_RECALCULAR_COSTO_BORRADO_COMPRA
+AFTER DELETE ON DETALLE_COMPRA
+FOR EACH ROW
+BEGIN
+    UPDATE PRODUCTOS P SET P_COMPRA = COALESCE((
+        SELECT DC.PRECIO_UNITARIO FROM DETALLE_COMPRA DC
+         WHERE DC.ID_PRODUCTO = OLD.ID_PRODUCTO
+         ORDER BY DC.ID_DETALLE_COMPRA DESC LIMIT 1), 0)
+     WHERE P.ID_PRODUCTO = OLD.ID_PRODUCTO;
+END //
+DELIMITER ;

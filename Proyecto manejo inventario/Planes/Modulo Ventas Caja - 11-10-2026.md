@@ -62,8 +62,18 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 - [ ] Reporte de stock crítico en app (el SP `SP_REPORTE_STOCK_CRITICO` existe, falta pantalla).
 - [ ] Kardex por producto en app (la bitácora `MOVIMIENTOS_INVENTARIO` ya se guarda, falta consulta por ítem).
 
+## Pendiente ganancias (12/10/2026, para después)
+
+- [ ] Ver ganancias: venta (precio de venta) menos costo (precio de compra). OJO: hoy la base no guarda costo por producto ni por lote, sin eso no hay cálculo serio. Definir primero dónde vive el costo y después el reporte. Estructurarlo bien, sin apuro.
+- [ ] El dueño menciona que ya tiene algo de ganancias por mes por ahí: ubicarlo y evaluarlo cuando se encare el tema.
+
 ## Progreso
 
+- [x] Pantalla de pago como pediste (12/10/2026): métodos por ID, `A pagar: $` sin subtotal, mensaje `A PAGAR / RECIBIDO / DEVUELTO. REGISTRADO POR EL EMPLEADO`. Probado en TEST y TECH con rollback.
+- [x] App al día con la DB (12/10/2026): costo en buscar-productos + `8. Ganancias` en ventas (mensual + líneas, interno sin IVA). `SP_CONSULTAR_PRODUCTOS_FILTRADO` devuelve COSTO en TEST y TECH. Probado en vivo. La `#5` sale `---` porque se vendió antes del costo (honesto, no inventa).
+- [x] Update de costo (12/10/2026): `SP_ACTUALIZAR_PRODUCTOS` acepta `P_COSTO` (NULL conserva, negativo rechaza); `productos.cpp` lo pide y el módulo de stock trae `2. Actualizar costo`. TEST verde, TECH verde con rollback, residuos 0.
+- [x] Ganancias base (12/10/2026): `COSTO` en PRODUCTOS (última compra manda, trigger + recompute al borrar) + `MONTO_GANANCIA` snapshot en líneas + `MONTO_GANANCIA_REEMBOLSADA` en devoluciones + `38- GANANCIAS.sql` (por línea y mensual). Suite TEST verde (80/80, dev 40, neta 40), TECH verde con backfill, residuos 0. La ganancia NO va en la factura del cliente, solo reportes internos.
+- [x] Reportes mudados del 37 al 24 (12/10/2026): vista + 2 SPs al final de `24- PAGOS.sql`, archivo 37 borrado, nombres intactos. SALDO y MONTO_REALIZADO a BRUTO. Import fresco TEST: 39 archivos, 0 avisos; suite verde, 0 errores, residuos 0. Cargado en TECH: `#5` da SALDO 0 y cierre 10-11 cuadra 61360/61360.
 
 ## Archivos tocados
 
