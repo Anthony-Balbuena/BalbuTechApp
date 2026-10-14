@@ -1,6 +1,6 @@
 # Pendientes — Flujo de compras
 
-> **✅ COMPLETO (08/10/2026):** plan espejo del flujo de ventas (ya cerrado). **Todo hecho:** blindaje total de los 5 SPs + P11C + P12C, extracción del archivo `19.1`, **Partes 1, 2, 3, 4, 5 y 7** y **residuos #426/#464 cancelados** (nueva línea base en contexto compras §27). La Parte 6 (C++) queda **fuera de alcance: no se toca**.
+> **✅ COMPLETO (08/10/2026).** Detalle movido a `Realizado.md` (BD) el 14/10/2026.
 
 ## Pendientes del flujo completo
 

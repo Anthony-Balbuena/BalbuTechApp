@@ -1,6 +1,6 @@
     # Pendientes — Flujo de ventas
 
-> **✅ FLUJO COMPLETO CERRADO (07/10/2026):** Partes 1, 1b, 2, 3, 4, 5 y 7 **hechas** · Parte 6 y conexión web → **⛔ fuera de alcance (solo SQL)**. Fixes **P11 y P12 hechos** (ver sección abajo). *Sin cabos sueltos.*
+> **✅ FLUJO COMPLETO CERRADO (07/10/2026).** Detalle movido a `Realizado.md` (BD) el 14/10/2026.
 
 ## P11 + P12 — fixes operativos (CERRADOS ✅)
 

@@ -43,11 +43,11 @@ DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CATEGORIA ;
 CREATE PROCEDURE SP_INSERTAR_CATEGORIA(
     IN P_NOMBRE VARCHAR(200),
-    -- (09/10/2026) C1. DEFAULTs: la app manda solo el nombre (1 arg).
+    -- (09/10/2026) C1. La app manda los 3 args siempre (sin DEFAULT: MariaDB no los soporta en SP).
     -- (11/10/2026) Tipos anchos: el texto largo debe ENTRAR para que las
     -- validaciones lo rechacen amable (param chico = 1406 en la puerta).
-    IN P_DESCRIPCION VARCHAR(500) DEFAULT NULL,
-    IN P_ICONO VARCHAR(500) DEFAULT NULL
+    IN P_DESCRIPCION VARCHAR(500),
+    IN P_ICONO VARCHAR(500)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(200);
@@ -106,10 +106,10 @@ DELIMITER //
 DROP PROCEDURE if EXISTS SP_ACTUALIZAR_CATEGORIA ;
 CREATE PROCEDURE SP_ACTUALIZAR_CATEGORIA(
     IN P_ID_CATEGORIA INT,
-    -- (09/10/2026) C2. DEFAULTs: la app manda solo id + nombre (2 args).
-    IN P_NOMBRE       VARCHAR(200) DEFAULT NULL,
-    IN P_DESCRIPCION  VARCHAR(500) DEFAULT NULL,
-    IN P_ICONO        VARCHAR(500) DEFAULT NULL
+    -- (09/10/2026) C2. La app manda los 4 args siempre (sin DEFAULT: MariaDB no los soporta en SP).
+    IN P_NOMBRE       VARCHAR(200),
+    IN P_DESCRIPCION  VARCHAR(500),
+    IN P_ICONO        VARCHAR(500)
 )
 proc_label: BEGIN
     DECLARE v_nombre_limpio VARCHAR(200);

@@ -60,7 +60,7 @@ el día que se ejecuta y borra del día 121 para allá. Sin parámetro usa
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LIMPIAR_LOGS_ANTIGUOS //
-CREATE PROCEDURE SP_LIMPIAR_LOGS_ANTIGUOS(IN P_DIAS INT DEFAULT 120)
+CREATE PROCEDURE SP_LIMPIAR_LOGS_ANTIGUOS(IN P_DIAS INT)
 BEGIN
     DECLARE V_BORRADOS INT;
     -- (10/10/2026) Días positivos: con 0 o negativo el corte es hoy/futuro

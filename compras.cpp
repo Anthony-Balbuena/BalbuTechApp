@@ -35,7 +35,9 @@ void mostrarMenuCompras() {
     cout << "1. Compra rapida (carrito)" << endl;
     cout << "2. Ver compra con IVA" << endl;
     cout << "3. Devolucion de compra" << endl;
-    cout << "4. Volver al Menu Principal" << endl;
+    cout << "4. Reporte por periodo" << endl;
+    cout << "5. Pagar compra" << endl;
+    cout << "6. Volver al Menu Principal" << endl;
     cout << "=========================" << endl;
 }
 
@@ -357,21 +359,29 @@ static void pagarCompra(const CierreCompra &c) {
             return;
         }
         cout << "A pagar: $" << c.bruto << endl;
-        string recStr = leerDatoSeguro("Monto recibido (Enter = exacto): ");
-        double recibido = c.bruto;
-        if (!recStr.empty()) {
-            try { recibido = stod(recStr); }
+        string pagStr = leerDatoSeguro("Monto pagado (Enter = exacto): ");
+        double pagado = c.bruto;
+        if (!pagStr.empty()) {
+            try { pagado = stod(pagStr); }
             catch (...) {
                 cout << ROJO << "Monto invalido." << RESET << endl;
                 return;
             }
+        }
+        if (pagado <= 0) {
+            cout << ROJO << "El monto debe ser mayor a cero." << RESET << endl;
+            return;
+        }
+        if (pagado > c.bruto) {
+            cout << ROJO << "Excede lo pendiente ($" << c.bruto << ")." << RESET << endl;
+            return;
         }
         string empStr = leerDatoSeguro("ID empleado que paga (Enter = dueno): ");
         std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_PAGO_COMPRA(?, ?, ?, ?)"));
         pp->setInt(1, c.idCompra);
         pp->setInt(2, stoi(metStr));
-        pp->setDouble(3, c.bruto);
+        pp->setDouble(3, pagado);
         if (empStr.empty()) pp->setNull(4, sql::DataType::INTEGER);
         else pp->setInt(4, stoi(empStr));
         string msg = Recogermensaje(pp.get());
@@ -382,7 +392,11 @@ static void pagarCompra(const CierreCompra &c) {
             "CALL SP_COMPRA_ENCABEZADO(?)"));
         pe->setInt(1, c.idCompra);
         std::unique_ptr<sql::ResultSet> re(pe->executeQuery());
-        if (re->next()) cout << "Estado final: " << re->getString("ESTADO") << endl;
+        if (re->next()) {
+            cout << "Estado final: " << re->getString("ESTADO") << endl;
+            if (re->getString("ESTADO") != "RECIBIDA")
+                printf("Saldo restante: $%.2f\n", c.bruto - pagado);
+        }
         drenarResultados(pe.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
@@ -602,6 +616,177 @@ static void devolucionCompraUI() {
     }
 }
 
+static int diasEnMesC(int ano, int mes) {
+    if (mes == 2) {
+        if ((ano % 4 == 0 && ano % 100 != 0) || (ano % 400 == 0)) return 29;
+        return 28;
+    }
+    if (mes == 4 || mes == 6 || mes == 9 || mes == 11) return 30;
+    return 31;
+}
+
+static const char *nombreMesC(int mes) {
+    static const char *nombres[] = {"", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+    if (mes < 1 || mes > 12) return "";
+    return nombres[mes];
+}
+
+static string fmt2C(int n) {
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%02d", n);
+    return string(buf);
+}
+
+static void reportePeriodoCompraUI() {
+    cout << "\n--- REPORTE DE COMPRAS POR PERIODO ---" << endl;
+    try {
+        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
+        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
+        string finStr = leerDatoSeguro("Mes final (1-12): ");
+        if (!esNumericoC(anoStr) || !esNumericoC(iniStr) || !esNumericoC(finStr)) {
+            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
+            return;
+        }
+        int ano = stoi(anoStr);
+        int mesInicio = stoi(iniStr);
+        int mesFin = stoi(finStr);
+        if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
+            mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
+            cout << ROJO << "Rango de meses invalido." << RESET << endl;
+            return;
+        }
+
+        int transGlobal = 0;
+        double subGlobal = 0.0, itbisGlobal = 0.0, brutoGlobal = 0.0;
+
+        for (int m = mesInicio; m <= mesFin; ++m) {
+            int maxDias = diasEnMesC(ano, m);
+            cout << "\n[Mes: " << nombreMesC(m) << " " << ano << "]" << endl;
+            cout << "  1. Mes completo" << endl;
+            cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
+            string modoStr = leerDatoSeguro("Opcion: ");
+            if (!esNumericoC(modoStr) || (modoStr != "1" && modoStr != "2")) {
+                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
+                modoStr = "1";
+            }
+
+            int dIni = 1, dFin = maxDias;
+            string filtro = "Mes completo";
+            if (modoStr == "2") {
+                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
+                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
+                if (!esNumericoC(diStr) || !esNumericoC(dfStr)) {
+                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
+                } else {
+                    dIni = stoi(diStr);
+                    dFin = stoi(dfStr);
+                    if (dIni < 1) dIni = 1;
+                    if (dFin > maxDias) dFin = maxDias;
+                    if (dIni > dFin) dFin = dIni;
+                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
+                }
+            }
+
+            string desde = anoStr + "-" + fmt2C(m) + "-" + fmt2C(dIni);
+            string hasta = anoStr + "-" + fmt2C(m) + "-" + fmt2C(dFin);
+
+            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+                "CALL SP_REPORTE_PERIODO_COMPRA(?, ?)"));
+            pstmt->setString(1, desde);
+            pstmt->setString(2, hasta);
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+            int trans = 0;
+            double sub = 0.0, itbis = 0.0, bruto = 0.0;
+            if (res->next()) {
+                trans = res->getInt("TRANSACCIONES");
+                sub = res->getDouble("SUBTOTAL");
+                itbis = res->getDouble("ITBIS");
+                bruto = res->getDouble("BRUTO");
+            }
+            drenarResultados(pstmt.get());
+
+            transGlobal += trans;
+            subGlobal += sub;
+            itbisGlobal += itbis;
+            brutoGlobal += bruto;
+
+            cout << "\n--------------------------------------------------" << endl;
+            cout << " [ " << nombreMesC(m) << " " << ano << " ]" << endl;
+            cout << "--------------------------------------------------" << endl;
+            printf(" %-14s: %s\n", "Filtro", filtro.c_str());
+            printf(" %-14s: %d\n", "Transacciones", trans);
+            printf(" %-14s: $%.2f\n", "Subtotal", sub);
+            printf(" %-14s: $%.2f\n", "ITBIS", itbis);
+            printf(" %-14s: $%.2f\n", "Total", bruto);
+        }
+
+        cout << "\n===================================================" << endl;
+        cout << " RESUMEN CONSOLIDADO (" << nombreMesC(mesInicio) << " - " << nombreMesC(mesFin) << " " << ano << ")" << endl;
+        cout << "===================================================" << endl;
+        printf(" %-14s: %d\n", "Transacciones", transGlobal);
+        printf(" %-14s: $%.2f\n", "Subtotal", subGlobal);
+        printf(" %-14s: $%.2f\n", "ITBIS", itbisGlobal);
+        printf(" %-14s: $%.2f\n", "Gran total", brutoGlobal);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo generar el reporte." << RESET << endl;
+    }
+}
+
+static void pagarCompraPendienteUI() {
+    cout << "\n--- PAGAR COMPRA ABIERTA ---" << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "CALL SP_COMPRAS_PENDIENTES()"));
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        printf("\n%-7s | %-20s | %-10s | %-10s | %-10s\n", "COMPRA", "PROVEEDOR", "ESTADO", "PAGADO", "SALDO");
+        bool hay = false;
+        while (rl->next()) {
+            hay = true;
+            printf("%-7d | %-20.20s | %-10s | %-10.2f | %-10.2f\n",
+                   rl->getInt("ID_COMPRA"),
+                   rl->getString("PROVEEDOR").c_str(),
+                   rl->getString("ESTADO").c_str(),
+                   (double)rl->getDouble("PAGADO"),
+                   (double)rl->getDouble("SALDO"));
+        }
+        drenarResultados(pl.get());
+        if (!hay) {
+            cout << "[!] Sin compras pendientes." << endl;
+            return;
+        }
+        string cStr = leerDatoSeguro("ID compra: ");
+        if (!esNumericoC(cStr)) {
+            cout << ROJO << "ID invalido." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_COMPRAS_PENDIENTES()"));
+        std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
+        double saldo = -1.0;
+        while (rs->next()) {
+            if (rs->getInt("ID_COMPRA") == stoi(cStr)) saldo = rs->getDouble("SALDO");
+        }
+        drenarResultados(ps.get());
+        if (saldo < 0) {
+            cout << ROJO << "Esa compra no esta pendiente." << RESET << endl;
+            return;
+        }
+        CierreCompra c;
+        c.idCompra = stoi(cStr);
+        c.idEmpleado = 0;
+        c.subtotal = saldo;
+        c.bruto = saldo;
+        pagarCompra(c);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo pagar." << RESET << endl;
+    }
+}
+
 void ejecutarSubmenuCompras() {
     int opcion = 0;
     do {
@@ -626,11 +811,17 @@ void ejecutarSubmenuCompras() {
                 devolucionCompraUI();
                 break;
             case 4:
+                reportePeriodoCompraUI();
+                break;
+            case 5:
+                pagarCompraPendienteUI();
+                break;
+            case 6:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 4) pausar();
-    } while (opcion != 4);
+        if (opcion != 6) pausar();
+    } while (opcion != 6);
 }
