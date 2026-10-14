@@ -62,6 +62,11 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 - [ ] Reporte de stock crítico en app (el SP `SP_REPORTE_STOCK_CRITICO` existe, falta pantalla).
 - [ ] Kardex por producto en app (la bitácora `MOVIMIENTOS_INVENTARIO` ya se guarda, falta consulta por ítem).
 
+## Pendiente reporte por periodo (13/10/2026, para después)
+
+- [ ] APP C++: `SP_REPORTE_PERIODO(tipo, desde, hasta)` real + pantalla con el flujo del prototipo (año, meses, por mes completo o días, tarjetas + consolidado). El prototipo de `C++.txt` usa `rand()`: NO pegarlo, solo reusar la interacción.
+- [ ] WEB: API mínima (`GET /api/reporte`) que llame al mismo SP + adaptar `index.html` (fetch en vez de random) + deploy. La web hoy es estática con simulados.
+
 ## Pendiente ganancias (12/10/2026, para después)
 
 - [ ] Ver ganancias: venta (precio de venta) menos costo (precio de compra). OJO: hoy la base no guarda costo por producto ni por lote, sin eso no hay cálculo serio. Definir primero dónde vive el costo y después el reporte. Estructurarlo bien, sin apuro.
