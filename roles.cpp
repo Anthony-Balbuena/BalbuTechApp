@@ -22,6 +22,7 @@
 #include "clientes.h"
 #include "usuarios.h"
 #include "ventas.h"
+#include "compras.h"
 #include "inventario.h"
 
 using namespace std;
@@ -138,9 +139,10 @@ void mostrarMenuSegunRol() {
         cout << "8. Productos" << endl;
         cout << "9. Metodos de pago" << endl;
         cout << "10. Ventas" << endl;
-        cout << "11. Inventario" << endl;
-        cout << "12. Ver permisos" << endl;
-        cout << "13. Cerrar sesión" << endl;
+        cout << "11. Compras" << endl;
+        cout << "12. Inventario" << endl;
+        cout << "13. Ver permisos" << endl;
+        cout << "14. Cerrar sesión" << endl;
     } else if (sesionActual.nombreRol == "RRHH") {
         cout << "1. Empleados" << endl;
         cout << "2. Roles" << endl;
@@ -249,16 +251,23 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 11:
+                    if (tienePermiso("GESTIONAR_COMPRAS")) {
+                        ejecutarSubmenuCompras();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar compras." << RESET << endl;
+                    }
+                    break;
+                case 12:
                     if (tienePermiso("GESTIONAR_INVENTARIO")) {
                         ejecutarSubmenuInventario();
                     } else {
                         cout << ROJO << "No tienes permiso para gestionar inventario." << RESET << endl;
                     }
                     break;
-                case 12:
+                case 13:
                     mostrarPermisosActuales();
                     break;
-                case 13:
+                case 14:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;

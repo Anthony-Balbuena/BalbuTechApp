@@ -30,14 +30,21 @@ bool intentarLogin(const string& usuario, const string& password) {
         if (rsel->next()) {
             string storedHash = rsel->getString("CONTRASENA");
             string estadoCuenta = rsel->getString("ESTADO");
+            int idUsuario = rsel->getInt("ID_USUARIO");
+            string rol;
+            try { rol = rsel->getString("NOMBRE_ROL"); } catch (...) { rol = ""; }
+            int idRol = 0;
+            try { idRol = rsel->isNull("ID_ROL") ? 0 : rsel->getInt("ID_ROL"); } catch (...) { idRol = 0; }
+
+            // Cerrar el SELECT antes de cualquier otra query: si el UPDATE
+            // de rehash corre con esto abierto, la conexion queda
+            // desincronizada ("Commands out of sync") y todo lo posterior falla.
+            rsel.reset();
+            drenarResultados(pSelect.get());
 
             string rehash;
             bool ok = verificarPassword(password, storedHash, &rehash);
             if (ok && estadoCuenta == "ACTIVO") {
-                int idUsuario = rsel->getInt("ID_USUARIO");
-                string rol = rsel->getString("NOMBRE_ROL");
-                int idRol = rsel->isNull("ID_ROL") ? 0 : rsel->getInt("ID_ROL");
-
                 // Si hubo rehash, actualizamos la BD al formato PBKDF2
                 if (!rehash.empty()) {
                     try {

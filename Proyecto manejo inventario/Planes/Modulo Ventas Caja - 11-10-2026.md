@@ -69,6 +69,13 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 
 ## Progreso
 
+- [x] Login envenenado (13/10/2026): `intentarLogin` corría el UPDATE de rehash con el SELECT abierto → "Commands out of sync" en todo lo posterior (empleados, proveedores, compras). Solo pasaba con hash legacy (ej. admin fresco), por eso en casa no se veía. Se cierra/drena antes del UPDATE. Probado: admin migra a PBKDF2 y listar anda.
+- [x] Buscar alineado con cantidad (13/10/2026): tabla `printf` + columna CANTIDAD en `buscarProducto()`. Humo en vivo OK.
+- [x] Cobrar venta en proceso (13/10/2026): `9. Cobrar venta` con `SP_VENTAS_PENDIENTES()` (para más tarde, anotado). Humo solo-lectura OK.
+- [x] Módulo Compras 1-4 (13/10/2026): `compras.h/cpp` (carrito con precio de compra, ticket BALBUTECH, pago por bruto, devolución) + botón `11. Compras` solo ADMIN + triggers de pago-compra a BRUTO (7 puntos + vista). Suite TEST verde, TECH humo verde, app humo OK, residuos 0.
+- [x] Fase 3 lista (13/10/2026): `39- LECTURAS_VENTAS.sql` (10 SP solo lectura) + `ventas.cpp` sin SELECT a tablas (solo `@nv`). Cargado en TEST y TECH (10/10), humo en vivo solo-lectura OK.
+- [x] SELECTs a SP en ventas (13/10/2026): buscar/stock por SP + `FN_TASA_ITBIS()` en `33- CONFIGURACION.sql`. Humo en vivo sin guardar: pica el 2 y suma bien. Fases 1 y 2 listas.
+- [x] Pull del trabajo revisado (13/10/2026): `SP_INSERTAR_PRODUCTO` ya pide P_COMPRA (9.º parámetro) y la app lo manda; estaba desfasado en las bases (8 params) y se recargó en TEST y TECH con prueba y rollback. `P_COMPRA=0` deja ganancia NULL. Compila OK.
 - [x] Pantalla de pago como pediste (12/10/2026): métodos por ID, `A pagar: $` sin subtotal, mensaje `A PAGAR / RECIBIDO / DEVUELTO. REGISTRADO POR EL EMPLEADO`. Probado en TEST y TECH con rollback.
 - [x] App al día con la DB (12/10/2026): costo en buscar-productos + `8. Ganancias` en ventas (mensual + líneas, interno sin IVA). `SP_CONSULTAR_PRODUCTOS_FILTRADO` devuelve COSTO en TEST y TECH. Probado en vivo. La `#5` sale `---` porque se vendió antes del costo (honesto, no inventa).
 - [x] Update de costo (12/10/2026): `SP_ACTUALIZAR_PRODUCTOS` acepta `P_COSTO` (NULL conserva, negativo rechaza); `productos.cpp` lo pide y el módulo de stock trae `2. Actualizar costo`. TEST verde, TECH verde con rollback, residuos 0.

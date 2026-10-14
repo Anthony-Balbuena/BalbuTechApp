@@ -33,7 +33,8 @@ void mostrarMenuVentas() {
     cout << "6. Reporte por rango" << endl;
     cout << "7. Cierre de caja" << endl;
     cout << "8. Ganancias" << endl;
-    cout << "9. Volver al Menu Principal" << endl;
+    cout << "9. Cobrar venta" << endl;
+    cout << "10. Volver al Menu Principal" << endl;
     cout << "========================" << endl;
 }
 
@@ -48,16 +49,18 @@ static bool esNumerico(const string &s) {
 static bool buscarPorId(int id, LineaCarrito &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "SELECT ID_PRODUCTO, CODIGO, NOMBRE, PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = ? AND ESTADO = 'ACTIVO'"));
-        pstmt->setInt(1, id);
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
+        pstmt->setString(1, to_string(id));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool ok = false;
-        if (res->next()) {
-            out.idProducto = res->getInt("ID_PRODUCTO");
-            out.codigo = res->getString("CODIGO");
-            out.nombre = res->getString("NOMBRE");
-            out.precio = res->getDouble("PRECIO");
-            ok = true;
+        while (!ok && res->next()) {
+            if (res->getInt("ID_PRODUCTO") == id && res->getString("ESTADO") == "ACTIVO") {
+                out.idProducto = id;
+                out.codigo = res->getString("CODIGO");
+                out.nombre = res->getString("NOMBRE");
+                out.precio = res->getDouble("PRECIO");
+                ok = true;
+            }
         }
         drenarResultados(pstmt.get());
         return ok;
@@ -69,16 +72,18 @@ static bool buscarPorId(int id, LineaCarrito &out) {
 static bool buscarPorCodigo(const string &codigo, LineaCarrito &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "SELECT ID_PRODUCTO, CODIGO, NOMBRE, PRECIO FROM PRODUCTOS WHERE CODIGO = ? AND ESTADO = 'ACTIVO'"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
         pstmt->setString(1, codigo);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool ok = false;
-        if (res->next()) {
-            out.idProducto = res->getInt("ID_PRODUCTO");
-            out.codigo = res->getString("CODIGO");
-            out.nombre = res->getString("NOMBRE");
-            out.precio = res->getDouble("PRECIO");
-            ok = true;
+        while (!ok && res->next()) {
+            if (res->getString("CODIGO") == codigo && res->getString("ESTADO") == "ACTIVO") {
+                out.idProducto = res->getInt("ID_PRODUCTO");
+                out.codigo = codigo;
+                out.nombre = res->getString("NOMBRE");
+                out.precio = res->getDouble("PRECIO");
+                ok = true;
+            }
         }
         drenarResultados(pstmt.get());
         return ok;
@@ -90,11 +95,16 @@ static bool buscarPorCodigo(const string &codigo, LineaCarrito &out) {
 static int stockDe(int idProducto) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "SELECT STOCK_ACTUAL FROM INVENTARIO WHERE ID_PRODUCTO = ?"));
-        pstmt->setInt(1, idProducto);
+            "CALL SP_CONSULTAR_INVENTARIO(?)"));
+        pstmt->setString(1, to_string(idProducto));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         int stock = 0;
-        if (res->next()) stock = res->getInt("STOCK_ACTUAL");
+        while (res->next()) {
+            if (res->getInt("ID_PRODUCTO") == idProducto) {
+                try { stock = res->getInt("STOCK_ACTUAL"); } catch (...) { stock = 0; }
+                break;
+            }
+        }
         drenarResultados(pstmt.get());
         return stock;
     } catch (const exception &) {
@@ -146,16 +156,12 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
 static double tasaIVA() {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "SELECT VALOR FROM CONFIGURACION WHERE CLAVE = 'ITBIS'"));
+            "SELECT FN_TASA_ITBIS() AS TASA"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         double tasa = 18.0;
-        if (res->next()) {
-            double v = 0.0;
-            try { v = stod(res->getString("VALOR")); } catch (...) { v = 0.0; }
-            if (v > 0) tasa = v;
-        }
+        if (res->next()) tasa = res->getDouble("TASA");
         drenarResultados(pstmt.get());
-        return tasa;
+        return tasa > 0 ? tasa : 18.0;
     } catch (const exception &) {
         return 18.0;
     }
@@ -230,7 +236,7 @@ static void pagarVenta(const CierreVenta &c) {
         cout << VERDE << msg << RESET << endl;
 
         std::unique_ptr<sql::PreparedStatement> pe(globalCon->prepareStatement(
-            "SELECT ESTADO FROM VENTAS WHERE ID_VENTA = ?"));
+            "CALL SP_VENTA_ESTADO(?)"));
         pe->setInt(1, c.idVenta);
         std::unique_ptr<sql::ResultSet> re(pe->executeQuery());
         if (re->next()) cout << "Estado final: " << re->getString("ESTADO") << endl;
@@ -303,7 +309,7 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
         }
 
         std::unique_ptr<sql::PreparedStatement> pv(globalCon->prepareStatement(
-            "SELECT SUBTOTAL, ITBIS, TOTAL_CON_IVA FROM VISTA_VENTA_CON_IVA WHERE ID_VENTA = ?"));
+            "CALL SP_VENTA_ENCABEZADO(?)"));
         pv->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> res(pv->executeQuery());
         if (res->next()) {
@@ -423,8 +429,7 @@ static void ventaRapida() {
 static void mostrarFactura(int idVenta) {
     try {
         std::unique_ptr<sql::PreparedStatement> ph(globalCon->prepareStatement(
-            "SELECT ID_VENTA, CLIENTE, FECHA, ESTADO, SUBTOTAL, ITBIS, TOTAL_CON_IVA "
-            "FROM VISTA_VENTA_CON_IVA WHERE ID_VENTA = ?"));
+            "CALL SP_VENTA_ENCABEZADO(?)"));
         ph->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rh(ph->executeQuery());
         if (!rh->next()) {
@@ -445,10 +450,7 @@ static void mostrarFactura(int idVenta) {
                vId, vCli.c_str(), vFecha.c_str(), vEstado.c_str());
 
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT P.NOMBRE, DV.CANTIDAD, DV.PRECIO_UNITARIO, DV.SUBTOTAL, DV.MONTO_ITBIS, "
-            "(DV.SUBTOTAL + DV.MONTO_ITBIS) AS TOTAL_LINEA "
-            "FROM DETALLES_VENTA DV JOIN PRODUCTOS P ON P.ID_PRODUCTO = DV.ID_PRODUCTO "
-            "WHERE DV.ID_VENTA = ? ORDER BY DV.ID_DETALLE_VENTA"));
+            "CALL SP_VENTA_LINEAS(?)"));
         pl->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-25s | %-4s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "ITBIS", "Subtotal", "Total");
@@ -472,8 +474,7 @@ static void mostrarFactura(int idVenta) {
 static void verPagosDeVenta(int idVenta) {
     try {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT ID_PAGO, NOMBRE_METODO, MONTO, MONTO_RECIBIDO, NOMBRE_EMPLEADO "
-            "FROM VISTA_RESUMEN_PAGOS WHERE ID_VENTA = ? ORDER BY ID_PAGO"));
+            "CALL SP_PAGOS_POR_VENTA(?)"));
         pl->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-7s | %-12s | %-10s | %-10s | %-15s\n", "ID_PAGO", "METODO", "MONTO", "RECIBIDO", "EMPLEADO");
@@ -499,8 +500,7 @@ static void verVentaConIVA() {
 
     try {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT ID_VENTA FROM VENTAS "
-            "ORDER BY ID_VENTA DESC LIMIT 20"));
+            "CALL SP_VENTAS_ULTIMAS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         vector<int> ids;
         while (rl->next()) ids.push_back(rl->getInt("ID_VENTA"));
@@ -530,8 +530,7 @@ static void cancelarVentaUI() {
     cout << "Solo ventas EN_PROCESO sin pagos. Repone el stock." << endl;
     try {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT ID_VENTA, CLIENTE, ESTADO, SUBTOTAL, ITBIS, TOTAL_CON_IVA "
-            "FROM VISTA_VENTA_CON_IVA ORDER BY ID_VENTA DESC LIMIT 20"));
+            "CALL SP_VENTAS_ULTIMAS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-6s | %-20s | %-10s | %-10s\n", "ID", "CLIENTE", "ESTADO", "TOTAL");
         while (rl->next()) {
@@ -570,8 +569,7 @@ static void anularPagoUI() {
     cout << "Si la venta estaba REALIZADA, vuelve a EN_PROCESO y cae el bono." << endl;
     try {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT ID_PAGO, ID_VENTA, NOMBRE_METODO, MONTO, MONTO_RECIBIDO, NOMBRE_EMPLEADO "
-            "FROM VISTA_RESUMEN_PAGOS ORDER BY ID_PAGO DESC LIMIT 20"));
+            "CALL SP_PAGOS_ULTIMOS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-7s | %-6s | %-12s | %-10s | %-10s | %-15s\n", "ID_PAGO", "VENTA", "METODO", "MONTO", "RECIBIDO", "EMPLEADO");
         while (rl->next()) {
@@ -709,9 +707,7 @@ static void devolucionVentaUI() {
     cout << "Registra la devolucion PENDIENTE y luego aprueba o rechaza." << endl;
     try {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "SELECT DV.ID_DETALLE_VENTA, DV.ID_VENTA, P.NOMBRE, DV.CANTIDAD "
-            "FROM DETALLES_VENTA DV JOIN PRODUCTOS P ON P.ID_PRODUCTO = DV.ID_PRODUCTO "
-            "ORDER BY DV.ID_DETALLE_VENTA DESC LIMIT 20"));
+            "CALL SP_DETALLES_VENDIDOS_ULTIMOS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-8s | %-6s | %-25s | %-4s\n", "ID_DET", "VENTA", "PRODUCTO", "CANT");
         while (rl->next()) {
@@ -765,8 +761,7 @@ static void devolucionVentaUI() {
         drenarResultados(pr.get());
 
         std::unique_ptr<sql::PreparedStatement> pi(globalCon->prepareStatement(
-            "SELECT ID_DEVOLUCION FROM DEVOLUCIONES WHERE ID_DETALLE_VENTA = ? "
-            "AND ESTADO = 'PENDIENTE' ORDER BY ID_DEVOLUCION DESC LIMIT 1"));
+            "CALL SP_DEVOLUCION_PENDIENTE_POR_DETALLE(?)"));
         pi->setInt(1, stoi(dStr));
         std::unique_ptr<sql::ResultSet> ri(pi->executeQuery());
         int idDev = 0;
@@ -806,10 +801,9 @@ static void devolucionVentaUI() {
 static void verGananciasUI() {
     cout << "\n--- GANANCIAS (interno, sin IVA) ---" << endl;
     try {
-        std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
-        std::unique_ptr<sql::ResultSet> rm(stmt->executeQuery(
-            "SELECT MES, VENTAS, SUBTOTAL, GANANCIA_BRUTA, GANANCIA_DEVUELTA, GANANCIA_NETA "
-            "FROM VW_GANANCIAS_MENSUAL"));
+        std::unique_ptr<sql::PreparedStatement> pm(globalCon->prepareStatement(
+            "CALL SP_GANANCIAS_MENSUAL()"));
+        std::unique_ptr<sql::ResultSet> rm(pm->executeQuery());
         printf("\n%-7s | %-6s | %-10s | %-10s | %-10s | %-10s\n", "MES", "VENTAS", "SUBTOTAL", "BRUTA", "DEVUELTA", "NETA");
         bool hayMes = false;
         while (rm->next()) {
@@ -823,7 +817,7 @@ static void verGananciasUI() {
                    (double)rm->getDouble("GANANCIA_NETA"));
         }
         if (!hayMes) cout << "[!] Sin ganancias registradas." << endl;
-        drenarResultados(stmt.get());
+        drenarResultados(pm.get());
 
         string mes = leerDatoSeguro("Mes (AAAA-MM, Enter = ultimas lineas): ");
         if (!mes.empty()) {
@@ -837,12 +831,10 @@ static void verGananciasUI() {
                 return;
             }
         }
-        string q = "SELECT ID_VENTA, FECHA, PRODUCTO, CANTIDAD, ITBIS, COSTO_TOTAL, TOTAL_LINEA, "
-                   "GANANCIA, GANANCIA_NETA "
-                   "FROM VW_GANANCIAS ";
-        if (!mes.empty()) q += "WHERE DATE_FORMAT(FECHA, '%Y-%m') = '" + mes + "' ";
-        q += "ORDER BY ID_VENTA DESC LIMIT 30";
-        std::unique_ptr<sql::ResultSet> rl(stmt->executeQuery(q));
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "CALL SP_GANANCIAS_LINEAS(?)"));
+        pl->setString(1, mes);
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-6s | %-19s | %-25s | %-4s | %-10s | %-10s | %-10s | %-10s\n", "VENTA", "FECHA", "PRODUCTO", "CANT", "ITBIS", "P.COMPRA", "P.VENTA", "GANANCIA");
         while (rl->next()) {
             double itbis = 0.0, pcompra = 0.0, pventa = 0.0, neta = 0.0;
@@ -861,11 +853,63 @@ static void verGananciasUI() {
                    rl->getInt("CANTIDAD"),
                    itbis, bCompra, pventa, neta);
         }
-        drenarResultados(stmt.get());
+        drenarResultados(pl.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
         cout << ROJO << "No se pudieron ver las ganancias." << RESET << endl;
+    }
+}
+
+static void cobrarVentaUI() {
+    cout << "\n--- COBRAR VENTA EN PROCESO ---" << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "CALL SP_VENTAS_PENDIENTES()"));
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        printf("\n%-6s | %-10s | %-10s | %-10s\n", "VENTA", "ESTADO", "PAGADO", "SALDO");
+        bool hay = false;
+        while (rl->next()) {
+            hay = true;
+            printf("%-6d | %-10s | %-10.2f | %-10.2f\n",
+                   rl->getInt("ID_VENTA"),
+                   rl->getString("ESTADO").c_str(),
+                   (double)rl->getDouble("PAGADO"),
+                   (double)rl->getDouble("SALDO"));
+        }
+        drenarResultados(pl.get());
+        if (!hay) {
+            cout << "[!] Sin ventas pendientes." << endl;
+            return;
+        }
+        string vStr = leerDatoSeguro("ID venta: ");
+        string eStr = leerDatoSeguro("ID empleado que cobra: ");
+        if (!esNumerico(vStr) || !esNumerico(eStr)) {
+            cout << ROJO << "IDs invalidos." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_VENTAS_PENDIENTES()"));
+        std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
+        double saldo = -1.0;
+        while (rs->next()) {
+            if (rs->getInt("ID_VENTA") == stoi(vStr)) saldo = rs->getDouble("SALDO");
+        }
+        drenarResultados(ps.get());
+        if (saldo < 0) {
+            cout << ROJO << "Esa venta no esta pendiente." << RESET << endl;
+            return;
+        }
+        CierreVenta c;
+        c.idVenta = stoi(vStr);
+        c.idEmpleado = stoi(eStr);
+        c.subtotal = saldo;
+        c.bruto = saldo;
+        pagarVenta(c);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo cobrar." << RESET << endl;
     }
 }
 
@@ -908,11 +952,14 @@ void ejecutarSubmenuVentas() {
                 verGananciasUI();
                 break;
             case 9:
+                cobrarVentaUI();
+                break;
+            case 10:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 9) pausar();
-    } while (opcion != 9);
+        if (opcion != 10) pausar();
+    } while (opcion != 10);
 }

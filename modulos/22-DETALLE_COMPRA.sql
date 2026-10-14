@@ -65,9 +65,12 @@ CREATE PROCEDURE 22_SP_AGREGAR_DETALLE_COMPRA(
 proc_label: BEGIN
     DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
     -- (11/10/2026) ITBIS por línea con tasa vigente.
+    -- (13/10/2026) P_PRECIO es el DE FACTURA (con ITBIS): se descuenta.
     DECLARE V_TASA_TXT VARCHAR(100);
     DECLARE V_TASA DECIMAL(5, 2);
     DECLARE V_ITBIS DECIMAL(10, 2);
+    DECLARE V_BRUTO_LINEA DECIMAL(12, 2);
+    DECLARE V_PRECIO_NETO DECIMAL(10, 2);
     -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
     -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
     -- no la toca y cualquier error se propaga para que el que llama decida.
@@ -127,9 +130,12 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
-    SET V_ITBIS = ROUND(P_CANTIDAD * P_PRECIO * V_TASA / 100, 2);
+    -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
+    SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
+    SET V_ITBIS = ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2);
+    SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - V_ITBIS) / P_CANTIDAD, 2);
     INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, MONTO_ITBIS)
-    VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, P_PRECIO, V_ITBIS);
+    VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO_NETO, V_ITBIS);
 
 
     IF V_PROPIA_TRANSACCION = 1 THEN
@@ -138,7 +144,7 @@ proc_label: BEGIN
 
     -- 3. Aviso de margen: si este precio de compra ya alcanza (o pasa)
     --    el precio de venta, se esta comprando a perdida o sin margen
-    IF P_PRECIO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
+    IF V_PRECIO_NETO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
         SELECT 'EXITO: PRODUCTO AGREGADO (ADVERTENCIA: PRECIO DE COMPRA IGUAL O MAYOR AL DE VENTA).' AS MENSAJE;
     ELSE
         SELECT 'EXITO: PRODUCTO AGREGADO.' AS MENSAJE;
@@ -243,9 +249,12 @@ proc_label: BEGIN
     DECLARE V_ID_DETALLE INT;
     DECLARE V_ESTADO VARCHAR(20);
     -- (11/10/2026) ITBIS por línea con tasa vigente.
+    -- (13/10/2026) P_PRECIO es el DE FACTURA (con ITBIS): se descuenta.
     DECLARE V_TASA_TXT VARCHAR(100);
     DECLARE V_TASA DECIMAL(5, 2);
     DECLARE V_ITBIS DECIMAL(10, 2);
+    DECLARE V_BRUTO_LINEA DECIMAL(12, 2);
+    DECLARE V_PRECIO_NETO DECIMAL(10, 2);
     -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
     -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
     -- no la toca y cualquier error se propaga para que el que llama decida.
@@ -309,9 +318,12 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
-    SET V_ITBIS = ROUND(P_CANTIDAD * P_PRECIO * V_TASA / 100, 2);
+    -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
+    SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
+    SET V_ITBIS = ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2);
+    SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - V_ITBIS) / P_CANTIDAD, 2);
     INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, MONTO_ITBIS)
-    VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, P_PRECIO, V_ITBIS);
+    VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO_NETO, V_ITBIS);
 
 
     IF V_PROPIA_TRANSACCION = 1 THEN
@@ -319,7 +331,7 @@ proc_label: BEGIN
     END IF;
 
     -- 6. Aviso de margen, igual que al agregar
-    IF P_PRECIO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
+    IF V_PRECIO_NETO >= (SELECT PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
         SELECT 'EXITO: LINEA MODIFICADA (ADVERTENCIA: PRECIO DE COMPRA IGUAL O MAYOR AL DE VENTA).' AS MENSAJE;
     ELSE
         SELECT 'EXITO: LINEA MODIFICADA.' AS MENSAJE;
