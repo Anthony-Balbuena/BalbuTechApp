@@ -39,6 +39,8 @@ done
 echo "Importando $MODULOS_DIR a base $DB_NAME ..."
 count=0
 failed=0
+# (14/10/2026) --force sale 0 aunque haya errores de sentencia adentro:
+# se cuentan las lineas ^ERROR por archivo para no mentir con "0 avisos".
 # sort -V ordena 1,2,3...10,11...36 (y 19 < 19.5 < 19.6 < 20) correctamente.
 while IFS= read -r f; do
   case "$f" in
@@ -46,14 +48,20 @@ while IFS= read -r f; do
   esac
   count=$((count + 1))
   echo "[$count] $f"
-  if ! mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
-      --default-character-set=utf8mb4 --database="$DB_NAME" --force < "$f"; then
-    echo "  AVISO: fallo al importar $f (sigo con --force, revisa el archivo)" >&2
+  log=$(mktemp)
+  mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
+      --default-character-set=utf8mb4 --database="$DB_NAME" --force < "$f" >"$log" 2>&1
+  errs=$(grep -c "^ERROR" "$log" || true)
+  if [ "$errs" -gt 0 ]; then
+    echo "  AVISO: $errs error(es) de sentencia en $f (sigo con --force):" >&2
+    grep "^ERROR" "$log" | head -n 5 >&2
     failed=$((failed + 1))
   fi
+  rm -f "$log"
 done < <(ls -1 "$MODULOS_DIR"/*.sql | sort -V)
 
-echo "Listo: $count archivos, $failed con avisos."
+echo "Listo: $count archivos, $failed con errores de sentencia."
+echo "Verifica rutinas con: bash db/check-app-sps.sh"
 echo "Tablas en $DB_NAME:"
 mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
   --database="$DB_NAME" -e "SHOW TABLES;"

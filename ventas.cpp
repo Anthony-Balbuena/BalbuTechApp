@@ -34,7 +34,9 @@ void mostrarMenuVentas() {
     cout << "7. Cierre de caja" << endl;
     cout << "8. Ganancias" << endl;
     cout << "9. Cobrar venta" << endl;
-    cout << "10. Volver al Menu Principal" << endl;
+    cout << "10. Reporte por periodo" << endl;
+    cout << "11. Ganancias por periodo" << endl;
+    cout << "12. Volver al Menu Principal" << endl;
     cout << "========================" << endl;
 }
 
@@ -703,6 +705,226 @@ static void reporteVentasUI() {
     }
 }
 
+static int diasEnMes(int ano, int mes) {
+    if (mes == 2) {
+        if ((ano % 4 == 0 && ano % 100 != 0) || (ano % 400 == 0)) return 29;
+        return 28;
+    }
+    if (mes == 4 || mes == 6 || mes == 9 || mes == 11) return 30;
+    return 31;
+}
+
+static const char *nombreMes(int mes) {
+    static const char *nombres[] = {"", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+    if (mes < 1 || mes > 12) return "";
+    return nombres[mes];
+}
+
+static string fmt2(int n) {
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%02d", n);
+    return string(buf);
+}
+
+static void reportePeriodoUI() {
+    cout << "\n--- REPORTE POR PERIODO ---" << endl;
+    try {
+        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
+        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
+        string finStr = leerDatoSeguro("Mes final (1-12): ");
+        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
+            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
+            return;
+        }
+        int ano = stoi(anoStr);
+        int mesInicio = stoi(iniStr);
+        int mesFin = stoi(finStr);
+        if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
+            mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
+            cout << ROJO << "Rango de meses invalido." << RESET << endl;
+            return;
+        }
+
+        int transGlobal = 0;
+        double subGlobal = 0.0, itbisGlobal = 0.0, brutoGlobal = 0.0;
+
+        for (int m = mesInicio; m <= mesFin; ++m) {
+            int maxDias = diasEnMes(ano, m);
+            cout << "\n[Mes: " << nombreMes(m) << " " << ano << "]" << endl;
+            cout << "  1. Mes completo" << endl;
+            cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
+            string modoStr = leerDatoSeguro("Opcion: ");
+            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
+                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
+                modoStr = "1";
+            }
+
+            int dIni = 1, dFin = maxDias;
+            string filtro = "Mes completo";
+            if (modoStr == "2") {
+                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
+                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
+                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
+                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
+                } else {
+                    dIni = stoi(diStr);
+                    dFin = stoi(dfStr);
+                    if (dIni < 1) dIni = 1;
+                    if (dFin > maxDias) dFin = maxDias;
+                    if (dIni > dFin) dFin = dIni;
+                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
+                }
+            }
+
+            string desde = anoStr + "-" + fmt2(m) + "-" + fmt2(dIni);
+            string hasta = anoStr + "-" + fmt2(m) + "-" + fmt2(dFin);
+
+            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+                "CALL SP_REPORTE_PERIODO(?, ?)"));
+            pstmt->setString(1, desde);
+            pstmt->setString(2, hasta);
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+            int trans = 0;
+            double sub = 0.0, itbis = 0.0, bruto = 0.0;
+            if (res->next()) {
+                trans = res->getInt("TRANSACCIONES");
+                sub = res->getDouble("SUBTOTAL");
+                itbis = res->getDouble("ITBIS");
+                bruto = res->getDouble("BRUTO");
+            }
+            drenarResultados(pstmt.get());
+
+            transGlobal += trans;
+            subGlobal += sub;
+            itbisGlobal += itbis;
+            brutoGlobal += bruto;
+
+            cout << "\n--------------------------------------------------" << endl;
+            cout << " [ " << nombreMes(m) << " " << ano << " ]" << endl;
+            cout << "--------------------------------------------------" << endl;
+            printf(" %-14s: %s\n", "Filtro", filtro.c_str());
+            printf(" %-14s: %d\n", "Transacciones", trans);
+            printf(" %-14s: $%.2f\n", "Subtotal", sub);
+            printf(" %-14s: $%.2f\n", "ITBIS", itbis);
+            printf(" %-14s: $%.2f\n", "Total", bruto);
+        }
+
+        cout << "\n===================================================" << endl;
+        cout << " RESUMEN CONSOLIDADO (" << nombreMes(mesInicio) << " - " << nombreMes(mesFin) << " " << ano << ")" << endl;
+        cout << "===================================================" << endl;
+        printf(" %-14s: %d\n", "Transacciones", transGlobal);
+        printf(" %-14s: $%.2f\n", "Subtotal", subGlobal);
+        printf(" %-14s: $%.2f\n", "ITBIS", itbisGlobal);
+        printf(" %-14s: $%.2f\n", "Gran total", brutoGlobal);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo generar el reporte." << RESET << endl;
+    }
+}
+
+static void reportePeriodoGananciaUI() {
+    cout << "\n--- GANANCIAS POR PERIODO (sin IVA) ---" << endl;
+    try {
+        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
+        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
+        string finStr = leerDatoSeguro("Mes final (1-12): ");
+        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
+            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
+            return;
+        }
+        int ano = stoi(anoStr);
+        int mesInicio = stoi(iniStr);
+        int mesFin = stoi(finStr);
+        if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
+            mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
+            cout << ROJO << "Rango de meses invalido." << RESET << endl;
+            return;
+        }
+
+        int transGlobal = 0;
+        double subGlobal = 0.0, brutaGlobal = 0.0, devGlobal = 0.0, netaGlobal = 0.0;
+
+        for (int m = mesInicio; m <= mesFin; ++m) {
+            int maxDias = diasEnMes(ano, m);
+            cout << "\n[Mes: " << nombreMes(m) << " " << ano << "]" << endl;
+            cout << "  1. Mes completo" << endl;
+            cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
+            string modoStr = leerDatoSeguro("Opcion: ");
+            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
+                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
+                modoStr = "1";
+            }
+
+            int dIni = 1, dFin = maxDias;
+            string filtro = "Mes completo";
+            if (modoStr == "2") {
+                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
+                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
+                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
+                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
+                } else {
+                    dIni = stoi(diStr);
+                    dFin = stoi(dfStr);
+                    if (dIni < 1) dIni = 1;
+                    if (dFin > maxDias) dFin = maxDias;
+                    if (dIni > dFin) dFin = dIni;
+                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
+                }
+            }
+
+            string desde = anoStr + "-" + fmt2(m) + "-" + fmt2(dIni);
+            string hasta = anoStr + "-" + fmt2(m) + "-" + fmt2(dFin);
+
+            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+                "CALL SP_REPORTE_PERIODO_GANANCIA(?, ?)"));
+            pstmt->setString(1, desde);
+            pstmt->setString(2, hasta);
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+            int trans = 0;
+            double sub = 0.0, bruta = 0.0, dev = 0.0, neta = 0.0;
+            if (res->next()) {
+                trans = res->getInt("TRANSACCIONES");
+                sub = res->getDouble("SUBTOTAL");
+                bruta = res->getDouble("BRUTA");
+                dev = res->getDouble("DEVUELTA");
+                neta = res->getDouble("NETA");
+            }
+            drenarResultados(pstmt.get());
+
+            transGlobal += trans;
+            subGlobal += sub;
+            brutaGlobal += bruta;
+            devGlobal += dev;
+            netaGlobal += neta;
+
+            cout << "\n--------------------------------------------------" << endl;
+            cout << " [ " << nombreMes(m) << " " << ano << " ]" << endl;
+            cout << "--------------------------------------------------" << endl;
+            printf(" %-14s: %s\n", "Filtro", filtro.c_str());
+            printf(" %-14s: %d\n", "Transacciones", trans);
+            printf(" %-14s: $%.2f\n", "Subtotal", sub);
+            printf(" %-14s: $%.2f\n", "Ganancia bruta", bruta);
+            printf(" %-14s: $%.2f\n", "Devuelta", dev);
+            printf(" %-14s: $%.2f\n", "Ganancia neta", neta);
+        }
+
+        cout << "\n===================================================" << endl;
+        cout << " RESUMEN CONSOLIDADO (" << nombreMes(mesInicio) << " - " << nombreMes(mesFin) << " " << ano << ")" << endl;
+        cout << "===================================================" << endl;
+        printf(" %-14s: %d\n", "Transacciones", transGlobal);
+        printf(" %-14s: $%.2f\n", "Subtotal", subGlobal);
+        printf(" %-14s: $%.2f\n", "Ganancia bruta", brutaGlobal);
+        printf(" %-14s: $%.2f\n", "Devuelta", devGlobal);
+        printf(" %-14s: $%.2f\n", "Ganancia neta", netaGlobal);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo generar el reporte." << RESET << endl;
+    }
+}
+
 static void devolucionVentaUI() {
     cout << "\n--- DEVOLUCION DE VENTA ---" << endl;
     cout << "Registra la devolucion PENDIENTE y luego aprueba o rechaza." << endl;
@@ -956,11 +1178,17 @@ void ejecutarSubmenuVentas() {
                 cobrarVentaUI();
                 break;
             case 10:
+                reportePeriodoUI();
+                break;
+            case 11:
+                reportePeriodoGananciaUI();
+                break;
+            case 12:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 10) pausar();
-    } while (opcion != 10);
+        if (opcion != 12) pausar();
+    } while (opcion != 12);
 }
