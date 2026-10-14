@@ -239,17 +239,18 @@ static void mostrarFacturaCompra(int idCompra) {
             "CALL SP_COMPRA_LINEAS(?)"));
         pl->setInt(1, idCompra);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-25s | %-4s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "ITBIS", "Subtotal", "Total");
+        printf("\n%-25s | %-4s | %-10s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "P.UNIT", "ITBIS", "Subtotal", "Total");
         while (rl->next()) {
-            printf("%-25.25s | %-4d | %-10.2f | %-10.2f | %-10.2f\n",
+            printf("%-25.25s | %-4d | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n",
                    rl->getString("NOMBRE").c_str(),
                    rl->getInt("CANTIDAD"),
+                   (double)rl->getDouble("PRECIO_UNITARIO"),
                    (double)rl->getDouble("MONTO_ITBIS"),
                    (double)rl->getDouble("SUBTOTAL"),
                    (double)rl->getDouble("TOTAL_LINEA"));
         }
         drenarResultados(pl.get());
-        printf("%-25s | %-4s | %-10.2f | %-10.2f | %-10.2f\n", "TOTAL", "", vItbis, vSub, vTotal);
+        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "TOTAL", "", "", vItbis, vSub, vTotal);
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
     }
