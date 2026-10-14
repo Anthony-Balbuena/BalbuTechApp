@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cstdio>
 #include <cmath>
 #include <memory>
 #include <stdexcept>
@@ -79,16 +80,14 @@ void registrarProducto() {
         string compraStr = leerDatoSeguro("\nPrecio de compra $: ");
         double compra = compraStr.empty() ? 0 : stod(compraStr);
 
-        string precioStr = leerDatoSeguro("\nPrecio del Producto $ (sin ITBIS): ");
+        string precioStr = leerDatoSeguro("\nPrecio de venta del  Producto $ (sin ITBIS): ");
         double precio = stod(precioStr);
         try {
             std::unique_ptr<sql::PreparedStatement> pt(globalCon->prepareStatement(
-                "SELECT VALOR FROM CONFIGURACION WHERE CLAVE = 'ITBIS'"));
+                "SELECT FN_TASA_ITBIS() AS TASA"));
             std::unique_ptr<sql::ResultSet> rt(pt->executeQuery());
             double tasa = 18.0;
-            if (rt->next()) {
-                try { tasa = stod(rt->getString("VALOR")); } catch (...) {}
-            }
+            if (rt->next()) tasa = rt->getDouble("TASA");
             drenarResultados(pt.get());
             cout << CIAN << "El cliente pagara: $" << (long long)llround(precio * (100.0 + tasa) / 100.0)
                  << " (ITBIS incluido)" << RESET << endl;
@@ -274,9 +273,11 @@ void buscarProducto() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\n----------------------------------------------------------------------------------------------------" << endl;
-        cout << "ID | CODIGO | NOMBRE | MARCA | CATEGORIA | PRECIO | P.COMPRA | ESTADO" << endl;
-        cout << "----------------------------------------------------------------------------------------------------" << endl;
+        const char *FMT = "%-5s | %-10s | %-25s | %-12s | %-20s | %-10s | %-10s | %-8s | %-8s\n";
+        const int ANCHO = 5 + 10 + 25 + 12 + 20 + 10 + 10 + 8 + 8 + 8 * 3;
+        cout << "\n" << string(ANCHO, '-') << endl;
+        printf(FMT, "ID", "CODIGO", "NOMBRE", "MARCA", "CATEGORIA", "PRECIO", "P.COMPRA", "CANTIDAD", "ESTADO");
+        cout << string(ANCHO, '-') << endl;
 
         bool encontrado = false;
         while (res->next()) {
@@ -286,21 +287,29 @@ void buscarProducto() {
                 double costo = res->getDouble("P_COMPRA");
                 costoStr = res->wasNull() ? "---" : ("$" + to_string((long long)llround(costo)));
             } catch (...) { costoStr = "---"; }
-            cout << res->getInt("ID_PRODUCTO") << " | "
-                 << res->getString("CODIGO") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("MARCA") << " | "
-                 << res->getString("CATEGORIA") << " | $"
-                 << res->getDouble("PRECIO") << " | "
-                 << costoStr << " | "
-                 << res->getString("ESTADO") << endl;
+            int stock = 0;
+            try { stock = res->getInt("STOCK"); } catch (...) { stock = 0; }
+            char bufPrecio[16];
+            snprintf(bufPrecio, sizeof(bufPrecio), "$%.0f", (double)res->getDouble("PRECIO"));
+            printf("%-5d | %-10s | %-25.25s | %-12.12s | %-20.20s | %-10s | %-10s | %-8d | %-8s\n",
+                   res->getInt("ID_PRODUCTO"),
+                   res->getString("CODIGO").c_str(),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("MARCA").c_str(),
+                   res->getString("CATEGORIA").c_str(),
+                   bufPrecio,
+                   costoStr.c_str(),
+                   stock,
+                   res->getString("ESTADO").c_str());
         }
+
+        cout << string(ANCHO, '-') << endl;
 
         if (!encontrado) {
             cout << "\n [!] No se encontraron productos con el filtro: ["
                  << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
-        cout << "----------------------------------------------------------------------------------------------------" << endl;
+        //cout << "----------------------------------------------------------------------------------------------------" << endl;
 
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
