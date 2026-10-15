@@ -15,6 +15,17 @@ public:
 
 // Prototipos de funciones de seguridad y entrada
 string leerDatoSeguro(const string& mensaje);
+
+// (15/10/2026) Entrada numerica con reintentos (hermana de leerDatoSeguro):
+// pide un numero en [minimo, maximo] con hasta maxIntentos intentos; si el
+// usuario cancela ('xxx') o se agotan los intentos lanza CancelarOperacionException.
+// porDefecto (opcional): entrada vacia devuelve *porDefecto (casos "Enter = exacto").
+constexpr int MAX_INTENTOS = 3;
+bool esNumerico(const string& texto);
+double leerNumeroConIntentos(const string& mensaje, double minimo, double maximo,
+                             const double* porDefecto = nullptr,
+                             int maxIntentos = MAX_INTENTOS);
+
 string aplicarHash(const string& input);
 
 // Necesitarás implementar o incluir utilidades para Base64

@@ -44,14 +44,6 @@ void mostrarMenuCompras() {
     cout << "=========================" << endl;
 }
 
-static bool esNumericoC(const string &s) {
-    if (s.empty()) return false;
-    for (char c : s) {
-        if (!isdigit(static_cast<unsigned char>(c))) return false;
-    }
-    return true;
-}
-
 static double tasaIVAC() {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
@@ -157,7 +149,7 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         while (res->next()) {
             if (res->getString("ESTADO") != "ACTIVO") continue;
             Cand c{res->getInt("ID_PRODUCTO"), res->getString("CODIGO"), res->getString("NOMBRE")};
-            if ((esNumericoC(entrada) && c.id == stoi(entrada)) || c.codigo == entrada) {
+            if ((esNumerico(entrada) && c.id == stoi(entrada)) || c.codigo == entrada) {
                 out.idProducto = c.id;
                 out.codigo = c.codigo;
                 out.nombre = c.nombre;
@@ -169,7 +161,7 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         drenarResultados(pstmt.get());
         if (exacto) return true;
         if (lista.empty()) {
-            if (esNumericoC(entrada)) return false;
+            if (esNumerico(entrada)) return false;
             string r = leerDatoSeguro("No existe. Registrar rapido? (s/n): ");
             if (r != "s" && r != "S") return false;
             return registroRapidoC(entrada, out);
@@ -183,7 +175,7 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         cout << "\nCoincidencias:" << endl;
         for (auto &c : lista) cout << c.id << " | " << c.codigo << " | " << c.nombre << endl;
         string pick = leerDatoSeguro("ID elegido: ");
-        if (!esNumericoC(pick)) return false;
+        if (!esNumerico(pick)) return false;
         return resolverProductoC(pick, out);
     } catch (const exception &) {
         return false;
@@ -210,6 +202,65 @@ static int stockDeC(int idProducto) {
     }
 }
 
+// Alta rapida de suplidor sin salir de la compra. Telefono/email opcionales.
+static bool registroRapidoS(LineaCompra &l, const string &sugerido = "") {
+    try {
+        string etiqueta = "Nombre del nuevo suplidor";
+        if (!sugerido.empty()) etiqueta += " [" + sugerido + "]";
+        etiqueta += ": ";
+        string nombre = leerDatoSeguro(etiqueta);
+        if (nombre.empty()) nombre = sugerido;
+        if (nombre.empty()) {
+            cout << ROJO << "El nombre es obligatorio." << RESET << endl;
+            return false;
+        }
+        string tel = leerDatoSeguro("Telefono (Enter = omitir): ");
+        string mail = leerDatoSeguro("Email (Enter = omitir): ");
+        std::unique_ptr<sql::PreparedStatement> pi(globalCon->prepareStatement(
+            "CALL SP_INSERTAR_PROVEEDOR(?, ?, ?, ?)"));
+        pi->setString(1, nombre);
+        if (tel.empty()) pi->setNull(2, sql::DataType::VARCHAR);
+        else pi->setString(2, tel);
+        if (mail.empty()) pi->setNull(3, sql::DataType::VARCHAR);
+        else pi->setString(3, mail);
+        pi->setNull(4, sql::DataType::VARCHAR);
+        string msg = Recogermensaje(pi.get());
+        drenarResultados(pi.get());
+        cout << VERDE << msg << RESET << endl;
+        int nuevoId = 0;
+        try {
+            std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+                "SELECT LAST_INSERT_ID()"));
+            std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+            if (rl->next()) nuevoId = rl->getInt(1);
+            drenarResultados(pl.get());
+        } catch (...) {}
+        if (nuevoId <= 0) {
+            cout << ROJO << "No se pudo obtener el ID del suplidor." << RESET << endl;
+            return false;
+        }
+        l.idProveedor = nuevoId;
+        try {
+            std::unique_ptr<sql::PreparedStatement> pv2(globalCon->prepareStatement(
+                "CALL SP_PROVEEDOR_ACTIVO(?)"));
+            pv2->setInt(1, nuevoId);
+            std::unique_ptr<sql::ResultSet> rv2(pv2->executeQuery());
+            if (rv2->next()) l.nombreProveedor = rv2->getString("NOMBRE");
+            else l.nombreProveedor = nombre;
+            drenarResultados(pv2.get());
+        } catch (...) {
+            l.nombreProveedor = nombre;
+        }
+        return true;
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+        return false;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo registrar: " << e.what() << RESET << endl;
+        return false;
+    }
+}
+
 static bool elegirSuplidor(LineaCompra &l) {
     try {
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
@@ -223,23 +274,64 @@ static bool elegirSuplidor(LineaCompra &l) {
                              rs->getDouble("ULTIMO_PRECIO")});
         }
         drenarResultados(ps.get());
+        // Grilla 2 cols: ID_PROV | PROVEEDOR. Sin historial: todos los activos.
+        const int WS0 = 7, WS1 = 20;
+        string bordeS = "+" + string(WS0 + 2, '-') + "+" + string(WS1 + 2, '-') + "+";
         if (!lista.empty()) {
             cout << "\nLo venden:" << endl;
+            cout << bordeS << endl;
+            printf("| %-*s | %-*s |\n", WS0, "ID_PROV", WS1, "PROVEEDOR");
+            cout << bordeS << endl;
             for (auto &s : lista) {
-                printf("%d | %-25.25s | ultimo $%.2f\n", s.id, s.nombre.c_str(), s.precio);
+                printf("| %-*d | %-*.20s |\n", WS0, s.id, WS1, s.nombre.c_str());
             }
+            cout << bordeS << endl;
+        } else {
+            try {
+                std::unique_ptr<sql::PreparedStatement> pt(globalCon->prepareStatement(
+                    "CALL SP_LISTAR_PROVEEDORES('')"));
+                std::unique_ptr<sql::ResultSet> rt(pt->executeQuery());
+                struct SupT { int id; string nombre; };
+                vector<SupT> todos;
+                while (rt->next()) {
+                    try {
+                        if (rt->getString("ESTADO") != "ACTIVO") continue;
+                    } catch (...) {}
+                    int sid = 0;
+                    try { sid = rt->getInt("ID_PROVEEDOR"); } catch (...) { continue; }
+                    string sn = "---";
+                    try { sn = rt->getString("NOMBRE"); } catch (...) {}
+                    if (sid > 0) todos.push_back({sid, sn});
+                }
+                drenarResultados(pt.get());
+                if (!todos.empty()) {
+                    cout << "\nSuplidores:" << endl;
+                    cout << bordeS << endl;
+                    printf("| %-*s | %-*s |\n", WS0, "ID_PROV", WS1, "PROVEEDOR");
+                    cout << bordeS << endl;
+                    for (auto &s : todos) {
+                        printf("| %-*d | %-*.20s |\n", WS0, s.id, WS1, s.nombre.c_str());
+                    }
+                    cout << bordeS << endl;
+                }
+            } catch (const exception &) {}
         }
-        string sStr = leerDatoSeguro("ID suplidor (Enter = mas barato): ");
+        string sStr = leerDatoSeguro("ID suplidor (Enter = mas barato, 0 = nuevo): ");
         if (sStr.empty()) {
             if (lista.empty()) {
-                cout << ROJO << "Sin historial: escribi el ID." << RESET << endl;
+                cout << ROJO << "Sin historial: elegi un ID de la lista." << RESET << endl;
                 return false;
             }
             l.idProveedor = lista[0].id;
             l.nombreProveedor = lista[0].nombre;
             return true;
         }
-        if (!esNumericoC(sStr)) return false;
+        if (sStr == "0") return registroRapidoS(l);
+        if (!esNumerico(sStr)) {
+            string r = leerDatoSeguro("Registrar '" + sStr + "' como nuevo suplidor? (s/n): ");
+            if (r != "s" && r != "S") return false;
+            return registroRapidoS(l, sStr);
+        }
         int idSup = stoi(sStr);
         std::unique_ptr<sql::PreparedStatement> pv(globalCon->prepareStatement(
             "CALL SP_PROVEEDOR_ACTIVO(?)"));
@@ -252,6 +344,11 @@ static bool elegirSuplidor(LineaCompra &l) {
             ok = true;
         } else {
             cout << ROJO << "Suplidor inexistente o inactivo." << RESET << endl;
+            // Drenar ANTES de otro comando en la misma conexion (si no: Commands out of sync).
+            drenarResultados(pv.get());
+            string r = leerDatoSeguro("Registrar uno nuevo sin salir de la compra? (s/n): ");
+            if (r == "s" || r == "S") return registroRapidoS(l);
+            return false;
         }
         drenarResultados(pv.get());
         return ok;
@@ -332,7 +429,7 @@ static void mostrarFacturaCompra(int idCompra) {
                    (double)rl->getDouble("TOTAL_LINEA"));
         }
         drenarResultados(pl.get());
-        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "TOTAL", "", "", vItbis, vSub, vTotal);
+        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "", vItbis, vSub, vTotal);
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
     }
@@ -341,7 +438,6 @@ static void mostrarFacturaCompra(int idCompra) {
 static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int idProvFijo, bool pedirProv) {
     CierreCompra out;
     if (carrito.empty()) return out;
-    const int MAX_INTENTOS = 3;
     int idProv = idProvFijo, idEmp = 0, idCompra = 0;
     try {
         bool iniciada = false;
@@ -349,14 +445,14 @@ static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int i
             try {
                 if (pedirProv) {
                     string provStr = leerDatoSeguro("ID proveedor: ");
-                    if (!esNumericoC(provStr)) {
+                    if (!esNumerico(provStr)) {
                         cout << ROJO << "ID invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
                         continue;
                     }
                     idProv = stoi(provStr);
                 }
                 string empStr = leerDatoSeguro("ID empleado: ");
-                if (!esNumericoC(empStr)) {
+                if (!esNumerico(empStr)) {
                     cout << ROJO << "ID invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
                     continue;
                 }
@@ -462,37 +558,18 @@ static void pagarCompra(const CierreCompra &c) {
         drenarResultados(pl.get());
         if (!hay) return;
 
-        string metStr = leerDatoSeguro("ID metodo: ");
-        if (!esNumericoC(metStr)) {
-            cout << ROJO << "Metodo invalido." << RESET << endl;
-            return;
-        }
+        int idMetodo = (int)leerNumeroConIntentos("ID metodo: ", 1, 999999999);
         cout << "A pagar: $" << c.bruto << endl;
-        string pagStr = leerDatoSeguro("Monto pagado (Enter = exacto): ");
-        double pagado = c.bruto;
-        if (!pagStr.empty()) {
-            try { pagado = stod(pagStr); }
-            catch (...) {
-                cout << ROJO << "Monto invalido." << RESET << endl;
-                return;
-            }
-        }
-        if (pagado <= 0) {
-            cout << ROJO << "El monto debe ser mayor a cero." << RESET << endl;
-            return;
-        }
-        if (pagado > c.bruto) {
-            cout << ROJO << "Excede lo pendiente ($" << c.bruto << ")." << RESET << endl;
-            return;
-        }
-        string empStr = leerDatoSeguro("ID empleado que paga (Enter = dueno): ");
+        double pagado = leerNumeroConIntentos("Monto pagado (Enter = exacto): ", 0.01, c.bruto, &c.bruto);
+        double defCero = 0.0;
+        double empVal = leerNumeroConIntentos("ID empleado que paga (Enter = dueno): ", 0, 999999999, &defCero);
         std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_PAGO_COMPRA(?, ?, ?, ?)"));
         pp->setInt(1, c.idCompra);
-        pp->setInt(2, stoi(metStr));
+        pp->setInt(2, idMetodo);
         pp->setDouble(3, pagado);
-        if (empStr.empty()) pp->setNull(4, sql::DataType::INTEGER);
-        else pp->setInt(4, stoi(empStr));
+        if (empVal <= 0) pp->setNull(4, sql::DataType::INTEGER);
+        else pp->setInt(4, (int)empVal);
         string msg = Recogermensaje(pp.get());
         drenarResultados(pp.get());
         cout << VERDE << msg << RESET << endl;
@@ -519,20 +596,24 @@ static void listarProductosParaCompra() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO('')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-5s | %-25s | %-8s | %-25s\n", "ID", "NOMBRE", "CANTIDAD", "PROVEEDOR");
+        // Grilla: ID_PROD | NOMBRE | CANTIDAD(stock). El suplidor se elige despues.
+        const int W0 = 7, W1 = 25, W2 = 8;
+        string borde = "+" + string(W0 + 2, '-') + "+" + string(W1 + 2, '-') + "+"
+                     + string(W2 + 2, '-') + "+";
+        cout << "\n" << borde << endl;
+        printf("| %-*s | %-*s | %-*s |\n", W0, "ID_PROD", W1, "NOMBRE", W2, "CANTIDAD");
+        cout << borde << endl;
         bool hay = false;
         while (res->next()) {
             hay = true;
             int stock = 0;
             try { stock = res->getInt("STOCK"); } catch (...) { stock = 0; }
-            string prov = "---";
-            try { prov = res->getString("PROVEEDOR"); } catch (...) {}
-            printf("%-5d | %-25.25s | %-8d | %-25.25s\n",
-                   res->getInt("ID_PRODUCTO"),
-                   res->getString("NOMBRE").c_str(),
-                   stock,
-                   prov.c_str());
+            printf("| %-*d | %-*.25s | %-*d |\n",
+                   W0, res->getInt("ID_PRODUCTO"),
+                   W1, res->getString("NOMBRE").c_str(),
+                   W2, stock);
         }
+        cout << borde << endl;
         if (!hay) cout << "[!] Sin productos activos." << endl;
         drenarResultados(pstmt.get());
     } catch (const exception &) {
@@ -560,9 +641,10 @@ static void compraRapida() {
             cout << ROJO << "Sin coincidencia." << RESET << endl;
             continue;
         }
+        cout << "Producto: " << prod.idProducto << " (" << prod.nombre << ")" << endl;
         cout << "Stock actual: " << stockDeC(prod.idProducto) << endl;
         string cantStr = leerDatoSeguro("Cantidad: ");
-        if (!esNumericoC(cantStr) || stoi(cantStr) <= 0) {
+        if (!esNumerico(cantStr) || stoi(cantStr) <= 0) {
             cout << ROJO << "Cantidad invalida." << RESET << endl;
             continue;
         }
@@ -655,14 +737,10 @@ static void verCompraConIVA() {
 static void devolucionCompraUI() {
     cout << "\n--- DEVOLUCION DE COMPRA ---" << endl;
     try {
-        string cStr = leerDatoSeguro("ID compra: ");
-        if (!esNumericoC(cStr)) {
-            cout << ROJO << "ID invalido." << RESET << endl;
-            return;
-        }
+        int idCompraDev = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
             "CALL SP_COMPRA_LINEAS(?)"));
-        pl->setInt(1, stoi(cStr));
+        pl->setInt(1, idCompraDev);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
         printf("\n%-8s | %-25s | %-4s | %-10s\n", "ID_DET", "PRODUCTO", "CANT", "PRECIO");
         bool hay = false;
@@ -679,13 +757,9 @@ static void devolucionCompraUI() {
             cout << "[!] La compra no tiene lineas." << endl;
             return;
         }
-        string dStr = leerDatoSeguro("ID detalle: ");
-        string eStr = leerDatoSeguro("ID empleado: ");
-        string kStr = leerDatoSeguro("Cantidad: ");
-        if (!esNumericoC(dStr) || !esNumericoC(eStr) || !esNumericoC(kStr) || stoi(kStr) <= 0) {
-            cout << ROJO << "IDs/cantidad invalidos." << RESET << endl;
-            return;
-        }
+        int idDet = (int)leerNumeroConIntentos("ID detalle: ", 1, 999999999);
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+        int cantDev = (int)leerNumeroConIntentos("Cantidad: ", 1, 999999999);
         string motivo = leerDatoSeguro("Motivo: ");
         if (motivo.empty()) {
             cout << ROJO << "El motivo es obligatorio." << RESET << endl;
@@ -702,9 +776,9 @@ static void devolucionCompraUI() {
         }
         std::unique_ptr<sql::PreparedStatement> pr0(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_DEVOLUCION_COMPRA(?, ?, ?, ?, ?, @dv)"));
-        pr0->setInt(1, stoi(dStr));
-        pr0->setInt(2, stoi(eStr));
-        pr0->setInt(3, stoi(kStr));
+        pr0->setInt(1, idDet);
+        pr0->setInt(2, idEmp);
+        pr0->setInt(3, cantDev);
         pr0->setString(4, motivo);
         pr0->setString(5, cond);
         pr0->execute();
@@ -778,7 +852,7 @@ static void reportePeriodoCompraUI() {
         string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
         string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
         string finStr = leerDatoSeguro("Mes final (1-12): ");
-        if (!esNumericoC(anoStr) || !esNumericoC(iniStr) || !esNumericoC(finStr)) {
+        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
             cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
             return;
         }
@@ -800,7 +874,7 @@ static void reportePeriodoCompraUI() {
             cout << "  1. Mes completo" << endl;
             cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
             string modoStr = leerDatoSeguro("Opcion: ");
-            if (!esNumericoC(modoStr) || (modoStr != "1" && modoStr != "2")) {
+            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
                 cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
                 modoStr = "1";
             }
@@ -810,7 +884,7 @@ static void reportePeriodoCompraUI() {
             if (modoStr == "2") {
                 string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
                 string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
-                if (!esNumericoC(diStr) || !esNumericoC(dfStr)) {
+                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
                     cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
                 } else {
                     dIni = stoi(diStr);
@@ -891,17 +965,13 @@ static void pagarCompraPendienteUI() {
             cout << "[!] Sin compras pendientes." << endl;
             return;
         }
-        string cStr = leerDatoSeguro("ID compra: ");
-        if (!esNumericoC(cStr)) {
-            cout << ROJO << "ID invalido." << RESET << endl;
-            return;
-        }
+        int idCompraPag = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_COMPRAS_PENDIENTES()"));
         std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
         double saldo = -1.0;
         while (rs->next()) {
-            if (rs->getInt("ID_COMPRA") == stoi(cStr)) saldo = rs->getDouble("SALDO");
+            if (rs->getInt("ID_COMPRA") == idCompraPag) saldo = rs->getDouble("SALDO");
         }
         drenarResultados(ps.get());
         if (saldo < 0) {
@@ -909,7 +979,7 @@ static void pagarCompraPendienteUI() {
             return;
         }
         CierreCompra c;
-        c.idCompra = stoi(cStr);
+        c.idCompra = idCompraPag;
         c.idEmpleado = 0;
         c.subtotal = saldo;
         c.bruto = saldo;
@@ -922,20 +992,22 @@ static void pagarCompraPendienteUI() {
 }
 
 static void verPreciosCompraUI() {
-    cout << "\n--- PRECIOS POR SUPLIDOR (quien vende mas barato) ---" << endl;
+    cout << "\n--- PRECIOS POR SUPLIDOR (barato y caro) ---" << endl;
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_REPORTE_PRECIOS_COMPRA()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-25s | %-10s | %-10s | %-25s | %-10s\n", "PRODUCTO", "SUPLIDORES", "MAS BARATO", "DONDE", "ULTIMA");
+        printf("\n%-25s | %-10s | %-10s | %-25s | %-10s | %-25s | %-10s\n", "PRODUCTO", "SUPLIDORES", "MAS BARATO", "BARATO EN", "MAS CARO", "CARO EN", "ULTIMA");
         bool hay = false;
         while (res->next()) {
             hay = true;
-            printf("%-25.25s | %-10d | %-10.2f | %-25.25s | %-10.10s\n",
+            printf("%-25.25s | %-10d | %-10.2f | %-25.25s | %-10.2f | %-25.25s | %-10.10s\n",
                    res->getString("PRODUCTO").c_str(),
                    res->getInt("SUPLIDORES"),
                    (double)res->getDouble("MAS_BARATO"),
                    res->getString("DONDE_BARATO").c_str(),
+                   (double)res->getDouble("MAS_CARO"),
+                   res->getString("DONDE_CARO").c_str(),
                    res->getString("ULTIMA_COMPRA").c_str());
         }
         if (!hay) cout << "[!] Sin datos: ninguna compra RECIBIDA aun." << endl;

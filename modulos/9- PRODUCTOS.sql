@@ -365,7 +365,9 @@ BEGIN
         -- (13/10/2026) Stock via JOIN a inventario (LEFT: sin fila igual lista).
         I.STOCK_ACTUAL AS STOCK,
         -- (13/10/2026) Proveedor para el listado de compras.
-        PR.NOMBRE AS PROVEEDOR
+        PR.NOMBRE AS PROVEEDOR,
+        -- (15/10/2026) ID del proveedor para la app.
+        P.ID_PROVEEDOR
     FROM PRODUCTOS P
     INNER JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
     INNER JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA

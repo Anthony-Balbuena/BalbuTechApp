@@ -3,6 +3,9 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <cstdlib>
+#include <cctype>
+#include "colores.h"
 #include <openssl/evp.h>
 #include <string>
 #include <openssl/rand.h>
@@ -25,6 +28,59 @@ string leerDatoSeguro(const string& mensaje) {
     }
 
     return entrada;
+}
+
+// --- Entrada numerica con reintentos (15/10/2026) ---
+static string recortarEspacios(const string& texto) {
+    size_t ini = texto.find_first_not_of(" \t\r\n");
+    if (ini == string::npos) return "";
+    size_t fin = texto.find_last_not_of(" \t\r\n");
+    return texto.substr(ini, fin - ini + 1);
+}
+
+// Acepta enteros y decimales con punto o coma (ej: 75.50 / 75,5).
+static bool parsearDecimal(const string& texto, double &valor) {
+    string limpio = recortarEspacios(texto);
+    if (limpio.empty()) return false;
+    for (char &c : limpio) {
+        if (c == ',') c = '.';
+    }
+    char* fin = nullptr;
+    valor = strtod(limpio.c_str(), &fin);
+    return fin != limpio.c_str() && *fin == '\0';
+}
+
+bool esNumerico(const string& texto) {
+    if (texto.empty()) return false;
+    for (char c : texto) {
+        if (!isdigit(static_cast<unsigned char>(c))) return false;
+    }
+    return true;
+}
+
+double leerNumeroConIntentos(const string& mensaje, double minimo, double maximo,
+                             const double* porDefecto, int maxIntentos) {
+    for (int intento = 1; intento <= maxIntentos; ++intento) {
+        string texto = recortarEspacios(leerDatoSeguro(mensaje));
+        if (texto.empty() && porDefecto != nullptr) {
+            return *porDefecto;
+        }
+        double valor = 0.0;
+        if (parsearDecimal(texto, valor)) {
+            if (valor >= minimo && valor <= maximo) {
+                return valor;
+            }
+            cout << ROJO << "Fuera de rango: debe estar entre " << minimo
+                 << " y " << maximo << " (intento " << intento << " de "
+                 << maxIntentos << ")." << RESET << endl;
+        } else {
+            cout << ROJO << "Valor invalido: escriba un numero (intento "
+                 << intento << " de " << maxIntentos << ")." << RESET << endl;
+        }
+    }
+    cout << ROJO << "Se agotaron los intentos. Regresando al menu principal..."
+         << RESET << endl;
+    throw CancelarOperacionException();
 }
 
 string aplicarHash(const string& input) {

@@ -76,9 +76,10 @@ DELIMITER ;
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_REPORTE_PRECIOS_COMPRA ;
 /*
-SP_REPORTE_PRECIOS_COMPRA (14/10/2026)
-Por producto: cuantos suplidores, el mas barato con su precio y fecha, y
-el ultimo precio pagado con su fecha. Para ver subidas de un vistazo.
+SP_REPORTE_PRECIOS_COMPRA (14/10/2026, 15/10/2026: + mas caro)
+Por producto: cuantos suplidores, el mas barato y el mas caro con su
+precio y suplidor, y la fecha de la ultima compra. Para ver subidas
+de un vistazo.
 */
 CREATE PROCEDURE SP_REPORTE_PRECIOS_COMPRA()
 BEGIN
@@ -90,6 +91,12 @@ BEGIN
               JOIN PROVEEDORES PR2 ON PR2.ID_PROVEEDOR = M2.ID_PROVEEDOR
              WHERE M2.ID_PRODUCTO = P.ID_PRODUCTO
              ORDER BY M2.ULTIMO_PRECIO ASC, M2.ULTIMA_FECHA DESC LIMIT 1) AS DONDE_BARATO,
+           MAX(M.ULTIMO_PRECIO) AS MAS_CARO,
+           (SELECT PR3.NOMBRE
+              FROM PRODUCTO_PROVEEDOR M3
+              JOIN PROVEEDORES PR3 ON PR3.ID_PROVEEDOR = M3.ID_PROVEEDOR
+             WHERE M3.ID_PRODUCTO = P.ID_PRODUCTO
+             ORDER BY M3.ULTIMO_PRECIO DESC, M3.ULTIMA_FECHA DESC LIMIT 1) AS DONDE_CARO,
            MAX(M.ULTIMA_FECHA) AS ULTIMA_COMPRA
       FROM PRODUCTO_PROVEEDOR M
       JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO

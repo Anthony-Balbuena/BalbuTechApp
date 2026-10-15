@@ -42,14 +42,6 @@ void mostrarMenuVentas() {
     cout << "========================" << endl;
 }
 
-static bool esNumerico(const string &s) {
-    if (s.empty()) return false;
-    for (char c : s) {
-        if (!isdigit(static_cast<unsigned char>(c))) return false;
-    }
-    return true;
-}
-
 static bool buscarPorId(int id, LineaCarrito &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
@@ -212,26 +204,14 @@ static void pagarVenta(const CierreVenta &c) {
         drenarResultados(pl.get());
         if (!hay) return;
 
-        string metStr = leerDatoSeguro("ID metodo: ");
-        if (!esNumerico(metStr)) {
-            cout << ROJO << "Metodo invalido." << RESET << endl;
-            return;
-        }
+        int idMetodo = (int)leerNumeroConIntentos("ID metodo: ", 1, 999999999);
         // (11/10/2026) Se cobra el BRUTO; los triggers ya comparan contra el bruto.
-        cout << "A pagar: $" << c.bruto << endl;
-        string recStr = leerDatoSeguro("Monto recibido (Enter = exacto): ");
-        double recibido = c.bruto;
-        if (!recStr.empty()) {
-            try { recibido = stod(recStr); }
-            catch (...) {
-                cout << ROJO << "Monto invalido." << RESET << endl;
-                return;
-            }
-        }
+        cout << "Total a pagar = $" << c.bruto << endl;
+        double recibido = leerNumeroConIntentos("Monto recibido (Enter = exacto): ", 0.01, 999999999, &c.bruto);
         std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
             "CALL 24_SP_REGISTRAR_PAGO(?, ?, ?, ?, ?)"));
         pp->setInt(1, c.idVenta);
-        pp->setInt(2, stoi(metStr));
+        pp->setInt(2, idMetodo);
         pp->setDouble(3, c.bruto);
         pp->setInt(4, c.idEmpleado);
         pp->setDouble(5, recibido);
@@ -255,7 +235,6 @@ static void pagarVenta(const CierreVenta &c) {
 static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
     CierreVenta out;
     if (carrito.empty()) return out;
-    const int MAX_INTENTOS = 3;
     int idEmp = 0, idCli = 0, idVenta = 0;
     try {
         bool iniciada = false;
@@ -491,7 +470,7 @@ static void mostrarFactura(int idVenta) {
         }
         drenarResultados(pl.get());
 
-        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "TOTAL", "", "",
+        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "",
                vItbis, vSub, vTotal);
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
@@ -610,16 +589,12 @@ static void anularPagoUI() {
         }
         drenarResultados(pl.get());
 
-        string pStr = leerDatoSeguro("ID pago: ");
-        string eStr = leerDatoSeguro("ID empleado que anula: ");
-        if (!esNumerico(pStr) || !esNumerico(eStr)) {
-            cout << ROJO << "IDs invalidos." << RESET << endl;
-            return;
-        }
+        int idPagoAnula = (int)leerNumeroConIntentos("ID pago: ", 1, 999999999);
+        int idEmpAnula = (int)leerNumeroConIntentos("ID empleado que anula: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_ANULAR_PAGO(?, ?)"));
-        pstmt->setInt(1, stoi(pStr));
-        pstmt->setInt(2, stoi(eStr));
+        pstmt->setInt(1, idPagoAnula);
+        pstmt->setInt(2, idEmpAnula);
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
@@ -966,13 +941,9 @@ static void devolucionVentaUI() {
         }
         drenarResultados(pl.get());
 
-        string dStr = leerDatoSeguro("ID detalle: ");
-        string eStr = leerDatoSeguro("ID empleado: ");
-        string cStr = leerDatoSeguro("Cantidad: ");
-        if (!esNumerico(dStr) || !esNumerico(eStr) || !esNumerico(cStr) || stoi(cStr) <= 0) {
-            cout << ROJO << "IDs/cantidad invalidos." << RESET << endl;
-            return;
-        }
+        int idDet = (int)leerNumeroConIntentos("ID detalle: ", 1, 999999999);
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+        int cantDev = (int)leerNumeroConIntentos("Cantidad: ", 1, 999999999);
         string motivo = leerDatoSeguro("Motivo: ");
         if (motivo.empty()) {
             cout << ROJO << "El motivo es obligatorio." << RESET << endl;
@@ -995,11 +966,11 @@ static void devolucionVentaUI() {
 
         std::unique_ptr<sql::PreparedStatement> pr(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_DEVOLUCION(?, ?, ?, ?, ?, ?)"));
-        pr->setInt(1, stoi(dStr));
+        pr->setInt(1, idDet);
         if (gStr.empty()) pr->setNull(2, sql::DataType::INTEGER);
         else pr->setInt(2, stoi(gStr));
-        pr->setInt(3, stoi(eStr));
-        pr->setInt(4, stoi(cStr));
+        pr->setInt(3, idEmp);
+        pr->setInt(4, cantDev);
         pr->setString(5, motivo);
         pr->setString(6, cond);
         cout << "\n--------------------------------------------" << endl;
@@ -1009,7 +980,7 @@ static void devolucionVentaUI() {
 
         std::unique_ptr<sql::PreparedStatement> pi(globalCon->prepareStatement(
             "CALL SP_DEVOLUCION_PENDIENTE_POR_DETALLE(?)"));
-        pi->setInt(1, stoi(dStr));
+        pi->setInt(1, idDet);
         std::unique_ptr<sql::ResultSet> ri(pi->executeQuery());
         int idDev = 0;
         if (ri->next()) idDev = ri->getInt("ID_DEVOLUCION");
@@ -1129,18 +1100,14 @@ static void cobrarVentaUI() {
             cout << "[!] Sin ventas pendientes." << endl;
             return;
         }
-        string vStr = leerDatoSeguro("ID venta: ");
-        string eStr = leerDatoSeguro("ID empleado que cobra: ");
-        if (!esNumerico(vStr) || !esNumerico(eStr)) {
-            cout << ROJO << "IDs invalidos." << RESET << endl;
-            return;
-        }
+        int idVenta = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
+        int idEmp = (int)leerNumeroConIntentos("ID empleado que cobra: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_VENTAS_PENDIENTES()"));
         std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
         double saldo = -1.0;
         while (rs->next()) {
-            if (rs->getInt("ID_VENTA") == stoi(vStr)) saldo = rs->getDouble("SALDO");
+            if (rs->getInt("ID_VENTA") == idVenta) saldo = rs->getDouble("SALDO");
         }
         drenarResultados(ps.get());
         if (saldo < 0) {
@@ -1148,8 +1115,8 @@ static void cobrarVentaUI() {
             return;
         }
         CierreVenta c;
-        c.idVenta = stoi(vStr);
-        c.idEmpleado = stoi(eStr);
+        c.idVenta = idVenta;
+        c.idEmpleado = idEmp;
         c.subtotal = saldo;
         c.bruto = saldo;
         pagarVenta(c);
@@ -1163,23 +1130,12 @@ static void cobrarVentaUI() {
 static void garantiaRegistrarUI() {
     cout << "\n--- REGISTRAR GARANTIA ---" << endl;
     try {
-        string dStr = leerDatoSeguro("ID detalle de venta: ");
-        string diasStr = leerDatoSeguro("Dias de validez (Enter = 30): ");
-        if (!esNumerico(dStr)) {
-            cout << ROJO << "ID invalido." << RESET << endl;
-            return;
-        }
-        int dias = 30;
-        if (!diasStr.empty()) {
-            if (!esNumerico(diasStr) || stoi(diasStr) <= 0) {
-                cout << ROJO << "Dias invalidos." << RESET << endl;
-                return;
-            }
-            dias = stoi(diasStr);
-        }
+        int idDetGar = (int)leerNumeroConIntentos("ID detalle de venta: ", 1, 999999999);
+        double defDias = 30.0;
+        int dias = (int)leerNumeroConIntentos("Dias de validez (Enter = 30): ", 1, 999999999, &defDias);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_GARANTIA(?, ?)"));
-        pstmt->setInt(1, stoi(dStr));
+        pstmt->setInt(1, idDetGar);
         pstmt->setInt(2, dias);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());

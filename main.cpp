@@ -9,7 +9,7 @@
 #include <cppconn/prepared_statement.h>
 
 #include "database.h"
-//#include "seguridad.h"
+#include "seguridad.h"
 #include "colores.h"
 #include "login.h"
 #include "sesion.h"
@@ -45,7 +45,6 @@ int main() {
         return 0;
     }
 
-    const int MAX_INTENTOS = 3;
     for (int intento = 1; intento <= MAX_INTENTOS; ++intento) {
         string usuario;
         string password;
