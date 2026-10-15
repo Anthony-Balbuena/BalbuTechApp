@@ -49,3 +49,10 @@
 - Reporte por período ventas (14/10) + compras (`4.`, Volver a 5) + ganancias (`11.`, Volver a 12): `SP_REPORTE_PERIODO_COMPRA` (RECIBIDA) y `SP_REPORTE_PERIODO_GANANCIA` (fórmulas del 38, sin IVA). Probados en vivo.
 - Revisión pull 14/10: quite `select *` de depuración en `2- MARCAS.sql`; cargué los 4 SP de período/pendientes en TEST y TECH (la app los llamaba y no existían); `check-app-sps` en TECH da 0 faltantes; reporte octubre en vivo cuadra (6 / 797000 / 143460 / 940460). Quitado de DEFAULTs en CATEGORIAS y PAGO: es el fix de import conocido, la app manda todos los args.
 - Pendientes hechos 14/10: Kardex (`SP_KARDEX_PRODUCTO` + `3.` en stock, humo en vivo); Garantías (`12.` con registrar/reclamar/finalizar); Historial (`SP_HISTORIAL_VENTA` + `13.`); `.env` creado (gitignored). Falta tu decisión: seed admin, SRI del CDN, devcontainer y tus ganancias por mes.
+
+## 15/10 — mapa suplidores, reintentos y etiquetas
+- Mapa 6 pasos: tabla `PRODUCTO_PROVEEDOR` + trigger al RECIBIDA + 4 SP (archivo 40) + carrito elige suplidor por línea con historial + split por factura + `6. Precios por suplidor`. Verificado 2 suplidores, anular/cancelar; `check-app-sps` 0 faltantes en ambas.
+- Reintentos al cerrar (compra y venta): 3 intentos estilo login, el carrito se conserva si falla.
+- Rename `COSTO` → `P_COMPRA` (tabla, SPs, triggers, app); `P_COMPRA NOT NULL` con estimados al 80% (NO REALES, van facturas).
+- JOIN de stock + filtros ID repuestos en SP productos; listados `ID | NOMBRE | ESTADO | P.COMPRA | STOCK`.
+- `P.UNIT` en facturas de venta y compra; carrito muestra precios con ITBIS.
