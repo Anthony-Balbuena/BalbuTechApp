@@ -107,22 +107,22 @@ void buscarMetodoPago() {
         pstmt->setString(1, busqueda);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        cout << "\n" << string(50, '-') << endl;
+        cout << "\n" << string(46, '-') << endl;
         printf("%-8s | %-35s\n", "ID", "METODO DE PAGO");
-        cout << string(50, '-') << endl;
+        cout << string(46, '-') << endl;
 
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
-            printf("%-8d | %-35s\n",
+            printf("%-8d | %-35.35s\n",
                    res->getInt("ID_METODO_PAGO"),
                    res->getString("NOMBRE").c_str());
+            cout << string(46, '-') << endl;
         }
 
         if (!encontrado) {
             cout << "\n[!] No se hallaron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
-        cout << string(50, '-') << endl;
 
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -138,13 +138,17 @@ void listarMetodosPago() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_METODO_PAGO, NOMBRE, ESTADO FROM METODOS_PAGO ORDER BY ID_METODO_PAGO"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | ESTADO" << endl;
+        cout << "\n" << string(57, '-') << endl;
+        printf("%-8s | %-35s | %-8s\n", "ID", "NOMBRE", "ESTADO");
+        cout << string(57, '-') << endl;
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_METODO_PAGO") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-8d | %-35.35s | %-8s\n",
+                   res->getInt("ID_METODO_PAGO"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("ESTADO").c_str());
+            cout << string(57, '-') << endl;
         }
 
         if (!encontrado) {

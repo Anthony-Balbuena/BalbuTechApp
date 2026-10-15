@@ -59,8 +59,8 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 
 ## Pendiente inventario (11/10/2026, a pedido)
 
-- [ ] Reporte de stock crítico en app (el SP `SP_REPORTE_STOCK_CRITICO` existe, falta pantalla).
-- [ ] Kardex por producto en app (la bitácora `MOVIMIENTOS_INVENTARIO` ya se guarda, falta consulta por ítem).
+- [x] Reporte de stock crítico en app (HECHO 14/10: `6. Reporte De Stock` en productos, verificado en vivo).
+- [x] Kardex por producto en app (HECHO 14/10: `3. Movimientos` en stock con `SP_KARDEX_*`).
 
 ## Pendiente reporte por periodo (13/10/2026, para después)
 
@@ -74,6 +74,8 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 
 ## Progreso
 
+- [x] Mapa suplidor-producto 6 pasos (14/10/2026): tabla `PRODUCTO_PROVEEDOR` + trigger al RECIBIDA + `SP_PRODUCTO_SUPLIDORES/HISTORIAL/REPORTE_PRECIOS/PROVEEDOR_ACTIVO` (archivo 40) + carrito elige suplidor por línea con historial + split por factura + `6. Precios por suplidor`. Verificado: 2 suplidores, trigger, reporte, anular/cancelar. TEST guarda #10/#11 CANCELADA + TProdS como evidencia.
+- [x] Reintentos al cerrar (14/10/2026): proveedor/empleado/cliente con 3 intentos estilo login + el carrito se conserva si falla; en ventas igual. Humo en vivo OK (proveedor malo → reintenta → compra #7 ABIERTA). Nota TEST: la compra #7 quedó CANCELADA como evidencia (las compras no se borran por diseño) con su proveedor/empleado anclados por FK.
 > Movido a `Realizado.md` (14/10/2026). Solo queda lo pendiente abajo.
 
 ## Archivos tocados

@@ -128,14 +128,17 @@ void buscarCliente() {
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool encontrado = false;
 
-        cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
+        printf("%s\n", string(88, '-').c_str());
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_CLIENTE") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("TELEFONO") << " | "
-                 << res->getString("EMAIL") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
+                   res->getInt("ID_CLIENTE"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("TELEFONO").c_str(),
+                   res->getString("EMAIL").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(88, '-').c_str());
         }
 
         if (!encontrado) {
@@ -156,15 +159,18 @@ void listarClientes() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
+        printf("%s\n", string(88, '-').c_str());
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_CLIENTE") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("TELEFONO") << " | "
-                 << res->getString("EMAIL") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
+                   res->getInt("ID_CLIENTE"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("TELEFONO").c_str(),
+                   res->getString("EMAIL").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(88, '-').c_str());
         }
 
         if (!encontrado) {

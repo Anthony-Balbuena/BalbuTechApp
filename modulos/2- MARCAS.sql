@@ -13,10 +13,6 @@ CREATE TABLE MARCAS (
     FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_MARCA)
 ) ENGINE = InnoDB;
-
-select * from CATEGORIAS;
-
-SELECT * FROM PRODUCTOS;
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------

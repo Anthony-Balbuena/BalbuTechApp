@@ -438,7 +438,7 @@ void buscarRol() {
         pstmt->setString(1, busqueda);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        string separator = string(50, '-');
+        string separator = string(38, '-');
         cout << "\n" << separator << endl;
         printf("%-5s | %-30s\n", "ID", "NOMBRE DEL ROL");
         cout << separator << endl;
@@ -449,12 +449,12 @@ void buscarRol() {
             printf("%-5d | %-30.30s\n",
                    res->getInt("ID_ROL"),
                    res->getString("NOMBRE_ROL").c_str());
+            cout << separator << endl;
         }
 
         if (!encontrado) {
             cout << "\n[!] No se hallaron roles con el filtro: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
-        cout << separator << endl;
 
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -471,12 +471,17 @@ void listarRoles() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE DEL ROL" << endl;
+        string separator = string(38, '-');
+        cout << "\n" << separator << endl;
+        printf("%-5s | %-30s\n", "ID", "NOMBRE DEL ROL");
+        cout << separator << endl;
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_ROL") << " | "
-                 << res->getString("NOMBRE_ROL") << endl;
+            printf("%-5d | %-30.30s\n",
+                   res->getInt("ID_ROL"),
+                   res->getString("NOMBRE_ROL").c_str());
+            cout << separator << endl;
         }
 
         if (!encontrado) {

@@ -4,7 +4,7 @@
 
 ## Pendientes del flujo completo
 
-- [ ] **Parte 6** — ⛔ **Fuera de alcance** (solo SQL; el módulo C++ no se toca).
+- [x] **Parte 6** — HECHO 13/10: existe `compras.h/cpp` completo (carrito, ticket, pago, devolución).
 
 ## Fixes y cambios de archivos ejecutados ✅
 

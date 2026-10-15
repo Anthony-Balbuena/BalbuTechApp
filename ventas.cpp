@@ -36,7 +36,9 @@ void mostrarMenuVentas() {
     cout << "9. Cobrar venta" << endl;
     cout << "10. Reporte por periodo" << endl;
     cout << "11. Ganancias por periodo" << endl;
-    cout << "12. Volver al Menu Principal" << endl;
+    cout << "12. Garantias" << endl;
+    cout << "13. Historial de venta" << endl;
+    cout << "14. Volver al Menu Principal" << endl;
     cout << "========================" << endl;
 }
 
@@ -253,32 +255,51 @@ static void pagarVenta(const CierreVenta &c) {
 static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
     CierreVenta out;
     if (carrito.empty()) return out;
+    const int MAX_INTENTOS = 3;
+    int idEmp = 0, idCli = 0, idVenta = 0;
     try {
-        string empStr = leerDatoSeguro("ID empleado: ");
-        string cliStr = leerDatoSeguro("ID cliente: ");
-        if (!esNumerico(empStr) || !esNumerico(cliStr)) {
-            cout << ROJO << "IDs invalidos." << RESET << endl;
-            return out;
-        }
-        int idEmp = stoi(empStr);
-        int idCli = stoi(cliStr);
+        bool iniciada = false;
+        for (int intento = 1; intento <= MAX_INTENTOS && !iniciada; ++intento) {
+            try {
+                string empStr = leerDatoSeguro("ID empleado: ");
+                string cliStr = leerDatoSeguro("ID cliente: ");
+                if (!esNumerico(empStr) || !esNumerico(cliStr)) {
+                    cout << ROJO << "IDs invalidos (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                    continue;
+                }
+                idEmp = stoi(empStr);
+                idCli = stoi(cliStr);
 
-        std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
-        stmt->execute("CALL 21_SP_INICIAR_VENTA(" + to_string(idEmp) + ", " + to_string(idCli) + ", @nv)");
-        {
-            // La llamada deja el MENSAJE como result-set pendiente: hay que
-            // consumirlo antes de pedir @nv o cae "Commands out of sync".
-            std::unique_ptr<sql::ResultSet> r0(stmt->getResultSet());
-            if (r0) { while (r0->next()) {} }
+                std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
+                stmt->execute("CALL 21_SP_INICIAR_VENTA(" + to_string(idEmp) + ", " + to_string(idCli) + ", @nv)");
+                {
+                    // La llamada deja el MENSAJE como result-set pendiente: hay que
+                    // consumirlo antes de pedir @nv o cae "Commands out of sync".
+                    std::unique_ptr<sql::ResultSet> r0(stmt->getResultSet());
+                    if (r0) { while (r0->next()) {} }
+                }
+                drenarResultados(stmt.get());
+                std::unique_ptr<sql::Statement> stmt2(globalCon->createStatement());
+                std::unique_ptr<sql::ResultSet> resId(stmt2->executeQuery("SELECT @nv AS IDV"));
+                idVenta = 0;
+                if (resId->next()) {
+                    try { idVenta = resId->getInt("IDV"); } catch (...) { idVenta = 0; }
+                }
+                drenarResultados(stmt2.get());
+                if (idVenta <= 0) {
+                    cout << ROJO << "No se pudo iniciar la venta (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                    continue;
+                }
+                iniciada = true;
+            } catch (const CancelarOperacionException &) {
+                throw;
+            } catch (const exception &e) {
+                idVenta = 0;
+                cout << ROJO << e.what() << " (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+            }
         }
-        drenarResultados(stmt.get());
-        std::unique_ptr<sql::Statement> stmt2(globalCon->createStatement());
-        std::unique_ptr<sql::ResultSet> resId(stmt2->executeQuery("SELECT @nv AS IDV"));
-        int idVenta = 0;
-        if (resId->next()) idVenta = resId->getInt("IDV");
-        drenarResultados(stmt2.get());
-        if (idVenta <= 0) {
-            cout << ROJO << "No se pudo iniciar la venta." << RESET << endl;
+        if (!iniciada) {
+            cout << ROJO << "Venta no iniciada. El carrito se mantiene: volve a elegir Cerrar." << RESET << endl;
             return out;
         }
         cout << VERDE << "Venta #" << idVenta << " iniciada." << RESET << endl;
@@ -416,16 +437,19 @@ static void ventaRapida() {
     if (!carrito.empty()) mostrarCarrito(carrito, tasa);
     else cout << "Carrito vacio." << endl;
     if (carrito.empty()) return;
-    string cerrar = leerDatoSeguro("Cerrar venta? (s/n): ");
-    if (cerrar != "s" && cerrar != "S") {
-        cout << "Venta no guardada." << endl;
+    while (true) {
+        string cerrar = leerDatoSeguro("Cerrar venta? (s/n): ");
+        if (cerrar != "s" && cerrar != "S") {
+            cout << "Venta no guardada." << endl;
+            return;
+        }
+        CierreVenta c = cerrarVenta(carrito);
+        if (c.idVenta <= 0) continue;
+        string pagar = leerDatoSeguro("Pagar ahora? (s/n): ");
+        if (pagar == "s" || pagar == "S") pagarVenta(c);
+        else cout << "Queda EN_PROCESO para cobrar despues." << endl;
         return;
     }
-    CierreVenta c = cerrarVenta(carrito);
-    if (c.idVenta <= 0) return;
-    string pagar = leerDatoSeguro("Pagar ahora? (s/n): ");
-    if (pagar == "s" || pagar == "S") pagarVenta(c);
-    else cout << "Queda EN_PROCESO para cobrar despues." << endl;
 }
 
 static void mostrarFactura(int idVenta) {
@@ -1136,6 +1160,140 @@ static void cobrarVentaUI() {
     }
 }
 
+static void garantiaRegistrarUI() {
+    cout << "\n--- REGISTRAR GARANTIA ---" << endl;
+    try {
+        string dStr = leerDatoSeguro("ID detalle de venta: ");
+        string diasStr = leerDatoSeguro("Dias de validez (Enter = 30): ");
+        if (!esNumerico(dStr)) {
+            cout << ROJO << "ID invalido." << RESET << endl;
+            return;
+        }
+        int dias = 30;
+        if (!diasStr.empty()) {
+            if (!esNumerico(diasStr) || stoi(diasStr) <= 0) {
+                cout << ROJO << "Dias invalidos." << RESET << endl;
+                return;
+            }
+            dias = stoi(diasStr);
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_REGISTRAR_GARANTIA(?, ?)"));
+        pstmt->setInt(1, stoi(dStr));
+        pstmt->setInt(2, dias);
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo registrar la garantia." << RESET << endl;
+    }
+}
+
+static void reclamoRegistrarUI() {
+    cout << "\n--- RECLAMAR GARANTIA ---" << endl;
+    try {
+        string gStr = leerDatoSeguro("ID garantia: ");
+        string desc = leerDatoSeguro("Descripcion del dano: ");
+        if (!esNumerico(gStr) || desc.empty()) {
+            cout << ROJO << "ID y descripcion obligatorios." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL 27_SP_REGISTRAR_RECLAMO_GARANTIA(?, ?)"));
+        pstmt->setInt(1, stoi(gStr));
+        pstmt->setString(2, desc);
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo registrar el reclamo." << RESET << endl;
+    }
+}
+
+static void reclamoFinalizarUI() {
+    cout << "\n--- FINALIZAR RECLAMO ---" << endl;
+    try {
+        string rStr = leerDatoSeguro("ID reclamo: ");
+        if (!esNumerico(rStr)) {
+            cout << ROJO << "ID invalido." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(?)"));
+        pstmt->setInt(1, stoi(rStr));
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo finalizar el reclamo." << RESET << endl;
+    }
+}
+
+static void ejecutarSubmenuGarantias() {
+    int opcion = 0;
+    do {
+        cout << "\n=== GARANTIAS ===" << endl;
+        cout << "1. Registrar garantia" << endl;
+        cout << "2. Reclamar garantia" << endl;
+        cout << "3. Finalizar reclamo" << endl;
+        cout << "4. Volver" << endl;
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        cin >> opcion;
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            opcion = -1;
+        } else {
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
+        switch (opcion) {
+            case 1: garantiaRegistrarUI(); break;
+            case 2: reclamoRegistrarUI(); break;
+            case 3: reclamoFinalizarUI(); break;
+            case 4: break;
+            default: cout << ROJO << "Opcion no valida." << RESET << endl; break;
+        }
+        if (opcion != 4) pausar();
+    } while (opcion != 4);
+}
+
+static void historialVentaUI() {
+    cout << "\n--- HISTORIAL DE VENTA ---" << endl;
+    try {
+        string vStr = leerDatoSeguro("ID venta: ");
+        if (!esNumerico(vStr)) {
+            cout << ROJO << "ID invalido." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_HISTORIAL_VENTA(?)"));
+        pstmt->setInt(1, stoi(vStr));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-19s | %-10s | %-10s | %-15s | %-30s\n", "FECHA", "DE", "A", "EMPLEADO", "MOTIVO");
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            string ant;
+            try { ant = res->getString("ESTADO_ANTERIOR"); } catch (...) { ant = "---"; }
+            printf("%-19.19s | %-10s | %-10s | %-15.15s | %-30.30s\n",
+                   res->getString("FECHA").c_str(),
+                   ant.c_str(),
+                   res->getString("ESTADO_NUEVO").c_str(),
+                   res->getString("EMPLEADO").c_str(),
+                   res->getString("MOTIVO").c_str());
+        }
+        if (!hay) cout << "[!] Sin historial." << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver el historial." << RESET << endl;
+    }
+}
+
 void ejecutarSubmenuVentas() {
     int opcion = 0;
     do {
@@ -1184,11 +1342,17 @@ void ejecutarSubmenuVentas() {
                 reportePeriodoGananciaUI();
                 break;
             case 12:
+                ejecutarSubmenuGarantias();
+                break;
+            case 13:
+                historialVentaUI();
+                break;
+            case 14:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 12) pausar();
-    } while (opcion != 12);
+        if (opcion != 14) pausar();
+    } while (opcion != 14);
 }
