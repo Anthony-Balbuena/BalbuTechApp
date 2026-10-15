@@ -126,16 +126,19 @@ void buscarProveedor() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
+        printf("%s\n", string(88, '-').c_str());
         bool encontrado = false;
 
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_PROVEEDOR") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("TELEFONO") << " | "
-                 << res->getString("EMAIL") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
+                   res->getInt("ID_PROVEEDOR"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("TELEFONO").c_str(),
+                   res->getString("EMAIL").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(88, '-').c_str());
         }
 
         if (!encontrado) {
@@ -156,16 +159,19 @@ void listarProveedores() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | TELEFONO | EMAIL | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
+        printf("%s\n", string(88, '-').c_str());
         bool encontrado = false;
 
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_PROVEEDOR") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("TELEFONO") << " | "
-                 << res->getString("EMAIL") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
+                   res->getInt("ID_PROVEEDOR"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("TELEFONO").c_str(),
+                   res->getString("EMAIL").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(88, '-').c_str());
         }
 
         if (!encontrado) {

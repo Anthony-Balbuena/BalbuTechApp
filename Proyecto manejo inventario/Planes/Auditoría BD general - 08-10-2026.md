@@ -108,8 +108,8 @@ Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 e
 
 ## 📋 Plan SQL (09/10/2026) — solo SQL, sin C++ ni web
 
-- [ ] **P9 — vuelto**: lógica en `24_SP_REGISTRAR_PAGO` (aceptar monto > total con `P_MONTO_RECIBIDO`, calcular vuelto y definir dónde se registra).
-- [ ] **E2E SQL Partes 2/4/5**: suites reproducibles estilo `test_blindaje_p3.sql` para cobro/cierre, cancelación y devoluciones/garantías.
+- [x] **P9 — vuelto**: HECHO (mensaje `A PAGAR / RECIBIDO / DEVUELTO` en el SP y la app).
+- [x] **E2E por tema**: HECHO (suites `t_*.sql` con rollback y residuos 0 en cada cambio).
 
 ## 🔌 Contrato C++↔SQL — hallazgos 09/10/2026 (verificados línea por línea)
 

@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <vector>
+#include <utility>
 #include <cstdio>
 #include <cmath>
 #include <memory>
@@ -30,34 +32,29 @@ void mostrarMenuProductos() {
 void registrarProducto() {
     cout << "\n---- REGISTRO DE PRODUCTO ---" << endl;
 
+    vector<pair<int, string>> marcas, categorias, proveedores;
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL PARA_INSERTAR_PRODUCTO()"));
         bool results = pstmt->execute();
 
         if (results) {
             std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
-            cout << CIAN << "\n--- CATEGORIAS DISPONIBLES ---\n" << RESET;
-            while (res->next()) {
-                cout << CIAN << " | ID: " << RESET << res->getInt("ID_CATEGORIA")
-                     << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
+            while (res && res->next()) {
+                categorias.emplace_back(res->getInt("ID_CATEGORIA"), res->getString("NOMBRE"));
             }
         }
 
         if (pstmt->getMoreResults()) {
             std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
-            cout << CIAN << "\n--- MARCAS DISPONIBLES ---\n" << RESET;
-            while (res->next()) {
-                cout << CIAN << "ID: " << RESET << res->getInt("ID_MARCA")
-                     << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
+            while (res && res->next()) {
+                marcas.emplace_back(res->getInt("ID_MARCA"), res->getString("NOMBRE"));
             }
         }
 
         if (pstmt->getMoreResults()) {
             std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
-            cout << CIAN << "\n--- PROVEEDORES DISPONIBLES ---\n" << RESET;
-            while (res->next()) {
-                cout << CIAN << "ID: " << RESET << res->getInt("ID_PROVEEDOR")
-                     << CIAN << " | Nombre: " << RESET << res->getString("NOMBRE") << endl;
+            while (res && res->next()) {
+                proveedores.emplace_back(res->getInt("ID_PROVEEDOR"), res->getString("NOMBRE"));
             }
         }
 
@@ -66,14 +63,25 @@ void registrarProducto() {
         cerr << ROJO << "Error al mostrar las listas: " << RESET << e.what() << endl;
     }
 
+    auto mostrarLista = [](const char *titulo, const vector<pair<int, string>> &v) {
+        cout << CIAN << "\n--- " << titulo << " ---\n" << RESET;
+        if (v.empty()) cout << "[!] Sin registros." << endl;
+        for (auto &p : v) {
+            cout << CIAN << "ID: " << RESET << p.first
+                 << CIAN << " | " << RESET << p.second << endl;
+        }
+    };
+
     try {
         string nombre = leerDatoSeguro("\nNombre del Producto: ");
         string codigo = leerDatoSeguro("\nCodigo del producto (Ej: CPU-001): ");
         string descripcion = leerDatoSeguro("\nDescripcion del Producto: ");
 
+        mostrarLista("MARCAS", marcas);
         string marcaStr = leerDatoSeguro("\nMarca del producto (ID-NUMERO): ");
         int idMarca = stoi(marcaStr);
 
+        mostrarLista("CATEGORIAS", categorias);
         string categoriaStr = leerDatoSeguro("\nCategoria del Producto (ID-NUMERO): ");
         int idCategoria = stoi(categoriaStr);
 
@@ -93,6 +101,7 @@ void registrarProducto() {
                  << " (ITBIS incluido)" << RESET << endl;
         } catch (...) {}
 
+        mostrarLista("PROVEEDORES", proveedores);
         string proveedorStr = leerDatoSeguro("\nID del Proveedor (ID-NUMERO): ");
         int idProveedor = stoi(proveedorStr);
 

@@ -171,14 +171,17 @@ void buscarEmpleado() {
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool encontrado = false;
 
-        cout << "\nID | NOMBRE | CEDULA | CARGO | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-28s | %-8s\n", "ID", "NOMBRE", "CEDULA", "CARGO", "ESTADO");
+        printf("%s\n", string(86, '-').c_str());
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_EMPLEADO") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("CEDULA") << " | "
-                 << res->getString("CARGO") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-28.28s | %-8s\n",
+                   res->getInt("ID_EMPLEADO"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("CEDULA").c_str(),
+                   res->getString("CARGO").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(86, '-').c_str());
         }
 
         if (!encontrado) {
@@ -199,15 +202,18 @@ void listarEmpleados() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS ORDER BY ID_EMPLEADO"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | CEDULA | CARGO | ESTADO" << endl;
+        printf("\n%-4s | %-22s | %-12s | %-28s | %-8s\n", "ID", "NOMBRE", "CEDULA", "CARGO", "ESTADO");
+        printf("%s\n", string(86, '-').c_str());
         bool encontrado = false;
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_EMPLEADO") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("CEDULA") << " | "
-                 << res->getString("CARGO") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-4d | %-22.22s | %-12.12s | %-28.28s | %-8s\n",
+                   res->getInt("ID_EMPLEADO"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("CEDULA").c_str(),
+                   res->getString("CARGO").c_str(),
+                   res->getString("ESTADO").c_str());
+            printf("%s\n", string(86, '-').c_str());
         }
 
         if (!encontrado) {

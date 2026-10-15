@@ -21,6 +21,8 @@ struct LineaCompra {
     string nombre;
     int cantidad = 0;
     double precioCompra = 0.0;
+    int idProveedor = 0;
+    string nombreProveedor;
 };
 
 struct CierreCompra {
@@ -37,7 +39,8 @@ void mostrarMenuCompras() {
     cout << "3. Devolucion de compra" << endl;
     cout << "4. Reporte por periodo" << endl;
     cout << "5. Pagar compra" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    cout << "6. Precios por suplidor" << endl;
+    cout << "7. Volver al Menu Principal" << endl;
     cout << "=========================" << endl;
 }
 
@@ -67,45 +70,50 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out);
 
 static bool registroRapidoC(const string &entrada, LineaCompra &out) {
     try {
-        cout << "\n--- REGISTRO RAPIDO (sin salir de la compra) ---" << endl;
+        vector<pair<int, string>> marcas, categorias, proveedores;
         try {
             std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement("CALL PARA_INSERTAR_PRODUCTO()"));
             if (pl->execute()) {
                 std::unique_ptr<sql::ResultSet> rc(pl->getResultSet());
-                cout << CIAN << "\n--- CATEGORIAS ---" << RESET << endl;
                 while (rc && rc->next()) {
-                    cout << CIAN << "ID: " << RESET << rc->getInt("ID_CATEGORIA")
-                         << CIAN << " | " << RESET << rc->getString("NOMBRE") << endl;
+                    categorias.emplace_back(rc->getInt("ID_CATEGORIA"), rc->getString("NOMBRE"));
                 }
             }
             if (pl->getMoreResults()) {
                 std::unique_ptr<sql::ResultSet> rc(pl->getResultSet());
-                cout << CIAN << "\n--- MARCAS ---" << RESET << endl;
                 while (rc && rc->next()) {
-                    cout << CIAN << "ID: " << RESET << rc->getInt("ID_MARCA")
-                         << CIAN << " | " << RESET << rc->getString("NOMBRE") << endl;
+                    marcas.emplace_back(rc->getInt("ID_MARCA"), rc->getString("NOMBRE"));
                 }
             }
             if (pl->getMoreResults()) {
                 std::unique_ptr<sql::ResultSet> rc(pl->getResultSet());
-                cout << CIAN << "\n--- PROVEEDORES ---" << RESET << endl;
                 while (rc && rc->next()) {
-                    cout << CIAN << "ID: " << RESET << rc->getInt("ID_PROVEEDOR")
-                         << CIAN << " | " << RESET << rc->getString("NOMBRE") << endl;
+                    proveedores.emplace_back(rc->getInt("ID_PROVEEDOR"), rc->getString("NOMBRE"));
                 }
             }
             drenarResultados(pl.get());
         } catch (...) {}
+        auto mostrarListaC = [](const char *titulo, const vector<pair<int, string>> &v) {
+            cout << CIAN << "\n--- " << titulo << " ---\n" << RESET;
+            if (v.empty()) cout << "[!] Sin registros." << endl;
+            for (auto &p : v) {
+                cout << CIAN << "ID: " << RESET << p.first
+                     << CIAN << " | " << RESET << p.second << endl;
+            }
+        };
         string nombre = leerDatoSeguro("Nombre [" + entrada + "]: ");
         if (nombre.empty()) nombre = entrada;
         string descripcion = nombre;
         if (descripcion.size() < 10) descripcion += " - registro rapido";
         string codigo = leerDatoSeguro("Codigo [" + entrada + "]: ");
         if (codigo.empty()) codigo = entrada;
-        string pvStr = leerDatoSeguro("Precio de venta $: ");
-        string pcStr = leerDatoSeguro("Precio de compra $: ");
+        mostrarListaC("MARCAS", marcas);
         string mcStr = leerDatoSeguro("ID marca: ");
+        mostrarListaC("CATEGORIAS", categorias);
         string ctStr = leerDatoSeguro("ID categoria: ");
+        string pcStr = leerDatoSeguro("Precio de compra $: ");
+        string pvStr = leerDatoSeguro("Precio de venta $: ");
+        mostrarListaC("PROVEEDORES", proveedores);
         string pv2Str = leerDatoSeguro("ID proveedor: ");
         double pv = stod(pvStr), pc = stod(pcStr);
         int mc = stoi(mcStr), ct = stoi(ctStr), pr = stoi(pv2Str);
@@ -202,6 +210,77 @@ static int stockDeC(int idProducto) {
     }
 }
 
+static bool elegirSuplidor(LineaCompra &l) {
+    try {
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_PRODUCTO_SUPLIDORES(?)"));
+        ps->setInt(1, l.idProducto);
+        std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
+        struct Sup { int id; string nombre; double precio; };
+        vector<Sup> lista;
+        while (rs->next()) {
+            lista.push_back({rs->getInt("ID_PROVEEDOR"), rs->getString("PROVEEDOR"),
+                             rs->getDouble("ULTIMO_PRECIO")});
+        }
+        drenarResultados(ps.get());
+        if (!lista.empty()) {
+            cout << "\nLo venden:" << endl;
+            for (auto &s : lista) {
+                printf("%d | %-25.25s | ultimo $%.2f\n", s.id, s.nombre.c_str(), s.precio);
+            }
+        }
+        string sStr = leerDatoSeguro("ID suplidor (Enter = mas barato): ");
+        if (sStr.empty()) {
+            if (lista.empty()) {
+                cout << ROJO << "Sin historial: escribi el ID." << RESET << endl;
+                return false;
+            }
+            l.idProveedor = lista[0].id;
+            l.nombreProveedor = lista[0].nombre;
+            return true;
+        }
+        if (!esNumericoC(sStr)) return false;
+        int idSup = stoi(sStr);
+        std::unique_ptr<sql::PreparedStatement> pv(globalCon->prepareStatement(
+            "CALL SP_PROVEEDOR_ACTIVO(?)"));
+        pv->setInt(1, idSup);
+        std::unique_ptr<sql::ResultSet> rv(pv->executeQuery());
+        bool ok = false;
+        if (rv->next()) {
+            l.idProveedor = idSup;
+            l.nombreProveedor = rv->getString("NOMBRE");
+            ok = true;
+        } else {
+            cout << ROJO << "Suplidor inexistente o inactivo." << RESET << endl;
+        }
+        drenarResultados(pv.get());
+        return ok;
+    } catch (const exception &) {
+        return false;
+    }
+}
+
+static void mostrarHistorialPrecios(int idProducto) {
+    try {
+        std::unique_ptr<sql::PreparedStatement> ph(globalCon->prepareStatement(
+            "CALL SP_PRODUCTO_HISTORIAL_PRECIOS(?)"));
+        ph->setInt(1, idProducto);
+        std::unique_ptr<sql::ResultSet> rh(ph->executeQuery());
+        printf("\n%-25s | %-10s | %-19s | %-4s\n", "PROVEEDOR", "PRECIO", "FECHA", "CANT");
+        bool hay = false;
+        while (rh->next()) {
+            hay = true;
+            printf("%-25.25s | %-10.2f | %-19.19s | %-4d\n",
+                   rh->getString("PROVEEDOR").c_str(),
+                   (double)rh->getDouble("PRECIO"),
+                   rh->getString("FECHA").c_str(),
+                   rh->getInt("CANTIDAD"));
+        }
+        if (!hay) cout << "[!] Sin historial: primera compra." << endl;
+        drenarResultados(ph.get());
+    } catch (const exception &) {}
+}
+
 static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa) {
     (void)tasa;
     cout << "\n--- CARRITO (precios de factura, con IVA) ---" << endl;
@@ -211,6 +290,7 @@ static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa
         double parcial = l.precioCompra * l.cantidad;
         total += parcial;
         cout << l.nombre << " x" << l.cantidad
+             << " [" << l.nombreProveedor << "]"
              << " | $" << l.precioCompra << " con ITBIS"
              << " | total $" << parcial << endl;
     }
@@ -258,33 +338,58 @@ static void mostrarFacturaCompra(int idCompra) {
     }
 }
 
-static CierreCompra cerrarCompra(const vector<LineaCompra> &carrito) {
+static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int idProvFijo, bool pedirProv) {
     CierreCompra out;
     if (carrito.empty()) return out;
+    const int MAX_INTENTOS = 3;
+    int idProv = idProvFijo, idEmp = 0, idCompra = 0;
     try {
-        string provStr = leerDatoSeguro("ID proveedor: ");
-        string empStr = leerDatoSeguro("ID empleado: ");
-        if (!esNumericoC(provStr) || !esNumericoC(empStr)) {
-            cout << ROJO << "IDs invalidos." << RESET << endl;
-            return out;
-        }
-        int idProv = stoi(provStr);
-        int idEmp = stoi(empStr);
+        bool iniciada = false;
+        for (int intento = 1; intento <= MAX_INTENTOS && !iniciada; ++intento) {
+            try {
+                if (pedirProv) {
+                    string provStr = leerDatoSeguro("ID proveedor: ");
+                    if (!esNumericoC(provStr)) {
+                        cout << ROJO << "ID invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                        continue;
+                    }
+                    idProv = stoi(provStr);
+                }
+                string empStr = leerDatoSeguro("ID empleado: ");
+                if (!esNumericoC(empStr)) {
+                    cout << ROJO << "ID invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                    continue;
+                }
+                idEmp = stoi(empStr);
 
-        std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
-        stmt->execute("CALL 19_SP_INICIAR_COMPRA(" + to_string(idProv) + ", " + to_string(idEmp) + ", @nc)");
-        {
-            std::unique_ptr<sql::ResultSet> r0(stmt->getResultSet());
-            if (r0) { while (r0->next()) {} }
+                std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
+                stmt->execute("CALL 19_SP_INICIAR_COMPRA(" + to_string(idProv) + ", " + to_string(idEmp) + ", @nc)");
+                {
+                    std::unique_ptr<sql::ResultSet> r0(stmt->getResultSet());
+                    if (r0) { while (r0->next()) {} }
+                }
+                drenarResultados(stmt.get());
+                std::unique_ptr<sql::Statement> stmt2(globalCon->createStatement());
+                std::unique_ptr<sql::ResultSet> resId(stmt2->executeQuery("SELECT @nc AS IDC"));
+                idCompra = 0;
+                if (resId->next()) {
+                    try { idCompra = resId->getInt("IDC"); } catch (...) { idCompra = 0; }
+                }
+                drenarResultados(stmt2.get());
+                if (idCompra <= 0) {
+                    cout << ROJO << "No se pudo iniciar la compra (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                    continue;
+                }
+                iniciada = true;
+            } catch (const CancelarOperacionException &) {
+                throw;
+            } catch (const exception &e) {
+                idCompra = 0;
+                cout << ROJO << e.what() << " (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+            }
         }
-        drenarResultados(stmt.get());
-        std::unique_ptr<sql::Statement> stmt2(globalCon->createStatement());
-        std::unique_ptr<sql::ResultSet> resId(stmt2->executeQuery("SELECT @nc AS IDC"));
-        int idCompra = 0;
-        if (resId->next()) idCompra = resId->getInt("IDC");
-        drenarResultados(stmt2.get());
-        if (idCompra <= 0) {
-            cout << ROJO << "No se pudo iniciar la compra." << RESET << endl;
+        if (!iniciada) {
+            cout << ROJO << "Compra no iniciada. El carrito se mantiene: volve a elegir Cerrar." << RESET << endl;
             return out;
         }
         cout << VERDE << "Compra #" << idCompra << " iniciada." << RESET << endl;
@@ -335,6 +440,10 @@ static CierreCompra cerrarCompra(const vector<LineaCompra> &carrito) {
         cout << ROJO << "Error al cerrar la compra: " << e.what() << RESET << endl;
     }
     return out;
+}
+
+static CierreCompra cerrarCompraForzada(const vector<LineaCompra> &grupo, int idProv) {
+    return cerrarCompraNucleo(grupo, idProv, false);
 }
 
 static void pagarCompra(const CierreCompra &c) {
@@ -465,9 +574,15 @@ static void compraRapida() {
             continue;
         }
         int cant = stoi(cantStr);
+        mostrarHistorialPrecios(prod.idProducto);
+        if (!elegirSuplidor(prod)) {
+            cout << ROJO << "Sin suplidor no hay linea." << RESET << endl;
+            continue;
+        }
         bool existe = false;
         for (auto &l : carrito) {
-            if (l.idProducto == prod.idProducto && l.precioCompra == precio) {
+            if (l.idProducto == prod.idProducto && l.precioCompra == precio
+                && l.idProveedor == prod.idProveedor) {
                 l.cantidad += cant;
                 existe = true;
                 break;
@@ -485,16 +600,35 @@ static void compraRapida() {
         return;
     }
     mostrarCarritoCompra(carrito, tasa);
-    string cerrar = leerDatoSeguro("Cerrar compra? (s/n): ");
-    if (cerrar != "s" && cerrar != "S") {
-        cout << "Compra no guardada." << endl;
-        return;
+    // Una factura = un suplidor: se parte el carrito por suplidor.
+    vector<int> suplidores;
+    for (auto &l : carrito) {
+        bool visto = false;
+        for (int s : suplidores) if (s == l.idProveedor) { visto = true; break; }
+        if (!visto) suplidores.push_back(l.idProveedor);
     }
-    CierreCompra c = cerrarCompra(carrito);
-    if (c.idCompra <= 0) return;
-    string pagar = leerDatoSeguro("Pagar ahora? (s/n): ");
-    if (pagar == "s" || pagar == "S") pagarCompra(c);
-    else cout << "Queda ABIERTA para pagar despues." << endl;
+    if (suplidores.size() > 1) {
+        cout << AZUL << "Mezclaste " << suplidores.size()
+             << " suplidores: se crean " << suplidores.size() << " compras (una por factura)." << RESET << endl;
+    }
+    while (true) {
+        string cerrar = leerDatoSeguro("Cerrar compra? (s/n): ");
+        if (cerrar != "s" && cerrar != "S") {
+            cout << "Compra no guardada." << endl;
+            return;
+        }
+        bool todoOk = true;
+        for (int sup : suplidores) {
+            vector<LineaCompra> grupo;
+            for (auto &l : carrito) if (l.idProveedor == sup) grupo.push_back(l);
+            CierreCompra c = cerrarCompraForzada(grupo, sup);
+            if (c.idCompra <= 0) { todoOk = false; break; }
+            string pagar = leerDatoSeguro("Pagar compra #" + to_string(c.idCompra) + " ahora? (s/n): ");
+            if (pagar == "s" || pagar == "S") pagarCompra(c);
+            else cout << "Queda ABIERTA para pagar despues." << endl;
+        }
+        if (todoOk) return;
+    }
 }
 
 static void verCompraConIVA() {
@@ -787,6 +921,30 @@ static void pagarCompraPendienteUI() {
     }
 }
 
+static void verPreciosCompraUI() {
+    cout << "\n--- PRECIOS POR SUPLIDOR (quien vende mas barato) ---" << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_REPORTE_PRECIOS_COMPRA()"));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-25s | %-10s | %-10s | %-25s | %-10s\n", "PRODUCTO", "SUPLIDORES", "MAS BARATO", "DONDE", "ULTIMA");
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            printf("%-25.25s | %-10d | %-10.2f | %-25.25s | %-10.10s\n",
+                   res->getString("PRODUCTO").c_str(),
+                   res->getInt("SUPLIDORES"),
+                   (double)res->getDouble("MAS_BARATO"),
+                   res->getString("DONDE_BARATO").c_str(),
+                   res->getString("ULTIMA_COMPRA").c_str());
+        }
+        if (!hay) cout << "[!] Sin datos: ninguna compra RECIBIDA aun." << endl;
+        drenarResultados(pstmt.get());
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver el reporte." << RESET << endl;
+    }
+}
+
 void ejecutarSubmenuCompras() {
     int opcion = 0;
     do {
@@ -817,11 +975,14 @@ void ejecutarSubmenuCompras() {
                 pagarCompraPendienteUI();
                 break;
             case 6:
+                verPreciosCompraUI();
+                break;
+            case 7:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        if (opcion != 7) pausar();
+    } while (opcion != 7);
 }

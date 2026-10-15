@@ -12,11 +12,20 @@
 
 using namespace std;
 
+static bool esNumericoInv(const string &s) {
+    if (s.empty()) return false;
+    for (char c : s) {
+        if (!isdigit(static_cast<unsigned char>(c))) return false;
+    }
+    return true;
+}
+
 void mostrarMenuInventario() {
     cout << "\n=== MODULO DE INVENTARIO ===" << endl;
     cout << "1. Ajuste de stock" << endl;
     cout << "2. Ajustar p.compra" << endl;
-    cout << "3. Volver al Menu Principal" << endl;
+    cout << "3. Movimientos" << endl;
+    cout << "4. Volver al Menu Principal" << endl;
     cout << "============================" << endl;
 }
 
@@ -155,6 +164,66 @@ static void actualizarCostoUI() {
     }
 }
 
+static string aColumna(const string &s, size_t maxCols) {
+    // El printf cuenta BYTES y la terminal muestra COLUMNAS: cada
+    // multibyte (ej. ™) se vuelve un solo '?' para no correr la tabla.
+    string out;
+    size_t cols = 0;
+    for (size_t i = 0; i < s.size() && cols < maxCols;) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < 0x80) { out += s[i]; i++; cols++; }
+        else {
+            out += '?';
+            i++;
+            while (i < s.size() && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) i++;
+            cols++;
+        }
+    }
+    return out;
+}
+
+static void kardexUI() {
+    cout << "\n--- MOVIMIENTOS DE STOCK ---" << endl;
+    try {
+        string idStr = leerDatoSeguro("ID producto (Enter = todos): ");
+        int idProd = -1;
+        if (!idStr.empty()) {
+            if (!esNumericoInv(idStr)) {
+                cout << ROJO << "ID invalido." << RESET << endl;
+                return;
+            }
+            idProd = stoi(idStr);
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            idProd < 0 ? "CALL SP_KARDEX_TODOS()" : "CALL SP_KARDEX_PRODUCTO(?)"));
+        if (idProd >= 0) pstmt->setInt(1, idProd);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-6s | %-25s | %-19s | %-10s | %-6s | %-15s | %-30s\n", "MOV", "PRODUCTO", "FECHA", "TIPO", "CANT", "EMPLEADO", "MOTIVO");
+        printf("%s\n", string(129, '-').c_str());
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            string motivo;
+            try { motivo = res->getString("OBSERVACION"); } catch (...) { motivo = ""; }
+            printf("%-6d | %-25s | %-19s | %-10s | %-6d | %-15s | %-30s\n",
+                   res->getInt("ID_MOVIMIENTO"),
+                   aColumna(res->getString("PRODUCTO"), 25).c_str(),
+                   res->getString("FECHA").c_str(),
+                   res->getString("TIPO_MOVIMIENTO").c_str(),
+                   res->getInt("CANTIDAD"),
+                   aColumna(res->getString("EMPLEADO"), 15).c_str(),
+                   aColumna(motivo, 30).c_str());
+            printf("%s\n", string(129, '-').c_str());
+        }
+        if (!hay) cout << "[!] Sin movimientos." << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver el kardex." << RESET << endl;
+    }
+}
+
 void ejecutarSubmenuInventario() {
     int opcion = 0;
     do {
@@ -176,11 +245,14 @@ void ejecutarSubmenuInventario() {
                 actualizarCostoUI();
                 break;
             case 3:
+                kardexUI();
+                break;
+            case 4:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 3) pausar();
-    } while (opcion != 3);
+        if (opcion != 4) pausar();
+    } while (opcion != 4);
 }

@@ -111,14 +111,16 @@ void buscarMarca() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | ESTADO" << endl;
+        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
+        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
         bool encontrado = false;
 
         while (res->next()) {
             encontrado = true;
-            cout << res->getInt("ID_MARCA") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-5d | %-30.30s | %-8s\n",
+                   res->getInt("ID_MARCA"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("ESTADO").c_str());
         }
 
         if (!encontrado) {
@@ -139,11 +141,13 @@ void listarMarcas() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_MARCAS()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\nID | NOMBRE | ESTADO" << endl;
+        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
+        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
         while (res->next()) {
-            cout << res->getInt("ID_MARCA") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("ESTADO") << endl;
+            printf("%-5d | %-30.30s | %-8s\n",
+                   res->getInt("ID_MARCA"),
+                   res->getString("NOMBRE").c_str(),
+                   res->getString("ESTADO").c_str());
         }
 
         drenarResultados(pstmt.get());

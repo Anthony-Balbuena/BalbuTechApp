@@ -173,3 +173,38 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_KARDEX_PRODUCTO ;
+/*
+SP_KARDEX_PRODUCTO (14/10/2026)
+Kardex de un producto: sus movimientos de stock del mas nuevo al mas viejo,
+con quien lo hizo y el motivo. Solo lectura.
+*/
+CREATE PROCEDURE SP_KARDEX_PRODUCTO(IN P_ID_PRODUCTO INT)
+BEGIN
+    SELECT M.ID_MOVIMIENTO, P.NOMBRE AS PRODUCTO, M.FECHA, M.TIPO_MOVIMIENTO,
+           M.CANTIDAD, E.NOMBRE AS EMPLEADO, M.OBSERVACION
+      FROM MOVIMIENTOS_INVENTARIO M
+      JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO
+      JOIN EMPLEADOS E ON E.ID_EMPLEADO = M.ID_EMPLEADO
+     WHERE M.ID_PRODUCTO = P_ID_PRODUCTO
+     ORDER BY M.ID_MOVIMIENTO DESC LIMIT 50;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_KARDEX_TODOS ;
+/*
+SP_KARDEX_TODOS (14/10/2026)
+Ultimos 50 movimientos de stock de todos los productos. Solo lectura.
+*/
+CREATE PROCEDURE SP_KARDEX_TODOS()
+BEGIN
+    SELECT M.ID_MOVIMIENTO, P.NOMBRE AS PRODUCTO, M.FECHA, M.TIPO_MOVIMIENTO,
+           M.CANTIDAD, E.NOMBRE AS EMPLEADO, M.OBSERVACION
+      FROM MOVIMIENTOS_INVENTARIO M
+      JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO
+      JOIN EMPLEADOS E ON E.ID_EMPLEADO = M.ID_EMPLEADO
+     ORDER BY M.ID_MOVIMIENTO DESC LIMIT 50;
+END //
+DELIMITER ;
