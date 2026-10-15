@@ -33,6 +33,12 @@
 - Abonos (14/10): `pagarCompra` manda lo tipeado (valida >0 y <= pendiente, muestra saldo restante). Probado en vivo con compra TEST #3: abono 3.00 (ABIERTA, saldo 5.00), pago anulado, compra cancelada, producto TEST a INACTIVO. La BD prohíbe borrar filas (residuo: #3 CANCELADA, excluida de reportes).
 - Fix `DEFAULT` en params de SP (MariaDB no lo soporta): `1- CATEGORIAS` (5), `24- PAGOS` (1), `28- LOG` (1). La app ya manda aridad completa. `import.sh` ahora cuenta errores reales de sentencia en vez de mentir con "0 avisos".
 
+### Sincronización sede trabajo (15/10)
+- Pull de casa aplicado a la viva del trabajo: módulos `20` (kardex), `21.5` (historial), `40` (suplidores) + formato de `2`; tabla `PRODUCTO_PROVEEDOR` + trigger + 7 SP nuevos → `check-app-sps`: 0 faltantes.
+- Binario recompilado; humo en vivo: `3. Movimientos` (14 movimientos reales), `13. Historial de venta` (venta 3), submenú `12. Garantias`, `6. Precios por suplidor` (vacío correcto: sin compras RECIBIDA acá todavía).
+- Nota: los IDs de marcas difieren entre sedes (acá 1=ASUS; casa 1=LENOVO) — el catálogo de casa NO se copia tal cual: si se carga acá, va con mapeo por nombre, no por ID.
+- Catálogo cargado con tope de 10 por tabla (pedido 15/10): +10 categorías (PLACA MADRE…HOGAR INTELIGENTE), +10 marcas (LENOVO, DELL, APPLE, AMD, NVIDIA, INTEL, GIGABYTE, ASROCK, SAMSUNG, LG), +10 proveedores placeholder (`SUPLIDOR 01`–`10`, renombrables con los reales) y +10 productos (LAP-002…LAP-007, RYZ-004, CPU-003, RTX-004, RTX-001). Mapeo por nombre, verificado con `SP_CONSULTAR_PRODUCTOS_FILTRADO`. Precios estimados de referencia; entran con stock cuando se compren por el módulo.
+
 ## C++ — app
 
 - Base 10-11/10: submenús 9/9, `unique_ptr`, drenaje de resultados, pausa, autologin de pruebas.
