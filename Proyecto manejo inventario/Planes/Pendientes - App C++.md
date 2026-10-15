@@ -22,4 +22,5 @@
 > Hechos movidos a `Realizado.md` (14/10/2026).
 - [x] Garantías/reclamos UI (HECHO 14/10: `12. Garantias` en ventas con registrar/reclamar/finalizar).
 - [x] Historial de estados (HECHO 14/10: `13. Historial de venta` con `SP_HISTORIAL_VENTA`).
-- [ ] (14/10, en curso) Ayudante único para todo ID/monto a ciegas (ex `pedirID`) -> `leerNumeroConIntentos` en seguridad.h/cpp (3 intentos, rango min/max, cancelable). 15/10: migrados los flujos de pagos y devoluciones (compras y ventas) y unificados esNumerico/MAX_INTENTOS; falta el resto (cancelar venta, reportes, etc.).
+- [x] Ayudante único para todo ID/monto a ciegas (HECHO 15/10: `leerNumeroConIntentos` en seguridad.h/cpp + 19 puntos de pagos y devoluciones migrados; detalle en `Realizado.md`).
+- [ ] Barrido restante de entradas a ciegas: `cancelarVentaUI`, reportes por período, historial y vistas (login y cierres mantienen su bucle propio de 3).

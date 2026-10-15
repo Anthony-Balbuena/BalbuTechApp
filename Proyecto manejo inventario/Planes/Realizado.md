@@ -62,3 +62,10 @@
 - Rename `COSTO` → `P_COMPRA` (tabla, SPs, triggers, app); `P_COMPRA NOT NULL` con estimados al 80% (NO REALES, van facturas).
 - JOIN de stock + filtros ID repuestos en SP productos; listados `ID | NOMBRE | ESTADO | P.COMPRA | STOCK`.
 - `P.UNIT` en facturas de venta y compra; carrito muestra precios con ITBIS.
+
+## 15/10 (tarde) — compra rápida y reporte de precios
+- Helper `leerNumeroConIntentos` (seguridad.h/cpp, HECHO): 3 intentos por dato, rango min/max, punto o coma, `xxx` cancela, Enter = default donde aplica. Migrados 19 puntos de pagos y devoluciones (compras: pagarCompra método/monto/empleado, devolución, pagar pendiente; ventas: pagarVenta método/monto, cobrar, anular, devolución, garantía). Unificados `esNumerico` y `MAX_INTENTOS` (main.cpp incluye seguridad.h). Build OK.
+- `SP_CONSULTAR_PRODUCTOS_FILTRADO` (9) devuelve `ID_PROVEEDOR`; aplicado a la viva.
+- Compra rápida en 2 listas con grilla tipo Excel: inicial `ID_PROD | NOMBRE | CANTIDAD`; al elegir confirma `Producto: <id> (<nombre>)`; paso suplidor `ID_PROV | PROVEEDOR` (sin historial lista todos los activos). En prueba en vivo.
+- Alta rápida de suplidor sin salir de la compra (`registroRapidoS` en compras.cpp): `0` = nuevo; ID inexistente o nombre ofrecen registrar; nombre obligatorio, tel/email opcionales. Fix `Commands out of sync` (drenar antes del retorno temprano). "Jose tech" creado en vivo desde la compra.
+- Reporte `6. Precios por suplidor`: `SP_REPORTE_PRECIOS_COMPRA` (40) ahora trae `MAS_CARO` + `DONDE_CARO` (aplicado a la viva); pantalla `MAS BARATO | BARATO EN | MAS CARO | CARO EN | ULTIMA`. Verificado en vivo (DELL G15: barato Jose tech, caro PM6).
