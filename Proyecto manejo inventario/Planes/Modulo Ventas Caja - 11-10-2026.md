@@ -1,6 +1,6 @@
 # Módulo Ventas Caja (C++) — 11/10/2026
 
-> Estado: en curso por partes. Parte 1 hecha. Parte 2 pendiente de aprobación.
+> Estado: cerrado (cobro y caja en app, ver Realizado).
 > Alcance: solo C++ (`ventas.h/cpp`, `roles.cpp`). La base ya existe y no se modifica en este módulo.
 
 ## Terminología (acordada 11/10/2026)
@@ -16,7 +16,7 @@
 - Archivos: `ventas.h`, `ventas.cpp` (nuevo), `roles.cpp` (menú + permiso).
 - Menú ADMIN `10. Ventas`, RRHH `5. Ventas`, EMPLEADO `3. Ventas`.
 - Permiso `GESTIONAR_VENTAS` otorgado a los tres roles (decisión: modo simple).
-- Submenú: `1. Venta rápida (pendiente)` + `2. Ver venta con IVA` (lee `VISTA_VENTA_CON_IVA`).
+- Submenú: `1. Venta rápida` (HECHO: `ventaRapida` en app) + `2. Ver venta con IVA` (lee `VISTA_VENTA_CON_IVA`).
 - Verificación: `bash build.sh` → `OK: ./output/app`.
 - Nota: modo simple implica que todos pueden anular/cancelar. Pendiente futuro: separar `REGISTRAR_VENTA` de `GESTIONAR_VENTAS`.
 

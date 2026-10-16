@@ -209,6 +209,6 @@ CALL SP_INSERTAR_PRODUCTO('INTEL ARC B580 12GB', 'GPU BATTLEMAGE 12GB 1440P', 11
 
 ## Pendiente
 
-- Comprar los productos por el módulo de compras para que entren con stock al inventario.
-- Normalizar `Mouse` (typo Dispocitivo), `Teclado` (descripción NULL), `IPHONE` como marca, y borrar `2` / `MARCA FASE I` / `CAT FASE I` / `PRODUCTO FASE I` (datos de prueba).
-- Cambios de formato C++ estilo kardex: marcas, empleados, roles, clientes, proveedores, métodos de pago (compila OK).
+- (HECHO 16/10) Compras por el módulo: 13 compras / 14 detalles, 5/10 nuevos con stock (el resto entra según se necesite).
+- Normalización (HECHO 16/10, verificado en viva): `Mouse`/`Teclado`/`2`/`FASE I` fuera; queda `IPHONE` como marca.
+- (HECHO 16/10) Formato kardex en listados C++ (marcas, empleados, roles, clientes, proveedores, métodos y resto).

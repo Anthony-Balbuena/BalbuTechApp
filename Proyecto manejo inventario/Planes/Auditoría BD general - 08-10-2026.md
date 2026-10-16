@@ -61,7 +61,7 @@ Barrido nuevo completo: **cero referencias rotas** a tablas/vistas en ningún `.
 
 1. `SP_ASIGNAR_TECNICO_RECLAMO`: validar que el empleado exista + impedir doble asignación EN_PROCESO del mismo reclamo.
 2. Asistencia: SALIDA sin ENTRADA devuelve "ÉXITO" falso → mensaje amable; doble ENTRADA da error técnico de duplicado → capturar el 1062 con mensaje amable.
-3. `sp_obtener_categorias_marcas` **sigue vivo en la BD local** (el archivo se borró pero la rutina quedó cargada) → `DROP` pendiente.
+3. `sp_obtener_categorias_marcas` se cargó a la viva al borrar el archivo → verificado 16/10: rutina inexistente (HECHO).
 4. `ROL_PERMISO.ROL_NOMBRE` sin FK a `ROLES`; `USUARIOS.CONTRASENA` en VARCHAR(255) vs hash PBKDF2 de 512.
 
 ## 🔧 Ejecución 09/10/2026 — mejoras realizadas (archivos + BD, con pruebas)
@@ -79,7 +79,7 @@ Barrido nuevo completo: **cero referencias rotas** a tablas/vistas en ningún `.
 - El C++ manda: compara `ADMIN`/`RRHH`/`EMPLEADO` hardcodeados (listas que calcan `ROL_PERMISO`). Se renombró `ROLES`: `ROLE_ADMIN`→`ADMIN`, `ROLE_GERENTE`→`RRHH`, `ROLE_VENDEDOR`→`EMPLEADO` (mapeo aprobado). `ROLE_INV_AUDITOR` queda para decidir después (nadie lo usa).
 - `ROL_PERMISO.ROL_NOMBRE` → VARCHAR(50) + FK `FK_ROL_PERMISO_ROL` → `ROLES(NOMBRE_ROL)` (archivo y BD).
 - Verificado: `FN_TIENE_PERMISO('abalbuena','GESTIONAR_ROLES')` pasó de 0 a **1**; SP asigna duplicados sin duplicar y altas reales (con limpieza); CHECK + FK rechazan nombres fantasmas; `abalbuena` ahora cae en la rama ADMIN del menú C++.
-- Estado final mejoras: #1 ✅ #2 ✅ #3 ✅ #4a ✅ #4b ✅. Pendiente futuro: destino de `ROLE_INV_AUDITOR`.
+- Estado final mejoras: #1 ✅ #2 ✅ #3 ✅ #4a ✅ #4b ✅. `ROLE_INV_AUDITOR` borrado de la BD (ver abajo), inexistencia verificada 16/10 (HECHO).
 
 ## 📋 Plan de mejoras (09/10/2026) — pendiente de ejecución
 
@@ -100,7 +100,7 @@ Todo probado en `ROLLBACK` con residuos 0. Lección: el `replaceAll` muerde — 
 
 ## ✅ Plan 3 cerrado 09/10/2026 — auditoría completa
 
-Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 en cada suite. Pendientes fuera de BD: `ROLE_INV_AUDITOR`, push de git.
+Todos los planes (1, 2, 3) y las mejoras 1-4 ejecutados y probados. Residuos 0 en cada suite. Pendiente fuera de BD: push de git (lo hace el usuario).
 
 ## 📝 Flujo registrar producto — detalles a corregir (09/10/2026)
 

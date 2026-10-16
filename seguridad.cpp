@@ -58,6 +58,13 @@ bool esNumerico(const string& texto) {
     return true;
 }
 
+string dinero(double v) {
+    // Mismo formato que cout << double (sin forzar decimales).
+    ostringstream o;
+    o << "$" << v;
+    return o.str();
+}
+
 double leerNumeroConIntentos(const string& mensaje, double minimo, double maximo,
                              const double* porDefecto, int maxIntentos) {
     for (int intento = 1; intento <= maxIntentos; ++intento) {
