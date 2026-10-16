@@ -70,7 +70,7 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 ## Pendiente ganancias (12/10/2026, para después)
 
 - [x] Ver ganancias (14/10/2026): ya existe — `P_COMPRA` + `MONTO_GANANCIA` + `38- GANANCIAS.sql` + `8. Ganancias` en ventas. Tachado por desactualizado.
-- [ ] El dueño menciona que ya tiene algo de ganancias por mes por ahí: ubicarlo y evaluarlo cuando se encare el tema.
+- [x] Ganancias por mes 15/10: cubierto con `11. Ganancias por periodo` + mensual en app (verificado en vivo).
 
 ## Progreso
 
