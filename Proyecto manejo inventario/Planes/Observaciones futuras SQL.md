@@ -2,7 +2,7 @@
 
 Notas que no son bugs hoy pero hay que tener presentes.
 
-## Consumo desde C++ (fase pendiente)
+## Consumo desde C++ (HECHO 16/10: `cierreCajaUI` consume los 3)
 
 - **`SP_CIERRE_CAJA` devuelve 3 result sets** (resumen, por estado, por método).
   `Recogermensaje()` solo lee el primero: cuando se consuma desde la app hay

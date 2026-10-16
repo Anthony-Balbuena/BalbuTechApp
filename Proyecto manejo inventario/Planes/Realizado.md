@@ -69,6 +69,13 @@
 - Compra rápida en 2 listas con grilla tipo Excel: inicial `ID_PROD | NOMBRE | CANTIDAD`; al elegir confirma `Producto: <id> (<nombre>)`; paso suplidor `ID_PROV | PROVEEDOR` (sin historial lista todos los activos). En prueba en vivo.
 - Alta rápida de suplidor sin salir de la compra (`registroRapidoS` en compras.cpp): `0` = nuevo; ID inexistente o nombre ofrecen registrar; nombre obligatorio, tel/email opcionales. Fix `Commands out of sync` (drenar antes del retorno temprano). "Jose tech" creado en vivo desde la compra.
 - Reporte `6. Precios por suplidor`: `SP_REPORTE_PRECIOS_COMPRA` (40) ahora trae `MAS_CARO` + `DONDE_CARO` (aplicado a la viva); pantalla `MAS BARATO | BARATO EN | MAS CARO | CARO EN | ULTIMA`. Verificado en vivo (DELL G15: barato Jose tech, caro PM6).
+
+## 16/10 — barrido de notas (lo hecho a Realizado)
+- `SP_CIERRE_CAJA` consumido desde C++ (`cierreCajaUI` lee resumen + por estado + por método): cierra fase pendiente 09/10.
+- Venta rápida en app (`ventaRapida`, opción 1): cierra pendiente 11/10.
+- Catálogo por módulo (verificado en viva): 13 compras / 14 detalles, 5/10 nuevos con stock (LENOVO 3, DELL 1, MACBOOK 1, INTEL 2, RTX4060 4); `Mouse`/`Teclado`/`2`/`FASE I` fuera. Queda: `IPHONE` como marca + renombrar `SUPLIDOR 01`–`10`.
+- Formato kardex en listados C++ (marcas, empleados, roles, clientes, proveedores, métodos y resto).
+- Limpieza vieja verificada: `sp_obtener_categorias_marcas` inexistente en la viva; `ROLE_INV_AUDITOR` borrado (0 usuarios/permisos), sin referencias en la app.
 - Revisión 15/10: el pull ya traía todo (helper intentos, registro rápido suplidor, MAS_CARO). Faltaba en la viva: `SP_REPORTE_PRECIOS_COMPRA` con caro (recargado) + backfill del mapa (8 parejas, trigger solo llena desde que existe). `check-app-sps` en TECH: 0 faltantes. Compila `OK`.
 - Barrido entradas a ciegas (15/10): `leerNumeroConIntentos` en inventario, productos, ventas y compras (pick, cantidades, cancelar, períodos, garantías, historial, devoluciones, registro). Los bucles de cerrar se quedan a mano: reintentan también errores de BD. Humo en vivo OK.
 - Barrido de entradas ciegas a `leerNumeroConIntentos` (15/10): inventario, productos, ventas (pick, cantidad, cancelar, períodos, garantías, historial, devolución) y compras (registro, pick, cantidad, período). Cierres con bucle propio (reintentan errores de BD). Humo en vivo OK, compila OK.

@@ -373,12 +373,7 @@ static void mostrarHistorialPrecios(int idProducto) {
     } catch (const exception &) {}
 }
 
-static string dinero(double v) {
-    // Mismo formato que cout << double (sin forzar decimales).
-    ostringstream o;
-    o << "$" << v;
-    return o.str();
-}
+// dinero() ahora vive en seguridad.h/cpp (compartido con ventas).
 
 static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa) {
     (void)tasa;

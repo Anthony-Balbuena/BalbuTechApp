@@ -26,6 +26,9 @@ double leerNumeroConIntentos(const string& mensaje, double minimo, double maximo
                              const double* porDefecto = nullptr,
                              int maxIntentos = MAX_INTENTOS);
 
+// (16/10/2026) Formato "$" + valor igual que cout << double (prompts "Enter = $X").
+string dinero(double v);
+
 string aplicarHash(const string& input);
 
 // Necesitarás implementar o incluir utilidades para Base64

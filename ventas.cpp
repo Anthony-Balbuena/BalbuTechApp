@@ -207,7 +207,8 @@ static void pagarVenta(const CierreVenta &c) {
         int idMetodo = (int)leerNumeroConIntentos("ID metodo: ", 1, 999999999);
         // (11/10/2026) Se cobra el BRUTO; los triggers ya comparan contra el bruto.
         cout << "Total a pagar = $" << c.bruto << endl;
-        double recibido = leerNumeroConIntentos("Monto recibido (Enter = exacto): ", 0.01, 999999999, &c.bruto);
+        double recibido = leerNumeroConIntentos("Monto recibido (Enter = " + dinero(c.bruto) + "): ", 0.01, 999999999, &c.bruto);
+        if (recibido != c.bruto) cout << "Monto recibido: $" << recibido << endl;
         std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
             "CALL 24_SP_REGISTRAR_PAGO(?, ?, ?, ?, ?)"));
         pp->setInt(1, c.idVenta);
