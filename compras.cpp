@@ -100,19 +100,13 @@ static bool registroRapidoC(const string &entrada, LineaCompra &out) {
         string codigo = leerDatoSeguro("Codigo [" + entrada + "]: ");
         if (codigo.empty()) codigo = entrada;
         mostrarListaC("MARCAS", marcas);
-        string mcStr = leerDatoSeguro("ID marca: ");
+        int mc = (int)leerNumeroConIntentos("ID marca: ", 1, 999999999);
         mostrarListaC("CATEGORIAS", categorias);
-        string ctStr = leerDatoSeguro("ID categoria: ");
-        string pcStr = leerDatoSeguro("Precio de compra $: ");
-        string pvStr = leerDatoSeguro("Precio de venta $: ");
+        int ct = (int)leerNumeroConIntentos("ID categoria: ", 1, 999999999);
+        double pc = leerNumeroConIntentos("Precio de compra $: ", 0, 999999999.99);
+        double pv = leerNumeroConIntentos("Precio de venta $: ", 0.01, 999999999.99);
         mostrarListaC("PROVEEDORES", proveedores);
-        string pv2Str = leerDatoSeguro("ID proveedor: ");
-        double pv = stod(pvStr), pc = stod(pcStr);
-        int mc = stoi(mcStr), ct = stoi(ctStr), pr = stoi(pv2Str);
-        if (pv <= 0 || pc < 0) {
-            cout << ROJO << "Precios invalidos." << RESET << endl;
-            return false;
-        }
+        int pr = (int)leerNumeroConIntentos("ID proveedor: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_INSERTAR_PRODUCTO(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setString(1, nombre);
@@ -174,9 +168,8 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         }
         cout << "\nCoincidencias:" << endl;
         for (auto &c : lista) cout << c.id << " | " << c.codigo << " | " << c.nombre << endl;
-        string pick = leerDatoSeguro("ID elegido: ");
-        if (!esNumerico(pick)) return false;
-        return resolverProductoC(pick, out);
+        int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
+        return resolverProductoC(to_string(pick), out);
     } catch (const exception &) {
         return false;
     }
@@ -643,19 +636,8 @@ static void compraRapida() {
         }
         cout << "Producto: " << prod.idProducto << " (" << prod.nombre << ")" << endl;
         cout << "Stock actual: " << stockDeC(prod.idProducto) << endl;
-        string cantStr = leerDatoSeguro("Cantidad: ");
-        if (!esNumerico(cantStr) || stoi(cantStr) <= 0) {
-            cout << ROJO << "Cantidad invalida." << RESET << endl;
-            continue;
-        }
-        string precioStr = leerDatoSeguro("Precio de factura c/u $ (con ITBIS): ");
-        double precio = 0.0;
-        try { precio = stod(precioStr); } catch (...) { precio = 0.0; }
-        if (precio <= 0) {
-            cout << ROJO << "Precio invalido." << RESET << endl;
-            continue;
-        }
-        int cant = stoi(cantStr);
+        int cant = (int)leerNumeroConIntentos("Cantidad: ", 1, 999999999);
+        double precio = leerNumeroConIntentos("Precio de factura c/u $ (con ITBIS): ", 0.01, 999999999.99);
         mostrarHistorialPrecios(prod.idProducto);
         if (!elegirSuplidor(prod)) {
             cout << ROJO << "Sin suplidor no hay linea." << RESET << endl;
@@ -849,16 +831,9 @@ static string fmt2C(int n) {
 static void reportePeriodoCompraUI() {
     cout << "\n--- REPORTE DE COMPRAS POR PERIODO ---" << endl;
     try {
-        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
-        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
-        string finStr = leerDatoSeguro("Mes final (1-12): ");
-        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
-            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
-            return;
-        }
-        int ano = stoi(anoStr);
-        int mesInicio = stoi(iniStr);
-        int mesFin = stoi(finStr);
+        int ano = (int)leerNumeroConIntentos("Ano del reporte (ej. 2026): ", 2000, 2100);
+        int mesInicio = (int)leerNumeroConIntentos("Mes inicial (1-12): ", 1, 12);
+        int mesFin = (int)leerNumeroConIntentos("Mes final (1-12): ", 1, 12);
         if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
             mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
             cout << ROJO << "Rango de meses invalido." << RESET << endl;
@@ -873,31 +848,19 @@ static void reportePeriodoCompraUI() {
             cout << "\n[Mes: " << nombreMesC(m) << " " << ano << "]" << endl;
             cout << "  1. Mes completo" << endl;
             cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
-            string modoStr = leerDatoSeguro("Opcion: ");
-            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
-                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
-                modoStr = "1";
-            }
+            double dUnoC = 1;
+            string modoStr = leerNumeroConIntentos("Opcion: ", 1, 2, &dUnoC) == 2 ? "2" : "1";
 
             int dIni = 1, dFin = maxDias;
             string filtro = "Mes completo";
             if (modoStr == "2") {
-                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
-                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
-                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
-                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
-                } else {
-                    dIni = stoi(diStr);
-                    dFin = stoi(dfStr);
-                    if (dIni < 1) dIni = 1;
-                    if (dFin > maxDias) dFin = maxDias;
-                    if (dIni > dFin) dFin = dIni;
-                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
-                }
+                dIni = (int)leerNumeroConIntentos("Dia de inicio (1-" + to_string(maxDias) + "): ", 1, maxDias);
+                dFin = (int)leerNumeroConIntentos("Dia de fin (1-" + to_string(maxDias) + "): ", dIni, maxDias);
+                filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
             }
 
-            string desde = anoStr + "-" + fmt2C(m) + "-" + fmt2C(dIni);
-            string hasta = anoStr + "-" + fmt2C(m) + "-" + fmt2C(dFin);
+            string desde = to_string(ano) + "-" + fmt2C(m) + "-" + fmt2C(dIni);
+            string hasta = to_string(ano) + "-" + fmt2C(m) + "-" + fmt2C(dFin);
 
             std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
                 "CALL SP_REPORTE_PERIODO_COMPRA(?, ?)"));

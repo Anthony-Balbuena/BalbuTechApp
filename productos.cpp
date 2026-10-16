@@ -78,18 +78,15 @@ void registrarProducto() {
         string descripcion = leerDatoSeguro("\nDescripcion del Producto: ");
 
         mostrarLista("MARCAS", marcas);
-        string marcaStr = leerDatoSeguro("\nMarca del producto (ID-NUMERO): ");
-        int idMarca = stoi(marcaStr);
+        int idMarca = (int)leerNumeroConIntentos("\nMarca del producto (ID-NUMERO): ", 1, 999999999);
 
         mostrarLista("CATEGORIAS", categorias);
-        string categoriaStr = leerDatoSeguro("\nCategoria del Producto (ID-NUMERO): ");
-        int idCategoria = stoi(categoriaStr);
+        int idCategoria = (int)leerNumeroConIntentos("\nCategoria del Producto (ID-NUMERO): ", 1, 999999999);
 
-        string compraStr = leerDatoSeguro("\nPrecio de compra $: ");
-        double compra = compraStr.empty() ? 0 : stod(compraStr);
+        double dCero = 0;
+        double compra = leerNumeroConIntentos("\nPrecio de compra $ (Enter = 0): ", 0, 999999999.99, &dCero);
 
-        string precioStr = leerDatoSeguro("\nPrecio de venta del  Producto $ (sin ITBIS): ");
-        double precio = stod(precioStr);
+        double precio = leerNumeroConIntentos("\nPrecio de venta del Producto $ (sin ITBIS): ", 0.01, 999999999.99);
         try {
             std::unique_ptr<sql::PreparedStatement> pt(globalCon->prepareStatement(
                 "SELECT FN_TASA_ITBIS() AS TASA"));
@@ -102,8 +99,7 @@ void registrarProducto() {
         } catch (...) {}
 
         mostrarLista("PROVEEDORES", proveedores);
-        string proveedorStr = leerDatoSeguro("\nID del Proveedor (ID-NUMERO): ");
-        int idProveedor = stoi(proveedorStr);
+        int idProveedor = (int)leerNumeroConIntentos("\nID del Proveedor (ID-NUMERO): ", 1, 999999999);
 
         string imagen = leerDatoSeguro("\nImagen (ruta o URL, presione Enter para omitir): ");
 
@@ -166,8 +162,7 @@ void actualizarProducto() {
     }
 
     try {
-        string idStr = leerDatoSeguro("ID del producto a modificar (NUMERO): ");
-        int idProducto = stoi(idStr);
+        int idProducto = (int)leerNumeroConIntentos("ID del producto a modificar (NUMERO): ", 1, 999999999);
 
         cout << "\nNota: Presione Enter sin escribir nada para conservar el valor actual." << endl;
         cout << "----------------------------------------------------------------------" << endl;
@@ -175,9 +170,6 @@ void actualizarProducto() {
         string nombre = leerDatoSeguro("Nuevo nombre: ");
         string codigo = leerDatoSeguro("Nuevo codigo: ");
         string descripcion = leerDatoSeguro("Nueva descripcion: ");
-        string precioRaw = leerDatoSeguro("Nuevo precio $: ");
-        string marcaRaw = leerDatoSeguro("Nueva Marca (ID NUMERO): ");
-        string categoriaRaw = leerDatoSeguro("Nueva Categoria (ID NUMERO): ");
 
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idProducto);
@@ -188,29 +180,33 @@ void actualizarProducto() {
         if (descripcion.empty()) pstmt->setNull(3, sql::DataType::VARCHAR);
         else pstmt->setString(3, descripcion);
 
-        if (precioRaw.empty()) pstmt->setNull(4, sql::DataType::DOUBLE);
-        else pstmt->setDouble(4, stod(precioRaw));
+        double dMenosUno = -1;
+        double vPrecio = leerNumeroConIntentos("Nuevo precio $ (Enter = omitir): ", 0.01, 999999999.99, &dMenosUno);
+        if (vPrecio < 0) pstmt->setNull(4, sql::DataType::DOUBLE);
+        else pstmt->setDouble(4, vPrecio);
 
         if (codigo.empty()) pstmt->setNull(5, sql::DataType::VARCHAR);
         else pstmt->setString(5, codigo);
 
-        if (marcaRaw.empty()) pstmt->setNull(6, sql::DataType::INTEGER);
-        else pstmt->setInt(6, stoi(marcaRaw));
+        int vMarca = (int)leerNumeroConIntentos("Nueva Marca (ID NUMERO, Enter = omitir): ", 1, 999999999, &dMenosUno);
+        if (vMarca < 0) pstmt->setNull(6, sql::DataType::INTEGER);
+        else pstmt->setInt(6, vMarca);
 
-        if (categoriaRaw.empty()) pstmt->setNull(7, sql::DataType::INTEGER);
-        else pstmt->setInt(7, stoi(categoriaRaw));
+        int vCat = (int)leerNumeroConIntentos("Nueva Categoria (ID NUMERO, Enter = omitir): ", 1, 999999999, &dMenosUno);
+        if (vCat < 0) pstmt->setNull(7, sql::DataType::INTEGER);
+        else pstmt->setInt(7, vCat);
 
-        string proveedorRaw = leerDatoSeguro("Nuevo Proveedor (ID NUMERO, Enter para omitir): ");
-        if (proveedorRaw.empty()) pstmt->setNull(8, sql::DataType::INTEGER);
-        else pstmt->setInt(8, stoi(proveedorRaw));
+        int vProv = (int)leerNumeroConIntentos("Nuevo Proveedor (ID NUMERO, Enter para omitir): ", 1, 999999999, &dMenosUno);
+        if (vProv < 0) pstmt->setNull(8, sql::DataType::INTEGER);
+        else pstmt->setInt(8, vProv);
 
         string imagenRaw = leerDatoSeguro("Nueva Imagen (ruta o URL, Enter para omitir): ");
         if (imagenRaw.empty()) pstmt->setNull(9, sql::DataType::VARCHAR);
         else pstmt->setString(9, imagenRaw);
 
-        string costoRaw = leerDatoSeguro("Precio de compra $ (Enter para omitir): ");
-        if (costoRaw.empty()) pstmt->setNull(10, sql::DataType::DOUBLE);
-        else pstmt->setDouble(10, stod(costoRaw));
+        double vCosto = leerNumeroConIntentos("Precio de compra $ (Enter para omitir): ", 0, 999999999.99, &dMenosUno);
+        if (vCosto < 0) pstmt->setNull(10, sql::DataType::DOUBLE);
+        else pstmt->setDouble(10, vCosto);
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -250,8 +246,7 @@ void cambiarEstadoProducto() {
     }
 
     try {
-        string idStr = leerDatoSeguro("Ingrese el ID del producto (NUMERO): ");
-        int idProducto = stoi(idStr);
+        int idProducto = (int)leerNumeroConIntentos("Ingrese el ID del producto (NUMERO): ", 1, 999999999);
 
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)"));
         pstmt->setInt(1, idProducto);

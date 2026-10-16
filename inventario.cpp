@@ -12,14 +12,6 @@
 
 using namespace std;
 
-static bool esNumericoInv(const string &s) {
-    if (s.empty()) return false;
-    for (char c : s) {
-        if (!isdigit(static_cast<unsigned char>(c))) return false;
-    }
-    return true;
-}
-
 void mostrarMenuInventario() {
     cout << "\n=== MODULO DE INVENTARIO ===" << endl;
     cout << "1. Ajuste de stock" << endl;
@@ -63,19 +55,11 @@ static void registrarAjuste() {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }
 
-        string prodStr = leerDatoSeguro("ID producto: ");
-        string empStr = leerDatoSeguro("ID empleado: ");
+        int idProd = (int)leerNumeroConIntentos("ID producto: ", 1, 999999999);
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
         string tipo = leerDatoSeguro("Tipo (ENTRADA/SALIDA): ");
-        string cantStr = leerDatoSeguro("Cantidad: ");
+        int cant = (int)leerNumeroConIntentos("Cantidad: ", 1, 999999999);
         string obs = leerDatoSeguro("Motivo (Enter para omitir): ");
-
-        int idProd = stoi(prodStr);
-        int idEmp = stoi(empStr);
-        int cant = stoi(cantStr);
-        if (cant <= 0) {
-            cout << ROJO << "La cantidad debe ser mayor a cero." << RESET << endl;
-            return;
-        }
         if (tipo != "ENTRADA" && tipo != "SALIDA") {
             cout << ROJO << "Tipo invalido. Use ENTRADA o SALIDA." << RESET << endl;
             return;
@@ -138,14 +122,8 @@ static void actualizarCostoUI() {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }
 
-        string idStr = leerDatoSeguro("ID producto: ");
-        string costoStr = leerDatoSeguro("Precio de compra $: ");
-        int idProd = stoi(idStr);
-        double costo = stod(costoStr);
-        if (costo < 0) {
-            cout << ROJO << "El costo no puede ser negativo." << RESET << endl;
-            return;
-        }
+        int idProd = (int)leerNumeroConIntentos("ID producto: ", 1, 999999999);
+        double costo = leerNumeroConIntentos("Precio de compra $: ", 0, 999999999.99);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_ACTUALIZAR_PRODUCTOS(?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)"));
         pstmt->setInt(1, idProd);
@@ -185,15 +163,8 @@ static string aColumna(const string &s, size_t maxCols) {
 static void kardexUI() {
     cout << "\n--- MOVIMIENTOS DE STOCK ---" << endl;
     try {
-        string idStr = leerDatoSeguro("ID producto (Enter = todos): ");
-        int idProd = -1;
-        if (!idStr.empty()) {
-            if (!esNumericoInv(idStr)) {
-                cout << ROJO << "ID invalido." << RESET << endl;
-                return;
-            }
-            idProd = stoi(idStr);
-        }
+        double dTodos = -1;
+        int idProd = (int)leerNumeroConIntentos("ID producto (Enter = todos): ", 1, 999999999, &dTodos);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             idProd < 0 ? "CALL SP_KARDEX_TODOS()" : "CALL SP_KARDEX_PRODUCTO(?)"));
         if (idProd >= 0) pstmt->setInt(1, idProd);

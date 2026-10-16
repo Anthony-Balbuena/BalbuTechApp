@@ -141,9 +141,8 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
         for (auto &c : lista) {
             cout << c.id << " | " << c.codigo << " | " << c.nombre << " | $" << c.precio << endl;
         }
-        string pick = leerDatoSeguro("ID elegido: ");
-        if (!esNumerico(pick)) return false;
-        return buscarPorId(stoi(pick), out);
+        int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
+        return buscarPorId(pick, out);
     } catch (const exception &) {
         return false;
     }
@@ -381,15 +380,8 @@ static void ventaRapida() {
             cout << ROJO << "Sin coincidencia." << RESET << endl;
             continue;
         }
-        string cantStr = leerDatoSeguro("Cantidad (1): ");
-        int cant = 1;
-        if (!cantStr.empty()) {
-            if (!esNumerico(cantStr) || stoi(cantStr) <= 0) {
-                cout << ROJO << "Cantidad invalida." << RESET << endl;
-                continue;
-            }
-            cant = stoi(cantStr);
-        }
+        double dUno = 1;
+        int cant = (int)leerNumeroConIntentos("Cantidad (1): ", 1, 999999999, &dUno);
         int enCarrito = 0;
         for (auto &l : carrito) {
             if (l.idProducto == prod.idProducto) enCarrito = l.cantidad;
@@ -516,14 +508,9 @@ static void verVentaConIVA() {
             return;
         }
         for (int id : ids) mostrarFactura(id);
-        string vPagos = leerDatoSeguro("Ver pagos de una venta? ID (Enter = omitir): ");
-        if (!vPagos.empty()) {
-            if (!esNumerico(vPagos)) {
-                cout << ROJO << "ID invalido." << RESET << endl;
-            } else {
-                verPagosDeVenta(stoi(vPagos));
-            }
-        }
+        double dNinguno = -1;
+        int vPagos = (int)leerNumeroConIntentos("Ver pagos de una venta? ID (Enter = omitir): ", 1, 999999999, &dNinguno);
+        if (vPagos >= 0) verPagosDeVenta(vPagos);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
@@ -548,16 +535,12 @@ static void cancelarVentaUI() {
         }
         drenarResultados(pl.get());
 
-        string vStr = leerDatoSeguro("ID venta: ");
-        string eStr = leerDatoSeguro("ID empleado (dueno): ");
-        if (!esNumerico(vStr) || !esNumerico(eStr)) {
-            cout << ROJO << "IDs invalidos." << RESET << endl;
-            return;
-        }
+        int idVentaCanc = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
+        int idEmpCanc = (int)leerNumeroConIntentos("ID empleado (dueno): ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_CANCELAR_VENTA(?, ?)"));
-        pstmt->setInt(1, stoi(vStr));
-        pstmt->setInt(2, stoi(eStr));
+        pstmt->setInt(1, idVentaCanc);
+        pstmt->setInt(2, idEmpCanc);
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
         cout << ">>> " << respuesta << " <<<" << endl;
@@ -729,16 +712,9 @@ static string fmt2(int n) {
 static void reportePeriodoUI() {
     cout << "\n--- REPORTE POR PERIODO ---" << endl;
     try {
-        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
-        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
-        string finStr = leerDatoSeguro("Mes final (1-12): ");
-        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
-            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
-            return;
-        }
-        int ano = stoi(anoStr);
-        int mesInicio = stoi(iniStr);
-        int mesFin = stoi(finStr);
+        int ano = (int)leerNumeroConIntentos("Ano del reporte (ej. 2026): ", 2000, 2100);
+        int mesInicio = (int)leerNumeroConIntentos("Mes inicial (1-12): ", 1, 12);
+        int mesFin = (int)leerNumeroConIntentos("Mes final (1-12): ", 1, 12);
         if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
             mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
             cout << ROJO << "Rango de meses invalido." << RESET << endl;
@@ -753,31 +729,19 @@ static void reportePeriodoUI() {
             cout << "\n[Mes: " << nombreMes(m) << " " << ano << "]" << endl;
             cout << "  1. Mes completo" << endl;
             cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
-            string modoStr = leerDatoSeguro("Opcion: ");
-            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
-                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
-                modoStr = "1";
-            }
+            double dUno = 1;
+            string modoStr = leerNumeroConIntentos("Opcion: ", 1, 2, &dUno) == 2 ? "2" : "1";
 
             int dIni = 1, dFin = maxDias;
             string filtro = "Mes completo";
             if (modoStr == "2") {
-                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
-                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
-                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
-                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
-                } else {
-                    dIni = stoi(diStr);
-                    dFin = stoi(dfStr);
-                    if (dIni < 1) dIni = 1;
-                    if (dFin > maxDias) dFin = maxDias;
-                    if (dIni > dFin) dFin = dIni;
-                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
-                }
+                dIni = (int)leerNumeroConIntentos("Dia de inicio (1-" + to_string(maxDias) + "): ", 1, maxDias);
+                dFin = (int)leerNumeroConIntentos("Dia de fin (1-" + to_string(maxDias) + "): ", dIni, maxDias);
+                filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
             }
 
-            string desde = anoStr + "-" + fmt2(m) + "-" + fmt2(dIni);
-            string hasta = anoStr + "-" + fmt2(m) + "-" + fmt2(dFin);
+            string desde = to_string(ano) + "-" + fmt2(m) + "-" + fmt2(dIni);
+            string hasta = to_string(ano) + "-" + fmt2(m) + "-" + fmt2(dFin);
 
             std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
                 "CALL SP_REPORTE_PERIODO(?, ?)"));
@@ -826,16 +790,9 @@ static void reportePeriodoUI() {
 static void reportePeriodoGananciaUI() {
     cout << "\n--- GANANCIAS POR PERIODO (sin IVA) ---" << endl;
     try {
-        string anoStr = leerDatoSeguro("Ano del reporte (ej. 2026): ");
-        string iniStr = leerDatoSeguro("Mes inicial (1-12): ");
-        string finStr = leerDatoSeguro("Mes final (1-12): ");
-        if (!esNumerico(anoStr) || !esNumerico(iniStr) || !esNumerico(finStr)) {
-            cout << ROJO << "Ano y meses deben ser numeros." << RESET << endl;
-            return;
-        }
-        int ano = stoi(anoStr);
-        int mesInicio = stoi(iniStr);
-        int mesFin = stoi(finStr);
+        int ano = (int)leerNumeroConIntentos("Ano del reporte (ej. 2026): ", 2000, 2100);
+        int mesInicio = (int)leerNumeroConIntentos("Mes inicial (1-12): ", 1, 12);
+        int mesFin = (int)leerNumeroConIntentos("Mes final (1-12): ", 1, 12);
         if (ano < 2000 || ano > 2100 || mesInicio < 1 || mesInicio > 12 ||
             mesFin < 1 || mesFin > 12 || mesInicio > mesFin) {
             cout << ROJO << "Rango de meses invalido." << RESET << endl;
@@ -850,31 +807,19 @@ static void reportePeriodoGananciaUI() {
             cout << "\n[Mes: " << nombreMes(m) << " " << ano << "]" << endl;
             cout << "  1. Mes completo" << endl;
             cout << "  2. Rango de dias (max " << maxDias << ")" << endl;
-            string modoStr = leerDatoSeguro("Opcion: ");
-            if (!esNumerico(modoStr) || (modoStr != "1" && modoStr != "2")) {
-                cout << ROJO << "Modo invalido, se usa mes completo." << RESET << endl;
-                modoStr = "1";
-            }
+            double dUno = 1;
+            string modoStr = leerNumeroConIntentos("Opcion: ", 1, 2, &dUno) == 2 ? "2" : "1";
 
             int dIni = 1, dFin = maxDias;
             string filtro = "Mes completo";
             if (modoStr == "2") {
-                string diStr = leerDatoSeguro("Dia de inicio (1-" + to_string(maxDias) + "): ");
-                string dfStr = leerDatoSeguro("Dia de fin (1-" + to_string(maxDias) + "): ");
-                if (!esNumerico(diStr) || !esNumerico(dfStr)) {
-                    cout << ROJO << "Dias invalidos, se usa mes completo." << RESET << endl;
-                } else {
-                    dIni = stoi(diStr);
-                    dFin = stoi(dfStr);
-                    if (dIni < 1) dIni = 1;
-                    if (dFin > maxDias) dFin = maxDias;
-                    if (dIni > dFin) dFin = dIni;
-                    filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
-                }
+                dIni = (int)leerNumeroConIntentos("Dia de inicio (1-" + to_string(maxDias) + "): ", 1, maxDias);
+                dFin = (int)leerNumeroConIntentos("Dia de fin (1-" + to_string(maxDias) + "): ", dIni, maxDias);
+                filtro = "Dias " + to_string(dIni) + " al " + to_string(dFin);
             }
 
-            string desde = anoStr + "-" + fmt2(m) + "-" + fmt2(dIni);
-            string hasta = anoStr + "-" + fmt2(m) + "-" + fmt2(dFin);
+            string desde = to_string(ano) + "-" + fmt2(m) + "-" + fmt2(dIni);
+            string hasta = to_string(ano) + "-" + fmt2(m) + "-" + fmt2(dFin);
 
             std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
                 "CALL SP_REPORTE_PERIODO_GANANCIA(?, ?)"));
@@ -949,11 +894,8 @@ static void devolucionVentaUI() {
             cout << ROJO << "El motivo es obligatorio." << RESET << endl;
             return;
         }
-        string gStr = leerDatoSeguro("ID garantia (Enter = sin garantia): ");
-        if (!gStr.empty() && !esNumerico(gStr)) {
-            cout << ROJO << "ID garantia invalido." << RESET << endl;
-            return;
-        }
+        double dNingunoG = -1;
+        int gId = (int)leerNumeroConIntentos("ID garantia (Enter = sin garantia): ", 1, 999999999, &dNingunoG);
         string condStr = leerDatoSeguro("Condicion [BUENO/DANADO/USADO] (Enter = BUENO): ");
         string cond = "BUENO";
         if (!condStr.empty()) {
@@ -967,8 +909,8 @@ static void devolucionVentaUI() {
         std::unique_ptr<sql::PreparedStatement> pr(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_DEVOLUCION(?, ?, ?, ?, ?, ?)"));
         pr->setInt(1, idDet);
-        if (gStr.empty()) pr->setNull(2, sql::DataType::INTEGER);
-        else pr->setInt(2, stoi(gStr));
+        if (gId < 0) pr->setNull(2, sql::DataType::INTEGER);
+        else pr->setInt(2, gId);
         pr->setInt(3, idEmp);
         pr->setInt(4, cantDev);
         pr->setString(5, motivo);
@@ -1149,15 +1091,15 @@ static void garantiaRegistrarUI() {
 static void reclamoRegistrarUI() {
     cout << "\n--- RECLAMAR GARANTIA ---" << endl;
     try {
-        string gStr = leerDatoSeguro("ID garantia: ");
+        int gIdR = (int)leerNumeroConIntentos("ID garantia: ", 1, 999999999);
         string desc = leerDatoSeguro("Descripcion del dano: ");
-        if (!esNumerico(gStr) || desc.empty()) {
-            cout << ROJO << "ID y descripcion obligatorios." << RESET << endl;
+        if (desc.empty()) {
+            cout << ROJO << "La descripcion es obligatoria." << RESET << endl;
             return;
         }
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL 27_SP_REGISTRAR_RECLAMO_GARANTIA(?, ?)"));
-        pstmt->setInt(1, stoi(gStr));
+        pstmt->setInt(1, gIdR);
         pstmt->setString(2, desc);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
@@ -1171,14 +1113,10 @@ static void reclamoRegistrarUI() {
 static void reclamoFinalizarUI() {
     cout << "\n--- FINALIZAR RECLAMO ---" << endl;
     try {
-        string rStr = leerDatoSeguro("ID reclamo: ");
-        if (!esNumerico(rStr)) {
-            cout << ROJO << "ID invalido." << RESET << endl;
-            return;
-        }
+        int rId = (int)leerNumeroConIntentos("ID reclamo: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(?)"));
-        pstmt->setInt(1, stoi(rStr));
+        pstmt->setInt(1, rId);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -1219,14 +1157,10 @@ static void ejecutarSubmenuGarantias() {
 static void historialVentaUI() {
     cout << "\n--- HISTORIAL DE VENTA ---" << endl;
     try {
-        string vStr = leerDatoSeguro("ID venta: ");
-        if (!esNumerico(vStr)) {
-            cout << ROJO << "ID invalido." << RESET << endl;
-            return;
-        }
+        int vHist = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_HISTORIAL_VENTA(?)"));
-        pstmt->setInt(1, stoi(vStr));
+        pstmt->setInt(1, vHist);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         printf("\n%-19s | %-10s | %-10s | %-15s | %-30s\n", "FECHA", "DE", "A", "EMPLEADO", "MOTIVO");
         bool hay = false;
