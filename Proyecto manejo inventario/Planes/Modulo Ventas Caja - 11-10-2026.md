@@ -74,6 +74,11 @@ Solo crear tabla si se requiere carrito persistente multi-caja o venta en pausa 
 
 ## Progreso
 
+- [x] Quitar por ID en venta normal (15/10): antes de cerrar pregunta una sola vez `Quitar algo? (ID producto)`; humo OK, residuos 0.
+- [x] Centavo de factura (15/10): el ITBIS absorbe el redondeo (`ITBIS = bruto − subtotal`) y el TOTAL cuadra exacto con el suplidor (400000.00, antes .01). En agregar y modificar, TEST y TECH. La #477 vieja queda como estaba (historia no se toca).
+- [x] Crash `xxx` en carrito (15/10): el loop solo atajaba el primer prompt; `xxx` en cantidad/precio subía sin catch → `terminate` + core. Ahora todo el cuerpo está en try/catch y vuelve al cierre con el carrito intacto (ventas y compras). Humo OK, residuos 0.
+- [x] Quitar/vaciar carrito en ventas (15/10): líneas numeradas + `Quitar linea?` + `Vaciar?`, solo memoria. Humo en vivo OK.
+- [x] Cancelar compra en app (15/10): `7. Cancelar compra` con lista y `SP_CANCELAR_COMPRA`. Compila OK.
 - [x] Mapa suplidor-producto 6 pasos (14/10/2026): tabla `PRODUCTO_PROVEEDOR` + trigger al RECIBIDA + `SP_PRODUCTO_SUPLIDORES/HISTORIAL/REPORTE_PRECIOS/PROVEEDOR_ACTIVO` (archivo 40) + carrito elige suplidor por línea con historial + split por factura + `6. Precios por suplidor`. Verificado: 2 suplidores, trigger, reporte, anular/cancelar. TEST guarda #10/#11 CANCELADA + TProdS como evidencia.
 - [x] Reintentos al cerrar (14/10/2026): proveedor/empleado/cliente con 3 intentos estilo login + el carrito se conserva si falla; en ventas igual. Humo en vivo OK (proveedor malo → reintenta → compra #7 ABIERTA). Nota TEST: la compra #7 quedó CANCELADA como evidencia (las compras no se borran por diseño) con su proveedor/empleado anclados por FK.
 > Movido a `Realizado.md` (14/10/2026). Solo queda lo pendiente abajo.

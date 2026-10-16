@@ -165,13 +165,14 @@ static double tasaIVA() {
 static void mostrarCarrito(const vector<LineaCarrito> &carrito, double tasa) {
     cout << "\n--- CARRITO (precios con IVA) ---" << endl;
     double total = 0.0;
-    for (auto &l : carrito) {
+    for (size_t i = 0; i < carrito.size(); ++i) {
+        auto &l = carrito[i];
         double neto = l.precio * l.cantidad;
         // Igual que la base: ITBIS redondeado por linea, el total cuadra con el ticket.
         double parcial = neto + round(neto * tasa) / 100.0;
         double unitIVA = round(l.precio * (100.0 + tasa)) / 100.0;
         total += parcial;
-        cout << l.nombre << " x" << l.cantidad
+        cout << (i + 1) << ". " << l.nombre << " x" << l.cantidad
              << " | $" << unitIVA << " con ITBIS"
              << " | total $" << parcial << endl;
     }
@@ -290,8 +291,9 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
                 pstmt->setInt(2, l.idProducto);
                 pstmt->setInt(3, l.cantidad);
                 pstmt->setInt(4, idEmp);
-                Recogermensaje(pstmt.get());
+                string rLinea = Recogermensaje(pstmt.get());
                 drenarResultados(pstmt.get());
+                if (rLinea.rfind("Error DB:", 0) == 0) throw runtime_error(rLinea);
             } catch (const exception &e) {
                 cout << ROJO << "Linea " << l.nombre << " fallo: " << e.what() << RESET << endl;
                 try {
@@ -367,6 +369,7 @@ static void ventaRapida() {
     cout << "Codigo de barra, ID o nombre. Vacio para cerrar." << endl;
     vector<LineaCarrito> carrito;
     while (true) {
+        try {
         string entrada;
         try {
             entrada = leerDatoSeguro("Producto: ");
@@ -404,11 +407,27 @@ static void ventaRapida() {
             carrito.push_back(prod);
         }
         mostrarCarrito(carrito, tasa);
+        } catch (const CancelarOperacionException &e) {
+            cout << "\n[!] " << e.what() << endl;
+            break;
+        }
     }
     if (!carrito.empty()) mostrarCarrito(carrito, tasa);
     else cout << "Carrito vacio." << endl;
     if (carrito.empty()) return;
     while (true) {
+        double dNingunoQ2 = -1;
+        int qid = (int)leerNumeroConIntentos("Quitar algo? (ID producto, Enter = no): ", 1, 999999999, &dNingunoQ2);
+        if (qid >= 0) {
+            size_t antes = carrito.size();
+            for (auto it = carrito.begin(); it != carrito.end(); ) {
+                if (it->idProducto == qid) it = carrito.erase(it);
+                else ++it;
+            }
+            if (carrito.size() == antes) cout << ROJO << "Ese ID no esta en el carrito." << RESET << endl;
+            if (carrito.empty()) { cout << "Carrito vacio." << endl; return; }
+            mostrarCarrito(carrito, tasa);
+        }
         string cerrar = leerDatoSeguro("Cerrar venta? (s/n): ");
         if (cerrar != "s" && cerrar != "S") {
             cout << "Venta no guardada." << endl;
