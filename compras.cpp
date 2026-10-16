@@ -4,6 +4,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <cppconn/resultset.h>
@@ -40,7 +41,8 @@ void mostrarMenuCompras() {
     cout << "4. Reporte por periodo" << endl;
     cout << "5. Pagar compra" << endl;
     cout << "6. Precios por suplidor" << endl;
-    cout << "7. Volver al Menu Principal" << endl;
+    cout << "7. Cancelar compra" << endl;
+    cout << "8. Volver al Menu Principal" << endl;
     cout << "=========================" << endl;
 }
 
@@ -264,7 +266,7 @@ static bool elegirSuplidor(LineaCompra &l) {
         vector<Sup> lista;
         while (rs->next()) {
             lista.push_back({rs->getInt("ID_PROVEEDOR"), rs->getString("PROVEEDOR"),
-                             rs->getDouble("ULTIMO_PRECIO")});
+                             static_cast<double>(rs->getDouble("ULTIMO_PRECIO"))});
         }
         drenarResultados(ps.get());
         // Grilla 2 cols: ID_PROV | PROVEEDOR. Sin historial: todos los activos.
@@ -371,20 +373,29 @@ static void mostrarHistorialPrecios(int idProducto) {
     } catch (const exception &) {}
 }
 
+static string dinero(double v) {
+    // Mismo formato que cout << double (sin forzar decimales).
+    ostringstream o;
+    o << "$" << v;
+    return o.str();
+}
+
 static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa) {
     (void)tasa;
     cout << "\n--- CARRITO (precios de factura, con IVA) ---" << endl;
+    printf("\n%-25s | %-4s | %-22s | %-15s | %-12s\n", "PRODUCTO", "CANT", "PROVEEDOR", "P.UNIT C/ITBIS", "TOTAL");
+    printf("%s\n", string(90, '-').c_str());
     double total = 0.0;
     for (auto &l : carrito) {
         // El precio escrito ya trae ITBIS: el parcial es directo.
         double parcial = l.precioCompra * l.cantidad;
         total += parcial;
-        cout << l.nombre << " x" << l.cantidad
-             << " [" << l.nombreProveedor << "]"
-             << " | $" << l.precioCompra << " con ITBIS"
-             << " | total $" << parcial << endl;
+        printf("%-25.25s | %-4d | %-22.22s | %-15s | %-12s\n",
+               l.nombre.c_str(), l.cantidad, l.nombreProveedor.c_str(),
+               dinero(l.precioCompra).c_str(), dinero(parcial).c_str());
+        printf("%s\n", string(90, '-').c_str());
     }
-    cout << "Total con IVA: $" << total << endl;
+    printf("%-25s | %-4s | %-22s | %-15s | %-12s\n", "Total con IVA =", "", "", "", dinero(total).c_str());
 }
 
 static void mostrarFacturaCompra(int idCompra) {
@@ -491,8 +502,9 @@ static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int i
                 pstmt->setInt(2, l.idProducto);
                 pstmt->setInt(3, l.cantidad);
                 pstmt->setDouble(4, l.precioCompra);
-                Recogermensaje(pstmt.get());
+                string rLinea = Recogermensaje(pstmt.get());
                 drenarResultados(pstmt.get());
+                if (rLinea.rfind("Error DB:", 0) == 0) throw runtime_error(rLinea);
             } catch (const exception &e) {
                 cout << ROJO << "Linea " << l.nombre << " fallo: " << e.what() << RESET << endl;
                 try {
@@ -535,6 +547,37 @@ static CierreCompra cerrarCompraForzada(const vector<LineaCompra> &grupo, int id
     return cerrarCompraNucleo(grupo, idProv, false);
 }
 
+// Dueño de la compra = empleado que la registró (lo usa el pago con Enter).
+static int duenoDeCompra(int idCompra) {
+    try {
+        std::unique_ptr<sql::PreparedStatement> q(globalCon->prepareStatement(
+            "SELECT ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = ?"));
+        q->setInt(1, idCompra);
+        std::unique_ptr<sql::ResultSet> r(q->executeQuery());
+        int id = 0;
+        if (r->next()) { try { id = r->getInt("ID_EMPLEADO"); } catch (...) {} }
+        drenarResultados(q.get());
+        return id;
+    } catch (const exception &) { return 0; }
+}
+
+static string etiquetaEmpleado(int idEmp, bool esDueno) {
+    string n;
+    if (idEmp > 0) {
+        try {
+            std::unique_ptr<sql::PreparedStatement> q(globalCon->prepareStatement(
+                "SELECT NOMBRE FROM EMPLEADOS WHERE ID_EMPLEADO = ?"));
+            q->setInt(1, idEmp);
+            std::unique_ptr<sql::ResultSet> r(q->executeQuery());
+            if (r->next()) n = r->getString("NOMBRE");
+            drenarResultados(q.get());
+        } catch (const exception &) {}
+    }
+    if (n.empty()) n = "DUENO";
+    else if (esDueno) n += " (dueno)";
+    return n;
+}
+
 static void pagarCompra(const CierreCompra &c) {
     if (c.idCompra <= 0) return;
     try {
@@ -553,9 +596,14 @@ static void pagarCompra(const CierreCompra &c) {
 
         int idMetodo = (int)leerNumeroConIntentos("ID metodo: ", 1, 999999999);
         cout << "A pagar: $" << c.bruto << endl;
-        double pagado = leerNumeroConIntentos("Monto pagado (Enter = exacto): ", 0.01, c.bruto, &c.bruto);
+        double pagado = leerNumeroConIntentos("Monto pagado (Enter = " + dinero(c.bruto) + "): ", 0.01, c.bruto, &c.bruto);
+        if (pagado != c.bruto) cout << "Monto pagado: $" << pagado << endl;
         double defCero = 0.0;
-        double empVal = leerNumeroConIntentos("ID empleado que paga (Enter = dueno): ", 0, 999999999, &defCero);
+        string nomDueno = etiquetaEmpleado(duenoDeCompra(c.idCompra), true);
+        double empVal = leerNumeroConIntentos("ID empleado que paga (Enter = " + nomDueno + "): ", 0, 999999999, &defCero);
+        if (empVal > 0) {
+            cout << "Empleado que paga: " << etiquetaEmpleado((int)empVal, false) << endl;
+        }
         std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
             "CALL SP_REGISTRAR_PAGO_COMPRA(?, ?, ?, ?)"));
         pp->setInt(1, c.idCompra);
@@ -621,6 +669,7 @@ static void compraRapida() {
     cout << "Codigo de barra, ID o nombre. Vacio para cerrar." << endl;
     vector<LineaCompra> carrito;
     while (true) {
+        try {
         string entrada;
         try {
             entrada = leerDatoSeguro("Producto: ");
@@ -658,6 +707,10 @@ static void compraRapida() {
             carrito.push_back(prod);
         }
         mostrarCarritoCompra(carrito, tasa);
+        } catch (const CancelarOperacionException &e) {
+            cout << "\n[!] " << e.what() << endl;
+            break;
+        }
     }
     if (carrito.empty()) {
         cout << "Carrito vacio." << endl;
@@ -682,9 +735,18 @@ static void compraRapida() {
             return;
         }
         bool todoOk = true;
-        for (int sup : suplidores) {
+        for (size_t gi = 0; gi < suplidores.size(); ++gi) {
+            int sup = suplidores[gi];
             vector<LineaCompra> grupo;
-            for (auto &l : carrito) if (l.idProveedor == sup) grupo.push_back(l);
+            double brutoGrupo = 0.0;
+            string nomSup;
+            for (auto &l : carrito) if (l.idProveedor == sup) {
+                grupo.push_back(l);
+                brutoGrupo += l.precioCompra * l.cantidad;
+                nomSup = l.nombreProveedor;
+            }
+            printf("\n=========== FACTURA %d DE %d: %d - %s ($%.2f) ===========\n",
+                   (int)gi + 1, (int)suplidores.size(), sup, nomSup.c_str(), brutoGrupo);
             CierreCompra c = cerrarCompraForzada(grupo, sup);
             if (c.idCompra <= 0) { todoOk = false; break; }
             string pagar = leerDatoSeguro("Pagar compra #" + to_string(c.idCompra) + " ahora? (s/n): ");
@@ -954,6 +1016,37 @@ static void pagarCompraPendienteUI() {
     }
 }
 
+static void cancelarCompraUI() {
+    cout << "\n--- CANCELAR COMPRA ---" << endl;
+    cout << "Solo compras ABIERTA sin pagos. Repone el stock." << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "CALL SP_COMPRAS_ULTIMAS()"));
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        printf("\n%-6s | %-20s | %-10s | %-10s\n", "ID", "PROVEEDOR", "ESTADO", "TOTAL");
+        while (rl->next()) {
+            printf("%-6d | %-20.20s | %-10s | %-10.2f\n",
+                   rl->getInt("ID_COMPRA"),
+                   rl->getString("PROVEEDOR").c_str(),
+                   rl->getString("ESTADO").c_str(),
+                   (double)rl->getDouble("TOTAL_CON_IVA"));
+        }
+        drenarResultados(pl.get());
+        int idCompraCanc = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
+        int idEmpCanc = (int)leerNumeroConIntentos("ID empleado (dueno): ", 1, 999999999);
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_CANCELAR_COMPRA(?, ?)"));
+        pstmt->setInt(1, idCompraCanc);
+        pstmt->setInt(2, idEmpCanc);
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo cancelar (verifica estado, pagos y dueno)." << RESET << endl;
+    }
+}
+
 static void verPreciosCompraUI() {
     cout << "\n--- PRECIOS POR SUPLIDOR (barato y caro) ---" << endl;
     try {
@@ -1013,11 +1106,14 @@ void ejecutarSubmenuCompras() {
                 verPreciosCompraUI();
                 break;
             case 7:
+                cancelarCompraUI();
+                break;
+            case 8:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 7) pausar();
-    } while (opcion != 7);
+        if (opcion != 8) pausar();
+    } while (opcion != 8);
 }
