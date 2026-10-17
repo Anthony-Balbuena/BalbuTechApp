@@ -10,6 +10,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "roles.h"
+#include "contrato.h"
 #include "colores.h"
 
 using namespace std;
@@ -27,7 +28,8 @@ void mostrarMenuEmpleados() {
     cout << "9. Justificar asistencia" << endl;
     cout << "10. Asistencia del dia" << endl;
     cout << "11. Resumen mensual" << endl;
-    cout << "12. Volver al Menu Principal" << endl;
+    cout << "12. Generar contrato" << endl;
+    cout << "13. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
 
@@ -517,12 +519,15 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
                 break;
             case 12:
+                ejecutarSubmenuContratos();
+                break;
+            case 13:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 12) pausar();
-    } while (opcion != 12);
+        if (opcion != 13) pausar();
+    } while (opcion != 13);
 }
 
