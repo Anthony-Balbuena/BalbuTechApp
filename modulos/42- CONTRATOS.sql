@@ -2,16 +2,19 @@
 ARCHIVO 42 - CONTRATOS (registro de contratos de empleados)
 El modulo de la app ya genera el HTML del contrato; esta tabla deja
 constancia de que existe y en que estado esta (activo o finalizado).
+TIPO (nombres de la UI, 17/10):
+- TEMPORAL: con duracion en meses (la ley lo llama "termino fijo").
+- FIJO: permanente, sin fecha fin (la ley lo llama "termino indefinido").
 - SALARIO es un snapshot: se copia de EMPLEADOS al momento de registrar,
   si despues cambia el salario del empleado el contrato viejo no se toca.
-- FECHA_FIN NULL = contrato indefinido.
+- FECHA_FIN NULL = contrato FIJO (permanente).
 - Solo un contrato ACTIVO por empleado (lo valida el SP).
 - Al despedir se finaliza a mano por ahora (opcion del menu empleados).
 */
 CREATE TABLE IF NOT EXISTS CONTRATOS (
     ID_CONTRATO INT NOT NULL AUTO_INCREMENT,
     ID_EMPLEADO INT NOT NULL,
-    TIPO ENUM('FIJO', 'INDEFINIDO') NOT NULL,
+    TIPO ENUM('TEMPORAL', 'FIJO') NOT NULL,
     FECHA_INICIO DATE NOT NULL,
     FECHA_FIN DATE NULL,
     SALARIO DECIMAL(10, 2) NOT NULL,
@@ -27,8 +30,8 @@ DROP PROCEDURE IF EXISTS SP_INSERTAR_CONTRATO //
 /*
 SP_INSERTAR_CONTRATO
 Registra un contrato para un empleado.
-P_MESES: duracion en meses (solo FIJO; para INDEFINIDO se pasa NULL y
-FECHA_FIN queda NULL). FECHA_INICIO es siempre hoy.
+P_MESES: duracion en meses (solo TEMPORAL; para FIJO permanente se pasa
+NULL y FECHA_FIN queda NULL). FECHA_INICIO es siempre hoy.
 SALARIO se copia de EMPLEADOS (snapshot). Frena si el empleado no existe,
 esta INACTIVO, o ya tiene un contrato ACTIVO.
 */
@@ -47,13 +50,13 @@ proc_label: BEGIN
     IF P_ID_EMPLEADO IS NULL OR P_ID_EMPLEADO <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: INGRESE EL ID DEL EMPLEADO.';
     END IF;
-    IF P_TIPO IS NULL OR P_TIPO NOT IN ('FIJO', 'INDEFINIDO') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL TIPO DEBE SER FIJO O INDEFINIDO.';
+    IF P_TIPO IS NULL OR P_TIPO NOT IN ('TEMPORAL', 'FIJO') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL TIPO DEBE SER TEMPORAL O FIJO.';
     END IF;
-    IF P_TIPO = 'FIJO' AND (P_MESES IS NULL OR P_MESES < 1) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL CONTRATO FIJO NECESITA UNA DURACION EN MESES MAYOR A CERO.';
+    IF P_TIPO = 'TEMPORAL' AND (P_MESES IS NULL OR P_MESES < 1) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL CONTRATO TEMPORAL NECESITA UNA DURACION EN MESES MAYOR A CERO.';
     END IF;
-    IF P_TIPO = 'INDEFINIDO' THEN
+    IF P_TIPO = 'FIJO' THEN
         SET P_MESES = NULL;
     END IF;
 
@@ -81,7 +84,7 @@ proc_label: BEGIN
         P_ID_EMPLEADO,
         P_TIPO,
         CURDATE(),
-        CASE WHEN P_TIPO = 'FIJO' THEN DATE_ADD(CURDATE(), INTERVAL P_MESES MONTH) ELSE NULL END,
+        CASE WHEN P_TIPO = 'TEMPORAL' THEN DATE_ADD(CURDATE(), INTERVAL P_MESES MONTH) ELSE NULL END,
         v_salario,
         P_RUTA
     );
