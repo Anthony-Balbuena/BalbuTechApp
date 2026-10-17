@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 #include <vector>
 #include <map>
 #include <limits>
@@ -93,8 +94,11 @@ static void reemplazar(string &texto, const string &clave, const string &valor) 
 
 // Dado un ID de empleado, devuelve el HTML del contrato ya relleno.
 // Lanza runtime_error si el empleado no existe.
-// tipoContrato: "fijo" | "indefinido".  duracionTexto: solo para fijo (ej. "1 año").
-string armarContrato(int idEmpleado, const string &tipoContrato,
+// tipoContrato: "TEMPORAL" (con duracion) | "FIJO" (permanente). Nota: los
+// TITULOS legales son al revés que la UI — la ley llama "termino fijo" al
+// temporal y "termino indefinido" al permanente. duracionTexto solo aplica
+// al temporal (ej. "1 año").
+string armarContrato(const DatosPersonaContrato &persona, const string &tipoContrato,
                      const string &duracionTexto,
                      const string &dirEmpleado, const string &horario,
                      const string &horasSemanales, const string &formaPago) {
@@ -106,24 +110,14 @@ string armarContrato(int idEmpleado, const string &tipoContrato,
     string html = ss.str();
     fin.close();
 
-    // Datos del empleado
-    std::unique_ptr<sql::PreparedStatement> pe(globalCon->prepareStatement(
-        "SELECT NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO "
-        "FROM EMPLEADOS WHERE ID_EMPLEADO = ?"));
-    pe->setInt(1, idEmpleado);
-    std::unique_ptr<sql::ResultSet> re(pe->executeQuery());
-    if (!re->next()) {
-        drenarResultados(pe.get());
-        throw runtime_error("No existe el empleado ID " + to_string(idEmpleado));
-    }
-    string nombre   = re->getString("NOMBRE");
-    string cedula   = re->getString("CEDULA");
-    string cargo    = re->getString("CARGO");
-    string salario  = re->getString("SALARIO");
-    string telefono = re->getString("TELEFONO");
-    string email    = re->getString("EMAIL");
-    string fIngreso = re->getString("FECHA_INGRESO");
-    drenarResultados(pe.get());
+    // Datos de la persona (los pide la app al generar; no se consulta la BD)
+    string nombre   = persona.nombre;
+    string cedula   = persona.cedula;
+    string cargo    = persona.cargo;
+    string salario  = persona.salario;
+    string telefono = persona.telefono;
+    string email    = persona.email;
+    string fIngreso = persona.fechaIngreso;
 
     // Datos de la empresa (CONFIGURACION)
     map<string, string> cfg = leerConfiguracion();
@@ -135,10 +129,10 @@ string armarContrato(int idEmpleado, const string &tipoContrato,
     string cedRepres  = cfgO(cfg, "CEDULA_REPRESENTANTE", "____________");
 
     // Tipo y duracion
-    bool esFijo = (tipoContrato == "fijo");
-    string tipoTit  = esFijo ? "CONTRATO DE TRABAJO A TERMINO FIJO"
-                             : "CONTRATO DE TRABAJO A TERMINO INDEFINIDO";
-    string duracion = esFijo ? duracionTexto : "indefinido";
+    bool esTemporal = (tipoContrato == "TEMPORAL");
+    string tipoTit  = esTemporal ? "CONTRATO DE TRABAJO A TERMINO FIJO"
+                                 : "CONTRATO DE TRABAJO A TERMINO INDEFINIDO";
+    string duracion = esTemporal ? duracionTexto : "indefinido";
     string pruebas  = "90";  // dias de prueba por defecto
 
     // Relleno de placeholders
@@ -206,6 +200,18 @@ string escribirContrato(const string &html, const string &nombreEmpleado,
 // Pantalla principal del modulo
 // ---------------------------------------------------------------------------
 
+// Valida una fecha ISO (AAAA-MM-DD) sin dejar que stoi explote con basura.
+static bool esFechaISO(const string &f) {
+    if (f.size() != 10 || f[4] != '-' || f[7] != '-') return false;
+    for (size_t i = 0; i < f.size(); i++) {
+        if (i == 4 || i == 7) continue;
+        if (f[i] < '0' || f[i] > '9') return false;
+    }
+    int mes = stoi(f.substr(5, 2));
+    int dia = stoi(f.substr(8, 2));
+    return mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31;
+}
+
 // Convierte la duracion en meses al texto del contrato (12 -> "1 año",
 // 6 -> "6 meses"). Asi el HTML y la BD hablan de lo mismo.
 static string textoDuracion(long meses) {
@@ -219,40 +225,59 @@ static string textoDuracion(long meses) {
 void ejecutarSubmenuContratos() {
     try {
         cout << "\n=== GENERAR CONTRATO DE TRABAJO ===" << endl;
-        cout << "Empleado (ID): ";
-        int idEmp = (int)leerNumeroConIntentos("", 1, 999999999);
+        cout << "(Solo genera el documento: nada se registra en la BD hasta la firma.)" << endl;
 
+        // --- DATOS DE LA PERSONA ---
+        // Sin ID: puede ser alguien que aun no esta registrado como empleado.
+        cout << "\n--- DATOS DE LA PERSONA ---" << endl;
+        auto requerido = [](const string &etiqueta) {
+            while (true) {
+                string v = leerDatoSeguro(etiqueta);
+                if (!v.empty()) return v;
+                cout << ROJO << "No puede quedar vacio." << RESET << endl;
+            }
+        };
+        DatosPersonaContrato p;
+        p.nombre = requerido("Nombre completo: ");
+        p.cedula = requerido("Cedula: ");
+        p.cargo  = requerido("Cargo: ");
+
+        double sal = leerNumeroConIntentos("Salario: ", 0, 999999999);
+        {
+            ostringstream ss;
+            ss << fixed << setprecision(2) << sal;
+            p.salario = ss.str();
+        }
+
+        p.telefono = leerDatoSeguro("Telefono (Enter = -): ");
+        if (p.telefono.empty()) p.telefono = "-";
+        p.email = leerDatoSeguro("Email (Enter = -): ");
+        if (p.email.empty()) p.email = "-";
+
+        while (true) {
+            p.fechaIngreso = leerDatoSeguro("Fecha de ingreso (AAAA-MM-DD, Enter = hoy): ");
+            if (p.fechaIngreso.empty()) { p.fechaIngreso = fechaHoyISO(); break; }
+            if (esFechaISO(p.fechaIngreso)) break;
+            cout << ROJO << "Formato invalido: use AAAA-MM-DD (ej. 2026-10-17)." << RESET << endl;
+        }
+
+        // --- CONTRATO ---
+        cout << "\n--- CONTRATO ---" << endl;
         cout << "Tipo de contrato:" << endl;
-        cout << "  1. Fijo (con duracion: 1 mes, 1 año, etc.)" << endl;
-        cout << "  2. Indefinido" << endl;
+        cout << "  1. Temporal (con duracion: 1 mes, 1 año, etc.)" << endl;
+        cout << "  2. Fijo" << endl;
         int op = (int)leerNumeroConIntentos("Opcion: ", 1, 2);
-        bool esFijo = (op == 1);
+        bool esTemporal = (op == 1);
 
         long meses = 0;
         string duracion;
-        if (esFijo) {
+        if (esTemporal) {
             meses = (long)leerNumeroConIntentos("Duracion en meses (12 = 1 año): ", 1, 1200);
             duracion = textoDuracion(meses);
         }
 
-        // Registrar ANTES de pedir todo lo demas: si ya tiene un contrato
-        // activo, aqui frena sin gastar los demas datos. La ruta del documento
-        // se completa despues de escribir el HTML.
-        {
-            std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
-                "CALL SP_INSERTAR_CONTRATO(?, ?, ?, ?)"));
-            ps->setInt(1, idEmp);
-            ps->setString(2, esFijo ? "FIJO" : "INDEFINIDO");
-            if (esFijo) ps->setInt(3, (int)meses);
-            else ps->setNull(3, sql::DataType::INTEGER);
-            ps->setNull(4, sql::DataType::VARCHAR);
-            string msg = Recogermensaje(ps.get());
-            cout << "\n" << msg << endl;
-            if (msg.rfind("Error DB:", 0) == 0) return;  // freno: no sigue
-        }
-
-        // Datos que no estan en la tabla EMPLEADOS: se piden al generar.
-        string dirEmp = leerDatoSeguro("Direccion del empleado: ");
+        // Condiciones que no estan en ningun lado: se piden a generar.
+        string dirEmp = requerido("Direccion del empleado: ");
         string horario = leerDatoSeguro("Horario (ej. 8:00 AM - 5:00 PM): ");
         if (horario.empty()) horario = "9:00 AM - 6:00 PM";
         string horasSem = leerDatoSeguro("Horas semanales (ej. 44): ");
@@ -260,28 +285,11 @@ void ejecutarSubmenuContratos() {
         string formaPago = leerDatoSeguro("Forma de pago (ej. transferencia bancaria): ");
         if (formaPago.empty()) formaPago = "transferencia bancaria";
 
-        string html = armarContrato(idEmp, esFijo ? "fijo" : "indefinido", duracion,
+        string html = armarContrato(p, esTemporal ? "TEMPORAL" : "FIJO", duracion,
                                     dirEmp, horario, horasSem, formaPago);
 
-        // nombre del empleado para el nombre del archivo
-        std::unique_ptr<sql::Statement> st(globalCon->createStatement());
-        std::unique_ptr<sql::ResultSet> r(st->executeQuery("SELECT NOMBRE FROM EMPLEADOS WHERE ID_EMPLEADO=" + to_string(idEmp)));
-        string nomEmp = "";
-        if (r->next()) nomEmp = r->getString("NOMBRE");
-        drenarResultados(st.get());
-
-        string ruta = escribirContrato(html, nomEmp, fechaHoyISO());
+        string ruta = escribirContrato(html, p.nombre, fechaHoyISO());
         cout << "\nContrato generado: " << ruta << endl;
-
-        // Dejar la ruta del documento en el registro que abrimos antes
-        {
-            std::unique_ptr<sql::PreparedStatement> pu(globalCon->prepareStatement(
-                "UPDATE CONTRATOS SET RUTA_DOCUMENTO=? "
-                "WHERE ID_EMPLEADO=? AND ESTADO='ACTIVO'"));
-            pu->setString(1, ruta);
-            pu->setInt(2, idEmp);
-            pu->executeUpdate();
-        }
 
         // abrir en el navegador (imprimir a PDF desde ahi)
         cout << "Abriendo en el navegador para imprimir a PDF..." << endl;

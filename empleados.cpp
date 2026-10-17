@@ -3,6 +3,8 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
+#include <utility>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
@@ -27,7 +29,7 @@ void mostrarMenuEmpleados() {
     cout << "8. Ver asistencia" << endl;
     cout << "9. Justificar asistencia" << endl;
     cout << "10. Asistencia del dia" << endl;
-    cout << "11. Resumen mensual" << endl;
+    cout << "11. Historial de asistencia" << endl;
     cout << "12. Generar contrato" << endl;
     cout << "13. Ver contratos" << endl;
     cout << "14. Finalizar contrato" << endl;
@@ -436,36 +438,58 @@ static void asistenciaHoyUI() {
     }
 }
 
-// (17/10/2026) Asistencia v2 - resumen mensual de UN empleado.
-static void resumenMensualUI() {
-    cout << "\n--- RESUMEN MENSUAL ---" << endl;
+// (17/10/2026) Asistencia v2 - historial de asistencia de UN empleado.
+static void historialAsistenciaUI() {
+    cout << "\n--- HISTORIAL DE ASISTENCIA ---" << endl;
     try {
-        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
-        string mes = leerDatoSeguro("Mes (AAAA-MM): ");
-        if (mes.size() != 7 || mes[4] != '-') {
-            cout << ROJO << "Mes invalido. Use AAAA-MM." << RESET << endl;
+        string filtro = leerDatoSeguro("Ingrese ID, nombre o cedula o Enter para ver todos: ");
+        vector<pair<int,string>> empleados;
+        std::unique_ptr<sql::PreparedStatement> pe(globalCon->prepareStatement(
+            "SELECT ID_EMPLEADO, NOMBRE, CEDULA FROM EMPLEADOS "
+            "WHERE (? = '' OR NOMBRE LIKE CONCAT('%', ?, '%') "
+            "       OR CEDULA LIKE CONCAT('%', ?, '%') "
+            "       OR ID_EMPLEADO = CAST(? AS UNSIGNED)) "
+            "ORDER BY ID_EMPLEADO"));
+        pe->setString(1, filtro); pe->setString(2, filtro);
+        pe->setString(3, filtro); pe->setString(4, filtro);
+        std::unique_ptr<sql::ResultSet> re(pe->executeQuery());
+        while (re->next()) {
+            empleados.push_back({re->getInt("ID_EMPLEADO"), (string)re->getString("NOMBRE")});
+        }
+        drenarResultados(pe.get());
+        if (empleados.empty()) {
+            cout << "[!] Ningun empleado coincide con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
             return;
         }
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL 11_SP_RESUMEN_ASISTENCIA_MES(?, ?)"));
-        pstmt->setInt(1, idEmp);
-        pstmt->setString(2, mes);
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        if (res->next()) {
-            printf("\nDias marcados : %d\n", res->getInt("DIAS_MARCADOS"));
-            printf("Horas totales : %.2f\n", (double)res->getDouble("HORAS_TOTALES"));
-            printf("Presencias    : %d\n", res->getInt("PRESENCIAS"));
-            printf("Tardanzas     : %d\n", res->getInt("TARDANZAS"));
-            printf("Ausencias     : %d\n", res->getInt("AUSENCIAS"));
-            printf("Permisos      : %d\n", res->getInt("PERMISOS"));
-        } else {
-            cout << "[!] Ese empleado no marco asistencia en " << mes << "." << endl;
+        for (auto &e : empleados) {
+            string mes = leerDatoSeguro("Mes para " + to_string(e.first) + " - " + e.second + " (AAAA-MM): ");
+            if (mes.size() != 7 || mes[4] != '-') {
+                cout << ROJO << "Mes invalido. Use AAAA-MM." << RESET << endl;
+                continue;
+            }
+            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+                "CALL 11_SP_RESUMEN_ASISTENCIA_MES(?, ?)"));
+            pstmt->setInt(1, e.first);
+            pstmt->setString(2, mes);
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+            printf("\n%-22.22s | %-5s\n", e.second.c_str(), mes.c_str());
+            printf("%s\n", string(36, '-').c_str());
+            if (res->next()) {
+                printf("%-16s: %d\n", "Dias marcados", res->getInt("DIAS_MARCADOS"));
+                printf("%-16s: %.2f\n", "Horas totales", (double)res->getDouble("HORAS_TOTALES"));
+                printf("%-16s: %d\n", "Presencias", res->getInt("PRESENCIAS"));
+                printf("%-16s: %d\n", "Tardanzas", res->getInt("TARDANZAS"));
+                printf("%-16s: %d\n", "Ausencias", res->getInt("AUSENCIAS"));
+                printf("%-16s: %d\n", "Permisos", res->getInt("PERMISOS"));
+            } else {
+                cout << "[!] Ese empleado no marco asistencia en " << mes << "." << endl;
+            }
+            drenarResultados(pstmt.get());
         }
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
-        cout << ROJO << "No se pudo ver el resumen." << RESET << endl;
+        cout << ROJO << "No se pudo ver el historial." << RESET << endl;
     }
 }
 
@@ -517,7 +541,7 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
                 break;
             case 11:
-                if (tienePermiso("CONSULTAR_REPORTES")) resumenMensualUI();
+                if (tienePermiso("CONSULTAR_REPORTES")) historialAsistenciaUI();
                 else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
                 break;
             case 12:
