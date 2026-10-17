@@ -164,25 +164,51 @@ function actualizarDatosMes(mes, ano, omitirSpinner = false) {
 
 function renderizarResultadosFinales(mes, modo, maxDiasMes, contenedorResultados) {
     let textoFiltro = "Mes Completo";
-    let ventasSimuladas = Math.floor(Math.random() * 40) + 10;
+
+    // Si la app exporto datos reales (datos-web.js), se usan. Si no, demo.
+    // NOTA: los datos exportados son del mes ENTERO; el filtro de dias no
+    // aplica sobre datos precargados (eso sera cuando haya API).
+    const hayDatosReales = typeof datosWeb !== 'undefined' && datosWeb.meses && datosWeb.meses[mes];
+    let ventasSimuladas, subtotalMonto, itbisMonto, totalGeneralMonto;
+
+    if (hayDatosReales) {
+        const d = datosWeb.meses[mes];
+        ventasSimuladas = d.transacciones;
+        subtotalMonto = d.subtotal;
+        itbisMonto = d.itbis;
+        totalGeneralMonto = d.total;
+    } else {
+        ventasSimuladas = Math.floor(Math.random() * 40) + 10;
+        subtotalMonto = ventasSimuladas * 150.00;
+        itbisMonto = subtotalMonto * 0.18;
+        totalGeneralMonto = subtotalMonto + itbisMonto;
+    }
 
     if (modo === 'personalizado') {
         const dInicio = Math.min(parseInt(document.getElementById(`dia-inicio-${mes}`).value) || 1, maxDiasMes);
         const dFin = Math.min(parseInt(document.getElementById(`dia-fin-${mes}`).value) || maxDiasMes, maxDiasMes);
         textoFiltro = `Días: ${dInicio} al ${dFin}`;
-        ventasSimuladas = Math.floor(Math.random() * 20) + 5;
+        if (!hayDatosReales) {
+            ventasSimuladas = Math.floor(Math.random() * 20) + 5;
+            subtotalMonto = ventasSimuladas * 150.00;
+            itbisMonto = subtotalMonto * 0.18;
+            totalGeneralMonto = subtotalMonto + itbisMonto;
+        } else {
+            textoFiltro += " (datos exportados = mes completo)";
+        }
     }
-
-    const subtotalMonto = ventasSimuladas * 150.00;
-    const itbisMonto = subtotalMonto * 0.18;
-    const totalGeneralMonto = subtotalMonto + itbisMonto;
 
     const subtotalFmt = subtotalMonto.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' });
     const itbisFmt = itbisMonto.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' });
     const totalGeneralFmt = totalGeneralMonto.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' });
 
+    const etiquetaFuente = hayDatosReales
+        ? `<div style="font-size: 0.7rem; color: #4ade80;">Datos reales (exportados de la app)</div>`
+        : `<div style="font-size: 0.7rem; color: #f87171;">DEMO — exporta desde la app (Ventas → 14) para ver datos reales</div>`;
+
     contenedorResultados.innerHTML = `
         <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 8px; font-weight: bold;">Filtro activo: ${textoFiltro}</div>
+        ${etiquetaFuente}
         <div class="stat-row">
             <span class="stat-label">Transacciones:</span>
             <span class="stat-value" data-raw-transacciones="${ventasSimuladas}">${ventasSimuladas}</span>
