@@ -29,3 +29,6 @@ entrar-local.ps1
 
 # Basura de Code Runner (Windows)
 tempCodeRunnerFile.cpp
+
+# Respaldos locales de BD (no van al repo)
+backups/
