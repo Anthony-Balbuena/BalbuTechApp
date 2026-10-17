@@ -17,6 +17,13 @@ std::string escribirContrato(const std::string &html,
                              const std::string &fechaISO);
 
 // Pantalla: pide datos, arma el contrato y lo abre en el navegador.
+// Ademas registra el contrato en la tabla CONTRATOS (con la ruta del HTML).
 void ejecutarSubmenuContratos();
+
+// Pantalla: historial de contratos de un empleado (SP_CONTRATOS_POR_EMPLEADO).
+void consultarContratosUI();
+
+// Pantalla: pasa un contrato de ACTIVO a FINALIZADO (SP_FINALIZAR_CONTRATO).
+void finalizarContratoUI();
 
 #endif
