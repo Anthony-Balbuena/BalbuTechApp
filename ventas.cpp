@@ -11,6 +11,7 @@
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "caja.h"
 #include "ventas.h"
 
 using namespace std;
@@ -21,6 +22,7 @@ struct LineaCarrito {
     string nombre;
     double precio = 0.0;
     int cantidad = 0;
+    double descuento = 0.0; // % de descuento de la línea (16/10/2026)
 };
 
 void mostrarMenuVentas() {
@@ -162,19 +164,48 @@ static double tasaIVA() {
     }
 }
 
+// (17/10/2026) Aviso de stock minimo: NO bloquea, solo avisa.
+// cantPorDescontar = lo que falta descontar (pre-venta: lo del carrito;
+// post-venta: 0 porque el descuento ya ocurrio).
+static void avisoStockCritico(int idProducto, int cantPorDescontar) {
+    try {
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_INVENTARIO(?)"));
+        pstmt->setString(1, to_string(idProducto));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        while (res->next()) {
+            if (res->getInt("ID_PRODUCTO") != idProducto) continue;
+            int stock = 0, minimo = 0;
+            try { stock = res->getInt("STOCK_ACTUAL"); } catch (...) {}
+            try { minimo = res->getInt("STOCK_MINIMO"); } catch (...) {}
+            int quedan = stock - cantPorDescontar;
+            if (quedan <= minimo) {
+                string estado = (quedan <= 0) ? "AGOTADO" : "CRITICO";
+                cout << AMARILLO << "[!] " << res->getString("NOMBRE")
+                     << ": quedan " << quedan << " (minimo " << minimo
+                     << ") - " << estado << ", considera reponer." << RESET << endl;
+            }
+            break;
+        }
+        drenarResultados(pstmt.get());
+    } catch (const exception &) {
+        // Sin poder consultar no molesta la venta.
+    }
+}
+
 static void mostrarCarrito(const vector<LineaCarrito> &carrito, double tasa) {
     cout << "\n--- CARRITO (precios con IVA) ---" << endl;
     double total = 0.0;
     for (size_t i = 0; i < carrito.size(); ++i) {
         auto &l = carrito[i];
-        double neto = l.precio * l.cantidad;
-        // Igual que la base: ITBIS redondeado por linea, el total cuadra con el ticket.
+        // Bruto con descuento; ITBIS redondeado por linea (igual que la base).
+        double neto = round(l.precio * l.cantidad * (100.0 - l.descuento)) / 100.0;
         double parcial = neto + round(neto * tasa) / 100.0;
-        double unitIVA = round(l.precio * (100.0 + tasa)) / 100.0;
+        double unitIVA = round(l.precio * (100.0 - l.descuento) * (100.0 + tasa)) / 10000.0;
         total += parcial;
-        cout << (i + 1) << ". " << l.nombre << " x" << l.cantidad
-             << " | $" << unitIVA << " con ITBIS"
-             << " | total $" << parcial << endl;
+        cout << (i + 1) << ". " << l.nombre << " x" << l.cantidad;
+        if (l.descuento > 0) cout << " -" << l.descuento << "%";
+        cout << " | $" << unitIVA << " con ITBIS" << " | total $" << parcial << endl;
     }
     cout << "Total con IVA: $" << total << endl;
 }
@@ -287,11 +318,12 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
         for (auto &l : carrito) {
             try {
                 std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-                    "CALL SP_AGREGAR_DETALLE_VENTA(?, ?, ?, ?)"));
+                    "CALL SP_AGREGAR_DETALLE_VENTA(?, ?, ?, ?, ?)"));
                 pstmt->setInt(1, idVenta);
                 pstmt->setInt(2, l.idProducto);
                 pstmt->setInt(3, l.cantidad);
                 pstmt->setInt(4, idEmp);
+                pstmt->setDouble(5, l.descuento);
                 string rLinea = Recogermensaje(pstmt.get());
                 drenarResultados(pstmt.get());
                 if (rLinea.rfind("Error DB:", 0) == 0) throw runtime_error(rLinea);
@@ -311,6 +343,9 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
                 return out;
             }
         }
+
+        // Aviso con el stock real ya descontado (lo pedido: alerta al vender).
+        for (auto &l : carrito) avisoStockCritico(l.idProducto, 0);
 
         std::unique_ptr<sql::PreparedStatement> pv(globalCon->prepareStatement(
             "CALL SP_VENTA_ENCABEZADO(?)"));
@@ -342,19 +377,25 @@ static void listarProductosParaVenta(double tasa) {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_CONSULTAR_INVENTARIO('')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-5s | %-10s | %-25s | %-10s | %-6s\n", "ID", "CODIGO", "NOMBRE", "P+IVA", "STOCK");
+        printf("\n%-5s | %-10s | %-25s | %-10s | %-6s | %-s\n", "ID", "CODIGO", "NOMBRE", "P+IVA", "STOCK", "ESTATUS");
+        printf("%s\n", string(78, '-').c_str());
         bool hay = false;
         while (res->next()) {
             hay = true;
             int stock = 0;
             try { stock = res->getInt("STOCK_ACTUAL"); } catch (...) { stock = 0; }
+            string estatus = "OK";
+            try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) {}
             double conIVA = round((double)res->getDouble("PRECIO") * (100.0 + tasa)) / 100.0;
-            printf("%-5d | %-10s | %-25.25s | %-10.2f | %-6d\n",
+            printf("%-5d | %-10s | %-25.25s | %-10.2f | %-6d | ", 
                    res->getInt("ID_PRODUCTO"),
                    res->getString("CODIGO").c_str(),
                    res->getString("NOMBRE").c_str(),
                    conIVA,
                    stock);
+            const string &c = (estatus == "AGOTADO" || estatus == "CR\u00cdTICO") ? ROJO
+                              : (estatus == "STOCK BAJO") ? AMARILLO : VERDE;
+            cout << c << estatus << RESET << endl;
         }
         if (!hay) cout << "[!] Sin productos activos." << endl;
         drenarResultados(pstmt.get());
@@ -365,6 +406,10 @@ static void listarProductosParaVenta(double tasa) {
 
 static void ventaRapida() {
     cout << "\n--- VENTA RAPIDA ---" << endl;
+    if (!hayTurnoAbierto()) {
+        cout << "[!] Sin turno de caja abierto: la venta se guarda igual y el"
+             " cobro se anota por fecha." << endl;
+    }
     double tasa = tasaIVA();
     listarProductosParaVenta(tasa);
     cout << "Codigo de barra, ID o nombre. Vacio para cerrar." << endl;
@@ -386,6 +431,17 @@ static void ventaRapida() {
         }
         double dUno = 1;
         int cant = (int)leerNumeroConIntentos("Cantidad (1): ", 1, 999999999, &dUno);
+        double dCero = 0.0;
+        double desc = 0.0;
+        bool yaEnCarrito = false;
+        for (auto &l : carrito) {
+            if (l.idProducto == prod.idProducto) yaEnCarrito = true;
+        }
+        // El descuento se pide al crear la línea; si el producto ya está,
+        // se suman cantidades y se conserva el descuento original.
+        if (!yaEnCarrito) {
+            desc = leerNumeroConIntentos("Descuento % (Enter = 0): ", 0, 100, &dCero);
+        }
         int enCarrito = 0;
         for (auto &l : carrito) {
             if (l.idProducto == prod.idProducto) enCarrito = l.cantidad;
@@ -405,9 +461,16 @@ static void ventaRapida() {
         }
         if (!existe) {
             prod.cantidad = cant;
+            prod.descuento = desc;
             carrito.push_back(prod);
         }
         mostrarCarrito(carrito, tasa);
+        // Aviso post-agregado: cuánto quedaría si se cierra la venta ahora.
+        int totalEnCarrito = 0;
+        for (auto &l : carrito) {
+            if (l.idProducto == prod.idProducto) totalEnCarrito = l.cantidad;
+        }
+        avisoStockCritico(prod.idProducto, totalEnCarrito);
         } catch (const CancelarOperacionException &e) {
             cout << "\n[!] " << e.what() << endl;
             break;
@@ -470,19 +533,24 @@ static void mostrarFactura(int idVenta) {
             "CALL SP_VENTA_LINEAS(?)"));
         pl->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-25s | %-4s | %-10s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "P.UNIT", "ITBIS", "Subtotal", "Total");
+        printf("\n%-25s | %-4s | %-10s | %-7s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "P.UNIT", "DESC", "ITBIS", "Subtotal", "Total");
         while (rl->next()) {
-            printf("%-25.25s | %-4d | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n",
+            double pct = rl->getDouble("PORCENTAJE_DESCUENTO");
+            char descCol[16];
+            if (pct > 0) snprintf(descCol, sizeof(descCol), "-%.4g%%", pct);
+            else snprintf(descCol, sizeof(descCol), "%s", "-");
+            printf("%-25.25s | %-4d | %-10.2f | %-7s | %-10.2f | %-10.2f | %-10.2f\n",
                    rl->getString("NOMBRE").c_str(),
                    rl->getInt("CANTIDAD"),
                    (double)rl->getDouble("PRECIO_UNITARIO"),
+                   descCol,
                    (double)rl->getDouble("MONTO_ITBIS"),
                    (double)rl->getDouble("SUBTOTAL"),
                    (double)rl->getDouble("TOTAL_LINEA"));
         }
         drenarResultados(pl.get());
 
-        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "",
+        printf("%-25s | %-4s | %-10s | %-7s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "", "",
                vItbis, vSub, vTotal);
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
