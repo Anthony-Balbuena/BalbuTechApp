@@ -32,3 +32,6 @@ tempCodeRunnerFile.cpp
 
 # Respaldos locales de BD (no van al repo)
 backups/
+
+# Datos exportados de la BD para la pagina web (cada sede genera el suyo)
+Pagina_Web/datos-web.js

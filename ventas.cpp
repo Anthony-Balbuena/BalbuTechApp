@@ -12,6 +12,8 @@
 #include "database.h"
 #include "seguridad.h"
 #include "caja.h"
+#include "roles.h"
+#include "web_export.h"
 #include "ventas.h"
 
 using namespace std;
@@ -40,7 +42,8 @@ void mostrarMenuVentas() {
     cout << "11. Ganancias por periodo" << endl;
     cout << "12. Garantias" << endl;
     cout << "13. Historial de venta" << endl;
-    cout << "14. Volver al Menu Principal" << endl;
+    cout << "14. Exportar datos para la web" << endl;
+    cout << "15. Volver al Menu Principal" << endl;
     cout << "========================" << endl;
 }
 
@@ -1326,11 +1329,15 @@ void ejecutarSubmenuVentas() {
                 historialVentaUI();
                 break;
             case 14:
+                if (tienePermiso("CONSULTAR_REPORTES")) exportarDatosWeb();
+                else cout << ROJO << "No tienes permiso para exportar reportes." << RESET << endl;
+                break;
+            case 15:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 14) pausar();
-    } while (opcion != 14);
+        if (opcion != 15) pausar();
+    } while (opcion != 15);
 }
