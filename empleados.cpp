@@ -9,6 +9,7 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
@@ -21,7 +22,12 @@ void mostrarMenuEmpleados() {
     cout << "4. Reactivar Empleado" << endl;
     cout << "5. Buscar Empleado" << endl;
     cout << "6. Listar Empleados" << endl;
-    cout << "7. Volver al Menu Principal" << endl;
+    cout << "7. Marcar asistencia" << endl;
+    cout << "8. Ver asistencia" << endl;
+    cout << "9. Justificar asistencia" << endl;
+    cout << "10. Asistencia del dia" << endl;
+    cout << "11. Resumen mensual" << endl;
+    cout << "12. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
 
@@ -228,8 +234,238 @@ void listarEmpleados() {
 
 // Submenú de empleados: muestra el menú, lee la opción y llama a la acción.
 // (Antes el menú solo se imprimía y volvía sin hacer nada.)
-void ejecutarSubmenuEmpleados() {
-    int opcion = 0;
+static int identificarEmpleado() {
+    // EL CORTE: hoy pide el ID; manana la huella entra aqui sin tocar lo demas.
+    return (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+}
+
+static void marcarAsistenciaAuto() {
+    cout << "\n--- MARCAR ASISTENCIA ---" << endl;
+    try {
+        int idEmp = identificarEmpleado();
+        std::unique_ptr<sql::PreparedStatement> ph(globalCon->prepareStatement("SELECT CURTIME() AS HORA"));
+        std::unique_ptr<sql::ResultSet> rh(ph->executeQuery());
+        string hora = "12:00:00";
+        if (rh->next()) hora = rh->getString("HORA");
+        drenarResultados(ph.get());
+        string tipo = (hora < "12:00:00") ? "ENTRADA" : "SALIDA";
+        cout << "Hora BD: " << hora << " -> " << tipo << endl;
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_REGISTRAR_ASISTENCIA(?, ?)"));
+        pstmt->setInt(1, idEmp);
+        pstmt->setString(2, tipo);
+        string msg = Recogermensaje(pstmt.get());
+        drenarResultados(pstmt.get());
+        bool espejo = (msg.find("YA TIENE REGISTRO DE ENTRADA") != string::npos ||
+                        msg.find("NO TIENE REGISTRO DE ENTRADA") != string::npos);
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0) {
+            cout << ROJO << msg << RESET << endl;
+            if (!espejo) return;
+            string otro = (tipo == "ENTRADA") ? "SALIDA" : "ENTRADA";
+            string r = leerDatoSeguro(("Marcar " + otro + " en su lugar? (s/n): ").c_str());
+            if (r != "s" && r != "S") return;
+            std::unique_ptr<sql::PreparedStatement> p2(globalCon->prepareStatement("CALL SP_REGISTRAR_ASISTENCIA(?, ?)"));
+            p2->setInt(1, idEmp);
+            p2->setString(2, otro);
+            cout << ">>> " << Recogermensaje(p2.get()) << " <<<" << endl;
+            drenarResultados(p2.get());
+            return;
+        }
+        cout << VERDE << msg << RESET << endl;
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo marcar asistencia." << RESET << endl;
+    }
+}
+
+static bool fechaValidaEmpleados(const string &s) {
+    // AAAA-MM-DD simple, igual que en ventas (sin bisiestos finos: la BD valida).
+    if (s.size() != 10 || s[4] != '-' || s[7] != '-') return false;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (i == 4 || i == 7) continue;
+        if (!isdigit(static_cast<unsigned char>(s[i]))) return false;
+    }
+    return true;
+}
+
+static void verAsistenciaUI() {    cout << "\n--- VER ASISTENCIA ---" << endl;
+    try {
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+        string ini = leerDatoSeguro("Desde (AAAA-MM-DD): ");
+        string fin = leerDatoSeguro("Hasta (AAAA-MM-DD): ");
+        if (!fechaValidaEmpleados(ini) || !fechaValidaEmpleados(fin) || ini > fin) {
+            cout << ROJO << "Rango invalido. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL(?, ?, ?)"));
+        pstmt->setInt(1, idEmp);
+        pstmt->setString(2, ini);
+        pstmt->setString(3, fin);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-12s | %-8s | %-8s | %-6s | %-10s\n", "FECHA", "ENTRADA", "SALIDA", "HORAS", "ESTADO");
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            string ent("--:--:--"), sal("--:--:--"), est("?");
+            try { ent = res->getString("HORA_ENTRADA").c_str(); } catch (...) {}
+            try { sal = res->getString("HORA_SALIDA").c_str(); } catch (...) {}
+            double hs = 0.0;
+            try { hs = res->getDouble("HORAS_TRABAJADAS"); } catch (...) {}
+            try { est = res->getString("ESTADO").c_str(); } catch (...) {}
+            printf("%-12.12s | %-8.8s | %-8.8s | %-6.2f | %-10.10s\n",
+                   res->getString("FECHA").c_str(), ent.c_str(), sal.c_str(), hs, est.c_str());
+        }
+        if (!hay) cout << "[!] Sin registros." << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver la asistencia." << RESET << endl;
+    }
+}
+
+// (17/10/2026) Asistencia v2 - justificar: cambia el estado de UN dia ya
+// marcado (AUSENTE/TARDE/PERMISO) con motivo. Bloquea fechas > 7 dias via
+// 11_SP_BLOQUEAR_EDICION_ANTIGUA. Solo admin.
+static void justificarAsistenciaUI() {
+    cout << "\n--- JUSTIFICAR ASISTENCIA ---" << endl;
+    try {
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+        string fecha = leerDatoSeguro("Fecha (AAAA-MM-DD): ");
+        if (!fechaValidaEmpleados(fecha)) {
+            cout << ROJO << "Fecha invalida. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        cout << "Nuevo estado: 1. AUSENTE  2. TARDE  3. PERMISO" << endl;
+        int opEst = (int)leerNumeroConIntentos("Opcion: ", 1, 3);
+        string estado = (opEst == 1) ? "AUSENTE" : (opEst == 2) ? "TARDE" : "PERMISO";
+        string motivo = leerDatoSeguro("Motivo: ");
+        if (motivo.empty()) {
+            cout << ROJO << "El motivo es obligatorio." << RESET << endl;
+            return;
+        }
+        // Freno 1: la BD bloquea ediciones de mas de 7 dias.
+        std::unique_ptr<sql::PreparedStatement> pb(globalCon->prepareStatement(
+            "CALL 11_SP_BLOQUEAR_EDICION_ANTIGUA(?, ?)"));
+        pb->setInt(1, idEmp);
+        pb->setString(2, fecha);
+        std::unique_ptr<sql::ResultSet> rb(pb->executeQuery());
+        bool permitido = false;
+        while (rb->next()) {
+            string est;
+            try { est = rb->getString("ESTADO"); } catch (...) {}
+            if (est == "ACCESO PERMITIDO") permitido = true;
+        }
+        drenarResultados(pb.get());
+        if (!permitido) {
+            cout << ROJO << "Fecha bloqueada: no se puede justificar mas de 7 dias atras." << RESET << endl;
+            return;
+        }
+        // Freno 2: el SP falla si ese dia no tiene registro.
+        std::unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
+            "CALL 11_SP_JUSTIFICAR_ASISTENCIA(?, ?, ?, ?)"));
+        p->setInt(1, idEmp);
+        p->setString(2, fecha);
+        p->setString(3, estado);
+        p->setString(4, motivo);
+        string msg = Recogermensaje(p.get());
+        drenarResultados(p.get());
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0)
+            cout << ROJO << msg << RESET << endl;
+        else
+            cout << VERDE << msg << RESET << endl;
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo justificar la asistencia: " << e.what() << RESET << endl;
+    }
+}
+
+// (17/10/2026) Asistencia v2 - reporte del dia: todos los activos con su
+// estado (AUSENTE si no marco). Cuenta presentes/tardes/ausentes/permisos.
+static void asistenciaHoyUI() {
+    cout << "\n--- ASISTENCIA DEL DIA ---" << endl;
+    try {
+        string fecha = leerDatoSeguro("Fecha (AAAA-MM-DD, Enter = hoy): ");
+        if (!fecha.empty() && !fechaValidaEmpleados(fecha)) {
+            cout << ROJO << "Fecha invalida. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL 11_SP_ASISTENCIA_HOY(?)"));
+        if (fecha.empty()) pstmt->setNull(1, sql::DataType::DATE);
+        else pstmt->setString(1, fecha);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        printf("\n%-5s | %-22s | %-12s | %-10s | %-10s | %-6s\n",
+               "ID", "NOMBRE", "CARGO", "ESTADO", "ENTRADA", "HORAS");
+        int nPres = 0, nTarde = 0, nAus = 0, nPerm = 0;
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            string est; try { est = res->getString("ESTADO"); } catch (...) {}
+            string ent("--:--:--"); try { ent = res->getString("HORA_ENTRADA"); } catch (...) {}
+            double hs = 0.0; try { hs = res->getDouble("HORAS"); } catch (...) {}
+            if (est == "PRESENTE") nPres++;
+            else if (est == "TARDE") nTarde++;
+            else if (est == "PERMISO") nPerm++;
+            else nAus++;
+            printf("%-5d | %-22.22s | %-12.12s | ", res->getInt("ID_EMPLEADO"),
+                   res->getString("NOMBRE").c_str(), res->getString("CARGO").c_str());
+            const string &c = (est == "PRESENTE") ? VERDE
+                            : (est == "TARDE") ? AMARILLO
+                            : (est == "PERMISO") ? CIAN : ROJO;
+            cout << c << est << RESET;
+            printf(" | %-10.10s | %-6.2f\n", ent.c_str(), hs);
+        }
+        if (!hay) cout << "[!] Sin empleados activos." << endl;
+        else {
+            cout << "\nResumen: " << VERDE << nPres << " presentes" << RESET
+                 << " | " << AMARILLO << nTarde << " tardes" << RESET
+                 << " | " << CIAN << nPerm << " permisos" << RESET
+                 << " | " << ROJO << nAus << " ausentes" << RESET << endl;
+        }
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver la asistencia del dia." << RESET << endl;
+    }
+}
+
+// (17/10/2026) Asistencia v2 - resumen mensual de UN empleado.
+static void resumenMensualUI() {
+    cout << "\n--- RESUMEN MENSUAL ---" << endl;
+    try {
+        int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
+        string mes = leerDatoSeguro("Mes (AAAA-MM): ");
+        if (mes.size() != 7 || mes[4] != '-') {
+            cout << ROJO << "Mes invalido. Use AAAA-MM." << RESET << endl;
+            return;
+        }
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL 11_SP_RESUMEN_ASISTENCIA_MES(?, ?)"));
+        pstmt->setInt(1, idEmp);
+        pstmt->setString(2, mes);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        if (res->next()) {
+            printf("\nDias marcados : %d\n", res->getInt("DIAS_MARCADOS"));
+            printf("Horas totales : %.2f\n", (double)res->getDouble("HORAS_TOTALES"));
+            printf("Presencias    : %d\n", res->getInt("PRESENCIAS"));
+            printf("Tardanzas     : %d\n", res->getInt("TARDANZAS"));
+            printf("Ausencias     : %d\n", res->getInt("AUSENCIAS"));
+            printf("Permisos      : %d\n", res->getInt("PERMISOS"));
+        } else {
+            cout << "[!] Ese empleado no marco asistencia en " << mes << "." << endl;
+        }
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver el resumen." << RESET << endl;
+    }
+}
+
+void ejecutarSubmenuEmpleados() {    int opcion = 0;
 
     do {
         mostrarMenuEmpleados();
@@ -263,12 +499,30 @@ void ejecutarSubmenuEmpleados() {
                 listarEmpleados();
                 break;
             case 7:
+                marcarAsistenciaAuto();
+                break;
+            case 8:
+                verAsistenciaUI();
+                break;
+            case 9:
+                if (tienePermiso("CONSULTAR_REPORTES")) justificarAsistenciaUI();
+                else cout << ROJO << "Solo administracion justifica asistencia." << RESET << endl;
+                break;
+            case 10:
+                if (tienePermiso("CONSULTAR_REPORTES")) asistenciaHoyUI();
+                else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
+                break;
+            case 11:
+                if (tienePermiso("CONSULTAR_REPORTES")) resumenMensualUI();
+                else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
+                break;
+            case 12:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 7) pausar();
-    } while (opcion != 7);
+        if (opcion != 12) pausar();
+    } while (opcion != 12);
 }
 

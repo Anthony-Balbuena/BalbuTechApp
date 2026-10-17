@@ -308,3 +308,70 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
+
+/*
+SP: 11_SP_RESUMEN_ASISTENCIA_MES  (17/10/2026 - asistencia v2)
+Resumen de un empleado en un mes (AAAA-MM): dias marcados, horas,
+tardanzas. Util para cerrar nomina.
+Devuelve 1 fila (0 si el empleado no marcó ese mes).
+*/
+
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS 11_SP_RESUMEN_ASISTENCIA_MES //
+CREATE PROCEDURE 11_SP_RESUMEN_ASISTENCIA_MES(
+    IN P_ID_EMPLEADO INT,
+    IN P_MES VARCHAR(7)        -- 'AAAA-MM'
+)
+BEGIN
+    -- Dias marcados en el mes (cualquier estado)
+    SELECT
+        COUNT(*)                                        AS DIAS_MARCADOS,
+        IFNULL(SUM(HORAS_TRABAJADAS), 0)               AS HORAS_TOTALES,
+        IFNULL(SUM(ESTADO = 'TARDE'), 0)               AS TARDANZAS,
+        IFNULL(SUM(ESTADO = 'AUSENTE'), 0)             AS AUSENCIAS,
+        IFNULL(SUM(ESTADO = 'PERMISO'), 0)             AS PERMISOS,
+        IFNULL(SUM(ESTADO = 'PRESENTE'), 0)            AS PRESENCIAS
+    FROM ASISTENCIA_EMPLEADOS
+    WHERE ID_EMPLEADO = P_ID_EMPLEADO
+      AND DATE_FORMAT(FECHA, '%Y-%m') = P_MES;
+END //
+
+DELIMITER ;
+
+
+/*
+SP: 11_SP_ASISTENCIA_HOY  (17/10/2026 - asistencia v2)
+Lista a todos los empleados activos con su estado del dia dado
+(por defecto HOY): PRESENTE / TARDE / PERMISO / AUSENTE.
+Si no hay fila en ASISTENCIA ese dia se marca AUSENTE.
+Devuelve 1 fila por empleado activo.
+*/
+
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS 11_SP_ASISTENCIA_HOY //
+CREATE PROCEDURE 11_SP_ASISTENCIA_HOY(
+    IN P_FECHA DATE              -- NULL = hoy
+)
+BEGIN
+    DECLARE V_FECHA DATE;
+    SET V_FECHA = IFNULL(P_FECHA, CURDATE());
+
+    SELECT
+        E.ID_EMPLEADO,
+        E.NOMBRE,
+        E.CARGO,
+        IFNULL(A.ESTADO, 'AUSENTE')        AS ESTADO,
+        A.HORA_ENTRADA,
+        A.HORA_SALIDA,
+        IFNULL(A.HORAS_TRABAJADAS, 0)      AS HORAS
+    FROM EMPLEADOS E
+    LEFT JOIN ASISTENCIA_EMPLEADOS A
+           ON A.ID_EMPLEADO = E.ID_EMPLEADO
+          AND A.FECHA = V_FECHA
+    WHERE E.ESTADO = 'ACTIVO'
+    ORDER BY E.ID_EMPLEADO;
+END //
+
+DELIMITER ;
