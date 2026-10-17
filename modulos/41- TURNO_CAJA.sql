@@ -1,0 +1,185 @@
+/*
+ARCHIVO 41 - TURNO_CAJA (apertura y cierre por caja y empleado)
+Un turno = desde que un empleado abre la caja hasta que la cierra.
+Guarda quién abrió y quién cerró, el monto de apertura y el cuadre:
+el saldo ESPERADO lo calcula solo (apertura + lo cobrado en PAGOS
+dentro de la ventana del turno) y el saldo REAL lo cuenta el empleado.
+La DIFERENCIA (real - esperado) es el cuadre: 0 = cuadra.
+La tabla TURNO_CAJA es la única que se crea; no se tocan ventas ni pagos
+(los pagos se anotan al turno por su fecha/hora).
+*/
+CREATE TABLE IF NOT EXISTS TURNO_CAJA (
+    ID_TURNO INT NOT NULL AUTO_INCREMENT,
+    CAJA VARCHAR(20) NOT NULL,
+    ID_EMPLEADO_APERTURA INT NOT NULL,
+    MONTO_INICIAL DECIMAL(10, 2) NOT NULL DEFAULT 0.00 CHECK (MONTO_INICIAL >= 0),
+    FECHA_APERTURA DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ID_EMPLEADO_CIERRE INT NULL,
+    FECHA_CIERRE DATETIME NULL,
+    SALDO_ESPERADO DECIMAL(10, 2) NULL,
+    SALDO_REAL DECIMAL(10, 2) NULL,
+    DIFERENCIA DECIMAL(10, 2) NULL,
+    ESTADO VARCHAR(10) NOT NULL DEFAULT 'ABIERTO' CHECK (ESTADO IN ('ABIERTO', 'CERRADO')),
+    PRIMARY KEY (ID_TURNO),
+    CONSTRAINT FK_TURNO_APERTURA FOREIGN KEY (ID_EMPLEADO_APERTURA) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    CONSTRAINT FK_TURNO_CIERRE FOREIGN KEY (ID_EMPLEADO_CIERRE) REFERENCES EMPLEADOS (ID_EMPLEADO)
+) ENGINE = InnoDB;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ABRIR_TURNO ;
+/*
+SP_ABRIR_TURNO
+Abre un turno en una caja con su empleado y monto inicial.
+Frena si ya hay un turno ABIERTO en esa caja (una caja = un turno a la vez).
+Devuelve EXITO con el ID del turno.
+*/
+CREATE PROCEDURE SP_ABRIR_TURNO(
+    IN P_CAJA VARCHAR(20),
+    IN P_ID_EMPLEADO INT,
+    IN P_MONTO_INICIAL DECIMAL(10, 2)
+)
+proc_label: BEGIN
+    -- 1. Datos minimos
+    IF P_CAJA IS NULL OR TRIM(P_CAJA) = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: INGRESE EL NOMBRE DE LA CAJA.';
+    END IF;
+    IF P_MONTO_INICIAL IS NULL OR P_MONTO_INICIAL < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL MONTO INICIAL NO PUEDE SER NEGATIVO.';
+    END IF;
+
+    -- 2. Una caja a la vez: no puede haber dos turnos ABIERTOS en la misma caja
+    IF EXISTS (
+        SELECT 1 FROM TURNO_CAJA
+        WHERE CAJA = P_CAJA AND ESTADO = 'ABIERTO'
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: YA HAY UN TURNO ABIERTO EN ESTA CAJA. CIERRELO ANTES DE ABRIR OTRO.';
+    END IF;
+
+    -- 3. Abrimos el turno
+    INSERT INTO TURNO_CAJA (CAJA, ID_EMPLEADO_APERTURA, MONTO_INICIAL)
+    VALUES (P_CAJA, P_ID_EMPLEADO, P_MONTO_INICIAL);
+
+    SELECT CONCAT('EXITO: TURNO #', LAST_INSERT_ID(), ' ABIERTO EN ', P_CAJA, '.') AS MENSAJE;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ESTADO_TURNO ;
+/*
+SP_ESTADO_TURNO
+Enseña el turno ABIERTO de una caja con lo cobrado hasta ahora
+(ventana: FECHA_APERTURA -> ahora). Si no hay turno abierto,
+devuelve una fila con ESTADO_TURNO = 'SIN TURNO' (fila única, sin join).
+Solo lectura.
+*/
+CREATE PROCEDURE SP_ESTADO_TURNO(IN P_CAJA VARCHAR(20))
+proc_label: BEGIN
+    DECLARE V_ID INT DEFAULT NULL;
+
+    SELECT ID_TURNO INTO V_ID
+    FROM TURNO_CAJA
+    WHERE CAJA = P_CAJA AND ESTADO = 'ABIERTO'
+    LIMIT 1;
+
+    IF V_ID IS NULL THEN
+        SELECT 'SIN TURNO' AS ESTADO_TURNO, P_CAJA AS CAJA;
+        LEAVE proc_label;
+    END IF;
+
+    SELECT
+        T.ID_TURNO,
+        T.CAJA,
+        'ABIERTO' AS ESTADO_TURNO,
+        T.FECHA_APERTURA,
+        T.MONTO_INICIAL,
+        E.NOMBRE AS EMPLEADO_APERTURA,
+        (SELECT IFNULL(SUM(P.MONTO), 0)
+           FROM PAGOS P
+          WHERE P.FECHA >= T.FECHA_APERTURA
+            AND P.FECHA <= NOW()) AS COBRADO_HASTA_AHORA,
+        (T.MONTO_INICIAL +
+         (SELECT IFNULL(SUM(P.MONTO), 0)
+            FROM PAGOS P
+           WHERE P.FECHA >= T.FECHA_APERTURA
+             AND P.FECHA <= NOW())) AS SALDO_ESPERADO_VIVO
+    FROM TURNO_CAJA T
+    JOIN EMPLEADOS E ON E.ID_EMPLEADO = T.ID_EMPLEADO_APERTURA
+    WHERE T.ID_TURNO = V_ID;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_CERRAR_TURNO ;
+/*
+SP_CERRAR_TURNO
+Cierra el turno con su cuadre: calcula el saldo ESPERADO (monto inicial
++ todo lo cobrado en PAGOS dentro de la ventana del turno), recibe el
+SALDO_REAL que cuenta el empleado y guarda la DIFERENCIA (real - esperado).
+0 = cuadra; negativo = falta plata; positivo = sobra.
+Devuelve el resumen del cierre como result set.
+*/
+CREATE PROCEDURE SP_CERRAR_TURNO(
+    IN P_ID_TURNO INT,
+    IN P_SALDO_REAL DECIMAL(10, 2),
+    IN P_ID_EMPLEADO_CIERRE INT
+)
+proc_label: BEGIN
+    DECLARE V_ESPERADO DECIMAL(10, 2) DEFAULT 0.00;
+
+    -- 1. Que exista y esté abierto
+    IF NOT EXISTS (SELECT 1 FROM TURNO_CAJA WHERE ID_TURNO = P_ID_TURNO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO EXISTE ESE TURNO.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM TURNO_CAJA WHERE ID_TURNO = P_ID_TURNO AND ESTADO = 'CERRADO') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESE TURNO YA ESTA CERRADO.';
+    END IF;
+    IF P_SALDO_REAL IS NULL OR P_SALDO_REAL < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL CIERRE REAL NO PUEDE SER NEGATIVO.';
+    END IF;
+
+    -- 2. Cuadre: esperado = apertura + cobrado dentro de la ventana del turno
+    SELECT MONTO_INICIAL + IFNULL(
+        (SELECT SUM(P.MONTO) FROM PAGOS P
+          WHERE P.FECHA >= (SELECT FECHA_APERTURA FROM TURNO_CAJA WHERE ID_TURNO = P_ID_TURNO)
+            AND P.FECHA <= NOW()), 0)
+    INTO V_ESPERADO
+    FROM TURNO_CAJA WHERE ID_TURNO = P_ID_TURNO;
+
+    -- 3. Cerramos y guardamos el cuadre
+    UPDATE TURNO_CAJA
+       SET ID_EMPLEADO_CIERRE = P_ID_EMPLEADO_CIERRE,
+           FECHA_CIERRE = NOW(),
+           SALDO_ESPERADO = V_ESPERADO,
+           SALDO_REAL = P_SALDO_REAL,
+           DIFERENCIA = P_SALDO_REAL - V_ESPERADO,
+           ESTADO = 'CERRADO'
+     WHERE ID_TURNO = P_ID_TURNO;
+
+    -- 4. Mensaje del cuadre (lo primero, para Recogermensaje de la app)
+    SELECT CONCAT(
+        'EXITO: TURNO #', P_ID_TURNO, ' CERRADO. ',
+        CASE
+            WHEN P_SALDO_REAL - V_ESPERADO = 0 THEN 'CUADRA.'
+            WHEN P_SALDO_REAL - V_ESPERADO < 0 THEN CONCAT('FALTA $', ABS(P_SALDO_REAL - V_ESPERADO), '.')
+            ELSE CONCAT('SOBRA $', P_SALDO_REAL - V_ESPERADO, '.')
+        END
+    ) AS MENSAJE;
+
+    -- 5. Resumen del cierre (una sola fila)
+    SELECT
+        T.ID_TURNO,
+        T.CAJA,
+        T.FECHA_APERTURA,
+        T.FECHA_CIERRE,
+        EA.NOMBRE AS EMPLEADO_APERTURA,
+        EC.NOMBRE AS EMPLEADO_CIERRE,
+        T.MONTO_INICIAL,
+        T.SALDO_ESPERADO,
+        T.SALDO_REAL,
+        T.DIFERENCIA
+    FROM TURNO_CAJA T
+    JOIN EMPLEADOS EA ON EA.ID_EMPLEADO = T.ID_EMPLEADO_APERTURA
+    LEFT JOIN EMPLEADOS EC ON EC.ID_EMPLEADO = T.ID_EMPLEADO_CIERRE
+    WHERE T.ID_TURNO = P_ID_TURNO;
+END //
+DELIMITER ;
