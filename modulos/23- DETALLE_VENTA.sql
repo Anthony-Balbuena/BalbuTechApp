@@ -1,7 +1,7 @@
 /*
 TABLA DETALLES_VENTA
 Guarda que productos forman parte de cada venta, con su cantidad y precio.
-El subtotal se calcula solo al multiplicar cantidad por precio.
+El subtotal se calcula solo al multiplicar cantidad por precio (menos el descuento de la línea si tiene).
 No se puede repetir el mismo producto dentro de la misma venta.
 */ 
 CREATE TABLE DETALLES_VENTA (
@@ -10,7 +10,9 @@ CREATE TABLE DETALLES_VENTA (
     ID_PRODUCTO INT NOT NULL,
     CANTIDAD INT NOT NULL CHECK (CANTIDAD > 0),
     PRECIO_UNITARIO DECIMAL(10, 2) NOT NULL CHECK (PRECIO_UNITARIO > 0),
-    SUBTOTAL DECIMAL(10, 2) GENERATED ALWAYS AS (CANTIDAD * PRECIO_UNITARIO) STORED,
+    -- (16/10/2026) Descuento de la línea en % (0 = sin descuento).
+    PORCENTAJE_DESCUENTO DECIMAL(5, 2) NOT NULL DEFAULT 0.00 CHECK (PORCENTAJE_DESCUENTO BETWEEN 0 AND 100),
+    SUBTOTAL DECIMAL(10, 2) GENERATED ALWAYS AS (ROUND(CANTIDAD * PRECIO_UNITARIO * (1 - PORCENTAJE_DESCUENTO / 100), 2)) STORED,
     -- (11/10/2026) ITBIS de la línea con la tasa vigente al registrar.
     MONTO_ITBIS DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     -- (12/10/2026) Ganancia snapshot: (precio - costo) x cantidad al vender.
@@ -65,7 +67,8 @@ CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_VENTA INT,
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD INT,
-    IN P_ID_EMPLEADO INT -- Nuevo parámetro 
+    IN P_ID_EMPLEADO INT,
+    IN P_DESCUENTO_PCT DECIMAL(5, 2) DEFAULT 0.00 -- (16/10/2026) % de descuento de la línea
 )
 proc_label: BEGIN
     DECLARE V_PRECIO DECIMAL(10, 2);
@@ -110,6 +113,12 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- (16/10/2026) Descuento: NULL cuenta como 0; fuera de 0-100 se corta amable.
+    IF IFNULL(P_DESCUENTO_PCT, 0) < 0 OR P_DESCUENTO_PCT > 100 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL DESCUENTO DEBE ESTAR ENTRE 0 Y 100.';
+        LEAVE proc_label;
+    END IF;
+
     -- 2. Obtener precio (antes que el stock: un producto inexistente no
     -- tiene fila y el mensaje debe decirlo, no "STOCK INSUFICIENTE")
     SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
@@ -141,16 +150,18 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
-    SET V_ITBIS = ROUND(P_CANTIDAD * V_PRECIO * V_TASA / 100, 2);
+    -- (16/10/2026) El descuento baja el bruto: el ITBIS sale sobre lo cobrado.
+    SET V_ITBIS = ROUND(ROUND(P_CANTIDAD * V_PRECIO * (1 - IFNULL(P_DESCUENTO_PCT, 0) / 100), 2) * V_TASA / 100, 2);
     -- (12/10/2026) Si nunca se compro (P_COMPRA 0 = pendiente), la ganancia queda NULL.
     SELECT P_COMPRA INTO V_COSTO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
     IF V_COSTO IS NULL OR V_COSTO = 0 THEN
         SET V_GANANCIA = NULL;
     ELSE
-        SET V_GANANCIA = ROUND(P_CANTIDAD * (V_PRECIO - V_COSTO), 2);
+        -- (16/10/2026) La ganancia tambien descuenta: bruto con descuento menos costo.
+        SET V_GANANCIA = ROUND(ROUND(P_CANTIDAD * V_PRECIO * (1 - IFNULL(P_DESCUENTO_PCT, 0) / 100), 2) - P_CANTIDAD * V_COSTO, 2);
     END IF;
-    INSERT INTO DETALLES_VENTA (ID_VENTA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, MONTO_ITBIS, MONTO_GANANCIA)
-    VALUES (P_ID_VENTA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO, V_ITBIS, V_GANANCIA);
+    INSERT INTO DETALLES_VENTA (ID_VENTA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, PORCENTAJE_DESCUENTO, MONTO_ITBIS, MONTO_GANANCIA)
+    VALUES (P_ID_VENTA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO, IFNULL(P_DESCUENTO_PCT, 0), V_ITBIS, V_GANANCIA);
 
     SELECT 'EXITO: PRODUCTO AGREGADO CORRECTAMENTE.' AS MENSAJE;
 END //

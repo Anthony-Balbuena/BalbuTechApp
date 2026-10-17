@@ -80,6 +80,7 @@ CREATE PROCEDURE SP_REGISTRAR_DEVOLUCION(
 proc_label: BEGIN
     DECLARE V_CANTIDAD_VENDIDA INT;
     DECLARE V_PRECIO_UNITARIO DECIMAL(10,2);
+    DECLARE V_DESC_PCT DECIMAL(5,2) DEFAULT 0.00;
     DECLARE V_CANTIDAD_YA_DEVUELTA INT;
     DECLARE V_CANTIDAD_MAX_PERMITIDA INT;
     DECLARE V_SUBTOTAL_REEMBOLSADO DECIMAL(10,2);
@@ -105,8 +106,9 @@ proc_label: BEGIN
     END IF;
 
     -- 2. Validar existencia del detalle de venta y obtener datos básicos
-    SELECT CANTIDAD, PRECIO_UNITARIO 
-    INTO V_CANTIDAD_VENDIDA, V_PRECIO_UNITARIO
+    -- (16/10/2026) Se lee tambien el descuento de la línea: el reembolso es sobre lo cobrado.
+    SELECT CANTIDAD, PRECIO_UNITARIO, IFNULL(PORCENTAJE_DESCUENTO, 0)
+    INTO V_CANTIDAD_VENDIDA, V_PRECIO_UNITARIO, V_DESC_PCT
     FROM DETALLES_VENTA 
     WHERE ID_DETALLE_VENTA = P_ID_DETALLE_VENTA;
 
@@ -146,7 +148,8 @@ proc_label: BEGIN
     END IF;
 
     -- 5. Calcular el subtotal que se va a reembolsar
-    SET V_SUBTOTAL_REEMBOLSADO = P_CANTIDAD * V_PRECIO_UNITARIO;
+    -- (16/10/2026) Se devuelve lo cobrado (con descuento), no el precio de lista.
+    SET V_SUBTOTAL_REEMBOLSADO = ROUND(P_CANTIDAD * V_PRECIO_UNITARIO * (1 - V_DESC_PCT / 100), 2);
 
     -- (11/10/2026) ITBIS con la tasa vigente (foto histórica).
     SELECT VALOR INTO V_TASA_TXT FROM CONFIGURACION WHERE CLAVE = 'ITBIS';
