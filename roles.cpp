@@ -19,6 +19,7 @@
 #include "proveedores.h"
 #include "metodos_pago.h"
 #include "empleados.h"
+#include "caja.h"
 #include "clientes.h"
 #include "usuarios.h"
 #include "ventas.h"
@@ -141,8 +142,9 @@ void mostrarMenuSegunRol() {
         cout << "10. Ventas" << endl;
         cout << "11. Compras" << endl;
         cout << "12. Inventario" << endl;
-        cout << "13. Ver permisos" << endl;
-        cout << "14. Cerrar sesión" << endl;
+        cout << "13. Caja (turnos)" << endl;
+        cout << "14. Ver permisos" << endl;
+        cout << "15. Cerrar sesión" << endl;
     } else if (sesionActual.nombreRol == "RRHH") {
         cout << "1. Empleados" << endl;
         cout << "2. Roles" << endl;
@@ -155,8 +157,9 @@ void mostrarMenuSegunRol() {
         cout << "1. Productos" << endl;
         cout << "2. Clientes" << endl;
         cout << "3. Ventas" << endl;
-        cout << "4. Ver permisos" << endl;
-        cout << "5. Cerrar sesión" << endl;
+        cout << "4. Caja (turnos)" << endl;
+        cout << "5. Ver permisos" << endl;
+        cout << "6. Cerrar sesión" << endl;
     }
 
     cout << "----------------------------------------" << endl;
@@ -265,9 +268,16 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 13:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_VENTAS")) {
+                        ejecutarSubmenuCaja();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar la caja." << RESET << endl;
+                    }
                     break;
                 case 14:
+                    mostrarPermisosActuales();
+                    break;
+                case 15:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
@@ -349,9 +359,16 @@ void ejecutarMenuSegunRol() {
                     }
                     break;
                 case 4:
-                    mostrarPermisosActuales();
+                    if (tienePermiso("GESTIONAR_VENTAS")) {
+                        ejecutarSubmenuCaja();
+                    } else {
+                        cout << ROJO << "No tienes permiso para gestionar la caja." << RESET << endl;
+                    }
                     break;
                 case 5:
+                    mostrarPermisosActuales();
+                    break;
+                case 6:
                     cerrarSesion();
                     cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
                     opcion = 0;
