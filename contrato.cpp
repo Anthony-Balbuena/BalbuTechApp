@@ -206,6 +206,16 @@ string escribirContrato(const string &html, const string &nombreEmpleado,
 // Pantalla principal del modulo
 // ---------------------------------------------------------------------------
 
+// Convierte la duracion en meses al texto del contrato (12 -> "1 año",
+// 6 -> "6 meses"). Asi el HTML y la BD hablan de lo mismo.
+static string textoDuracion(long meses) {
+    if (meses > 0 && meses % 12 == 0) {
+        long anios = meses / 12;
+        return to_string(anios) + (anios == 1 ? " año" : " años");
+    }
+    return to_string(meses) + (meses == 1 ? " mes" : " meses");
+}
+
 void ejecutarSubmenuContratos() {
     try {
         cout << "\n=== GENERAR CONTRATO DE TRABAJO ===" << endl;
@@ -218,10 +228,27 @@ void ejecutarSubmenuContratos() {
         int op = (int)leerNumeroConIntentos("Opcion: ", 1, 2);
         bool esFijo = (op == 1);
 
+        long meses = 0;
         string duracion;
         if (esFijo) {
-            duracion = leerDatoSeguro("Duracion del contrato (ej. 1 año, 6 meses, 1 mes): ");
-            if (duracion.empty()) duracion = "1 año";
+            meses = (long)leerNumeroConIntentos("Duracion en meses (12 = 1 año): ", 1, 1200);
+            duracion = textoDuracion(meses);
+        }
+
+        // Registrar ANTES de pedir todo lo demas: si ya tiene un contrato
+        // activo, aqui frena sin gastar los demas datos. La ruta del documento
+        // se completa despues de escribir el HTML.
+        {
+            std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+                "CALL SP_INSERTAR_CONTRATO(?, ?, ?, ?)"));
+            ps->setInt(1, idEmp);
+            ps->setString(2, esFijo ? "FIJO" : "INDEFINIDO");
+            if (esFijo) ps->setInt(3, (int)meses);
+            else ps->setNull(3, sql::DataType::INTEGER);
+            ps->setNull(4, sql::DataType::VARCHAR);
+            string msg = Recogermensaje(ps.get());
+            cout << "\n" << msg << endl;
+            if (msg.rfind("Error DB:", 0) == 0) return;  // freno: no sigue
         }
 
         // Datos que no estan en la tabla EMPLEADOS: se piden al generar.
@@ -246,6 +273,16 @@ void ejecutarSubmenuContratos() {
         string ruta = escribirContrato(html, nomEmp, fechaHoyISO());
         cout << "\nContrato generado: " << ruta << endl;
 
+        // Dejar la ruta del documento en el registro que abrimos antes
+        {
+            std::unique_ptr<sql::PreparedStatement> pu(globalCon->prepareStatement(
+                "UPDATE CONTRATOS SET RUTA_DOCUMENTO=? "
+                "WHERE ID_EMPLEADO=? AND ESTADO='ACTIVO'"));
+            pu->setString(1, ruta);
+            pu->setInt(2, idEmp);
+            pu->executeUpdate();
+        }
+
         // abrir en el navegador (imprimir a PDF desde ahi)
         cout << "Abriendo en el navegador para imprimir a PDF..." << endl;
 #ifdef _WIN32
@@ -260,5 +297,62 @@ void ejecutarSubmenuContratos() {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
         cout << ROJO << "No se pudo generar el contrato: " << e.what() << RESET << endl;
+    }
+}
+
+// Historial de contratos de un empleado, mas reciente primero.
+void consultarContratosUI() {
+    try {
+        cout << "\n=== CONTRATOS DEL EMPLEADO ===" << endl;
+        int idEmp = (int)leerNumeroConIntentos("Empleado (ID): ", 1, 999999999);
+
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_CONTRATOS_POR_EMPLEADO(?)"));
+        ps->setInt(1, idEmp);
+        std::unique_ptr<sql::ResultSet> r(ps->executeQuery());
+
+        bool hay = false;
+        printf("\n%-4s | %-11s | %-10s | %-10s | %-10s | %-11s | %s\n",
+               "ID", "TIPO", "INICIO", "FIN", "SALARIO", "ESTADO", "DOCUMENTO");
+        printf("%s\n", string(95, '-').c_str());
+        while (r->next()) {
+            hay = true;
+            string fin = r->isNull("FECHA_FIN") ? "indefinido" : r->getString("FECHA_FIN");
+            string doc = r->isNull("RUTA_DOCUMENTO") ? "-" : r->getString("RUTA_DOCUMENTO");
+            printf("%-4d | %-11s | %-10s | %-10s | %10.2f | %-11s | %s\n",
+                   r->getInt("ID_CONTRATO"),
+                   r->getString("TIPO").c_str(),
+                   r->getString("FECHA_INICIO").c_str(),
+                   fin.c_str(),
+                   (double)r->getDouble("SALARIO"),
+                   r->getString("ESTADO").c_str(),
+                   doc.c_str());
+        }
+        drenarResultados(ps.get());
+        if (!hay) cout << "El empleado no tiene contratos registrados." << endl;
+
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudieron ver los contratos: " << e.what() << RESET << endl;
+    }
+}
+
+// Pasa un contrato de ACTIVO a FINALIZADO (a mano, p.ej. al despedir).
+void finalizarContratoUI() {
+    try {
+        cout << "\n=== FINALIZAR CONTRATO ===" << endl;
+        cout << "(Al despedir a un empleado, finaliza aqui su contrato.)" << endl;
+        int idCont = (int)leerNumeroConIntentos("Contrato (ID): ", 1, 999999999);
+
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_FINALIZAR_CONTRATO(?)"));
+        ps->setInt(1, idCont);
+        cout << "\n" << Recogermensaje(ps.get()) << endl;
+
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo finalizar el contrato: " << e.what() << RESET << endl;
     }
 }
