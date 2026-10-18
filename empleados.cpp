@@ -31,9 +31,10 @@ void mostrarMenuEmpleados() {
     cout << "10. Asistencia del dia" << endl;
     cout << "11. Historial de asistencia" << endl;
     cout << "12. Generar contrato" << endl;
-    cout << "13. Ver contratos" << endl;
-    cout << "14. Finalizar contrato" << endl;
-    cout << "15. Volver al Menu Principal" << endl;
+    cout << "13. Subir contrato (al firmar)" << endl;
+    cout << "14. Ver contratos" << endl;
+    cout << "15. Finalizar contrato" << endl;
+    cout << "16. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
 
@@ -548,18 +549,21 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 ejecutarSubmenuContratos();
                 break;
             case 13:
-                consultarContratosUI();
+                subirContratoUI();
                 break;
             case 14:
-                finalizarContratoUI();
+                consultarContratosUI();
                 break;
             case 15:
+                finalizarContratoUI();
+                break;
+            case 16:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 15) pausar();
-    } while (opcion != 15);
+        if (opcion != 16) pausar();
+    } while (opcion != 16);
 }
 

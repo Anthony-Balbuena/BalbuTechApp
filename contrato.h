@@ -44,4 +44,9 @@ void consultarContratosUI();
 // Pantalla: pasa un contrato de ACTIVO a FINALIZADO (SP_FINALIZAR_CONTRATO).
 void finalizarContratoUI();
 
+// Pantalla: sube (registra) un contrato cuando la persona firma, a partir del
+// .borrador que dejo la opcion 12. Si la cedula no existe en EMPLEADOS, el
+// trigger TR_ALTA_EMPLEADO crea al empleado sola (alta directa).
+void subirContratoUI();
+
 #endif
