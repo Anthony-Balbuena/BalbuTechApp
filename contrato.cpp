@@ -6,6 +6,9 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <algorithm>
+#include <cstdio>
+#include <filesystem>
 #include <map>
 #include <limits>
 #include <mysql_connection.h>
@@ -291,6 +294,35 @@ void ejecutarSubmenuContratos() {
         string ruta = escribirContrato(html, p.nombre, fechaHoyISO());
         cout << "\nContrato generado: " << ruta << endl;
 
+        // Borrador (clave=valor) junto al HTML: lo lee la opcion 13 Subir
+        // cuando la persona firma, asi no hay que volver a pedir los datos.
+        string rutaBorrador = ruta;
+        size_t puntoHtml = rutaBorrador.rfind(".html");
+        if (puntoHtml != string::npos) rutaBorrador.replace(puntoHtml, 5, ".borrador");
+        {
+            ofstream fb(rutaBorrador);
+            if (fb) {
+                fb << "nombre=" << p.nombre << "\n"
+                   << "cedula=" << p.cedula << "\n"
+                   << "cargo=" << p.cargo << "\n"
+                   << "salario=" << p.salario << "\n"
+                   << "telefono=" << p.telefono << "\n"
+                   << "email=" << p.email << "\n"
+                   << "fecha_ingreso=" << p.fechaIngreso << "\n"
+                   << "tipo=" << (esTemporal ? "TEMPORAL" : "FIJO") << "\n"
+                   << "meses=" << (esTemporal ? to_string(meses) : "0") << "\n"
+                   << "dir=" << dirEmp << "\n"
+                   << "horario=" << horario << "\n"
+                   << "horas=" << horasSem << "\n"
+                   << "forma_pago=" << formaPago << "\n"
+                   << "html=" << ruta << "\n"
+                   << "generado=" << fechaHoyISO() << "\n";
+                fb.close();
+                cout << "Borrador guardado: " << rutaBorrador
+                     << endl;
+            }
+        }
+
         // abrir en el navegador (imprimir a PDF desde ahi)
         cout << "Abriendo en el navegador para imprimir a PDF..." << endl;
 #ifdef _WIN32
@@ -362,5 +394,151 @@ void finalizarContratoUI() {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
         cout << ROJO << "No se pudo finalizar el contrato: " << e.what() << RESET << endl;
+    }
+}
+
+// Lee un .borrador (clave=valor) a un mapa. False si no se abre o esta vacio.
+static bool leerBorrador(const string &ruta, map<string, string> &datos) {
+    ifstream fb(ruta);
+    if (!fb) return false;
+    string linea;
+    while (getline(fb, linea)) {
+        size_t igual = linea.find('=');
+        if (igual == string::npos || igual == 0) continue;
+        datos[linea.substr(0, igual)] = linea.substr(igual + 1);
+    }
+    return !datos.empty();
+}
+
+// Sube (registra) el contrato cuando la persona firma. Usa el .borrador de la
+// opcion 12 para no repetir datos; el trigger crea o vincula al empleado.
+void subirContratoUI() {
+    try {
+        namespace fs = std::filesystem;
+        cout << "\n=== SUBIR CONTRATO (AL FIRMAR) ===" << endl;
+
+        // 1. Borradores pendientes (los ya subidos quedan como .subido)
+        vector<pair<string, map<string, string>>> pendientes;
+        if (fs::exists("contratos")) {
+            vector<string> rutas;
+            for (const auto &entrada : fs::directory_iterator("contratos")) {
+                if (entrada.is_regular_file() && entrada.path().extension() == ".borrador")
+                    rutas.push_back(entrada.path().string());
+            }
+            sort(rutas.begin(), rutas.end());
+            for (const string &r : rutas) {
+                map<string, string> datos;
+                if (leerBorrador(r, datos)) pendientes.push_back({r, datos});
+            }
+        }
+
+        if (pendientes.empty()) {
+            cout << "No hay borradores pendientes. Genere el contrato con la opcion 12." << endl;
+            return;
+        }
+
+        cout << "\nBorradores pendientes:" << endl;
+        for (size_t i = 0; i < pendientes.size(); i++) {
+            const auto &d = pendientes[i].second;
+            string nombre = d.count("nombre") ? d.at("nombre") : "?";
+            string tipo = d.count("tipo") ? d.at("tipo") : "?";
+            string meses = d.count("meses") ? d.at("meses") : "0";
+            cout << "  " << (i + 1) << ". " << nombre << " - " << tipo;
+            if (tipo == "TEMPORAL" && meses != "0") cout << " " << meses << " meses";
+            cout << "  (" << pendientes[i].first << ")" << endl;
+        }
+        cout << "  0. Volver" << endl;
+
+        int op = (int)leerNumeroConIntentos("Elegir: ", 0, (double)pendientes.size());
+        if (op == 0) return;
+
+        const string rutaBorrador = pendientes[op - 1].first;
+        map<string, string> b = pendientes[op - 1].second;
+
+        // 2. Campos que el SP necesita a toda costa
+        for (const char *clave : {"nombre", "cedula", "cargo", "salario",
+                                   "telefono", "email", "fecha_ingreso", "tipo"}) {
+            if (!b.count(clave) || b.at(clave).empty()) {
+                cout << ROJO << "El borrador esta incompleto (falta '" << clave
+                     << "'). Genere el contrato de nuevo con la opcion 12." << RESET << endl;
+                return;
+            }
+        }
+
+        double salario = 0;
+        try {
+            salario = stod(b.at("salario"));
+        } catch (const exception &) {
+            cout << ROJO << "El borrador tiene un salario invalido: '"
+                 << b.at("salario") << "'." << RESET << endl;
+            return;
+        }
+
+        // 3. Si la cedula aun no es de nadie, es un empleado NUEVO: EMPLEADOS
+        //    guarda su telefono y email unicos, asi que "-" no entra.
+        string telefono = b.at("telefono");
+        string email = b.at("email");
+        {
+            std::unique_ptr<sql::PreparedStatement> pc(globalCon->prepareStatement(
+                "SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA = ?"));
+            pc->setString(1, b.at("cedula"));
+            std::unique_ptr<sql::ResultSet> rc(pc->executeQuery());
+            bool esNuevo = true;
+            if (rc->next()) esNuevo = (rc->getInt(1) == 0);
+            drenarResultados(pc.get());
+
+            if (esNuevo) {
+                while (telefono.empty() || telefono == "-") {
+                    telefono = leerDatoSeguro("Telefono real del empleado nuevo (unico en la BD): ");
+                    if (telefono.empty() || telefono == "-")
+                        cout << ROJO << "El empleado nuevo necesita un telefono real." << RESET << endl;
+                }
+                while (email.empty() || email == "-") {
+                    email = leerDatoSeguro("Email real del empleado nuevo (unico en la BD): ");
+                    if (email.empty() || email == "-")
+                        cout << ROJO << "El empleado nuevo necesita un email real." << RESET << endl;
+                }
+            }
+        }
+
+        // 4. Registrar: el SP frena lo que haga falta y el trigger resuelve
+        //    el empleado (lo crea o lo vincula).
+        bool esTemporal = (b.at("tipo") == "TEMPORAL");
+        long meses = 0;
+        if (esTemporal && b.count("meses") && !b.at("meses").empty()) {
+            try { meses = stol(b.at("meses")); } catch (const exception &) { meses = 0; }
+        }
+
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_SUBIR_CONTRATO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        ps->setString(1, b.at("nombre"));
+        ps->setString(2, b.at("cedula"));
+        ps->setString(3, b.at("cargo"));
+        ps->setDouble(4, salario);
+        ps->setString(5, telefono);
+        ps->setString(6, email);
+        ps->setString(7, b.at("fecha_ingreso"));
+        ps->setString(8, esTemporal ? "TEMPORAL" : "FIJO");
+        if (esTemporal) ps->setInt(9, (int)meses);
+        else ps->setNull(9, sql::DataType::INTEGER);
+        ps->setString(10, b.count("html") ? b.at("html") : "");
+        string msg = Recogermensaje(ps.get());
+        cout << "\n" << msg << endl;
+
+        // 5. Si salio bien, el borrador deja de estar pendiente
+        if (msg.rfind("EXITO", 0) == 0) {
+            string destino = rutaBorrador;
+            size_t punto = destino.rfind(".borrador");
+            if (punto != string::npos) destino.replace(punto, 9, ".subido");
+            if (std::rename(rutaBorrador.c_str(), destino.c_str()) == 0)
+                cout << "Borrador marcado: " << destino << endl;
+            else
+                cout << "[Aviso] No se pudo marcar el borrador; el contrato ya quedo registrado." << endl;
+        }
+
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo subir el contrato: " << e.what() << RESET << endl;
     }
 }
