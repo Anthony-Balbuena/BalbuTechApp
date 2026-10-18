@@ -1,19 +1,44 @@
 #!/bin/bash
 # Verifica que existan todos los stored procedures que la app C++ invoca.
-# Uso: docker compose exec app bash db/check-app-sps.sh
+# Uso Docker:  docker compose exec app bash db/check-app-sps.sh
+# Uso local:   DB_HOST=127.0.0.1 bash db/check-app-sps.sh
 # Extraidos de grep 'CALL ...' en *.cpp
+#
+# (18/10/2026) Antes mentia: si TODAS las conexiones fallaban (host malo, DB
+# apagada) igual imprimia "Faltantes: 0", porque el contador solo sumaba con
+# c="0" y una conexion fallida deja c vacio. Ahora hace pre-chequeo de conexion
+# y trata cualquier respuesta vacia como error: falla en rojo con exit 1.
 set -u
 DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-BALBU_TECH}"
 DB_USER="${DB_USER:-root}"
 DB_PASSWORD="${DB_PASSWORD:-${MARIADB_ROOT_PASSWORD:-linux01}}"
-Q() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -N -e "$1"; }
+Q() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -N -e "$1" 2>&1; }
+
+# 0) Pre-chequeo de conexion: sin esto un host malo daba falso "Faltantes: 0".
+if ! preq=$(Q "SELECT 1"); then
+  echo "ERROR: no hay conexion a $DB_HOST:$DB_PORT (base $DB_NAME, usuario $DB_USER)." >&2
+  echo "       Respuesta: $preq" >&2
+  echo "       Local: DB_HOST=127.0.0.1 bash db/check-app-sps.sh" >&2
+  exit 1
+fi
+
 missing=0
+checked=0
+conn_errors=0
 while read -r p; do
   [ -z "$p" ] && continue
+  checked=$((checked+1))
   c=$(Q "SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema='$DB_NAME' AND ROUTINE_NAME='$p'")
-  if [ "$c" = "0" ]; then echo "FALTA: $p"; missing=$((missing+1)); fi
+  if [ -z "$c" ] || ! printf '%s' "$c" | grep -qE '^[0-9]+$'; then
+    echo "ERROR: no se pudo verificar $p (respuesta no valida: '$c')." >&2
+    missing=$((missing+1))
+    conn_errors=$((conn_errors+1))
+  elif [ "$c" = "0" ]; then
+    echo "FALTA: $p"
+    missing=$((missing+1))
+  fi
 done <<'SPS'
 SP_GET_USUARIO_LOGIN
 SP_INSERTAR_CATEGORIA
@@ -98,4 +123,11 @@ SP_SUBIR_CONTRATO
 SP_FINALIZAR_CONTRATO
 SP_CONTRATOS_POR_EMPLEADO
 SPS
-echo "Faltantes: $missing"
+
+if [ "$missing" -gt 0 ]; then
+  echo "Faltantes: $missing de $checked."
+  [ "$conn_errors" -gt 0 ] && echo "Incluye $conn_errors sin poder verificar (error de conexion)."
+  exit 1
+fi
+echo "Faltantes: 0 (verificados $checked)."
+exit 0
