@@ -7,8 +7,14 @@ set -u
 
 HOST="${DB_HOST:-127.0.0.1}"
 USER="${DB_USER:-root}"
-PASS="${DB_PASSWORD:-linux01}"
+PASS="${DB_PASSWORD:-}"
 DB="${DB_NAME:-BALBU_TECH_TEST}"
+
+# Sin credencial en el repo: exporta DB_PASSWORD al correr el test.
+if [ -z "$PASS" ]; then
+  echo "FALTA DB_PASSWORD: exporta la contrasena de MariaDB del usuario $USER antes de correr (el repo no guarda credenciales)."
+  exit 1
+fi
 
 esperados=(
   "EL TIPO DEBE SER TEMPORAL O FIJO"
