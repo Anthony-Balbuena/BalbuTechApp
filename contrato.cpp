@@ -237,6 +237,10 @@ void ejecutarSubmenuContratos() {
             while (true) {
                 string v = leerDatoSeguro(etiqueta);
                 if (!v.empty()) return v;
+                // (18/10/2026) Con la entrada agotada leerDatoSeguro() devuelve
+                // "" para siempre: sin esto el bucle gira sin fin (misma clase
+                // de bug que el de los menus con EOF).
+                if (cin.eof()) throw CancelarOperacionException();
                 cout << ROJO << "No puede quedar vacio." << RESET << endl;
             }
         };
@@ -296,10 +300,25 @@ void ejecutarSubmenuContratos() {
 
         // Borrador (clave=valor) junto al HTML: lo lee la opcion 13 Subir
         // cuando la persona firma, asi no hay que volver a pedir los datos.
-        string rutaBorrador = ruta;
-        size_t puntoHtml = rutaBorrador.rfind(".html");
-        if (puntoHtml != string::npos) rutaBorrador.replace(puntoHtml, 5, ".borrador");
-        {
+        // (18/10/2026) La ruta del borrador sale SOLO si el documento termina
+        // en ".html". Antes se hacia rfind(".html") y, si no aparecia, la ruta
+        // quedaba IGUAL a la del documento: el ofstream de abajo lo abria en
+        // modo truncado y lo pisaba con el borrador. Hoy escribirContrato()
+        // siempre devuelve .html, pero el dia que deje de hacerlo esto borraba
+        // el contrato recien generado sin decir una palabra.
+        const string sufijoHtml = ".html";
+        string rutaBorrador;
+        if (ruta.size() > sufijoHtml.size() &&
+            ruta.compare(ruta.size() - sufijoHtml.size(), sufijoHtml.size(),
+                         sufijoHtml) == 0) {
+            rutaBorrador = ruta.substr(0, ruta.size() - sufijoHtml.size()) + ".borrador";
+        }
+
+        if (rutaBorrador.empty()) {
+            cout << AMARILLO << "[Aviso] El documento no termina en .html: no "
+                    "genere el borrador para no pisarlo. La opcion 13 Subir no "
+                    "va a ver este contrato." << RESET << endl;
+        } else {
             ofstream fb(rutaBorrador);
             if (fb) {
                 fb << "nombre=" << p.nombre << "\n"
@@ -318,8 +337,18 @@ void ejecutarSubmenuContratos() {
                    << "html=" << ruta << "\n"
                    << "generado=" << fechaHoyISO() << "\n";
                 fb.close();
-                cout << "Borrador guardado: " << rutaBorrador
-                     << endl;
+                if (fb) {
+                    cout << "Borrador guardado: " << rutaBorrador << endl;
+                } else {
+                    cout << AMARILLO << "[Aviso] El borrador " << rutaBorrador
+                         << " quedo incompleto (se lleno el disco?). La opcion 13 "
+                            "Subir puede no verlo." << RESET << endl;
+                }
+            } else {
+                cout << AMARILLO << "[Aviso] No se pudo guardar el borrador "
+                     << rutaBorrador << ": la opcion 13 Subir no va a ver este "
+                        "contrato. Revisa permisos y espacio en disco, y genera "
+                        "el contrato de nuevo." << RESET << endl;
             }
         }
 
@@ -447,10 +476,38 @@ void subirContratoUI() {
             if (tipo == "TEMPORAL" && meses != "0") cout << " " << meses << " meses";
             cout << "  (" << pendientes[i].first << ")" << endl;
         }
+        // (18/10/2026) Salida para el borrador que ya no sirve. Sin esto, uno
+        // que no se pudo marcar como .subido (falla el rename de mas abajo)
+        // quedaba en esta lista para siempre: el SP lo frena con "ESA CEDULA
+        // YA TIENE UN CONTRATO ACTIVO" y no habia forma de sacarlo de aca.
+        const int opDescartar = (int)pendientes.size() + 1;
+        cout << "  " << opDescartar << ". Descartar un borrador (no sube nada)" << endl;
         cout << "  0. Volver" << endl;
 
-        int op = (int)leerNumeroConIntentos("Elegir: ", 0, (double)pendientes.size());
+        int op = (int)leerNumeroConIntentos("Elegir: ", 0, (double)opDescartar);
         if (op == 0) return;
+
+        if (op == opDescartar) {
+            int cual = (int)leerNumeroConIntentos(
+                "Cual descarto? (0 = cancelar): ", 0, (double)pendientes.size());
+            if (cual == 0) return;
+
+            const string origen = pendientes[cual - 1].first;
+            string destino = origen;
+            size_t corte = destino.rfind(".borrador");
+            if (corte != string::npos) destino.replace(corte, 9, ".descartado");
+            else destino += ".descartado";
+
+            // No se borra: se renombra, igual que .subido, para no perder el
+            // registro de quien lo genero.
+            if (std::rename(origen.c_str(), destino.c_str()) == 0)
+                cout << VERDE << "Borrador descartado (queda como " << destino
+                     << ")." << RESET << endl;
+            else
+                cout << ROJO << "No se pudo descartar " << origen
+                     << ". Borralo a mano si ya no sirve." << RESET << endl;
+            return;
+        }
 
         const string rutaBorrador = pendientes[op - 1].first;
         map<string, string> b = pendientes[op - 1].second;
@@ -463,6 +520,17 @@ void subirContratoUI() {
                      << "'). Genere el contrato de nuevo con la opcion 12." << RESET << endl;
                 return;
             }
+        }
+
+        // (18/10/2026) Antes esto era "== TEMPORAL" y todo lo demas caia como
+        // FIJO sin avisar: un borrador corrupto registraba un contrato fijo
+        // que nadie pidio, y el freno del SP ("EL TIPO DEBE SER TEMPORAL O
+        // FIJO") era inalcanzable desde aca. Se valida antes de tocar la BD.
+        if (b.at("tipo") != "TEMPORAL" && b.at("tipo") != "FIJO") {
+            cout << ROJO << "El borrador tiene un tipo invalido: '" << b.at("tipo")
+                 << "'. Debe ser TEMPORAL o FIJO. Genere el contrato de nuevo con "
+                    "la opcion 12." << RESET << endl;
+            return;
         }
 
         double salario = 0;
@@ -490,11 +558,15 @@ void subirContratoUI() {
             if (esNuevo) {
                 while (telefono.empty() || telefono == "-") {
                     telefono = leerDatoSeguro("Telefono real del empleado nuevo (unico en la BD): ");
+                    // (18/10/2026) Entrada agotada -> leerDatoSeguro() devuelve
+                    // "" y este bucle giraba sin fin.
+                    if (cin.eof()) throw CancelarOperacionException();
                     if (telefono.empty() || telefono == "-")
                         cout << ROJO << "El empleado nuevo necesita un telefono real." << RESET << endl;
                 }
                 while (email.empty() || email == "-") {
                     email = leerDatoSeguro("Email real del empleado nuevo (unico en la BD): ");
+                    if (cin.eof()) throw CancelarOperacionException();
                     if (email.empty() || email == "-")
                         cout << ROJO << "El empleado nuevo necesita un email real." << RESET << endl;
                 }
@@ -530,10 +602,21 @@ void subirContratoUI() {
             string destino = rutaBorrador;
             size_t punto = destino.rfind(".borrador");
             if (punto != string::npos) destino.replace(punto, 9, ".subido");
-            if (std::rename(rutaBorrador.c_str(), destino.c_str()) == 0)
+            if (std::rename(rutaBorrador.c_str(), destino.c_str()) == 0) {
                 cout << "Borrador marcado: " << destino << endl;
-            else
-                cout << "[Aviso] No se pudo marcar el borrador; el contrato ya quedo registrado." << endl;
+            } else {
+                // El contrato YA quedo en la BD: reintentar la subida la frena
+                // el SP ("esa cedula ya tiene un contrato activo"). El borrador
+                // se queda en la lista, asi que hay que decir donde esta y como
+                // sacarlo, o es una trampa para siempre.
+                cout << AMARILLO
+                     << "[Aviso] No se pudo marcar el borrador; el contrato ya "
+                        "quedo registrado." << endl
+                     << "        Siguio pendiente en: " << rutaBorrador << endl
+                     << "        Ya no sirve: descartalo desde este mismo menu "
+                        "(opcion \"Descartar un borrador\") o borra el archivo."
+                     << RESET << endl;
+            }
         }
 
     } catch (const CancelarOperacionException &e) {
