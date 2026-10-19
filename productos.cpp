@@ -412,13 +412,9 @@ void ejecutarSubmenuProductos() {
     do {
         mostrarMenuProductos();
         cout << AZUL << "Seleccione una opcion: " << RESET;
-        cin >> opcion;
-        if (cin.fail()) {
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            opcion = -1;
-        } else {
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        if (!leerOpcionMenu(opcion)) {
+            cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
+            break;
         }
 
         switch (opcion) {

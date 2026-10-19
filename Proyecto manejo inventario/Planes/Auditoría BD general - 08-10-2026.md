@@ -137,8 +137,9 @@ C1–C3, V1–V4 ejecutados en archivos + BD y probados (`t_todo*.sql`), residuo
 
 ## 🔑 Login admin 09/10/2026
 
-- Causa: `CONTRASENA` en texto plano (`Pedro0110`), el C++ espera SHA256-hex legacy (y rehashea a PBKDF2 al entrar).
-- Fix: `UPDATE ... SET CONTRASENA = SHA2('Pedro0110',256)` (misma clave, 64 chars, coincide ✅). Al primer login exitoso la app la pasa a PBKDF2 sola.
+- Causa: `CONTRASENA` en texto plano (`<clave>`), el C++ espera SHA256-hex legacy (y rehashea a PBKDF2 al entrar).
+- Fix: `UPDATE ... SET CONTRASENA = SHA2('<clave>',256)` (misma clave, 64 chars, coincide ✅). Al primer login exitoso la app la pasa a PBKDF2 sola.
+  *(18/10/2026: la clave se enmascaró — el repo es público y estaba publicada.)*
 
 ## 🔑 Login 10/10/2026 — causa raíz: el conector (no la clave)
 

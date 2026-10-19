@@ -16,6 +16,13 @@ public:
 // Prototipos de funciones de seguridad y entrada
 string leerDatoSeguro(const string& mensaje);
 
+// (18/10/2026) Lee la opcion de un menu. Devuelve false si la entrada se
+// agoto (EOF: Ctrl+D o pipe corto): el bucle del menu debe cortar, porque
+// cin.clear() borra el flag pero NO el EOF del buffer, asi que el siguiente
+// "cin >>" vuelve a fallar al instante (de ahi el bucle de "Opcion no valida").
+// Si la lectura falla por otra razon, deja opcion = -1 (fuera de rango).
+bool leerOpcionMenu(int &opcion);
+
 // (15/10/2026) Entrada numerica con reintentos (hermana de leerDatoSeguro):
 // pide un numero en [minimo, maximo] con hasta maxIntentos intentos; si el
 // usuario cancela ('xxx') o se agotan los intentos lanza CancelarOperacionException.

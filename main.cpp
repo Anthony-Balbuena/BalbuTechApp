@@ -30,7 +30,7 @@ int main() {
 
     // (10/10/2026) SOLO PRUEBAS: si existen BALBU_USER y BALBU_PASS, entra
     // directo sin pedir nada. La clave vive en TU terminal, jamás en el repo.
-    // Uso: BALBU_USER=abalbuena BALBU_PASS=Pedro0110 ./output/app
+    // Uso: BALBU_USER=<usuario> BALBU_PASS=<clave> ./output/app
     const char* devUser = std::getenv("BALBU_USER");
     const char* devPass = std::getenv("BALBU_PASS");
     if (devUser && devUser[0] && devPass && devPass[0]
