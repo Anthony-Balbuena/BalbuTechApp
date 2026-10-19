@@ -95,5 +95,8 @@ void mostrarCategoriasYMarcas() {
 
 void pausar() {
     cout << "\nPresione Enter para volver...";
+    // (18/10/2026) Con la entrada agotada cin.get() vuelve al instante y no
+    // frena nada. Si ya hay EOF no hay Enter que esperar.
+    if (cin.eof()) return;
     cin.get();
 }

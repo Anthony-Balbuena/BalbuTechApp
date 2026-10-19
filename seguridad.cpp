@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cctype>
+#include <limits>
 #include "colores.h"
 #include <openssl/evp.h>
 #include <string>
@@ -28,6 +29,24 @@ string leerDatoSeguro(const string& mensaje) {
     }
 
     return entrada;
+}
+
+// (18/10/2026) Opcion de menu a prueba de EOF.
+// El molde anterior (cin >> opcion; if (cin.fail()) { cin.clear(); ... })
+// giraba para siempre con la entrada agotada: clear() limpia el flag pero el
+// buffer sigue en EOF, asi que el siguiente ">>" falla al instante y opcion
+// nunca llega a valer la opcion de salida. Aqui se detecta el EOF ANTES de
+// limpiar nada y se avisa al llamador para que corte el bucle.
+bool leerOpcionMenu(int &opcion) {
+    if (!(cin >> opcion)) {
+        if (cin.eof()) return false;   // entrada agotada: que el menu corte
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        opcion = -1;                   // fuera de rango -> "Opcion no valida"
+        return true;
+    }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    return true;
 }
 
 // --- Entrada numerica con reintentos (15/10/2026) ---
