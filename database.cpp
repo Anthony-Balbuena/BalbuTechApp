@@ -19,8 +19,13 @@ void inicializarConexion() {
         // En Docker: DB_HOST=db (ver .env). En Windows local: DB_HOST=127.0.0.1.
         string host = envOr("DB_HOST", "127.0.0.1");
         string port = envOr("DB_PORT", "3306");
-        string user = envOr("DB_USER", "root");
-        string pass = envOr("DB_PASSWORD", "linux01");
+        // (19/10/2026) Sin credenciales por defecto: viven solo en .env.
+        string user = envOr("DB_USER", "");
+        string pass = envOr("DB_PASSWORD", "");
+        if (user.empty() || pass.empty()) {
+            cout << "ERROR: faltan DB_USER/DB_PASSWORD en el entorno. Revisa tu .env (ver .env.example)." << endl;
+            exit(1);
+        }
         string name = envOr("DB_NAME", "BALBU_TECH");
 
         sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();

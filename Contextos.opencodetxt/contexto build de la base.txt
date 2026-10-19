@@ -29,7 +29,7 @@ y manda ERROR 1064 en cascada. Por eso el loader:
 
 Comandos:
   python3 /tmp/opencode/load_modules.py BALBU_TECH_TEST /tmp/opencode/build.log 2
-  mysql -uroot -plinux01 -e "DROP DATABASE IF EXISTS BALBU_TECH_TEST; \
+  mysql -uroot -p"$MARIADB_ROOT_PASSWORD" -e "DROP DATABASE IF EXISTS BALBU_TECH_TEST; \
         CREATE DATABASE BALBU_TECH_TEST CHARACTER SET utf8mb4;"
 
 Se corren 2 pasadas a proposito: la 1 crea todo lo que puede y la 2 pega los
@@ -77,7 +77,7 @@ del build.
 ================================================================================
 5. REGRESION DE SUITES (se corre al final de cada paquetite)
 ================================================================================
-for f in /tmp/opencode/test_*.sql; do mysql -uroot -plinux01 BALBU_TECH < $f; done
+for f in /tmp/opencode/test_*.sql; do mysql -uroot -p"$MARIADB_ROOT_PASSWORD" BALBU_TECH < $f; done
 
 Ojo: las suites buscan datos de semilla (proveedor, producto, empleado) que el
 repo NO trae, por eso se corren contra BALBU_TECH y no contra la arena. Los

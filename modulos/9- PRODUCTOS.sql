@@ -409,7 +409,8 @@ BEGIN
         P.P_COMPRA,
         -- CONTROL DE ALERTAS CON MÚLTIPLES CONDICIONES (Else If)
         CASE 
-            WHEN I.STOCK_ACTUAL = 0 THEN 'AGOTADO'
+            -- (19/10/2026) Sin fila en INVENTARIO = sin stock: antes el NULL caia en 'OK'.
+            WHEN IFNULL(I.STOCK_ACTUAL, 0) = 0 THEN 'AGOTADO'
             WHEN I.STOCK_ACTUAL <= I.STOCK_MINIMO THEN 'CRÍTICO' 
             WHEN I.STOCK_ACTUAL <= (I.STOCK_MINIMO * 2) THEN 'STOCK BAJO'
             ELSE 'OK' 

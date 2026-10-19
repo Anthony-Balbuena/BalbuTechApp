@@ -80,7 +80,7 @@
             "type": "shell",
             "label": "Docker: ver tablas",
             "command": "docker",
-            "args": ["compose", "exec", "db", "mariadb", "-uroot", "-plinux01", "-DBALBU_TECH", "-e", "SHOW TABLES;"],
+            "args": ["compose", "exec", "app", "bash", "db/show-tables.sh"],
             "options": {"cwd": "${workspaceFolder}"},
             "presentation": {"reveal": "always", "panel": "shared"},
             "problemMatcher": []
