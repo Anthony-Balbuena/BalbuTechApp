@@ -92,3 +92,75 @@
 - Renombre de tipos de contrato (17/10, corrección del dueño): la UI ya no dice fijo/indefinido — ahora **TEMPORAL (con duración) / FIJO (permanente)**. Cambió el enum `TIPO ENUM('TEMPORAL','FIJO')`, la validación y lógica de fechas del `SP_INSERTAR_CONTRATO`, el menú de generar y los flags internos (`esTemporal`). TEST recreado (tabla vacía, DROP+apply); la viva ni lo tenía todavía, así que toma el enum nuevo directo. OJO: los TÍTULOS legales del HTML quedan invertidos respecto a la UI por la ley dominicana — temporal → "TERMINO FIJO", fijo → "TERMINO INDEFINIDO" (comentario de plantilla actualizado). Humo: temporal 6 meses (fin 2027-04-17, título FIJO, "por tiempo 6 meses"), fijo (fin NULL, sin prompt de duración, título INDEFINIDO), finalizar corta fin a hoy, freno por activo, residuos 0.
 - Generar contrato sin ID ni BD (17/10, requerimiento del dueño: "que solo me pida los datos del nuevo empleado menos su id porque no tiene"): opción 12 pide ahora --- DATOS DE LA PERSONA --- (nombre/cédula/cargo requeridos con re-prompt, salario numérico con 2 decimales, teléfono/email Enter = "-", fecha de ingreso con validación AAAA-MM-DD manual + Enter = hoy) y --- CONTRATO --- (tipo + condiciones), genera el HTML y NO escribe en la BD (elimuidos el INSERT temprano, el UPDATE de ruta y el SELECT de nombre; `armarContrato` recibe struct `DatosPersonaContrato`, solo lee CONFIGURACION). Humo: "32/13/99" frena y re-pide, HTML con los datos tipeados y 0 placeholders sin llenar, CONTRATOS = 0 filas, residuos 0. El footer de la plantilla ya marcaba "Borrador sujeto a revisión legal antes de su firma". Próximo pendiente: registro AL FIRMAR.
 - Subir contrato = alta automática de empleado (18/10, requerimiento del dueño: "UN TR QUE META AL EMPLEADO AUTOMATICO... PARA QUE LA INTRODUCCION DE UN EMPLEADO SEA DIRECTO" + "con borrador arranca"): TR_ALTA_EMPLEADO (BEFORE INSERT en CONTRATOS) crea al empleado nuevo con ESTADO ACTIVO y le asigna el ID al contrato, o vincula el existente por cédula sin duplicar, o frena si hay más de uno con la misma cédula. SP_SUBIR_CONTRATO recibe los datos de la persona (sin ID) con frenos: activo por cédula, inactivo, teléfono/email únicos (o "-"), temporal sin meses, tipo inválido. CONTRATOS con snapshot NOMBRE/CEDULA/CARGO/TELEFONO/EMAIL/FECHA_INGRESO (+ ALTER IF NOT EXISTS idempotente). App: 12 genera el .borrador (clave=valor) junto al HTML; 13 Subir lista pendientes, pide teléfono/email reales solo si el empleado nuevo viene con "-", registra y marca .subido; menú 12-16. Test rojo→verde db/test-contratos-subir.sh (10 casos, frenos, residuos 0, aborta si base sucia); check-app-sps 0 faltantes real; humo punta a punta OK (contrato #5 → empleado recién creado ID 23, FECHA_FIN +8 meses). Lección: BD tests SIEMPRE en serie (una corrida paralela dejó 8 filas basura commiteadas).
+
+## 18/10 — Auditoría BD general (08/10) cerrada → movida acá
+
+> Reverificado contra la viva el 18/10/2026. Lo que seguía **abierto** quedó en `../Auditoria/Auditoría BD general - 08-10-2026.md`.
+
+### Los 8 errores reales (corregidos 08–10/10, verificados objeto por objeto el 09/10)
+- `SP_TOGGLE_ESTADO_MARCA` (`2`): alternaba `ACTIVO/INACTIVO` contra un ENUM `ACTIVA/INACTIVA` → ERROR 1265. Ahora `ACTIVA/INACTIVA`, con validación de existencia.
+- `SP_TOGGLE_ESTADO_METODO_PAGO` (`4`): hacía `UPDATE` de una columna `ESTADO` que no existía. Columna agregada en el `CREATE` + migración `ADD COLUMN IF NOT EXISTS`, con backfill `ACTIVO`.
+- `SP_ASIGNAR_TECNICO_RECLAMO` (`34`): ponía `EN_PROCESO` en un ENUM que no lo tenía. Se eliminó ese `UPDATE`: el reclamo queda `PENDIENTE` y el avance vive en `ASIGNACIONES_RECLAMOS.ESTADO_ASIGNACION`.
+- `SP_ASIGNAR_PERMISO_A_ROL` / `FN_TIENE_PERMISO` (`36`): leían `USUARIOS_SISTEMA`, que no existe. Ahora `USUARIOS → ROLES`.
+- `SP_REGISTRAR_ASISTENCIA` (`11`): insertaba en `ASISTENCIA`, que no existe. Ahora `ASISTENCIA_EMPLEADOS` (`ENTRADA` crea la fila, `SALIDA` pone `HORA_SALIDA`).
+- `27_SP_FINALIZAR_RECLAMO_TOTAL` (`27`): insertaba en `LOG_AUDITORIA`, inexistente → ROLLBACK siempre. Ahora `AUDITORIA_SISTEMA`; además quedó blindado (patrón fase I + guard `RECLAMO NO ENCONTRADO`).
+- `SP_REPORTAR_ACCESOS` (`28`): usaba `U.NOMBRE_USUARIO`; la columna real es `USUARIOS.USUARIO`.
+- `sp_obtener_categorias_marcas` (`Mejoras_extras.sql`): leía tablas en minúscula con columnas inexistentes. Archivo borrado (`git rm`) y SP dado de baja en la viva (inexistencia reverificada el 16/10).
+- Barrido del 09/10: cero referencias rotas a tablas/vistas en los `.sql`, ENUMs consistentes, tablas archivos↔BD 40/40.
+
+### Mejoras 1–4 (09/10, archivo + BD, con pruebas)
+- #1 `SP_ASIGNAR_TECNICO_RECLAMO`: valida que el empleado exista e impide doble asignación en curso del mismo reclamo.
+- #2 Asistencia: rechaza doble `ENTRADA` y `SALIDA` sin `ENTRADA` (mensaje amable en vez del 1062 crudo).
+- #3 `sp_obtener_categorias_marcas`: `DROP` en la viva.
+- #4a Contraseñas: `USUARIOS.CONTRASENA` → 512 y los params de `SP_INSERTAR_USUARIO` y `SP_CAMBIAR_CONTRASENA` → 512. (Quedó una rutina sin tocar: ver pendientes.)
+- #4b Roles alineados al C++ (que manda): `ROLE_ADMIN`→`ADMIN`, `ROLE_GERENTE`→`RRHH`, `ROLE_VENDEDOR`→`EMPLEADO`; `ROL_PERMISO.ROL_NOMBRE` → `VARCHAR(50)` + FK `FK_ROL_PERMISO_ROL`. `FN_TIENE_PERMISO('abalbuena','GESTIONAR_ROLES')` pasó de 0 a **1** y `abalbuena` cae en la rama ADMIN del menú. `ROLE_INV_AUDITOR` borrado de la viva (0 usuarios, 0 permisos).
+
+### Planes 1, 2 y 3 (09/10)
+- Plan 1 cerrado salvo 1.2; Plan 2 (blindaje mediano) y Plan 3 (auditoría completa) cerrados. Todo probado en `ROLLBACK` con residuos 0.
+- Lección: un `replaceAll` global tocó 2 líneas sanas de un SP y hubo que revertir verificando línea por línea.
+
+### Contrato C++ ↔ SQL (09/10)
+- C1 `SP_INSERTAR_CATEGORIA` 1 vs 3 args y C2 `SP_ACTUALIZAR_CATEGORIA` 2 vs 4 → `DEFAULT NULL` en los params.
+- C3 `SP_ACTUALIZAR_EMPLEADO` permutado (corrompía datos) → firma al orden del C++, cada dato verificado en su columna.
+- C4 `usuarios.cpp:242` `NOMBRE_USUARIO` → `USUARIO`. C5 `database.cpp:51,61` `CATEGORIA`/`MARCA` singular → plural.
+- V1 `SP_CANCELAR_VENTA` sin transacción ni `FOR UPDATE` → fase I + `FOR UPDATE`. V2 `SP_ASIGNAR_FACTURA_VENTA` sin traducir el 1062 → handler espejo de compras. V3 `24_SP_REGISTRAR_PAGO` exigía 5 args → `DEFAULT NULL`. V4 ~8 errores técnicos de ventas → guards amables.
+- Falso positivo descartado: las vistas con `GROUP BY` corren bien (la PK las cubre); el `SUM`/`VUELTO` en `NULL` es cosmético.
+
+### Login (09–10/10)
+- 09/10: la clave del admin estaba en texto plano. Se pasó a `SHA2(clave,256)` (64 chars) y la app la rehasha a PBKDF2 en el primer login.
+- 10/10 causa raíz: **era el conector, no la clave**. `libmysqlcppconn 7.1.1.9` corrompe al leer strings de más de 64 bytes por protocolo binario (`REPEAT('A',100)` volvía roto). Fix: Connector/C++ 8.4.0 en `~/conectores`, `build.sh` con `-std=c++17` y fallback al sistema, `output/app` recompilado. Eso cerró también el bloqueo de toolchain que la nota daba por pendiente.
+- Verificado punta a punta: login → menú ADMIN → Roles → listar los 3 → volver → cerrar sesión.
+
+### Bugs sistémicos de C++ (10/10)
+- **Out-of-sync**: cada `CALL` deja un result-set de cola; sin drenarlo falla la query siguiente (por eso algunos listados sí andaban). Helper `drenarResultados()` (2 overloads) + `Recogermensaje` (cubre todas las escrituras) + 50+ sitios de lectura. Corrida completa de 9 submenús con **0 errores**.
+- **`unique_ptr`**: ~90 declaraciones migradas, `delete` manuales fuera, `#include <memory>`; diff 591+/274-. Verificado con build + auditoría anti-doble-free en 0 + tour de 9 submenús + alta real.
+- **Fuga de `pstmt`**: el refactor masivo (`delete` en el catch, por script) rompió fin de línea, paréntesis y scopes; se detectó con build + diff y se revirtió. La fuga (~100 bytes por operación fallida) queda como **deuda técnica aceptada**, a mano y función por función.
+- **Métodos de pago** (huérfano rescatado): permiso `GESTIONAR_METODOS_PAGO` asignado al ADMIN + opción 9 en su menú + `ejecutarSubmenuMetodosPago()` + include faltante.
+
+### TEST montado (11/10)
+- `BALBU_TECH_TEST` cargado con `import.sh` (40 tablas / 124 rutinas / 72 triggers / 19 vistas) + seed admin.
+- Fix durable: neutralizados los 3 `USE BALBU_TECH;` hardcodeados (`1-`, `10-`, `27-`) que fugaban objetos a TECH.
+- Regla de la casa: **probar en TEST, no en TECH**. Smoke test con `ROLLBACK`, aserciones contra seeds (no contra 0).
+
+### Gemelos de la BD (cerrado y reverificado 18/10)
+- IDÉNTICOS: `13_SP_HISTORIAL_PERMISOS_EMPLEADO` y `35_SP_FINALIZAR_RECLAMO_TOTAL` ya no existen en la viva y tienen 0 referencias en el repo.
+- DIFERENTES: `1_SP_BUSCAR_CATEGORIAS`, `1_SP_TOGGLE_ESTADO_CATEGORIA` y `5_SP_TOGGLE_ESTADO_PROVEEDOR` ya no existen; quedaron las versiones sin número, que **sí** tienen llamadas (`categorias.cpp:138`, `proveedores.cpp`, `ventas.cpp`).
+- `VERANTESDEINSERT`: no existe en la viva.
+
+### Otras mejoras del 08/10 ya resueltas (reverificadas 18/10)
+- FK `PRODUCTOS.ID_PROVEEDOR` → `FK_PRODUCTO_PROVEEDOR` (ya no hay huérfanos posibles).
+- FK `ROL_PERMISO.ROL_NOMBRE` → `FK_ROL_PERMISO_ROL` (el CHECK pasó a FK real).
+- `DETALLE_REPARACIONES.ESTADO_AVANCE` → ENUM.
+- Orden de triggers explícito con `FOLLOWS` en los grupos frágiles (`23-`, `26-`, `32-`, `15-`): ya no depende del orden de creación.
+- Tablas que estaban sin `BEFORE`: `DEVOLUCIONES` (`INSERT`/`UPDATE`/`DELETE`), `BONOS_EMPLEADOS` (`INSERT`/`UPDATE`), `LIQUIDACIONES` (`INSERT`/`UPDATE`/`DELETE`) y `RECLAMOS_GARANTIAS` (`UPDATE`/`DELETE`).
+- `USUARIOS_SISTEMA`: 0 referencias vivas (solo un comentario histórico en `36-`).
+- `leerDatoSeguro` «se comía la línea vacía»: era el `peek`/`ignore`, eliminado el 10/10 (`seguridad.cpp:23-25`). Hoy es `cin.clear()` + `getline`.
+
+### ITBIS (11/10)
+- Opción A, por línea: `MONTO_ITBIS` en `DETALLE_COMPRA`/`DETALLES_VENTA` + snapshots en devoluciones, tasa leída de `CONFIGURACION`, `TOTAL` bruto intacto, 2 vistas con IVA. Suites `t_iva*.sql` verdes en TEST y TECH, residuos 0.
+
+### Lecciones de esta auditoría
+- `git pull` antes de editar y commit propio después: otro commit (`b421d91`) reescribió `12-` y `15-` sin los fixes y hubo que re-aplicarlos.
+- Los tests de BD van **en serie**: una corrida en paralelo dejó 8 filas basura.
+- `-e` sin `ROLLBACK` no se usa. Aserciones contra seeds/demo, no contra 0.
+- El diff manda: verificar línea por línea después de cualquier reemplazo global.
