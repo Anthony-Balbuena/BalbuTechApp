@@ -1,5 +1,6 @@
-# Normalizacion de saltos de linea: el repo guarda LF; los .sh y el codigo
-# fuente quedan LF incluso para checkouts en Windows (bash no tolera CRLF).
+# Normalizacion de saltos de linea: el repo guarda LF en el indice.
+# Los scripts bash quedan LF aunque el checkout sea en Windows
+# (con CRLF, bash falla con `$'\r': command not found`).
 * text=auto
 *.cpp text eol=lf
 *.h text eol=lf
@@ -10,3 +11,4 @@
 *.json text eol=lf
 *.yml text eol=lf
 *.txt text eol=lf
+Dockerfile text eol=lf

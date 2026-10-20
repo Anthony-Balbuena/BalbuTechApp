@@ -2,7 +2,7 @@
 # Importa modulos/*.sql en orden numerico a la DB del contenedor.
 # Uso dentro del contenedor app:  bash db/import.sh
 # Uso desde Windows (host):       docker compose exec app bash db/import.sh
-# Variables: DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME (ver .env),
+# Variables: DB_HOST/DB_PORT/DB_ADMIN_USER/DB_ADMIN_PASSWORD/DB_NAME (ver .env),
 #            MODULOS_DIR (por defecto ./modulos; util para validar otro set de SQL).
 #
 # Por que no usar /docker-entrypoint-initdb.d:
@@ -14,8 +14,9 @@ cd "$(dirname "$0")/.."
 DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-BALBU_TECH}"
-DB_USER="${DB_USER:-root}"
-DB_PASSWORD="${DB_PASSWORD:-${MARIADB_ROOT_PASSWORD:-linux01}}"
+# (19/10/2026) Mantenimiento con usuario admin dedicado; sin claves por defecto.
+DB_USER="${DB_ADMIN_USER:-balbu_admin}"
+DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD (revisar .env)}"
 MODULOS_DIR="${MODULOS_DIR:-modulos}"
 
 if [ ! -d "$MODULOS_DIR" ]; then
