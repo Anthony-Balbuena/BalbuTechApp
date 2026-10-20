@@ -1,4 +1,12 @@
-# Los scripts bash deben conservar LF aunque el checkout sea en Windows
-# (con CRLF, bash falla con `$'\r': command not found`).
+# Normalizacion de saltos de linea: el repo guarda LF; los .sh y el codigo
+# fuente quedan LF incluso para checkouts en Windows (bash no tolera CRLF).
+* text=auto
+*.cpp text eol=lf
+*.h text eol=lf
+*.sql text eol=lf
 *.sh text eol=lf
-Dockerfile text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.txt text eol=lf
