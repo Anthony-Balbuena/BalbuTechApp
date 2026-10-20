@@ -68,7 +68,7 @@ CREATE PROCEDURE SP_AGREGAR_DETALLE_VENTA(
     IN P_ID_PRODUCTO INT,
     IN P_CANTIDAD INT,
     IN P_ID_EMPLEADO INT,
-    IN P_DESCUENTO_PCT DECIMAL(5, 2) DEFAULT 0.00 -- (16/10/2026) % de descuento de la línea
+    IN P_DESCUENTO_PCT DECIMAL(5, 2) -- (16/10/2026) % de descuento de la línea; (19/10/2026) sin DEFAULT 0.00: el server 10.11 no soporta DEFAULT en parametros
 )
 proc_label: BEGIN
     DECLARE V_PRECIO DECIMAL(10, 2);

@@ -27,8 +27,13 @@ Credenciales de entrada: `admin` / `admin123`.
 3. O usa `Ctrl+Shift+B` -> `Docker: compilar con g++`, y las tareas `Docker: importar...`, `Docker: ver tablas`.
 
 ## Variables (.env)
-`DB_HOST=db DB_PORT=3306 DB_NAME=BALBU_TECH DB_USER=root DB_PASSWORD=linux01`.
-La app lee `DB_*` en `database.cpp`. En Windows local sin Docker usa `DB_HOST=127.0.0.1`.
+(19/10/2026) Las claves viven SOLO en `.env` (ignorado por git); `.env.example` es la plantilla.
+- `DB_HOST=db DB_PORT=3306 DB_NAME=BALBU_TECH` — conexion y base.
+- `DB_USER=balbu_app` + `DB_PASSWORD` — usuario dedicado de la app (DML + EXECUTE sobre la base).
+- `DB_ADMIN_USER=balbu_admin` + `DB_ADMIN_PASSWORD` — scripts de mantenimiento (import, seeds, check).
+- `DB_ROOT_PASSWORD` — clave de root, solo administracion por socket dentro del contenedor `db`.
+La app lee `DB_*` en `database.cpp`; sin `DB_USER`/`DB_PASSWORD` no arranca (falla clara, sin defaults).
+En Windows local sin Docker usa `DB_HOST=127.0.0.1` y exporta las variables en la terminal.
 El contenedor publica MariaDB en el host como `127.0.0.1:3307` (`DB_PORT_HOST`)
 porque el `3306` suele estar ocupado por MariaDB local en Windows; dentro de
 la red Docker la app usa `db:3306`.

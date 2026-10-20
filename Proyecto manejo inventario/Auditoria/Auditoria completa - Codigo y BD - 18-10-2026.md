@@ -45,13 +45,13 @@ Esto no es relleno: son fortalezas reales, varias por encima del promedio de un 
 
 ### C-1. La credencial de `root` de la base está en el código, en 12 archivos y en 17 commits
 
-`database.cpp:23` — `envOr("DB_PASSWORD", "linux01")` es el **default de runtime**. Replicado en `docker-compose.yml:28`, `db/import.sh:18`, `db/seed-admin.sh:16`, `db/seed-catalogo.sh:13`, `db/check-app-sps.sh:16`, `.env.example`, `.vscode/tasks.json`, `README-DOCKER.md` y 2 documentos. Además está en **17 commits** del historial.
+`database.cpp:23` — `envOr("DB_PASSWORD", «clave»)` es el **default de runtime** (clave rotada el 19/10/2026). Replicado en `docker-compose.yml:28`, `db/import.sh:18`, `db/seed-admin.sh:16`, `db/seed-catalogo.sh:13`, `db/check-app-sps.sh:16`, `.env.example`, `.vscode/tasks.json`, `README-DOCKER.md` y 2 documentos. Además está en **17 commits** del historial.
 
 **Lo bueno:** `.env` **nunca** estuvo versionado (0 commits).
 
 ### C-2. La clave del administrador está en el historial público del repositorio
 
-`Pedro0110` aparece en **4 commits, los 4 en `origin/main`**. Se quitó del working tree, pero eso **no alcanza**: el historial es público y la credencial es recuperable. La única reparación es **rotarla**.
+`<clave personal eliminada>` aparece en **4 commits, los 4 en `origin/main`**. Se quitó del working tree, pero eso **no alcanza**: el historial es público y la credencial es recuperable. La única reparación es **rotarla**.
 
 ### C-3. Un `CHECK` hardcodeado hace inadministrable el sistema de permisos
 
@@ -186,10 +186,10 @@ Dos afirmaciones de los auditores eran incorrectas y se corrigieron midiendo con
 
 **Antes que nada — la puerta.**
 
-1. **Rotar las dos credenciales** (la de `root` de la base y la del administrador). Sacarlas del working tree no alcanza: están en el historial público.
-2. **Sacar MariaDB de la red**: que escuche solo en `127.0.0.1`, y eliminar `root@%`.
-3. **Dejar de conectar como `root`**: usuario dedicado con solo los privilegios de datos que la app necesita.
-4. **`database.cpp:23`**: sin default hardcodeado; si falta la variable de entorno, fallar fuerte y claro.
+1. **Rotar las dos credenciales** (la de `root` de la base y la del administrador). Sacarlas del working tree no alcanza: están en el historial público. *(19/10/2026: la de `root` rotada. Queda la del administrador — C-2.)*
+2. **Sacar MariaDB de la red**: que escuche solo en `127.0.0.1`, y eliminar `root@%`. *(19/10/2026: hecho — el puerto del host publica solo en `127.0.0.1`, `root@%` eliminado, y los 404 definers de TECH+AUDIT que dependían de él convertidos a `root@localhost`.)*
+3. **Dejar de conectar como `root`**: usuario dedicado con solo los privilegios de datos que la app necesita. *(19/10/2026: hecho — `balbu_app` para la app, `balbu_admin` para mantenimiento; `root` queda solo por socket dentro del contenedor.)*
+4. **`database.cpp:23`**: sin default hardcodeado; si falta la variable de entorno, fallar fuerte y claro. *(19/10/2026: hecho — `exit(1)` si faltan `DB_USER`/`DB_PASSWORD`.)*
 
 **Después — lo que rompe funcionalidad.**
 
