@@ -118,17 +118,21 @@
 
 <div class="firma">
   <div>
-    <div class="linea">EL EMPLEADOR</div>
-    <div>{{NOMBRE_EMPRESA}}</div>
+    <div class="linea">Firma del empleado</div>
+    <div>{{NOMBRE_EMPLEADO}}</div>
+    <div>CÉDULA: {{CEDULA}}</div>
   </div>
   <div>
-    <div class="linea">EL EMPLEADO</div>
-    <div>{{NOMBRE_EMPLEADO}}</div>
+    <div class="linea">Firma del empleador</div>
+    <div>{{REPRESENTANTE}}</div>
+    <div>CÉDULA: {{CEDULA_REPRESENTANTE}}</div>
+    <div>{{NOMBRE_EMPRESA}}</div>
   </div>
 </div>
 
 <p class="pie">
-  Documento generado por BALBU_TECH el {{FECHA_GENERACION}}. Borrador sujeto a revisión legal antes de su firma.
+  Documento generado por {{NOMBRE_EMPRESA}}, RNC {{RNC_EMPRESA}}, {{CIUDAD}}, República Dominicana,
+  el {{FECHA_GENERACION}}. Borrador sujeto a revisión legal antes de su firma.
   Para guardar como PDF: menú del navegador &rarr; Imprimir &rarr; "Guardar como PDF".
 </p>
 

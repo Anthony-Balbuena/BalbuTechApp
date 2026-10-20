@@ -1,0 +1,16 @@
+nombre=JOse
+cedula=12345678909
+cargo=vendedor
+salario=23000.00
+salario_ofrecido=23000.00
+telefono=-
+email=-
+fecha_ingreso=2026-10-19
+tipo=FIJO
+meses=0
+dir=211221
+horario=9:00 AM - 6:00 PM
+horas=44
+forma_pago=transferencia bancaria
+html=contratos/CONTRATO_JOse_2026-10-19.html
+generado=2026-10-19

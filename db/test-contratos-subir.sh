@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Tests de "subir contrato = alta automatica de empleado" (S1-S3, S5 del
-# feature odd/tasks/contratos-subir-alta.md). Corre contra BALBU_TECH_TEST
-# dentro de un START TRANSACTION / ROLLBACK: cero residuos.
-# Uso:  bash db/test-contratos-subir.sh
+# Tests de "subir contrato" (19/10/2026).
+# El contrato se firma ANTES del alta: CONTRATOS es el registro del papel, no
+# crea empleados. Si la cedula ya existe en EMPLEADOS se vincula al momento; si
+# no, ID_EMPLEADO queda NULL y TR_VINCULAR_CONTRATO lo completa cuando el alta
+# ocurre despues.
+# Corre contra BALBU_TECH_TEST dentro de un START TRANSACTION / ROLLBACK:
+# cero residuos.
+# Uso:  DB_PASSWORD=<clave> bash db/test-contratos-subir.sh
 set -u
 
 HOST="${DB_HOST:-127.0.0.1}"
@@ -17,14 +21,11 @@ if [ -z "$PASS" ]; then
 fi
 
 esperados=(
-  "EL TIPO DEBE SER TEMPORAL O FIJO"
-  "NECESITA UNA DURACION EN MESES MAYOR A CERO"
   "YA TIENE UN CONTRATO ACTIVO"
   "PERTENECE A UN EMPLEADO INACTIVO"
-  "ESE TELEFONO YA PERTENECE A OTRO EMPLEADO"
-  "ESE EMAIL YA PERTENECE A OTRO EMPLEADO"
-  "NECESITA TELEFONO Y EMAIL REALES"
   "HAY MAS DE UN EMPLEADO CON ESA CEDULA"
+  "NECESITA UNA DURACION EN MESES MAYOR A CERO"
+  "EL TIPO DEBE SER TEMPORAL O FIJO"
 )
 
 fail=0
@@ -32,7 +33,8 @@ fail=0
 # --- Baseline: ninguna cedula marcador puede existir antes de correr ---
 # Si esta sucia, se aborta: seguir daria errores en cascada imposibles de leer.
 base=$(mariadb -N -h "$HOST" -u "$USER" -p"$PASS" "$DB" \
-  -e "SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA LIKE '302998877%';" 2>/dev/null)
+  -e "SELECT (SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA LIKE '302998877%')
+     + (SELECT COUNT(*) FROM CONTRATOS WHERE CEDULA LIKE '302998877%');" 2>/dev/null)
 if [ "${base:-0}" != "0" ]; then
   echo "BASE SUCIA: $base filas con cedula marcador antes del test. Limpialas y vuelve a correr:"
   echo "  DELETE FROM CONTRATOS WHERE CEDULA LIKE '302998877%'; DELETE FROM EMPLEADOS WHERE CEDULA LIKE '302998877%';"
@@ -43,7 +45,7 @@ fi
 OUT=$(mariadb --force -h "$HOST" -u "$USER" -p"$PASS" "$DB" 2>&1 <<'EOF'
 START TRANSACTION;
 
--- Existe: Pedro (registrado a mano antes del contrato)
+-- Existe: Pedro (registrado a mano en el modulo de empleados)
 INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
 VALUES ('Pedro Prueba', '30299887779', 'Bodeguero', 10000.00, '8095552222', 'pedro.prueba@correo.test', '2026-01-15');
 SELECT ID_EMPLEADO INTO @pedro FROM EMPLEADOS WHERE CEDULA = '30299887779';
@@ -58,55 +60,62 @@ VALUES ('Ambiguo Uno', '30299887781', 'A', 6000.00, '8095554444', 'amb1@correo.t
 INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
 VALUES ('Ambiguo Dos', '30299887781', 'B', 6100.00, '8095555555', 'amb2@correo.test', '2026-01-15');
 
--- T1: alta de persona NUEVA -> trigger crea empleado y el contrato apunta a su ID
+-- T1: cedula que NO existe -> registra el contrato, NO crea al empleado
 CALL SP_SUBIR_CONTRATO('Maria Prueba', '30299887777', 'Cajera', 12000.00,
   '8095551111', 'maria.prueba@correo.test', '2026-10-18', 'TEMPORAL', 6, 'contratos/test.html');
-SELECT ID_CONTRATO INTO @c1 FROM CONTRATOS WHERE CEDULA = '30299887777';
-SELECT ID_EMPLEADO INTO @m1 FROM EMPLEADOS WHERE CEDULA = '30299887777';
-SELECT IF(@c1 IS NOT NULL AND @m1 IS NOT NULL
-  AND (SELECT ID_EMPLEADO FROM CONTRATOS WHERE ID_CONTRATO = @c1) = @m1
-  AND (SELECT ESTADO FROM EMPLEADOS WHERE ID_EMPLEADO = @m1) = 'ACTIVO'
-  AND (SELECT NOMBRE FROM CONTRATOS WHERE ID_CONTRATO = @c1) = 'Maria Prueba',
-  'OK alta nueva', 'FALLO alta nueva') AS prueba;
+SELECT IF((SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA = '30299887777') = 0
+  AND (SELECT COUNT(*) FROM CONTRATOS WHERE CEDULA = '30299887777') = 1
+  AND (SELECT ID_EMPLEADO FROM CONTRATOS WHERE CEDULA = '30299887777') IS NULL,
+  'OK contrato sin empleado', 'FALLO contrato sin empleado') AS prueba;
+
+-- T1b: FECHA_INICIO sale de la fecha de ingreso (no de CURDATE) y FECHA_FIN
+--      del temporal se calcula desde ahi
+SELECT IF((SELECT FECHA_INICIO FROM CONTRATOS WHERE CEDULA = '30299887777') = '2026-10-18'
+  AND (SELECT FECHA_FIN FROM CONTRATOS WHERE CEDULA = '30299887777') = '2027-04-18',
+  'OK fechas desde el ingreso', 'FALLO fechas desde el ingreso') AS prueba;
 
 -- T2: subir contrato a un empleado YA EXISTENTE -> vincula, no duplica
 CALL SP_SUBIR_CONTRATO('Pedro Prueba', '30299887779', 'Bodeguero', 10000.00,
   '8095552222', 'pedro.prueba@correo.test', '2026-01-15', 'FIJO', NULL, 'contratos/test2.html');
 SELECT IF((SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA = '30299887779') = 1
-  AND (SELECT ID_EMPLEADO FROM CONTRATOS WHERE CEDULA = '30299887779') = @pedro,
+  AND (SELECT ID_EMPLEADO FROM CONTRATOS WHERE CEDULA = '30299887779') = @pedro
+  AND (SELECT NOMBRE FROM CONTRATOS WHERE CEDULA = '30299887779') = 'Pedro Prueba',
   'OK vinculo', 'FALLO vinculo') AS prueba;
 
+-- T2b: FIJO = sin fecha fin
+SELECT IF((SELECT FECHA_FIN FROM CONTRATOS WHERE CEDULA = '30299887779') IS NULL,
+  'OK fijo sin fecha fin', 'FALLO fijo con fecha fin') AS prueba;
+
 -- T3: freno un solo contrato ACTIVO por cedula
-CALL SP_SUBIR_CONTRATO('Maria Prueba', '30299887777', 'Cajera', 12000.00,
-  '8095551111', 'maria.prueba@correo.test', '2026-10-18', 'FIJO', NULL, 'x.html');
+CALL SP_SUBIR_CONTRATO('Pedro Prueba', '30299887779', 'Bodeguero', 10000.00,
+  '8095552222', 'pedro.prueba@correo.test', '2026-01-15', 'FIJO', NULL, 'x.html');
 
 -- T4: freno empleado INACTIVO
 CALL SP_SUBIR_CONTRATO('Inactivo Prueba', '30299887780', 'Auxiliar', 5000.00,
   '8095553333', 'inactivo.prueba@correo.test', '2026-01-15', 'FIJO', NULL, NULL);
 
--- T5: freno telefono que ya es de otro empleado (persona nueva)
-CALL SP_SUBIR_CONTRATO('Tel Prueba', '30299887782', 'Auxiliar', 9000.00,
-  '8095552222', 'tel.ajeno@correo.test', '2026-10-18', 'FIJO', NULL, NULL);
-
--- T6: persona nueva sin datos reales de contacto (default "-")
-CALL SP_SUBIR_CONTRATO('Sin Dato Prueba', '30299887784', 'Auxiliar', 9000.00,
-  '-', '-', '2026-10-18', 'FIJO', NULL, NULL);
-
--- T7: freno email que ya es de otro empleado (persona nueva)
-CALL SP_SUBIR_CONTRATO('Mail Prueba', '30299887783', 'Auxiliar', 9000.00,
-  '8095556666', 'pedro.prueba@correo.test', '2026-10-18', 'FIJO', NULL, NULL);
-
--- T8: temporal sin meses
-CALL SP_SUBIR_CONTRATO('Meses Prueba', '30299887785', 'Auxiliar', 7000.00,
-  '8095557777', 'meses@correo.test', '2026-10-18', 'TEMPORAL', NULL, NULL);
-
--- T9: tipo invalido
-CALL SP_SUBIR_CONTRATO('Tipo Prueba', '30299887785', 'Auxiliar', 7000.00,
-  '8095557777', 'meses@correo.test', '2026-10-18', 'INDEFINIDO', NULL, NULL);
-
--- T10: cedula ambigua -> el trigger frena (no se crea contrato)
+-- T5: cedula ambigua -> el SP frena (no se crea contrato)
 CALL SP_SUBIR_CONTRATO('Ambiguo Tres', '30299887781', 'C', 6200.00,
   '8095558888', 'amb3@correo.test', '2026-10-18', 'FIJO', NULL, 't.html');
+
+-- T6: temporal sin meses (cedula sin contrato ni empleado)
+CALL SP_SUBIR_CONTRATO('Meses Prueba', '30299887782', 'Auxiliar', 7000.00,
+  '8095557777', 'meses@correo.test', '2026-10-18', 'TEMPORAL', NULL, NULL);
+
+-- T7: tipo invalido
+CALL SP_SUBIR_CONTRATO('Tipo Prueba', '30299887782', 'Auxiliar', 7000.00,
+  '8095557777', 'meses@correo.test', '2026-10-18', 'INDEFINIDO', NULL, NULL);
+
+-- T8: el alta posterior engancha el contrato huerfano (TR_VINCULAR_CONTRATO)
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('Maria Prueba', '30299887777', 'Cajera', 12000.00, '8095551111', 'maria.prueba@correo.test', '2026-10-18');
+SELECT IF((SELECT ID_EMPLEADO FROM CONTRATOS WHERE CEDULA = '30299887777')
+  = (SELECT ID_EMPLEADO FROM EMPLEADOS WHERE CEDULA = '30299887777'),
+  'OK trigger vincula al dar el alta', 'FALLO trigger vincula') AS prueba;
+
+-- T9: historial por cedula (antes y despues del alta)
+CALL SP_CONTRATOS_POR_CEDULA('30299887777');
+CALL SP_CONTRATOS_POR_CEDULA('30299887779');
 
 ROLLBACK;
 EOF
@@ -119,14 +128,34 @@ if echo "$OUT" | grep -q "FALLO"; then
   fail=1
 fi
 
-# 2. Las dos altas exitosas ocurrieron
+# 2. Dos subidas exitosas (T1 huerfano + T2 vinculado)
 n_exit=$(echo "$OUT" | grep -c "EXITO")
 if [ "$n_exit" -ne 2 ]; then
-  echo "FALTA EXITO: se esperaban 2, hay $n_exit"
+  echo "FALTA EXITO: se esperaba 2, hay $n_exit"
   fail=1
 fi
 
-# 3. Cada freno esperado se disparo exactamente
+# 3. El mensaje distingue pendiente de alta y vinculado
+if ! echo "$OUT" | grep -q "EMPLEADO PENDIENTE DE ALTA"; then
+  echo "NO DICE 'PENDIENTE DE ALTA': $OUT"
+  fail=1
+fi
+if ! echo "$OUT" | grep -q "EMPLEADO VINCULADO"; then
+  echo "NO DICE VINCULADO: $OUT"
+  fail=1
+fi
+if echo "$OUT" | grep -q "NUEVO CREADO"; then
+  echo "SIGUE DICIENDO 'NUEVO CREADO'"
+  fail=1
+fi
+
+# 4. El historial por cedula devuelve el contrato
+if ! echo "$OUT" | grep -q "Cajera"; then
+  echo "EL HISTORIAL POR CEDULA NO DEVOLVIO EL CONTRATO"
+  fail=1
+fi
+
+# 5. Cada freno esperado se disparo
 for e in "${esperados[@]}"; do
   n=$(echo "$OUT" | grep -c "$e")
   if [ "$n" -lt 1 ]; then
@@ -135,7 +164,7 @@ for e in "${esperados[@]}"; do
   fi
 done
 
-# 4. Ningun ERROR inesperado (p.ej. SP inexistente)
+# 6. Ningun ERROR inesperado (p.ej. SP inexistente)
 while IFS= read -r line; do
   match=0
   for e in "${esperados[@]}"; do
@@ -147,7 +176,7 @@ while IFS= read -r line; do
   fi
 done < <(echo "$OUT" | grep "^ERROR")
 
-# 5. Residuos: tras ROLLBACK no queda rastro de las cedulas marcador
+# 7. Residuos: tras ROLLBACK no queda rastro de las cedulas marcador
 post=$(mariadb -N -h "$HOST" -u "$USER" -p"$PASS" "$DB" \
   -e "SELECT (SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA LIKE '302998877%')
      + (SELECT COUNT(*) FROM CONTRATOS WHERE CEDULA LIKE '302998877%');" 2>/dev/null)

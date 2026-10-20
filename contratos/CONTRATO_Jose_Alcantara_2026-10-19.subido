@@ -1,0 +1,15 @@
+nombre=Jose Alcantara
+cedula=40229519463
+cargo=Vendedor
+salario=25000.00
+telefono=8298754312
+email=-
+fecha_ingreso=2026-10-19
+tipo=FIJO
+meses=0
+dir=Santo domingo
+horario=8:00 AM - 4:00 PM
+horas=44
+forma_pago=Cuenta de banco
+html=contratos/CONTRATO_Jose_Alcantara_2026-10-19.html
+generado=2026-10-19

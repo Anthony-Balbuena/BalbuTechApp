@@ -41,21 +41,94 @@ void mostrarMenuEmpleados() {
 void registrarEmpleado() {
     cout << "\n--- REGISTRO DE EMPLEADO ---" << endl;
     try {
-        string nombre = leerDatoSeguro("Nombre Completo: ");
-        string cedula = leerDatoSeguro("Cedula: ");
-        string cargo = leerDatoSeguro("Cargo: ");
-        string salStr = leerDatoSeguro("Salario: ");
-        double salario = stod(salStr);
-        string telefono = leerDatoSeguro("Telefono: ");
-        string email = leerDatoSeguro("Email: ");
+        string nombre, cedula, cargo, telefono, email, fechaIngreso;
+        double salario = 0.0;
+        bool precargado = false;
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?)"));
+        // (19/10/2026) Contratos firmados sin empleado: el alta se precarga con
+        // lo que dice el papel. El vinculo del contrato lo hace TR_VINCULAR_CONTRATO.
+        struct Pendiente { int id; string nombre, cedula, cargo, telefono, email, fecha; double salario; };
+        vector<Pendiente> pend;
+        {
+            std::unique_ptr<sql::PreparedStatement> pp(globalCon->prepareStatement(
+                "SELECT ID_CONTRATO, NOMBRE, CEDULA, CARGO, TELEFONO, EMAIL, "
+                "FECHA_INGRESO, SALARIO FROM CONTRATOS "
+                "WHERE ID_EMPLEADO IS NULL AND ESTADO = 'ACTIVO' "
+                "ORDER BY ID_CONTRATO"));
+            std::unique_ptr<sql::ResultSet> rp(pp->executeQuery());
+            while (rp->next()) {
+                Pendiente p;
+                p.id = rp->getInt("ID_CONTRATO");
+                p.nombre = rp->getString("NOMBRE");
+                p.cedula = rp->getString("CEDULA");
+                p.cargo = rp->getString("CARGO");
+                p.telefono = rp->isNull("TELEFONO") ? "" : rp->getString("TELEFONO");
+                p.email = rp->isNull("EMAIL") ? "" : rp->getString("EMAIL");
+                p.fecha = rp->isNull("FECHA_INGRESO") ? "" : rp->getString("FECHA_INGRESO");
+                p.salario = rp->getDouble("SALARIO");
+                pend.push_back(p);
+            }
+            drenarResultados(pp.get());
+        }
+
+        if (!pend.empty()) {
+            cout << "\nContratos firmados sin empleado:" << endl;
+            for (size_t i = 0; i < pend.size(); i++) {
+                printf("  %zu. %s - %s - %s - %.2f - ingreso %s\n",
+                       i + 1, pend[i].nombre.c_str(), pend[i].cedula.c_str(),
+                       pend[i].cargo.c_str(), pend[i].salario,
+                       pend[i].fecha.c_str());
+            }
+            cout << "  0. Dar de alta a alguien sin contrato" << endl;
+            int op = (int)leerNumeroConIntentos("Elegir: ", 0, (double)pend.size());
+            if (op > 0) {
+                const Pendiente &p = pend[op - 1];
+                nombre = p.nombre;
+                cedula = p.cedula;
+                cargo = p.cargo;
+                telefono = p.telefono;
+                email = p.email;
+                fechaIngreso = p.fecha;
+                salario = p.salario;
+                precargado = true;
+                cout << "\nDatos cargados del contrato #" << p.id << "." << endl;
+            }
+        }
+
+        // Enter deja el valor del contrato. Un "-" del borrador no sirve como
+        // dato real: se vuelve a pedir.
+        auto pedirConDefault = [](const string &etiqueta, const string &actual) {
+            if (actual.empty() || actual == "-") return leerDatoSeguro(etiqueta);
+            string v = leerDatoSeguro(etiqueta + " [" + actual + "]: ");
+            return v.empty() ? actual : v;
+        };
+
+        if (!precargado) {
+            nombre = leerDatoSeguro("Nombre Completo: ");
+            cedula = leerDatoSeguro("Cedula: ");
+            cargo = leerDatoSeguro("Cargo: ");
+            string salStr = leerDatoSeguro("Salario: ");
+            salario = stod(salStr);
+        }
+
+        telefono = pedirConDefault("Telefono: ", telefono);
+        email = pedirConDefault("Email: ", email);
+        if (fechaIngreso.empty()) {
+            fechaIngreso = leerDatoSeguro("Fecha de ingreso (AAAA-MM-DD, Enter = hoy): ");
+        } else {
+            fechaIngreso = pedirConDefault("Fecha de ingreso (AAAA-MM-DD): ", fechaIngreso);
+        }
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_INSERTAR_EMPLEADO(?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, cedula);
         pstmt->setString(3, cargo);
         pstmt->setDouble(4, salario);
         pstmt->setString(5, telefono);
         pstmt->setString(6, email);
+        if (fechaIngreso.empty()) pstmt->setNull(7, sql::DataType::DATE);
+        else pstmt->setString(7, fechaIngreso);
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -542,7 +615,7 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
                 break;
             case 12:
-                ejecutarSubmenuContratos();
+                generarContratoUI();
                 break;
             case 13:
                 subirContratoUI();

@@ -164,3 +164,142 @@
 - Los tests de BD van **en serie**: una corrida en paralelo dejó 8 filas basura.
 - `-e` sin `ROLLBACK` no se usa. Aserciones contra seeds/demo, no contra 0.
 - El diff manda: verificar línea por línea después de cualquier reemplazo global.
+
+## 19/10 — El contrato no crea empleados (eliminado `TR_ALTA_EMPLEADO`)
+
+**Decisión (pedido del dueño):** subir un contrato **no** debe dar de alta a nadie en `EMPLEADOS`. El empleado se registra antes, a mano, en el módulo de empleados; el contrato solo **vincula** por cédula. Revierte el pedido original de «alta directa al firmar» (18/10).
+
+**Por qué:** un contrato es un documento, no el origen de un registro maestro. El trigger creaba empleados sin usuario, sin revisión de RRHH y colgando del `AUTO_INCREMENT`; un error en la carga dejaba altas sin control.
+
+**Qué se cambió**
+- `modulos/42- CONTRATOS.sql`:
+  - `SP_SUBIR_CONTRATO`: busca `ID_EMPLEADO` por cédula. Si no existe → `ERROR: NO EXISTE UN EMPLEADO CON ESA CEDULA. REGISTRELO PRIMERO EN EL MODULO DE EMPLEADOS.` Si hay 2 o más → error de ambigüedad. Inserta con ese `v_id` (antes iba `NULL` y lo resolvía el trigger). Mensaje fijo `… EMPLEADO VINCULADO.`
+  - Se borró `TR_ALTA_EMPLEADO` (líneas 235-274) y quedó un `DROP TRIGGER IF EXISTS` para limpiar las bases donde exista.
+  - Typo `FINALIZELLO` → mensaje reescrito: «CIERRE ESE CONTRATO ANTES DE REGISTRAR OTRO».
+  - Fuera las validaciones de teléfono/email únicos: solo aplicaban al alta automática.
+- `contrato.cpp`: opción 13 avisa antes de llamar al SP si la cédula no existe («Esa cedula no esta registrada en Empleados…») y no pide más datos. Se eliminaron los dos bucles de teléfono/email del alta.
+- `contrato.h`: comentario actualizado (ya no menciona el trigger).
+- `modulos/42- CONTRATOS.md`: intro, tabla, validaciones, sección Triggers («Ninguno») y reglas de negocio.
+- Tests: `db/test-contratos-subir.sh` reescrito (T1 ahora prueba que una cédula inexistente **no crea nada**; 7 casos, 1 alta exitosa). `db/test-contrato-borrador.sh` caso 5 pasa a probar el aviso de cédula no registrada.
+
+**Evidencia**
+- `bash build.sh` → `OK: ./output/app`.
+- `DB_PASSWORD=… bash db/test-contratos-subir.sh` → `TODOS LOS TESTS DE CONTRATOS-SUBIR OK` (contra `BALBU_TECH_TEST`, con `ROLLBACK`).
+- `bash db/test-contrato-borrador.sh` → 5/5 OK (contra `BALBU_TECH_TEST`, usuario fixture `admin`).
+- En la viva: trigger eliminado (0 triggers en `CONTRATOS`), `SP_SUBIR_CONTRATO` sin `INSERT INTO EMPLEADOS`, prueba con cédula inexistente frena y con cédula real vincula; `ROLLBACK` deja 0 contratos y 9 empleados.
+
+**Consecuencia operativa:** si cambia el cargo o el salario, se corrige en el módulo de empleados. El contrato guarda el snapshot de lo firmado y no toca al empleado.
+
+### 19/10 (segunda parte) — Opción 12 pide cédula y separa salario ofrecido / pactado
+
+**Pedido del dueño:** el borrador tiene que pedir los datos del empleado y arrancar por la cédula (es la clave real: art. 24.1 de la Ley 16-92 y dato obligatorio del registro del MT). El salario ofrecido puede no ser el pactado: el empleado puede pedir más y la empresa dárselo, o la empresa dar menos.
+
+**Cómo quedó la opción 12 (`generarContratoUI`, antes `ejecutarSubmenuContratos`)**
+1. Pide la **cédula** y busca en `EMPLEADOS`:
+   - no existe → avisa y no genera nada;
+   - 2 o más con la misma cédula → frena (misma regla que el SP);
+   - existe → precarga nombre y cargo actuales como default (Enter los acepta).
+2. `Cargo que se le ofrece` (default: el actual).
+3. `Salario ofrecido` (default: el que gana hoy).
+4. `Salario pactado` (default: el ofrecido). Se puede subir o bajar.
+5. Teléfono/email (Enter = `-`), fecha de ingreso (Enter = hoy), tipo (fijo/temporal + meses), dirección, horario, horas semanales y forma de pago.
+
+**Qué se guarda dónde**
+- El contrato (HTML y `CONTRATOS.SALARIO`) lleva el **pactado**.
+- El borrador guarda además `salario_ofrecido=` como referencia; la opción 13 lo ignora.
+- No se agregó columna a la base: el ofrecido es un dato de negociación, no del contrato firmado.
+
+**Evidencia**
+- `bash build.sh` → `OK`.
+- `db/test-contrato-borrador.sh` → **6/6 OK** (nuevo caso 6: cédula inexistente en la opción 12 avisa y no genera archivos).
+- Prueba manual con la viva: cédula 40229519463 → nombre y cargo precargados, cargo cambiado a «Cajero», ofrecido 20 000, pactado 18 000; el borrador guardó ambos y el HTML mostró 18 000.
+- El directorio temporal se borró después de la prueba.
+
+### 19/10 (tercera parte) — La opción 12 ya no consulta la base, firmas y tabla EMPRESA
+
+**Pedido del dueño:** "si un empleado acaba de firmar todavía no está en la DB, eso no cuadra".
+
+**Por qué:** la opción 12 es la **oferta**. La genera reclutamiento antes de que la persona exista como empleado. Exigir la cédula en `EMPLEADOS` invertía el orden real: primero el papel firmado, después el alta.
+
+**Qué se cambió**
+- `contrato.cpp` — `generarContratoUI()`:
+  - Fuera la consulta a `EMPLEADOS` y los dos frenos (cédula repetida, cédula no registrada). Ahora pide cédula, nombre y cargo directo.
+  - La cédula se valida a **11 dígitos** (sin guiones ni espacios).
+  - `Salario ofrecido` pasa a ser obligatorio (antes tenía como default el sueldo actual del empleado, que ya no se consulta).
+  - `pedirMonto()`: con la entrada agotada corta antes de volver a pedir. Sin eso, un monto obligatorio sin default giraba sin fin.
+- `plantillas/contrato.html` — bloque de firmas nuevo: línea + nombre + cédula del empleado; línea + representante + cédula + empresa. El pie pasa de "generado por BALBU_TECH" a "generado por {empresa}, RNC {rnc}, {ciudad}, República Dominicana, el {fecha}".
+- `modulos/33- CONFIGURACION.sql` — se agregaron las cinco claves de empresa (`RNC`, `CIUDAD`, `DIRECCION_EMPRESA`, `REPRESENTANTE`, `CEDULA_REPRESENTANTE`) con valor **vacío**. `CONFIGURACION` es la configuración de la empresa (ya tenía `NOMBRE_TIENDA = BALBU_TECH`); ahí va todo lo suyo.
+- `armarContrato()` — lee la empresa de `CONFIGURACION`. Lo que esté vacío se imprime como `____________`.
+
+**Hallazgo:** `CONFIGURACION` solo tenía `NOMBRE_TIENDA`, `ITBIS` y `DIAS_GARANTIA`. `armarContrato` pedía `RNC`, `CIUDAD`, `DIRECCION_EMPRESA`, `REPRESENTANTE` y `CEDULA_REPRESENTANTE`, no los encontraba y los dejaba en `____________`. **Todos los contratos generados hasta hoy salieron con el RNC, la ciudad, la dirección y el representante en blanco.** No era un problema del pie: era del documento entero.
+
+**Decisión:** primero se creó una tabla `EMPRESA` aparte; el dueño la rechazó. Todo lo de la empresa va en `CONFIGURACION`, con las claves nuevas vacías hasta que cargue los datos con un `UPDATE`. La tabla `EMPRESA` se borró de `BALBU_TECH` y `BALBU_TECH_TEST` y su módulo `43- EMPRESA.sql` se eliminó.
+
+**Evidencia**
+- `bash build.sh` → `OK: ./output/app`.
+- `db/test-contrato-borrador.sh` → **7/7 OK** contra `BALBU_TECH_TEST` (caso 6 reescrito: cédula válida inexistente no frena; caso 7 nuevo: cédula de 3 dígitos rechazada).
+- Prueba manual con cédula 40229519463, ofrecido 20 000, pactado 18 000, FIJO: HTML con `CÉDULA: 40229519463` bajo la firma, pie con `BALBU_TECH, RNC ____________, ____________` y borrador con `salario_ofrecido=20000.00` / `salario=18000.00`. Cero escrituras en la base.
+- En la viva y en TEST: `EMPRESA` eliminada; `CONFIGURACION` con las cinco claves nuevas vacías (TEST conservó `CIUDAD = Santo Domingo` que ya tenía).
+- Segunda prueba manual contra TEST: el pie salió con `BALBU_TECH, RNC ____________, Santo Domingo` — el nombre y la ciudad salieron de `CONFIGURACION`, el RNC vacío del placeholder.
+
+**Pendiente:** cargar RNC, dirección, representante y su cédula con `UPDATE` sobre `CONFIGURACION`. Y decidir si la 13 vuelve a crear el empleado o se mantiene el alta manual (pregunta abierta).
+
+### 19/10 (cuarta parte) — Opción 13: cotejo, registro y alta vinculada
+
+**Pedido del dueño:** ejecutar el plan aprobado de la opción 13 ("dale con todo").
+
+**El modelo que quedó**
+
+```
+12  reclutamiento arma el borrador            → HTML + .borrador
+13  contrataciones coteja y registra          → CONTRATOS con CEDULA e ID_EMPLEADO = NULL
+1   el encargado de altas elige el contrato   → datos precargados
+    INSERT en EMPLEADOS → TR_VINCULAR_CONTRATO completa ID_EMPLEADO
+```
+
+`CONTRATOS` es el registro del papel. La cédula es la llave y existe desde la
+oferta; `ID_EMPLEADO` puede ser `NULL` hasta el alta.
+
+**Qué se cambió**
+
+- `modulos/42- CONTRATOS.sql`
+  - `ID_EMPLEADO INT NULL` en el `CREATE TABLE` y un `ALTER ... MODIFY`
+    idempotente para las bases que ya existían.
+  - Índice `IX_CONTRATOS_CEDULA` (se crea solo si falta).
+  - `TR_VINCULAR_CONTRATO` (AFTER INSERT en `EMPLEADOS`): completa el ID de los
+    contratos huérfanos de esa cédula. No crea ni modifica nada más.
+  - `SP_SUBIR_CONTRATO` reescrito: ya no exige empleado; freno de contrato
+    ACTIVO por cédula; `FECHA_INICIO`/`FECHA_FIN` desde `P_FECHA_INGRESO`;
+    mensaje `EMPLEADO PENDIENTE DE ALTA` o `EMPLEADO VINCULADO`.
+  - `SP_CONTRATOS_POR_CEDULA` reemplaza a `SP_CONTRATOS_POR_EMPLEADO` y devuelve
+    nombre, cargo y `VINCULO` (`PENDIENTE`/`VINCULADO`).
+  - **Desvío consciente:** el freno de empleado INACTIVO se mantiene **solo si
+    la cédula ya existe**; el caso nuevo (persona sin alta) no lo toca.
+- `modulos/8- EMPLEADOS.sql` — `SP_INSERTAR_EMPLEADO` recibe `P_FECHA_INGRESO`
+  (7º parámetro); sin fecha usa `CURDATE()`, como antes.
+- `contrato.cpp`
+  - **13** coteja el borrador contra el papel: muestra cada valor como default,
+    valida cédula/salario/fecha, resume las diferencias y pide confirmación.
+  - Escaneo opcional (PDF/JPG/PNG, ≤ 20 MB) copiado a `contratos/firmados/`;
+    Enter = sin escaneo. Nunca se guarda en la base.
+  - **14** pide cédula, lista el historial y ofrece adjuntar el escaneo si falta.
+  - **15** pide cédula, busca el contrato ACTIVO y lo finaliza.
+- `empleados.cpp` — la opción 1 lista los contratos firmados sin empleado y
+  precarga todos los datos (incluida la fecha de ingreso).
+- `db/check-app-sps.sh` — nombre del SP actualizado.
+
+**Evidencia**
+- `bash build.sh` → `OK: ./output/app`.
+- `DB_PASSWORD=… bash db/test-contratos-subir.sh` → **OK**, 9 aserciones contra
+  `BALBU_TECH_TEST` con `ROLLBACK` (cero residuos).
+- `DB_NAME=BALBU_TECH_TEST … bash db/test-contrato-borrador.sh` → **14/14 OK**.
+- `DB_HOST=127.0.0.1 bash db/check-app-sps.sh` → `Faltantes: 0 (verificados 82)`.
+- Viva: el contrato #4 de Jose Alcantara quedó intacto (1 fila, `ACTIVO`,
+  `ID_EMPLEADO = 1`). Las pruebas de UI solo tocan `BALBU_TECH_TEST` y limpian
+  sus cédulas marcador.
+
+**Pendiente**
+- Cargar `RNC`, `DIRECCION_EMPRESA`, `REPRESENTANTE` y `CEDULA_REPRESENTANTE` en
+  `CONFIGURACION` (siguen vacíos y el contrato los imprime en blanco).
+- Campos legales que el contrato todavía no pide: nacionalidad, edad, sexo,
+  estado civil, RNL, lugar de prestación, provincia y municipio.

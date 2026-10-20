@@ -1,21 +1,27 @@
 /*
-ARCHIVO 42 - CONTRATOS (registro de contratos de empleados)
-El modulo de la app genera el HTML del contrato (borrador); al FIRMAR se sube
-con SP_SUBIR_CONTRATO y ahi el trigger TR_ALTA_EMPLEADO crea al empleado solo
-si su cedula aun no existe en EMPLEADOS (la introduccion de un empleado es
-directa: los datos se piden una vez, en el contrato).
-TIPO (nombres de la UI, 17/10):
-- TEMPORAL: con duracion en meses (la ley lo llama "termino fijo").
-- FIJO: permanente, sin fecha fin (la ley lo llama "termino indefinido").
+ARCHIVO 42 - CONTRATOS (registro del contrato firmado)
+El modulo de la app genera el HTML del contrato (borrador, opcion 12); cuando
+el empleado firma, la opcion 13 lo coteja y lo registra con SP_SUBIR_CONTRATO.
+CONTRATOS es el REGISTRO DEL PAPEL: no da de alta empleados.
+
+Modelo (19/10/2026):
+- La CEDULA es la llave: existe desde la oferta y no cambia.
+- ID_EMPLEADO puede ser NULL: el contrato se firma ANTES del alta. Cuando el
+  empleado se crea en EMPLEADOS, TR_VINCULAR_CONTRATO completa el ID solo.
+- TIPO (nombres de la UI, 17/10):
+  - TEMPORAL: con duracion en meses (la ley lo llama "termino fijo").
+  - FIJO: permanente, sin fecha fin (la ley lo llama "termino indefinido").
 - NOMBRE/CEDULA/CARGO/TELEFONO/EMAIL/FECHA_INGRESO/SALARIO son un snapshot
   de lo que se firmo: no cambian despues aunque cambie el empleado.
+- FECHA_INICIO = FECHA_INGRESO del contrato (no el dia en que se sube).
 - FECHA_FIN NULL = contrato FIJO (permanente).
 - Solo un contrato ACTIVO por cedula (lo valida el SP).
 - Al despedir se finaliza a mano (opcion del menu empleados).
+- El escaneo del papel lo archiva RRHH; la app solo guarda la ruta si se la dan.
 */
 CREATE TABLE IF NOT EXISTS CONTRATOS (
     ID_CONTRATO INT NOT NULL AUTO_INCREMENT,
-    ID_EMPLEADO INT NOT NULL,
+    ID_EMPLEADO INT NULL,
     TIPO ENUM('TEMPORAL', 'FIJO') NOT NULL,
     FECHA_INICIO DATE NOT NULL,
     FECHA_FIN DATE NULL,
@@ -43,20 +49,36 @@ ALTER TABLE CONTRATOS
     ADD COLUMN IF NOT EXISTS EMAIL VARCHAR(100) NULL AFTER TELEFONO,
     ADD COLUMN IF NOT EXISTS FECHA_INGRESO DATE NULL AFTER EMAIL;
 
+-- (19/10/2026) El contrato nace antes que el empleado: el ID puede faltar.
+-- Idempotente: correrlo dos veces no cambia nada.
+ALTER TABLE CONTRATOS MODIFY ID_EMPLEADO INT NULL;
+
+-- La busqueda por cedula pasa a ser el camino normal (idempotente).
+SET @hay_indice := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CONTRATOS'
+                      AND INDEX_NAME = 'IX_CONTRATOS_CEDULA');
+SET @sql_indice := IF(@hay_indice = 0,
+                      'CREATE INDEX IX_CONTRATOS_CEDULA ON CONTRATOS (CEDULA)',
+                      'DO 0');
+PREPARE st_indice FROM @sql_indice;
+EXECUTE st_indice;
+DEALLOCATE PREPARE st_indice;
+
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_INSERTAR_CONTRATO //
 DROP PROCEDURE IF EXISTS SP_SUBIR_CONTRATO //
 /*
 SP_SUBIR_CONTRATO
-Sube (registra) un contrato cuando la persona firma. No pide ID: recibe los
-datos de la persona que trae el borrador y, si esa cedula aun no existe en
-EMPLEADOS, el trigger TR_ALTA_EMPLEADO la crea al insertar el contrato.
-P_MESES: duracion en meses (solo TEMPORAL; para FIJO permanente se pasa NULL
-y FECHA_FIN queda NULL). FECHA_INICIO es siempre hoy (dia de la firma).
-Los datos quedan como snapshot en la fila del contrato.
+Registra el contrato firmado. No pide ID: recibe los datos cotejados del
+borrador y los guarda como snapshot.
+- Si la cedula YA existe en EMPLEADOS, vincula el ID en el momento.
+- Si NO existe (lo normal: el contrato se firma antes del alta), ID_EMPLEADO
+  queda NULL y TR_VINCULAR_CONTRATO lo completa cuando el alta ocurra.
+- Si ya hay 2+ empleados con esa cedula, frena por ambiguedad.
+P_MESES: duracion en meses (solo TEMPORAL; para FIJO se pasa NULL).
+FECHA_INICIO y FECHA_FIN salen de P_FECHA_INGRESO, no de CURDATE().
 Frena: datos minimos, tipo invalido, temporal sin meses, cedula con contrato
-ACTIVO, empleado INACTIVO, y contacto que ya pertenezca a otro empleado
-(TELEFONO/EMAIL son unicos en EMPLEADOS).
+ACTIVO, y empleado existente INACTIVO.
 */
 CREATE PROCEDURE SP_SUBIR_CONTRATO(
     IN P_NOMBRE VARCHAR(100),
@@ -72,6 +94,7 @@ CREATE PROCEDURE SP_SUBIR_CONTRATO(
 )
 proc_label: BEGIN
     DECLARE v_existe INT DEFAULT 0;
+    DECLARE v_id INT DEFAULT NULL;
     DECLARE v_estado VARCHAR(10) DEFAULT NULL;
 
     -- 1. Datos minimos
@@ -87,64 +110,59 @@ proc_label: BEGIN
     IF P_TIPO = 'TEMPORAL' AND (P_MESES IS NULL OR P_MESES < 1) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL CONTRATO TEMPORAL NECESITA UNA DURACION EN MESES MAYOR A CERO.';
     END IF;
-    IF P_SALARIO IS NULL OR P_SALARIO < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL SALARIO ES OBLIGATORIO.';
+    IF P_SALARIO IS NULL OR P_SALARIO <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL SALARIO ES OBLIGATORIO Y DEBE SER MAYOR A CERO.';
     END IF;
     IF P_FECHA_INGRESO IS NULL THEN
         SET P_FECHA_INGRESO = CURDATE();
     END IF;
 
-    -- 2. Esa cedula, ¿ya es de alguien?
+    -- 2. El empleado puede no existir todavia: el contrato se firma antes
+    --    del alta. Si existe, se vincula ya.
     SELECT COUNT(*) INTO v_existe FROM EMPLEADOS WHERE CEDULA = P_CEDULA;
 
-    IF v_existe > 0 THEN
-        -- Un solo contrato ACTIVO por cedula (da igual el ID)
-        IF EXISTS (
-            SELECT 1 FROM CONTRATOS C
-            JOIN EMPLEADOS E ON E.ID_EMPLEADO = C.ID_EMPLEADO
-            WHERE E.CEDULA = P_CEDULA AND C.ESTADO = 'ACTIVO'
-        ) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESA CEDULA YA TIENE UN CONTRATO ACTIVO. FINALIZELLO ANTES DE REGISTRAR OTRO.';
-        END IF;
+    IF v_existe > 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: HAY MAS DE UN EMPLEADO CON ESA CEDULA. REVISE LOS REGISTROS.';
+    END IF;
 
-        -- No se le firma contrato a un empleado inactivo
-        SELECT ESTADO INTO v_estado
-        FROM EMPLEADOS WHERE CEDULA = P_CEDULA
-        ORDER BY (ESTADO = 'ACTIVO') DESC
-        LIMIT 1;
+    IF v_existe = 1 THEN
+        SELECT ID_EMPLEADO, ESTADO INTO v_id, v_estado
+        FROM EMPLEADOS WHERE CEDULA = P_CEDULA LIMIT 1;
+
         IF v_estado = 'INACTIVO' THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESA CEDULA PERTENECE A UN EMPLEADO INACTIVO. NO SE LE PUEDE REGISTRAR UN CONTRATO.';
-        END IF;
-    ELSE
-        -- Persona nueva: necesita contacto real (lo guarda EMPLEADOS y es unico)
-        IF P_TELEFONO IS NULL OR P_TELEFONO IN ('', '-') OR P_EMAIL IS NULL OR P_EMAIL IN ('', '-') THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NUEVO NECESITA TELEFONO Y EMAIL REALES.';
-        END IF;
-        IF EXISTS (SELECT 1 FROM EMPLEADOS WHERE TELEFONO = P_TELEFONO) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESE TELEFONO YA PERTENECE A OTRO EMPLEADO.';
-        END IF;
-        IF EXISTS (SELECT 1 FROM EMPLEADOS WHERE EMAIL = P_EMAIL) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESE EMAIL YA PERTENECE A OTRO EMPLEADO.';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESA CEDULA PERTENECE A UN EMPLEADO INACTIVO. REACTIVELO ANTES DE REGISTRAR UN CONTRATO.';
         END IF;
     END IF;
 
-    -- 3. Insertamos con ID_EMPLEADO NULL: el trigger lo crea o lo vincula
+    -- 3. Un solo contrato ACTIVO por cedula. Se mira por cedula (el ID puede
+    --    ser NULL) y tambien por ID cuando ya esta vinculado.
+    IF EXISTS (
+        SELECT 1 FROM CONTRATOS
+        WHERE ESTADO = 'ACTIVO'
+          AND (CEDULA = P_CEDULA OR (v_id IS NOT NULL AND ID_EMPLEADO = v_id))
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESA CEDULA YA TIENE UN CONTRATO ACTIVO. CIERRE ESE CONTRATO ANTES DE REGISTRAR OTRO.';
+    END IF;
+
+    -- 4. Registro del papel
     INSERT INTO CONTRATOS (
         ID_EMPLEADO, TIPO, FECHA_INICIO, FECHA_FIN, SALARIO, RUTA_DOCUMENTO,
         NOMBRE, CEDULA, CARGO, TELEFONO, EMAIL, FECHA_INGRESO
     ) VALUES (
-        NULL,
+        v_id,
         P_TIPO,
-        CURDATE(),
-        CASE WHEN P_TIPO = 'TEMPORAL' THEN DATE_ADD(CURDATE(), INTERVAL P_MESES MONTH) ELSE NULL END,
+        P_FECHA_INGRESO,
+        CASE WHEN P_TIPO = 'TEMPORAL'
+             THEN DATE_ADD(P_FECHA_INGRESO, INTERVAL P_MESES MONTH)
+             ELSE NULL END,
         P_SALARIO,
         P_RUTA,
         P_NOMBRE, P_CEDULA, P_CARGO, P_TELEFONO, P_EMAIL, P_FECHA_INGRESO
     );
 
     SELECT CONCAT(
-        'EXITO: CONTRATO #', LAST_INSERT_ID(),
-        IF(v_existe = 0, ' REGISTRADO. EMPLEADO NUEVO CREADO.', ' REGISTRADO. EMPLEADO VINCULADO.')
+        'EXITO: CONTRATO #', LAST_INSERT_ID(), ' REGISTRADO.',
+        IF(v_id IS NULL, ' EMPLEADO PENDIENTE DE ALTA.', ' EMPLEADO VINCULADO.')
     ) AS MENSAJE;
 END //
 DELIMITER ;
@@ -186,90 +204,55 @@ DELIMITER ;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_CONTRATOS_POR_EMPLEADO //
+DROP PROCEDURE IF EXISTS SP_CONTRATOS_POR_CEDULA //
 /*
-SP_CONTRATOS_POR_EMPLEADO
-Historial completo de contratos de un empleado (mas reciente primero).
-Frena si el empleado no existe.
+SP_CONTRATOS_POR_CEDULA
+Historial completo de contratos de una persona (mas reciente primero).
+Funciona antes y despues del alta: busca por cedula, no por ID.
+No frena si no hay contratos: devuelve 0 filas.
 */
-CREATE PROCEDURE SP_CONTRATOS_POR_EMPLEADO(
-    IN P_ID_EMPLEADO INT
+CREATE PROCEDURE SP_CONTRATOS_POR_CEDULA(
+    IN P_CEDULA VARCHAR(20)
 )
 proc_label: BEGIN
-    IF P_ID_EMPLEADO IS NULL OR P_ID_EMPLEADO <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: INGRESE EL ID DEL EMPLEADO.';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO EXISTE UN EMPLEADO CON ESE ID.';
+    IF P_CEDULA IS NULL OR TRIM(P_CEDULA) = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: INGRESE LA CEDULA.';
     END IF;
 
     SELECT
         C.ID_CONTRATO,
+        C.ID_EMPLEADO,
+        C.NOMBRE,
+        C.CARGO,
         C.TIPO,
         C.FECHA_INICIO,
         C.FECHA_FIN,
         C.SALARIO,
         C.ESTADO,
-        C.RUTA_DOCUMENTO
+        C.RUTA_DOCUMENTO,
+        IF(C.ID_EMPLEADO IS NULL, 'PENDIENTE', 'VINCULADO') AS VINCULO
     FROM CONTRATOS C
-    WHERE C.ID_EMPLEADO = P_ID_EMPLEADO
+    WHERE C.CEDULA = P_CEDULA
     ORDER BY C.ID_CONTRATO DESC;
 END //
 DELIMITER ;
 
+-- (19/10/2026) Cuando se da de alta al empleado, sus contratos firmados
+-- dejan de estar huerfanos. AFTER INSERT sobre EMPLEADOS: no crea nada, solo
+-- completa el ID que falto al registrar el contrato.
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_VINCULAR_CONTRATO //
+CREATE TRIGGER TR_VINCULAR_CONTRATO AFTER INSERT ON EMPLEADOS
+FOR EACH ROW
+BEGIN
+    UPDATE CONTRATOS
+    SET ID_EMPLEADO = NEW.ID_EMPLEADO
+    WHERE CEDULA = NEW.CEDULA AND ID_EMPLEADO IS NULL;
+END //
+DELIMITER ;
+
+-- TR_ALTA_EMPLEADO ELIMINADO (18/10/2026): subir un contrato ya NO crea
+-- empleados. El alta la hace RRHH desde el modulo de EMPLEADOS.
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_ALTA_EMPLEADO //
-/*
-TR_ALTA_EMPLEADO (disparador)
-Se dispara SOLO antes de cada INSERT en CONTRATOS y resuelve el ID del
-empleado, que es lo que permite la introduccion directa (sin Agregar Empleado):
-- Si el contrato ya trae ID_EMPLEADO, no toca nada (lo valido el SP y ademas
-  lo cuida la llave foranea).
-- Si no trae ID (persona nueva):
-  * cedula con 2 o mas empleados -> frena (ambiguo);
-  * cedula con 1 empleado -> vincula ese mismo ID (no duplica);
-  * cedula sin empleado -> lo CREA en EMPLEADOS con ESTADO 'ACTIVO' y le
-    pone ese ID al contrato (los datos salen del snapshot del contrato).
-Nota: TELEFONO/EMAIL son unicos en EMPLEADOS; los frenos de duplicidad los
-hace el SP antes de llegar aqui.
-*/
-CREATE TRIGGER TR_ALTA_EMPLEADO
-BEFORE INSERT ON CONTRATOS
-FOR EACH ROW
-proc_label: BEGIN
-    DECLARE v_n INT DEFAULT 0;
-    DECLARE v_id INT DEFAULT NULL;
-    DECLARE v_estado VARCHAR(10) DEFAULT NULL;
-
-    IF NEW.ID_EMPLEADO IS NULL THEN
-        IF NEW.CEDULA IS NULL OR TRIM(NEW.CEDULA) = '' THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: FALTA LA CEDULA PARA CREAR AL EMPLEADO.';
-        END IF;
-
-        SELECT COUNT(*) INTO v_n FROM EMPLEADOS WHERE CEDULA = NEW.CEDULA;
-
-        IF v_n > 1 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: HAY MAS DE UN EMPLEADO CON ESA CEDULA. REVISE LOS REGISTROS.';
-        ELSEIF v_n = 1 THEN
-            SELECT ID_EMPLEADO, ESTADO INTO v_id, v_estado
-            FROM EMPLEADOS WHERE CEDULA = NEW.CEDULA;
-            IF v_estado = 'INACTIVO' THEN
-                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESA CEDULA PERTENECE A UN EMPLEADO INACTIVO. NO SE LE PUEDE REGISTRAR UN CONTRATO.';
-            END IF;
-            SET NEW.ID_EMPLEADO = v_id;
-        ELSE
-            INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO, ESTADO)
-            VALUES (
-                NEW.NOMBRE,
-                NEW.CEDULA,
-                NEW.CARGO,
-                NEW.SALARIO,
-                NEW.TELEFONO,
-                NEW.EMAIL,
-                COALESCE(NEW.FECHA_INGRESO, CURDATE()),
-                'ACTIVO'
-            );
-            SET NEW.ID_EMPLEADO = LAST_INSERT_ID();
-        END IF;
-    END IF;
-END //
 DELIMITER ;
