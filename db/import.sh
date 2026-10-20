@@ -62,6 +62,12 @@ while IFS= read -r f; do
 done < <(ls -1 "$MODULOS_DIR"/*.sql | sort -V)
 
 echo "Listo: $count archivos, $failed con errores de sentencia."
+# (20/10/2026) --force hace que mariadb salga 0 aunque haya errores de sentencia.
+# El conteo de arriba es el unico aviso: si hubo errores, el import falla.
+if [ "$failed" -gt 0 ]; then
+  echo "Import con errores: $failed archivo(s). Revisar los AVISOS de arriba." >&2
+  exit 1
+fi
 echo "Verifica rutinas con: bash db/check-app-sps.sh"
 echo "Tablas en $DB_NAME:"
 mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
