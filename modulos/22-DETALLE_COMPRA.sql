@@ -512,10 +512,23 @@ Cada vez que entra un producto en una compra, le suma la cantidad al stock.
 Si el producto todavia no tiene fila en INVENTARIO, la crea primero
 (mismos defaults que SP_RECIBIR_MERCANCIA) y le suma encima; asi nunca
 se pierde una entrada por falta de registro en inventario.
+(20/10/2026) El orden de los triggers de alta ahora esta declarado con
+FOLLOWS: corre despues de TR_CALCULAR_TOTAL_COMPRA.
 */
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_ACTUALIZAR_STOCK_COMPRA
+-- AFTER INSERT ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     INSERT INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
+--     VALUES (NEW.ID_PRODUCTO, NEW.CANTIDAD, 5, 'ALMACEN_PRINCIPAL')
+--     ON DUPLICATE KEY UPDATE STOCK_ACTUAL = STOCK_ACTUAL + NEW.CANTIDAD;
+-- END //
 CREATE TRIGGER TR_ACTUALIZAR_STOCK_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_CALCULAR_TOTAL_COMPRA
 BEGIN
     INSERT INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
     VALUES (NEW.ID_PRODUCTO, NEW.CANTIDAD, 5, 'ALMACEN_PRINCIPAL')
@@ -570,13 +583,43 @@ TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
 Cuando se quita una linea de una compra, le resta la cantidad al stock
 (lo inverso de TR_ACTUALIZAR_STOCK_COMPRA) y en el MISMO trigger anota
 la SALIDA en el historial con el stock antes y despues. Van juntos a
-proposito: los triggers de DELETE no se pueden ordenar a gusto y asi el
-antes/despues sale bien sin importar en que orden disparen los demas.
+proposito: asi el antes/despues sale bien siempre.
+(20/10/2026) El orden de los triggers de baja ahora esta declarado con
+FOLLOWS: corre despues de TR_RECALCULAR_TOTAL_COMPRA.
 El guard de stock y de estado esta en el BEFORE, que corre primero.
 */
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
+-- AFTER DELETE ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE V_STOCK_ANTES INT;
+--     DECLARE V_STOCK_DESPUES INT;
+--
+--     -- 1. Stock antes de restar
+--     SELECT STOCK_ACTUAL INTO V_STOCK_ANTES
+--       FROM INVENTARIO WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
+--
+--     SET V_STOCK_DESPUES = V_STOCK_ANTES - OLD.CANTIDAD;
+--
+--     -- 2. Bajar el stock
+--     UPDATE INVENTARIO
+--        SET STOCK_ACTUAL = V_STOCK_DESPUES
+--      WHERE ID_PRODUCTO = OLD.ID_PRODUCTO;
+--
+--     -- 3. UNA fila de historial con el antes y el despues
+--     INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
+--         ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
+--     ) VALUES (
+--         OLD.ID_PRODUCTO, 'SALIDA', OLD.CANTIDAD, V_STOCK_ANTES, V_STOCK_DESPUES,
+--         'Producto quitado de la compra'
+--     );
+-- END //
 CREATE TRIGGER TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
 AFTER DELETE ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_RECALCULAR_TOTAL_COMPRA
 BEGIN
     DECLARE V_STOCK_ANTES INT;
     DECLARE V_STOCK_DESPUES INT;
@@ -610,10 +653,26 @@ DROP TRIGGER IF EXISTS TR_AUDITORIA_MOVIMIENTO_COMPRA ;
 TR_AUDITORIA_MOVIMIENTO_COMPRA
 Cuando se registra una compra, anota automaticamente la ENTRADA de mercancia.
 Toma el empleado de la compra y deja el movimiento con su observacion.
+(20/10/2026) El orden de los triggers de alta ahora esta declarado con
+FOLLOWS: corre despues de TR_ACTUALIZAR_STOCK_COMPRA.
 */
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_COMPRA
+-- AFTER INSERT ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     -- Obtenemos el empleado de la cabecera de la compra para el registro
+--     DECLARE V_ID_EMPLEADO INT;
+--     SELECT ID_EMPLEADO INTO V_ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = NEW.ID_COMPRA;
+--
+--     INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
+--     VALUES (NEW.ID_PRODUCTO, V_ID_EMPLEADO, 'ENTRADA', NEW.CANTIDAD, CONCAT('Compra registrada ID: ', NEW.ID_COMPRA));
+-- END //
 CREATE TRIGGER TR_AUDITORIA_MOVIMIENTO_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_ACTUALIZAR_STOCK_COMPRA
 BEGIN
     -- Obtenemos el empleado de la cabecera de la compra para el registro
     DECLARE V_ID_EMPLEADO INT;
@@ -635,10 +694,26 @@ TR_AUDITORIA_BORRADO_COMPRA
 Cuando se quita una linea de una compra, anota la SALIDA de esa
 mercancia (el stock que se regresa al inventario). El empleado lo toma
 de la compra, igual que en la ENTRADA.
+(20/10/2026) El orden de los triggers de baja ahora esta declarado con
+FOLLOWS: corre despues de TR_ACTUALIZAR_STOCK_BORRADO_COMPRA.
 */
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_AUDITORIA_BORRADO_COMPRA
+-- AFTER DELETE ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE V_ID_EMPLEADO INT;
+--     SELECT ID_EMPLEADO INTO V_ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
+--
+--     INSERT INTO MOVIMIENTOS_INVENTARIO (ID_PRODUCTO, ID_EMPLEADO, TIPO_MOVIMIENTO, CANTIDAD, OBSERVACION)
+--     VALUES (OLD.ID_PRODUCTO, V_ID_EMPLEADO, 'SALIDA', OLD.CANTIDAD,
+--             CONCAT('Producto quitado de la compra ID: ', OLD.ID_COMPRA));
+-- END //
 CREATE TRIGGER TR_AUDITORIA_BORRADO_COMPRA
 AFTER DELETE ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_ACTUALIZAR_STOCK_BORRADO_COMPRA
 BEGIN
     DECLARE V_ID_EMPLEADO INT;
     SELECT ID_EMPLEADO INTO V_ID_EMPLEADO FROM COMPRAS WHERE ID_COMPRA = OLD.ID_COMPRA;
@@ -873,6 +948,40 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[COSTO: ultima compra}----------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+-- (20/10/2026) La regla del costo de compra vive en una sola funcion
+-- (FN_COSTO_COMPRA_VIGENTE) y la usan todos los triggers que tocan
+-- PRODUCTOS.P_COMPRA. Antes cada trigger repetia su propia version de la
+-- regla y ninguna miraba si la compra estaba CANCELADA: por eso una compra
+-- cancelada dejaba su precio pegado en P_COMPRA (costo fantasma).
+DELIMITER //
+DROP FUNCTION IF EXISTS FN_COSTO_COMPRA_VIGENTE ;
+/*
+FN_COSTO_COMPRA_VIGENTE (20/10/2026)
+Devuelve el precio de la ultima linea de compra del producto cuya compra NO
+esta cancelada. Si el producto no tiene ninguna compra valida, devuelve 0
+(nunca se compro: el costo queda en 0 y la ganancia de la venta queda NULL).
+Es la unica definicion de la regla del costo de compra: la usan todos los
+triggers que tocan PRODUCTOS.P_COMPRA.
+*/
+CREATE FUNCTION FN_COSTO_COMPRA_VIGENTE(P_ID_PRODUCTO INT)
+  RETURNS DECIMAL(10,2)
+  DETERMINISTIC
+  READS SQL DATA
+BEGIN
+    DECLARE V_COSTO DECIMAL(10,2);
+
+    SELECT DC.PRECIO_UNITARIO INTO V_COSTO
+      FROM DETALLE_COMPRA DC
+      INNER JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
+     WHERE DC.ID_PRODUCTO = P_ID_PRODUCTO
+       AND C.ESTADO <> 'CANCELADA'
+     ORDER BY DC.ID_DETALLE_COMPRA DESC
+     LIMIT 1;
+
+    RETURN IFNULL(V_COSTO, 0);
+END //
+DELIMITER ;
+
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_ACTUALIZAR_COSTO_COMPRA ;
 /*
@@ -881,11 +990,30 @@ Cada linea de compra que entra deja su precio como COSTO del producto
 (ultima compra manda). Corre al final (orden por creacion) y solo toca
 PRODUCTOS.P_COMPRA: no interfiere con total, stock ni auditoria.
 */
+-- Version anterior (20/10/2026): el costo era el precio de la linea que
+-- entraba, sin preguntar si su compra estaba cancelada y sin declarar el
+-- orden de ejecucion.
+-- CREATE TRIGGER TR_ACTUALIZAR_COSTO_COMPRA
+-- AFTER INSERT ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     UPDATE PRODUCTOS SET P_COMPRA = NEW.PRECIO_UNITARIO
+--      WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+-- END //
+/*
+TR_ACTUALIZAR_COSTO_COMPRA (20/10/2026)
+Cada linea de compra que entra deja su precio como COSTO del producto
+(ultima compra manda). Ahora el precio sale de FN_COSTO_COMPRA_VIGENTE (que
+ignora las compras canceladas) y el trigger declara su orden: corre despues
+de la auditoria del movimiento, igual que antes, pero eso ya no depende del
+orden accidentado de creacion.
+*/
 CREATE TRIGGER TR_ACTUALIZAR_COSTO_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_AUDITORIA_MOVIMIENTO_COMPRA
 BEGIN
-    UPDATE PRODUCTOS SET P_COMPRA = NEW.PRECIO_UNITARIO
+    UPDATE PRODUCTOS SET P_COMPRA = FN_COSTO_COMPRA_VIGENTE(NEW.ID_PRODUCTO)
      WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
 END //
 DELIMITER ;
@@ -898,15 +1026,59 @@ Si se quita la ultima linea comprada, el COSTO vuelve a la compra anterior
 que quede (o NULL si nunca se compro). Asi una compra cancelada no deja un
 costo fantasma.
 */
+-- Version anterior (20/10/2026): tomaba la ultima linea que quedara, aunque
+-- su compra estuviera cancelada, y no declaraba su orden de ejecucion.
+-- CREATE TRIGGER TR_RECALCULAR_COSTO_BORRADO_COMPRA
+-- AFTER DELETE ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     UPDATE PRODUCTOS P SET P_COMPRA = COALESCE((
+--         SELECT DC.PRECIO_UNITARIO FROM DETALLE_COMPRA DC
+--          WHERE DC.ID_PRODUCTO = OLD.ID_PRODUCTO
+--          ORDER BY DC.ID_DETALLE_COMPRA DESC LIMIT 1), 0)
+--      WHERE P.ID_PRODUCTO = OLD.ID_PRODUCTO;
+-- END //
+/*
+TR_RECALCULAR_COSTO_BORRADO_COMPRA (20/10/2026)
+Si se quita la ultima linea comprada, el COSTO vuelve a la compra VALIDA
+anterior (la que no este cancelada), o a 0 si ya no queda ninguna. El precio
+sale de FN_COSTO_COMPRA_VIGENTE, la misma regla que usa el resto.
+*/
 CREATE TRIGGER TR_RECALCULAR_COSTO_BORRADO_COMPRA
 AFTER DELETE ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_AUDITORIA_BORRADO_COMPRA
 BEGIN
-    UPDATE PRODUCTOS P SET P_COMPRA = COALESCE((
-        SELECT DC.PRECIO_UNITARIO FROM DETALLE_COMPRA DC
-         WHERE DC.ID_PRODUCTO = OLD.ID_PRODUCTO
-         ORDER BY DC.ID_DETALLE_COMPRA DESC LIMIT 1), 0)
+    UPDATE PRODUCTOS P SET P_COMPRA = FN_COSTO_COMPRA_VIGENTE(OLD.ID_PRODUCTO)
      WHERE P.ID_PRODUCTO = OLD.ID_PRODUCTO;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_RECALCULAR_COSTO_COMPRA_CANCELADA ;
+/*
+TR_RECALCULAR_COSTO_COMPRA_CANCELADA (20/10/2026)
+Cuando una compra pasa a CANCELADA, el costo de sus productos vuelve al de
+la ultima compra VALIDA. Antes el precio de la compra cancelada se quedaba
+pegado en PRODUCTOS.P_COMPRA (costo fantasma) y contaminaba la ganancia de
+las ventas de ese producto.
+Corre despues de TR_CAMBIO_ESTADO_COMPRA (modulo 19) y antes de
+TR_MAPA_COMPRA_RECIBIDA (modulo 40).
+*/
+CREATE TRIGGER TR_RECALCULAR_COSTO_COMPRA_CANCELADA
+AFTER UPDATE ON COMPRAS
+FOR EACH ROW
+FOLLOWS TR_CAMBIO_ESTADO_COMPRA
+BEGIN
+    IF NEW.ESTADO = 'CANCELADA' AND IFNULL(OLD.ESTADO, '') <> 'CANCELADA' THEN
+        UPDATE PRODUCTOS P
+           SET P.P_COMPRA = FN_COSTO_COMPRA_VIGENTE(P.ID_PRODUCTO)
+         WHERE P.ID_PRODUCTO IN (
+               SELECT DC.ID_PRODUCTO
+                 FROM DETALLE_COMPRA DC
+                WHERE DC.ID_COMPRA = NEW.ID_COMPRA
+        );
+    END IF;
 END //
 DELIMITER ;
 

@@ -303,3 +303,58 @@ oferta; `ID_EMPLEADO` puede ser `NULL` hasta el alta.
   `CONFIGURACION` (siguen vacíos y el contrato los imprime en blanco).
 - Campos legales que el contrato todavía no pide: nacionalidad, edad, sexo,
   estado civil, RNL, lugar de prestación, provincia y municipio.
+
+### 20/10 - Costo fantasma: el precio de una compra cancelada ya no se queda pegado
+
+**Qué se cambió**
+- `modulos/22- DETALLE_COMPRA.sql`
+  - Nueva función `FN_COSTO_COMPRA_VIGENTE(P_ID_PRODUCTO)`: devuelve el precio de
+    la última línea de compra **cuya compra NO está CANCELADA** (0 si no hay
+    ninguna). Es la única definición de la regla del costo de compra.
+  - `TR_ACTUALIZAR_COSTO_COMPRA` (AFTER INSERT) ahora usa la función: antes
+    ponía el precio de la línea que entraba sin preguntar si su compra estaba
+    cancelada.
+  - `TR_RECALCULAR_COSTO_BORRADO_COMPRA` (AFTER DELETE) ahora usa la función:
+    antes tomaba la última línea que quedara, aunque su compra estuviera
+    cancelada.
+  - **Nuevo** `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` (AFTER UPDATE ON `COMPRAS`):
+    cuando una compra pasa a CANCELADA, el costo de sus productos vuelve al de
+    la última compra válida. Este es el trigger que cierra el bug.
+  - `FOLLOWS` en toda la cadena de `DETALLE_COMPRA` y de `COMPRAS`: el orden de
+    ejecución ya no depende del orden accidentado de creación.
+- `modulos/32- HISTORIAL_MOVIMIENTOS_PRODUCTO.sql`: `TR_HISTORIAL_COMPRA`
+  declara su lugar en la cadena (total → stock → auditoría → costo → historial).
+- `modulos/40- PRODUCTO_PROVEEDOR.sql`: `TR_MAPA_COMPRA_RECIBIDA` declara su
+  lugar en la cadena de `COMPRAS`.
+
+**Por qué pasaba**
+`SP_CANCELAR_COMPRA` marca la compra CANCELADA pero conserva el detalle ("el
+detalle queda como evidencia"), así que el trigger que recalcula el costo
+(solo corre en AFTER DELETE) nunca se disparaba y el precio de la compra
+cancelada quedaba pegado en `PRODUCTOS.P_COMPRA`. Como
+`23- DETALLE_VENTA.sql` usa ese valor como costo, la venta mostraba una
+ganancia o una pérdida que no existía.
+
+**Evidencia**
+- Test en la viva (transacción con `ROLLBACK`, 0 residuos): producto con costo
+  manual 999 → compra de 1 unidad a 100 → costo 100 → **cancelar la compra →
+  costo 0** (antes quedaba 100) → segunda compra a 200 → costo 200 → borrar la
+  línea → costo 0.
+- Orden real de los triggers medido en la viva: coincide con el declarado.
+- `bash build.sh` → `OK: ./output/app`.
+- `db/check-app-sps.sh` → `Faltantes: 0 (verificados 85)`.
+- Producto de prueba 8 (TEST ABONO, el único costo fantasma vivo) borrado con
+  sus tablas referenciadoras: **0 residuos**. La compra 3 (CANCELADA) quedó con
+  TOTAL 0.
+- Rollback: `backups/costo-fantasma-antes-20-10.sql`.
+
+**Pendiente**
+- La regla acordada es "última compra válida": el costo manual que se carga en
+  la ficha de un producto se respeta hasta la primera compra real; después
+  manda la compra (y si esa compra se cancela, el costo queda en 0 = "nunca se
+  compró"). Si el costo manual debe ser intocable, hace falta una columna
+  aparte.
+- `SP_ACTUALIZAR_PRODUCTO` (módulo 9) deja sobrescribir `P_COMPRA` a mano: es
+  una segunda entrada al costo, fuera de la regla automática.
+- `DETALLES_VENTA.MONTO_GANANCIA` es un snapshot: las ganancias ya registradas
+  no se recalculan con este fix (solo las ventas futuras).
