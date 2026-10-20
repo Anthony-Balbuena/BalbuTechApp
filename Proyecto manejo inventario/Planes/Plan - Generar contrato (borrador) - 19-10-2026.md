@@ -50,7 +50,7 @@ _________________________________          _________________________________
 Firma del empleado                         Firma del empleador
 
 Anthony BAlbuena                           {{REPRESENTANTE}}
-CÉDULA: 40229519463                        CÉDULA: {{CEDULA_REPRESENTANTE}}
+CÉDULA: 00000000000                        CÉDULA: {{CEDULA_REPRESENTANTE}}
                                            BALBU_TECH
 ```
 
@@ -132,6 +132,6 @@ Se descartó una tabla `EMPRESA` aparte: el dueño la rechazó. `CONFIGURACION` 
 
 - `bash build.sh` → `OK: ./output/app`.
 - `db/test-contrato-borrador.sh` → **7/7 OK** contra `BALBU_TECH_TEST`.
-- Prueba manual (cédula 40229519463, ofrecido 20 000, pactado 18 000, FIJO): el HTML salió con las firmas, la cédula impresa, el pie con `RNC ____________` y `____________` (tabla vacía) y `BALBU_TECH`; el `.borrador` guardó `salario_ofrecido=20000.00` y `salario=18000.00`. No hubo escrituras en la base.
+- Prueba manual (cédula 00000000000, ofrecido 20 000, pactado 18 000, FIJO): el HTML salió con las firmas, la cédula impresa, el pie con `RNC ____________` y `____________` (tabla vacía) y `BALBU_TECH`; el `.borrador` guardó `salario_ofrecido=20000.00` y `salario=18000.00`. No hubo escrituras en la base.
 
 **Pendiente de este plan:** cargar los datos reales de la empresa con los `UPDATE` de arriba (RNC, ciudad, dirección, representante y su cédula).

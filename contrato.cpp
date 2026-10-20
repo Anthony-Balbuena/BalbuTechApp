@@ -274,9 +274,9 @@ void generarContratoUI() {
         p.nombre = requerido("Nombre completo: ");
         p.cargo  = requerido("Cargo que se le ofrece: ");
 
-        // Ofrecido y pactado no tienen por que coincidir: el empleado puede
-        // pedir mas (y se le da) o la empresa puede ofrecer menos. El contrato
-        // guarda el pactado; el ofrecido queda en el borrador como referencia.
+        // (20/10/2026) La opcion 12 es la OFERTA: solo pide el salario
+        // ofrecido. El salario pactado se define al subir el contrato
+        // (opcion 13), cuando se coteja contra el papel firmado.
         auto pedirMonto = [](const string &etiqueta, double defecto) {
             while (true) {
                 string s = recortar(leerDatoSeguro(etiqueta));
@@ -303,12 +303,9 @@ void generarContratoUI() {
             ostringstream so;
             so << fixed << setprecision(2) << ofrecido;
             p.salarioOfrecido = so.str();
-
-            double pactado = pedirMonto(
-                "Salario pactado (Enter = " + so.str() + "): ", ofrecido);
-            ostringstream sp;
-            sp << fixed << setprecision(2) << pactado;
-            p.salario = sp.str();
+            // El documento se imprime con el ofrecido; el pactado se confirma
+            // en la opcion 13 antes de registrar.
+            p.salario = p.salarioOfrecido;
         }
 
         p.telefono = recortar(leerDatoSeguro("Telefono (Enter = -): "));

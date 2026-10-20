@@ -76,17 +76,44 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_COMPRA ;
 TR_HISTORIAL_COMPRA
 Al comprar, anota en el historial la ENTRADA con el stock antes y
 despues. Solo registra: el que suma el stock es
-TR_ACTUALIZAR_STOCK_COMPRA (19), que corre antes.
+TR_ACTUALIZAR_STOCK_COMPRA (22), que corre antes.
+(20/10/2026) El orden de los triggers de alta ya no depende del orden de
+creacion: esta declarado con FOLLOWS (total -> stock -> auditoria -> costo
+-> historial), asi que este trigger corre al final de la cadena de la compra.
 */
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_HISTORIAL_COMPRA
+-- AFTER INSERT ON DETALLE_COMPRA
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE v_stock_anterior INT;
+--     DECLARE v_stock_nuevo INT;
+--
+--     -- 1. Leemos el stock ya actualizado (el trigger de la compra, archivo 19,
+--     -- se crea primero y por eso corre antes)
+--     SELECT STOCK_ACTUAL INTO v_stock_nuevo FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
+--
+--     -- 2. El stock anterior era el actual menos lo comprado
+--     SET v_stock_anterior = v_stock_nuevo - NEW.CANTIDAD;
+--
+--     -- 3. Registramos el movimiento en el historial
+--     INSERT INTO HISTORIAL_MOVIMIENTOS_PRODUCTO (
+--         ID_PRODUCTO, TIPO_MOVIMIENTO, CANTIDAD, STOCK_ANTERIOR, STOCK_NUEVO, OBSERVACION
+--     ) VALUES (
+--         NEW.ID_PRODUCTO, 'ENTRADA', NEW.CANTIDAD, v_stock_anterior, v_stock_nuevo, 'Compra registrada automáticamente'
+--     );
+-- END//
 CREATE TRIGGER TR_HISTORIAL_COMPRA
 AFTER INSERT ON DETALLE_COMPRA
 FOR EACH ROW
+FOLLOWS TR_ACTUALIZAR_COSTO_COMPRA
 BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
 
-    -- 1. Leemos el stock ya actualizado (el trigger de la compra, archivo 19,
-    -- se crea primero y por eso corre antes)
+    -- 1. Leemos el stock ya actualizado (el trigger de stock, 22, ya corrio
+    -- porque el orden de la cadena esta declarado con FOLLOWS)
     SELECT STOCK_ACTUAL INTO v_stock_nuevo FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
 
     -- 2. El stock anterior era el actual menos lo comprado
@@ -104,9 +131,11 @@ DELIMITER ;
 /*
 TR_HISTORIAL_BORRADO_COMPRA - NO SE CREA AQUI
 El historial de cuando se quita una linea de una compra lo escribe
-TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (19- COMPRAS) dentro del mismo
-trigger que baja el stock: los triggers de DELETE no se pueden ordenar
-y asi el antes/despues sale siempre bien. Aqui solo queda la nota.
+TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (22) dentro del mismo trigger que baja
+el stock: asi el antes/despues sale siempre bien.
+(20/10/2026) Ademas el orden de los triggers de baja ya esta declarado con
+FOLLOWS (total -> stock -> auditoria -> costo).
+Aqui solo queda la nota.
 */
 ----DEVOLUCIONES (version vieja, comentada)
 

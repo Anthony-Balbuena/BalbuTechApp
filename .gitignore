@@ -35,3 +35,6 @@ backups/
 
 # Datos exportados de la BD para la pagina web (cada sede genera el suyo)
 Pagina_Web/datos-web.js
+
+# Contratos generados con datos personales
+contratos/

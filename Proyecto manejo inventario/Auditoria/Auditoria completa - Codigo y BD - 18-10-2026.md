@@ -98,7 +98,7 @@ Tres instancias confirmadas:
 El C++ **no tiene una sola transacción** (`autocommit`/`COMMIT`/`ROLLBACK`: cero coincidencias en todo el C++). La atomicidad depende por completo de los SP — que en general lo hacen bien (ver §1) —, pero:
 
 - La venta multi-línea **no es atómica** (`ventas.cpp:321-348`: compensación best-effort con `SP_CANCELAR_VENTA`).
-- **El orden de los triggers de `DETALLE_COMPRA` es un artefacto del historial de creación**: ninguno de los cinco declara `FOLLOWS`. Verificado en la viva: el orden actual (stock → auditoría → total → historial → costo) coincide con el comentario de `19.1` pero **no** con el orden en que aparecen los `CREATE TRIGGER` en los archivos. Un rebuild limpio podría desfasar los snapshots `STOCK_ANTERIOR`/`STOCK_NUEVO`.
+- **El orden de los triggers de `DETALLE_COMPRA` es un artefacto del historial de creación**: ninguno de los cinco declara `FOLLOWS`. Verificado en la viva: el orden actual (stock → auditoría → total → historial → costo) coincide con el comentario de `19.1` pero **no** con el orden en que aparecen los `CREATE TRIGGER` en los archivos. Un rebuild limpio podría desfasar los snapshots `STOCK_ANTERIOR`/`STOCK_NUEVO`. *(20/10/2026: **corregido**. Toda la cadena de `DETALLE_COMPRA` y la de `COMPRAS` declara su orden con `FOLLOWS`; el orden real se midió en la viva y coincide con el declarado. Ver `Planes/Realizado.md` → "Costo fantasma".)*
 - "Un contrato ACTIVO por cédula" se prueba con un `IF EXISTS` y no hay constraint que lo garantice (`42:102-108`).
 - `FN_TIENE_PERMISO` se declara `P_ACCION VARCHAR(20)` pero hay permisos de 21 y 22 caracteres. **No trunca: revienta.** Verificado: `ERROR 1406 (22001) Data too long for column 'P_ACCION'`. El C++ lo convierte en `Error DB: ...`.
 
@@ -153,7 +153,7 @@ Todo lo siguiente se comprobó con consultas reales, no por lectura de archivos.
 
 | # | Hallazgo | Evidencia medida |
 | --- | --- | --- |
-| 1 | **Costo fantasma tras cancelar una compra** | `PRODUCTO FASE I` (ID 20) tiene `P_COMPRA = 10.00` — el precio exacto de las **dos compras canceladas** (426 y 464) y **cero** compras válidas. El trigger que recalcula el costo solo corre en el camino `DELETE`, y `SP_CANCELAR_COMPRA` no borra el detalle. |
+| 1 | **Costo fantasma tras cancelar una compra** | `PRODUCTO FASE I` (ID 20) tiene `P_COMPRA = 10.00` — el precio exacto de las **dos compras canceladas** (426 y 464) y **cero** compras válidas. El trigger que recalcula el costo solo corre en el camino `DELETE`, y `SP_CANCELAR_COMPRA` no borra el detalle. *(20/10/2026: **corregido** — la regla del costo vive ahora en `FN_COSTO_COMPRA_VIGENTE` (ignora las compras canceladas) y un trigger nuevo la aplica cuando la compra se cancela.)* |
 | 2 | `FN_TIENE_PERMISO` revienta, no trunca | `ERROR 1406 (22001)` con un permiso de 21 caracteres. |
 | 3 | Permisos ejecutables hoy | `PERMISOS` = 17, `ROL_PERMISO` = 26 (ADMIN 17, RRHH 5, EMPLEADO 4), `ROLES` = 3, `USUARIOS` = **1** (`abalbuena`, ADMIN). `FN_TIENE_PERMISO('abalbuena','GESTIONAR_ROLES') = 1`; con un permiso inexistente = 0: **la función funciona**. |
 | 4 | `EMPLEADOS.CEDULA` sin `UNIQUE` | `SHOW INDEX` solo devuelve `PRIMARY`, `EMAIL`, `TELEFONO`. **Estado: 9 empleados, 9 cédulas distintas** → riesgo latente, no materializado. |

@@ -212,7 +212,7 @@
 **Evidencia**
 - `bash build.sh` → `OK`.
 - `db/test-contrato-borrador.sh` → **6/6 OK** (nuevo caso 6: cédula inexistente en la opción 12 avisa y no genera archivos).
-- Prueba manual con la viva: cédula 40229519463 → nombre y cargo precargados, cargo cambiado a «Cajero», ofrecido 20 000, pactado 18 000; el borrador guardó ambos y el HTML mostró 18 000.
+- Prueba manual con la viva: cédula 00000000000 → nombre y cargo precargados, cargo cambiado a «Cajero», ofrecido 20 000, pactado 18 000; el borrador guardó ambos y el HTML mostró 18 000.
 - El directorio temporal se borró después de la prueba.
 
 ### 19/10 (tercera parte) — La opción 12 ya no consulta la base, firmas y tabla EMPRESA
@@ -238,7 +238,7 @@
 **Evidencia**
 - `bash build.sh` → `OK: ./output/app`.
 - `db/test-contrato-borrador.sh` → **7/7 OK** contra `BALBU_TECH_TEST` (caso 6 reescrito: cédula válida inexistente no frena; caso 7 nuevo: cédula de 3 dígitos rechazada).
-- Prueba manual con cédula 40229519463, ofrecido 20 000, pactado 18 000, FIJO: HTML con `CÉDULA: 40229519463` bajo la firma, pie con `BALBU_TECH, RNC ____________, ____________` y borrador con `salario_ofrecido=20000.00` / `salario=18000.00`. Cero escrituras en la base.
+- Prueba manual con cédula 00000000000, ofrecido 20 000, pactado 18 000, FIJO: HTML con `CÉDULA: 00000000000` bajo la firma, pie con `BALBU_TECH, RNC ____________, ____________` y borrador con `salario_ofrecido=20000.00` / `salario=18000.00`. Cero escrituras en la base.
 - En la viva y en TEST: `EMPRESA` eliminada; `CONFIGURACION` con las cinco claves nuevas vacías (TEST conservó `CIUDAD = Santo Domingo` que ya tenía).
 - Segunda prueba manual contra TEST: el pie salió con `BALBU_TECH, RNC ____________, Santo Domingo` — el nombre y la ciudad salieron de `CONFIGURACION`, el RNC vacío del placeholder.
 
@@ -294,7 +294,7 @@ oferta; `ID_EMPLEADO` puede ser `NULL` hasta el alta.
   `BALBU_TECH_TEST` con `ROLLBACK` (cero residuos).
 - `DB_NAME=BALBU_TECH_TEST … bash db/test-contrato-borrador.sh` → **14/14 OK**.
 - `DB_HOST=127.0.0.1 bash db/check-app-sps.sh` → `Faltantes: 0 (verificados 82)`.
-- Viva: el contrato #4 de Jose Alcantara quedó intacto (1 fila, `ACTIVO`,
+- Viva: el contrato #4 de Empleado de prueba quedó intacto (1 fila, `ACTIVO`,
   `ID_EMPLEADO = 1`). Las pruebas de UI solo tocan `BALBU_TECH_TEST` y limpian
   sus cédulas marcador.
 
@@ -303,3 +303,74 @@ oferta; `ID_EMPLEADO` puede ser `NULL` hasta el alta.
   `CONFIGURACION` (siguen vacíos y el contrato los imprime en blanco).
 - Campos legales que el contrato todavía no pide: nacionalidad, edad, sexo,
   estado civil, RNL, lugar de prestación, provincia y municipio.
+
+### 20/10 — Opción 12 ya no pide el salario pactado
+
+**Pedido del dueño (verbatim):** "en generar contrato no puede ponerme sueldo pactado, eso va en subir el contrato. Tienes que quitar eso de ahí, solo se deja en subir el contrato."
+
+**Qué se cambió**
+- `contrato.cpp` — `generarContratoUI()`: la opción 12 pide solo `Salario ofrecido`; se eliminó el prompt `Salario pactado`.
+- El HTML y el `.borrador` se generan con ese monto. El `.borrador` conserva `salario_ofrecido=` (mismo valor); la opción 13 lo usa como default del cotejo.
+- La opción 13 sigue pidiendo `Salario pactado` y es la que registra el valor en `CONTRATOS.SALARIO`.
+- `contrato.h` — comentarios del struct `DatosPersonaContrato` actualizados.
+
+**Evidencia**
+- `bash build.sh` → `OK: ./output/app`.
+- Humo contra la viva: opción 12 con 18500 mostró solo `Salario ofrecido`; HTML con `RD$18500.00`; borrador con `salario=18500.00` / `salario_ofrecido=18500.00`.
+- Humo opción 13: mostró `Salario pactado [18500.00]` y cortó con EOF sin escribir en la base.
+- La suite completa contra `BALBU_TECH_TEST` no se pudo correr con el usuario de la app (`balbu_app` no tiene acceso a esa base).
+
+### 20/10 - Costo fantasma: el precio de una compra cancelada ya no se queda pegado
+
+**Qué se cambió**
+- `modulos/22- DETALLE_COMPRA.sql`
+  - Nueva función `FN_COSTO_COMPRA_VIGENTE(P_ID_PRODUCTO)`: devuelve el precio de
+    la última línea de compra **cuya compra NO está CANCELADA** (0 si no hay
+    ninguna). Es la única definición de la regla del costo de compra.
+  - `TR_ACTUALIZAR_COSTO_COMPRA` (AFTER INSERT) ahora usa la función: antes
+    ponía el precio de la línea que entraba sin preguntar si su compra estaba
+    cancelada.
+  - `TR_RECALCULAR_COSTO_BORRADO_COMPRA` (AFTER DELETE) ahora usa la función:
+    antes tomaba la última línea que quedara, aunque su compra estuviera
+    cancelada.
+  - **Nuevo** `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` (AFTER UPDATE ON `COMPRAS`):
+    cuando una compra pasa a CANCELADA, el costo de sus productos vuelve al de
+    la última compra válida. Este es el trigger que cierra el bug.
+  - `FOLLOWS` en toda la cadena de `DETALLE_COMPRA` y de `COMPRAS`: el orden de
+    ejecución ya no depende del orden accidentado de creación.
+- `modulos/32- HISTORIAL_MOVIMIENTOS_PRODUCTO.sql`: `TR_HISTORIAL_COMPRA`
+  declara su lugar en la cadena (total → stock → auditoría → costo → historial).
+- `modulos/40- PRODUCTO_PROVEEDOR.sql`: `TR_MAPA_COMPRA_RECIBIDA` declara su
+  lugar en la cadena de `COMPRAS`.
+
+**Por qué pasaba**
+`SP_CANCELAR_COMPRA` marca la compra CANCELADA pero conserva el detalle ("el
+detalle queda como evidencia"), así que el trigger que recalcula el costo
+(solo corre en AFTER DELETE) nunca se disparaba y el precio de la compra
+cancelada quedaba pegado en `PRODUCTOS.P_COMPRA`. Como
+`23- DETALLE_VENTA.sql` usa ese valor como costo, la venta mostraba una
+ganancia o una pérdida que no existía.
+
+**Evidencia**
+- Test en la viva (transacción con `ROLLBACK`, 0 residuos): producto con costo
+  manual 999 → compra de 1 unidad a 100 → costo 100 → **cancelar la compra →
+  costo 0** (antes quedaba 100) → segunda compra a 200 → costo 200 → borrar la
+  línea → costo 0.
+- Orden real de los triggers medido en la viva: coincide con el declarado.
+- `bash build.sh` → `OK: ./output/app`.
+- `db/check-app-sps.sh` → `Faltantes: 0 (verificados 85)`.
+- Producto de prueba 8 (TEST ABONO, el único costo fantasma vivo) borrado con
+  sus tablas referenciadoras: **0 residuos**. La compra 3 (CANCELADA) quedó con
+  TOTAL 0.
+- Rollback: `backups/costo-fantasma-antes-20-10.sql`.
+
+**Pendiente**
+- La regla acordada es "última compra válida": el costo manual que se carga en
+  la ficha de un producto se respeta hasta la primera compra real; después
+  manda la compra (y si esa compra se cancela, el costo queda en 0 = "nunca se
+  compró"). Si el costo manual debe ser intocable, hace falta una columna
+  aparte.
+- `SP_ACTUALIZAR_PRODUCTO` (módulo 9) deja sobrescribir `P_COMPRA` a mano: es
+  una segunda entrada al costo, fuera de la regla automática.
+- `DETALLES_VENTA.MONTO_GANANCIA` es un snapshot: las ganancias ya registradas
+  no se recalculan con este fix (solo las ventas futuras).

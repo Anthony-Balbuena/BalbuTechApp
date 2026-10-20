@@ -9,9 +9,15 @@ CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
     NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
 ) ENGINE = InnoDB; 
--- Semillas base: los roles que la app compara tal cual (roles.cpp: ADMIN/RRHH/EMPLEADO).
+-- (20/10/2026, C-3) Semillas base: el set final de roles de la tienda.
+-- Antes eran solo los que la app comparaba tal cual (roles.cpp: ADMIN/RRHH/EMPLEADO);
+-- ahora los permisos salen de la base y estas filas solo garantizan que existan
+-- los roles que ROL_PERMISO referencia (FK) y que el login los encuentre.
+-- Los roles viejos quedan al principio para no cambiar los ID_ROL existentes.
 -- Sin estas filas fallan los seeds de ROL_PERMISO (FK) y el login. Idempotente.
-INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('ADMIN'), ('RRHH'), ('EMPLEADO');
+-- Version anterior (solo los roles que la app comparaba tal cual):
+-- INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('ADMIN'), ('RRHH'), ('EMPLEADO');
+INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('ADMIN'), ('RRHH'), ('EMPLEADO'), ('GERENTE'), ('CAJERO'), ('ALMACEN');
 /*
 INDICE IX_ROLES_NOMBRE
 Indice no unico sobre NOMBRE_ROL que acelera las busquedas y listados

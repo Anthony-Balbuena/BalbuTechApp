@@ -10,8 +10,8 @@ struct DatosPersonaContrato {
     std::string nombre;
     std::string cedula;
     std::string cargo;
-    std::string salario;         // pactado, ya formateado con 2 decimales
-    std::string salarioOfrecido; // referencia de la oferta (no va al contrato)
+    std::string salario;         // salario impreso en el documento (el ofrecido)
+    std::string salarioOfrecido; // mismo valor, como referencia en el .borrador
     std::string telefono;
     std::string email;
     std::string fechaIngreso;    // ISO YYYY-MM-DD

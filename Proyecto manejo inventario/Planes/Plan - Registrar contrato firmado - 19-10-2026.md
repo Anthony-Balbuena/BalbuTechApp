@@ -72,7 +72,7 @@ En el `CREATE TABLE IF NOT EXISTS` también se cambia `ID_EMPLEADO INT NOT NULL`
 **Lista de borradores** (hoy muestra solo nombre y tipo):
 
 ```
-1. Anthony BAlbuena — 40229519463 — Cajero — ingreso 2026-11-01  (contratos/...)
+1. Anthony BAlbuena — 00000000000 — Cajero — ingreso 2026-11-01  (contratos/...)
 2. Descartar un borrador (no sube nada)
 0. Volver
 ```
@@ -84,7 +84,7 @@ En el `CREATE TABLE IF NOT EXISTS` también se cambia `ID_EMPLEADO INT NOT NULL`
 (Enter deja el valor del borrador; escribi el valor si el papel dice otra cosa)
 
 Nombre [Anthony BAlbuena]:
-Cedula [40229519463]:
+Cedula [00000000000]:
 Cargo [Cajero]:
 Salario pactado [18000.00]:
 Tipo [FIJO]:
@@ -127,7 +127,7 @@ En la opción 1 (Agregar Empleado), antes de pedir datos:
 
 ```
 Contratos firmados sin empleado:
-  1. Anthony BAlbuena — 40229519463 — Cajero — 18,000.00 — ingreso 01/11/2026
+  1. Anthony BAlbuena — 00000000000 — Cajero — 18,000.00 — ingreso 01/11/2026
   2. ...
   0. Dar de alta a alguien sin contrato
 ```
@@ -192,7 +192,7 @@ Contratos firmados sin empleado:
 `CREATE TABLE` y en un `ALTER ... MODIFY` idempotente; índice
 `IX_CONTRATOS_CEDULA` (se crea solo si falta); `TR_VINCULAR_CONTRATO` (AFTER
 INSERT en `EMPLEADOS`). Aplicado a `BALBU_TECH` y `BALBU_TECH_TEST`. El contrato
-real de la viva (Jose Alcantara, #4) quedó intacto.
+real de la viva (Empleado de prueba, #4) quedó intacto.
 
 **Fase 2 — `SP_SUBIR_CONTRATO`.** Cédula sin empleado → registra con
 `ID_EMPLEADO = NULL` y responde `EMPLEADO PENDIENTE DE ALTA`; con empleado →

@@ -21,3 +21,25 @@ Notas que no son bugs hoy pero hay que tener presentes.
 - ENUMs consistentes por dominio (43 columnas).
 - Sin `CALL`s colgados en `.sql` ni en C++ (`check-app-sps.sh`: 0 faltantes).
 - Import: 0 errores — 59 tablas / 124 SPs / 72 triggers.
+
+## Consolidar los ALTER dentro del CREATE TABLE (pendiente, para el final)
+
+Hoy el esquema se arma en dos pasos: `CREATE TABLE` y después una tanda de
+`ALTER TABLE` (25 en 11 módulos) para agregar columnas, defaults, NOT NULL,
+índices o FK. Ejemplo claro: `PRODUCTOS.ID_PROVEEDOR` (módulo 9) ya está
+definido en el `CREATE TABLE` como `INT NOT NULL` + FK; igual quedaron 4
+`ALTER` de la migración (agregar con `DEFAULT 1`, forzar `NOT NULL DEFAULT 1`,
+`DROP DEFAULT` y otro `MODIFY`). En ese caso no hay que reescribir el `CREATE`:
+se borran los 4 `ALTER` y la tabla queda igual.
+
+Regla: cada módulo muestra la tabla final en un solo `CREATE TABLE`; los
+`ALTER` de migración se borran. Si un `ALTER` agrega algo que el `CREATE` no
+tiene, primero se pasa al `CREATE` y después se borra el `ALTER`.
+
+Cuando termine el trabajo actual: dejar cada `CREATE TABLE` con la definición
+final (columnas, defaults, constraints, índices y FK) y borrar los `ALTER` que
+solo existen para llegar a ese estado. Si hace falta migrar una base existente,
+ese `ALTER` va en un script de migración aparte, no en el módulo de esquema.
+
+Ojo: no todos los 25 se pueden borrar sin más; hay que revisar uno por uno
+(algunos crean FK o índices que deben pasar al `CREATE`).
