@@ -304,6 +304,22 @@ oferta; `ID_EMPLEADO` puede ser `NULL` hasta el alta.
 - Campos legales que el contrato todavía no pide: nacionalidad, edad, sexo,
   estado civil, RNL, lugar de prestación, provincia y municipio.
 
+### 20/10 — Opción 12 ya no pide el salario pactado
+
+**Pedido del dueño (verbatim):** "en generar contrato no puede ponerme sueldo pactado, eso va en subir el contrato. Tienes que quitar eso de ahí, solo se deja en subir el contrato."
+
+**Qué se cambió**
+- `contrato.cpp` — `generarContratoUI()`: la opción 12 pide solo `Salario ofrecido`; se eliminó el prompt `Salario pactado`.
+- El HTML y el `.borrador` se generan con ese monto. El `.borrador` conserva `salario_ofrecido=` (mismo valor); la opción 13 lo usa como default del cotejo.
+- La opción 13 sigue pidiendo `Salario pactado` y es la que registra el valor en `CONTRATOS.SALARIO`.
+- `contrato.h` — comentarios del struct `DatosPersonaContrato` actualizados.
+
+**Evidencia**
+- `bash build.sh` → `OK: ./output/app`.
+- Humo contra la viva: opción 12 con 18500 mostró solo `Salario ofrecido`; HTML con `RD$18500.00`; borrador con `salario=18500.00` / `salario_ofrecido=18500.00`.
+- Humo opción 13: mostró `Salario pactado [18500.00]` y cortó con EOF sin escribir en la base.
+- La suite completa contra `BALBU_TECH_TEST` no se pudo correr con el usuario de la app (`balbu_app` no tiene acceso a esa base).
+
 ### 20/10 - Costo fantasma: el precio de una compra cancelada ya no se queda pegado
 
 **Qué se cambió**

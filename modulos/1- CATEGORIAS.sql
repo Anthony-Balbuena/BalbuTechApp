@@ -6,10 +6,6 @@ Solo puede haber una categoria con cada nombre y todas arrancan ACTIVAS.
 Se usa para agrupar los productos en el catalogo.
 */
 
-select * from DETALLES_VENTA
-
-SELECT * FROM `PAGOS`;
-
 CREATE TABLE CATEGORIAS (
     ID_CATEGORIA INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(50) NOT NULL UNIQUE,
@@ -271,9 +267,3 @@ BEGIN
     SELECT ID_CATEGORIA, NOMBRE, ESTADO FROM CATEGORIAS ORDER BY ID_CATEGORIA;
 END //
 DELIMITER ;
-
-
-
-
-
-select * from PRODUCTOS;;
