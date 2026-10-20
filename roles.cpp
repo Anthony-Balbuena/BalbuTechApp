@@ -28,353 +28,233 @@
 
 using namespace std;
 
-// Obtiene la lista de permisos que tiene un rol concreto dentro del sistema.
+// ---------------------------------------------------------------------------
+// Permisos: la base es la unica fuente de verdad (C-3, 20/10/2026).
+// ---------------------------------------------------------------------------
+
+// Recorta espacios de los extremos.
+static string recortar(const string& s) {
+    size_t i = s.find_first_not_of(" \t\r\n");
+    if (i == string::npos) return "";
+    size_t f = s.find_last_not_of(" \t\r\n");
+    return s.substr(i, f - i + 1);
+}
+
+// Obtiene la lista de permisos que tiene un rol concreto (consulta la base).
 vector<std::string> obtenerPermisosPorRol(const std::string& rol) {
     std::vector<std::string> permisos;
+    if (globalCon == nullptr) return permisos;
 
-    if (rol == "ADMIN") {
-        permisos = {
-            "GESTIONAR_ROLES",
-            "GESTIONAR_USUARIOS",
-            "GESTIONAR_EMPLEADOS",
-            "GESTIONAR_CLIENTES",
-            "GESTIONAR_PROVEEDORES",
-            "GESTIONAR_CATEGORIAS",
-            "GESTIONAR_MARCAS",
-            "GESTIONAR_PRODUCTOS",
-            "GESTIONAR_METODOS_PAGO",
-            "GESTIONAR_INVENTARIO",
-            "GESTIONAR_VENTAS",
-            "GESTIONAR_COMPRAS",
-            "CONSULTAR_REPORTES"
-        };
-    } else if (rol == "RRHH") {
-        permisos = {
-            "GESTIONAR_EMPLEADOS",
-            "GESTIONAR_ROLES",
-            "GESTIONAR_USUARIOS",
-            "GESTIONAR_CLIENTES",
-            "GESTIONAR_VENTAS",
-            "CONSULTAR_REPORTES"
-        };
-    } else if (rol == "EMPLEADO") {
-        permisos = {
-            "CONSULTAR_PRODUCTOS",
-            "CONSULTAR_CLIENTES",
-            "GESTIONAR_VENTAS",
-            "REGISTRAR_ASISTENCIA",
-            "SOLICITAR_PERMISO"
-        };
+    try {
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "SELECT P.NOMBRE_PERMISO FROM ROL_PERMISO RP "
+            "INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO "
+            "WHERE RP.ROL_NOMBRE = ? ORDER BY P.NOMBRE_PERMISO"));
+        ps->setString(1, rol);
+
+        std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
+        while (res->next()) {
+            permisos.push_back(res->getString("NOMBRE_PERMISO"));
+        }
+        drenarResultados(ps.get());
+    } catch (const exception&) {
+        permisos.clear();
     }
 
     return permisos;
 }
 
-// Verifica si el usuario autenticado tiene permiso para ejecutar una acción concreta.
+// Verifica si el usuario autenticado tiene permiso para ejecutar una accion.
+// Sin atajo local: la funcion de la base es la unica respuesta.
 bool tienePermiso(const string& accion) {
-    if (!sesionActiva()) {
+    if (!sesionActiva() || globalCon == nullptr) {
         return false;
     }
 
-    vector<string> permisos = obtenerPermisosPorRol(sesionActual.nombreRol);
-    for (const string& permiso : permisos) {
-        if (permiso == accion) {
-            return true;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "SELECT IFNULL(FN_TIENE_PERMISO(?, ?), 0) AS PERMISO"
+        ));
+        pstmt->setString(1, sesionActual.username);
+        pstmt->setString(2, accion);
+
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        bool permitido = false;
+
+        if (res->next()) {
+            permitido = res->getInt("PERMISO") == 1;
         }
+
+        drenarResultados(pstmt.get());
+        return permitido;
+    } catch (const exception&) {
+        return false;
     }
-
-    if (globalCon != nullptr) {
-        try {
-            std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-                "SELECT IFNULL(FN_TIENE_PERMISO(?, ?), 0) AS PERMISO"
-            ));
-            pstmt->setString(1, sesionActual.username);
-            pstmt->setString(2, accion);
-
-            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-            bool permitido = false;
-
-            if (res->next()) {
-                permitido = res->getInt("PERMISO") == 1;
-            }
-
-            drenarResultados(pstmt.get());
-            return permitido;
-        } catch (const exception&) {
-            return false;
-        }
-    }
-
-    return false;
 }
 
-// Muestra todos los permisos disponibles para el rol actual de la sesión activa.
+// Permisos efectivos del usuario logueado. Se consulta por USUARIO (no por
+// nombre de rol): si el rol se renombra, la sesion sigue mostrando lo correcto.
+static vector<string> permisosDelUsuario(const string& usuario) {
+    vector<string> permisos;
+    if (globalCon == nullptr) return permisos;
+
+    try {
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "SELECT P.NOMBRE_PERMISO FROM USUARIOS U "
+            "INNER JOIN ROLES R ON R.ID_ROL = U.ID_ROL "
+            "INNER JOIN ROL_PERMISO RP ON RP.ROL_NOMBRE = R.NOMBRE_ROL "
+            "INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO "
+            "WHERE U.USUARIO = ? ORDER BY P.NOMBRE_PERMISO"));
+        ps->setString(1, usuario);
+
+        std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
+        while (res->next()) {
+            permisos.push_back(res->getString("NOMBRE_PERMISO"));
+        }
+        drenarResultados(ps.get());
+    } catch (const exception&) {
+        permisos.clear();
+    }
+
+    return permisos;
+}
+
+// Muestra todos los permisos efectivos del usuario de la sesion activa.
 void mostrarPermisosActuales() {
     if (!sesionActiva()) {
         cout << ROJO << "No hay sesión activa." << RESET << endl;
         return;
     }
 
-    cout << AZUL << "\nPermisos para: " << sesionActual.nombreRol << RESET << endl;
-    vector<string> permisos = obtenerPermisosPorRol(sesionActual.nombreRol);
+    cout << AZUL << "\nPermisos para: " << sesionActual.username
+         << " (" << sesionActual.nombreRol << ")" << RESET << endl;
+
+    vector<string> permisos = permisosDelUsuario(sesionActual.username);
+    if (permisos.empty()) {
+        cout << "Sin permisos asignados." << endl;
+        return;
+    }
+
     for (const string& permiso : permisos) {
         cout << "- " << permiso << endl;
     }
 }
 
-// Genera el menú principal según el rol activo del usuario autenticado.
-void mostrarMenuSegunRol() {
+// ---------------------------------------------------------------------------
+// Menu principal dinamico: se arma con los permisos reales de la base.
+// ---------------------------------------------------------------------------
+
+enum class AccionMenu {
+    Roles, Usuarios, Empleados, Clientes, Proveedores, Categorias, Marcas,
+    Productos, MetodosPago, Ventas, Compras, Inventario, Caja,
+    VerPermisos, CerrarSesion
+};
+
+struct ItemMenu {
+    const char* etiqueta;
+    vector<string> permisos;  // cualquiera de estos habilita; vacio = siempre
+    AccionMenu accion;
+};
+
+// Orden fijo (el del menu historico de ADMIN): cada rol ve el subconjunto que
+// le permiten sus permisos. Agregar un modulo = agregar un item aca.
+static const vector<ItemMenu>& itemsMenuPrincipal() {
+    static const vector<ItemMenu> items = {
+        {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
+        {"Usuarios",         {"GESTIONAR_USUARIOS"},                       AccionMenu::Usuarios},
+        {"Empleados",        {"GESTIONAR_EMPLEADOS"},                      AccionMenu::Empleados},
+        {"Clientes",         {"GESTIONAR_CLIENTES", "CONSULTAR_CLIENTES"}, AccionMenu::Clientes},
+        {"Proveedores",      {"GESTIONAR_PROVEEDORES"},                    AccionMenu::Proveedores},
+        {"Categorias",       {"GESTIONAR_CATEGORIAS"},                     AccionMenu::Categorias},
+        {"Marcas",           {"GESTIONAR_MARCAS"},                         AccionMenu::Marcas},
+        {"Productos",        {"GESTIONAR_PRODUCTOS", "CONSULTAR_PRODUCTOS"}, AccionMenu::Productos},
+        {"Metodos de pago",  {"GESTIONAR_METODOS_PAGO"},                   AccionMenu::MetodosPago},
+        {"Ventas",           {"GESTIONAR_VENTAS"},                         AccionMenu::Ventas},
+        {"Compras",          {"GESTIONAR_COMPRAS"},                        AccionMenu::Compras},
+        {"Inventario",       {"GESTIONAR_INVENTARIO"},                     AccionMenu::Inventario},
+        {"Caja (turnos)",    {"GESTIONAR_VENTAS"},                         AccionMenu::Caja},
+        {"Ver permisos",     {},                                           AccionMenu::VerPermisos},
+        {"Cerrar sesión",    {},                                           AccionMenu::CerrarSesion}
+    };
+    return items;
+}
+
+static bool puedeVerItem(const ItemMenu& item) {
+    if (item.permisos.empty()) return true;
+    for (const string& permiso : item.permisos) {
+        if (tienePermiso(permiso)) return true;
+    }
+    return false;
+}
+
+// Arma una sola vez la lista visible (evita una consulta por item dos veces).
+static vector<const ItemMenu*> menuVisible() {
+    vector<const ItemMenu*> visibles;
+    for (const ItemMenu& item : itemsMenuPrincipal()) {
+        if (puedeVerItem(item)) visibles.push_back(&item);
+    }
+    return visibles;
+}
+
+static void imprimirMenu(const vector<const ItemMenu*>& visibles) {
     cout << MAGENTA << "\n=== MENU PRINCIPAL BALBU_TECH ===" << RESET << endl;
     cout << AZUL << "Usuario activo: " << sesionActual.username << RESET << endl;
     cout << AZUL << "Rol: " << sesionActual.nombreRol << RESET << endl;
     cout << "----------------------------------------" << endl;
 
-    if (sesionActual.nombreRol == "ADMIN") {
-        cout << "1. Roles" << endl;
-        cout << "2. Usuarios" << endl;
-        cout << "3. Empleados" << endl;
-        cout << "4. Clientes" << endl;
-        cout << "5. Proveedores" << endl;
-        cout << "6. Categorias" << endl;
-        cout << "7. Marcas" << endl;
-        cout << "8. Productos" << endl;
-        cout << "9. Metodos de pago" << endl;
-        cout << "10. Ventas" << endl;
-        cout << "11. Compras" << endl;
-        cout << "12. Inventario" << endl;
-        cout << "13. Caja (turnos)" << endl;
-        cout << "14. Ver permisos" << endl;
-        cout << "15. Cerrar sesión" << endl;
-    } else if (sesionActual.nombreRol == "RRHH") {
-        cout << "1. Empleados" << endl;
-        cout << "2. Roles" << endl;
-        cout << "3. Usuarios" << endl;
-        cout << "4. Clientes" << endl;
-        cout << "5. Ventas" << endl;
-        cout << "6. Ver permisos" << endl;
-        cout << "7. Cerrar sesión" << endl;
-    } else {
-        cout << "1. Productos" << endl;
-        cout << "2. Clientes" << endl;
-        cout << "3. Ventas" << endl;
-        cout << "4. Caja (turnos)" << endl;
-        cout << "5. Ver permisos" << endl;
-        cout << "6. Cerrar sesión" << endl;
+    int n = 0;
+    for (const ItemMenu* item : visibles) {
+        cout << ++n << ". " << item->etiqueta << endl;
     }
 
     cout << "----------------------------------------" << endl;
 }
 
-// Ejecuta la navegación del sistema, validando permisos antes de abrir cada módulo.
+// Genera el menú principal según los permisos del usuario autenticado.
+void mostrarMenuSegunRol() {
+    imprimirMenu(menuVisible());
+}
+
+// Ejecuta la navegación del sistema con la misma lista visible del menú.
 void ejecutarMenuSegunRol() {
     int opcion = 0;
 
     do {
-        mostrarMenuSegunRol();
+        vector<const ItemMenu*> visibles = menuVisible();
+        imprimirMenu(visibles);
+
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
 
-        if (sesionActual.nombreRol == "ADMIN") {
-            switch (opcion) {
-                case 1:
-                    if (tienePermiso("GESTIONAR_ROLES")) {
-                        ejecutarSubmenuRoles();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar roles." << RESET << endl;
-                    }
-                    break;
-                case 2:
-                    if (tienePermiso("GESTIONAR_USUARIOS")) {
-                        ejecutarSubmenuUsuarios();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar usuarios." << RESET << endl;
-                    }
-                    break;
-                case 3:
-                    if (tienePermiso("GESTIONAR_EMPLEADOS")) {
-                        ejecutarSubmenuEmpleados();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar empleados." << RESET << endl;
-                    }
-                    break;
-                case 4:
-                    if (tienePermiso("GESTIONAR_CLIENTES")) {
-                        ejecutarSubmenuClientes();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar clientes." << RESET << endl;
-                    }
-                    break;
-                case 5:
-                    if (tienePermiso("GESTIONAR_PROVEEDORES")) {
-                        ejecutarSubmenuProveedores();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar proveedores." << RESET << endl;
-                    }
-                    break;
-                case 6:
-                    if (tienePermiso("GESTIONAR_CATEGORIAS")) {
-                        ejecutarSubmenuCategorias();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar categorias." << RESET << endl;
-                    }
-                    break;
-                case 7:
-                    if (tienePermiso("GESTIONAR_MARCAS")) {
-                        ejecutarSubmenuMarcas();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar marcas." << RESET << endl;
-                    }
-                    break;
-                case 8:
-                    if (tienePermiso("GESTIONAR_PRODUCTOS")) {
-                        ejecutarSubmenuProductos();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar productos." << RESET << endl;
-                    }
-                    break;
-                case 9:
-                    if (tienePermiso("GESTIONAR_METODOS_PAGO")) {
-                        ejecutarSubmenuMetodosPago();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar metodos de pago." << RESET << endl;
-                    }
-                    break;
-                case 10:
-                    if (tienePermiso("GESTIONAR_VENTAS")) {
-                        ejecutarSubmenuVentas();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
-                    }
-                    break;
-                case 11:
-                    if (tienePermiso("GESTIONAR_COMPRAS")) {
-                        ejecutarSubmenuCompras();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar compras." << RESET << endl;
-                    }
-                    break;
-                case 12:
-                    if (tienePermiso("GESTIONAR_INVENTARIO")) {
-                        ejecutarSubmenuInventario();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar inventario." << RESET << endl;
-                    }
-                    break;
-                case 13:
-                    if (tienePermiso("GESTIONAR_VENTAS")) {
-                        ejecutarSubmenuCaja();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar la caja." << RESET << endl;
-                    }
-                    break;
-                case 14:
-                    mostrarPermisosActuales();
-                    break;
-                case 15:
-                    cerrarSesion();
-                    cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
-                    opcion = 0;
-                    break;
-                default:
-                    cout << ROJO << "Opcion no valida." << RESET << endl;
-                    break;
-            }
-        } else if (sesionActual.nombreRol == "RRHH") {
-            switch (opcion) {
-                case 1:
-                    if (tienePermiso("GESTIONAR_EMPLEADOS")) {
-                        ejecutarSubmenuEmpleados();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar empleados." << RESET << endl;
-                    }
-                    break;
-                case 2:
-                    if (tienePermiso("GESTIONAR_ROLES")) {
-                        ejecutarSubmenuRoles();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar roles." << RESET << endl;
-                    }
-                    break;
-                case 3:
-                    if (tienePermiso("GESTIONAR_USUARIOS")) {
-                        ejecutarSubmenuUsuarios();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar usuarios." << RESET << endl;
-                    }
-                    break;
-                case 4:
-                    if (tienePermiso("GESTIONAR_CLIENTES")) {
-                        ejecutarSubmenuClientes();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar clientes." << RESET << endl;
-                    }
-                    break;
-                case 5:
-                    if (tienePermiso("GESTIONAR_VENTAS")) {
-                        ejecutarSubmenuVentas();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
-                    }
-                    break;
-                case 6:
-                    mostrarPermisosActuales();
-                    break;
-                case 7:
-                    cerrarSesion();
-                    cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
-                    opcion = 0;
-                    break;
-                default:
-                    cout << ROJO << "Opcion no valida." << RESET << endl;
-                    break;
-            }
-        } else {
-            switch (opcion) {
-                case 1:
-                    if (tienePermiso("CONSULTAR_PRODUCTOS")) {
-                        ejecutarSubmenuProductos();
-                    } else {
-                        cout << ROJO << "No tienes permiso para consultar productos." << RESET << endl;
-                    }
-                    break;
-                case 2:
-                    if (tienePermiso("CONSULTAR_CLIENTES")) {
-                        ejecutarSubmenuClientes();
-                    } else {
-                        cout << ROJO << "No tienes permiso para consultar clientes." << RESET << endl;
-                    }
-                    break;
-                case 3:
-                    if (tienePermiso("GESTIONAR_VENTAS")) {
-                        ejecutarSubmenuVentas();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar ventas." << RESET << endl;
-                    }
-                    break;
-                case 4:
-                    if (tienePermiso("GESTIONAR_VENTAS")) {
-                        ejecutarSubmenuCaja();
-                    } else {
-                        cout << ROJO << "No tienes permiso para gestionar la caja." << RESET << endl;
-                    }
-                    break;
-                case 5:
-                    mostrarPermisosActuales();
-                    break;
-                case 6:
-                    cerrarSesion();
-                    cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
-                    opcion = 0;
-                    break;
-                default:
-                    cout << ROJO << "Opcion no valida." << RESET << endl;
-                    break;
-            }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
+        const ItemMenu& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionMenu::Roles:       ejecutarSubmenuRoles(); break;
+            case AccionMenu::Usuarios:    ejecutarSubmenuUsuarios(); break;
+            case AccionMenu::Empleados:   ejecutarSubmenuEmpleados(); break;
+            case AccionMenu::Clientes:    ejecutarSubmenuClientes(); break;
+            case AccionMenu::Proveedores: ejecutarSubmenuProveedores(); break;
+            case AccionMenu::Categorias:  ejecutarSubmenuCategorias(); break;
+            case AccionMenu::Marcas:      ejecutarSubmenuMarcas(); break;
+            case AccionMenu::Productos:   ejecutarSubmenuProductos(); break;
+            case AccionMenu::MetodosPago: ejecutarSubmenuMetodosPago(); break;
+            case AccionMenu::Ventas:      ejecutarSubmenuVentas(); break;
+            case AccionMenu::Compras:     ejecutarSubmenuCompras(); break;
+            case AccionMenu::Inventario:  ejecutarSubmenuInventario(); break;
+            case AccionMenu::Caja:        ejecutarSubmenuCaja(); break;
+            case AccionMenu::VerPermisos: mostrarPermisosActuales(); break;
+            case AccionMenu::CerrarSesion:
+                cerrarSesion();
+                cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
+                return;
+        }
     } while (opcion != 0);
 }
 
@@ -385,7 +265,10 @@ void mostrarMenuRoles() {
     cout << "2. Actualizar Rol" << endl;
     cout << "3. Buscar Rol" << endl;
     cout << "4. Listar Roles" << endl;
-    cout << "5. Volver al Menu Principal" << endl;
+    cout << "5. Asignar permiso a rol" << endl;
+    cout << "6. Quitar permiso a rol" << endl;
+    cout << "7. Ver permisos de un rol" << endl;
+    cout << "8. Volver al Menu Principal" << endl;
     cout << "=======================" << endl;
 }
 
@@ -507,8 +390,113 @@ void listarRoles() {
     }
 }
 
-// Submenú de roles: lee la opción y llama a la acción (antes el menú
-// solo se mostraba y volvía sin hacer nada).
+// Muestra los roles con su ID (para elegir en las acciones de permisos).
+static void mostrarRolesDisponibles() {
+    try {
+        std::unique_ptr<sql::Statement> st(globalCon->createStatement());
+        std::unique_ptr<sql::ResultSet> res(st->executeQuery(
+            "SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL"));
+        cout << "\nRoles:" << endl;
+        while (res->next()) {
+            cout << "  " << res->getInt("ID_ROL") << ". "
+                 << res->getString("NOMBRE_ROL") << endl;
+        }
+        drenarResultados(st.get());
+    } catch (const exception&) {
+        cout << ROJO << "No se pudieron listar los roles." << RESET << endl;
+    }
+}
+
+// Muestra los permisos disponibles (los que existen en la tabla).
+static void mostrarPermisosDisponibles() {
+    try {
+        std::unique_ptr<sql::Statement> st(globalCon->createStatement());
+        std::unique_ptr<sql::ResultSet> res(st->executeQuery(
+            "SELECT NOMBRE_PERMISO FROM PERMISOS ORDER BY NOMBRE_PERMISO"));
+        cout << "\nPermisos disponibles:" << endl;
+        while (res->next()) {
+            cout << "  - " << res->getString("NOMBRE_PERMISO") << endl;
+        }
+        drenarResultados(st.get());
+    } catch (const exception&) {
+        cout << ROJO << "No se pudieron listar los permisos." << RESET << endl;
+    }
+}
+
+// Pide rol y permiso por nombre exacto y llama al SP de asignar o quitar.
+static void cambiarPermisoDeRol(bool asignar) {
+    try {
+        mostrarRolesDisponibles();
+        string rol = recortar(leerDatoSeguro("Rol (nombre exacto): "));
+        if (rol.empty()) {
+            cout << "Cancelado." << endl;
+            return;
+        }
+
+        mostrarPermisosDisponibles();
+        string permiso = recortar(leerDatoSeguro("Permiso (nombre exacto): "));
+        if (permiso.empty()) {
+            cout << "Cancelado." << endl;
+            return;
+        }
+
+        const char* sql = asignar
+            ? "CALL SP_ASIGNAR_PERMISO_A_ROL(?, ?)"
+            : "CALL SP_QUITAR_PERMISO_A_ROL(?, ?)";
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(sql));
+        ps->setString(1, rol);
+        ps->setString(2, permiso);
+
+        cout << "\n" << Recogermensaje(ps.get()) << endl;
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo cambiar el permiso: " << e.what() << RESET << endl;
+    }
+}
+
+// Lista los permisos actuales de un rol.
+static void verPermisosDeRol() {
+    try {
+        mostrarRolesDisponibles();
+        string rol = recortar(leerDatoSeguro("Rol (nombre exacto): "));
+        if (rol.empty()) {
+            cout << "Cancelado." << endl;
+            return;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+            "CALL SP_LISTAR_PERMISOS_POR_ROL(?)"));
+        ps->setString(1, rol);
+        std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
+
+        string separator = string(78, '-');
+        cout << "\n" << separator << endl;
+        printf("%-5s | %-30s | %s\n", "ID", "PERMISO", "DESCRIPCION");
+        cout << separator << endl;
+
+        bool hay = false;
+        while (res->next()) {
+            hay = true;
+            printf("%-5d | %-30.30s | %.50s\n",
+                   res->getInt("ID_PERMISO"),
+                   res->getString("NOMBRE_PERMISO").c_str(),
+                   res->isNull("DESCRIPCION") ? "" : res->getString("DESCRIPCION").c_str());
+        }
+        if (!hay) {
+            cout << "[!] Ese rol no tiene permisos asignados." << endl;
+        }
+        cout << separator << endl;
+
+        drenarResultados(ps.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudieron ver los permisos: " << e.what() << RESET << endl;
+    }
+}
+
+// Submenú de roles: lee la opción y llama a la acción.
 void ejecutarSubmenuRoles() {
     int opcion = 0;
 
@@ -534,12 +522,21 @@ void ejecutarSubmenuRoles() {
                 listarRoles();
                 break;
             case 5:
+                cambiarPermisoDeRol(true);
+                break;
+            case 6:
+                cambiarPermisoDeRol(false);
+                break;
+            case 7:
+                verPermisosDeRol();
+                break;
+            case 8:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 5) pausar();
-    } while (opcion != 5);
+        if (opcion != 8) pausar();
+    } while (opcion != 8);
 }
 

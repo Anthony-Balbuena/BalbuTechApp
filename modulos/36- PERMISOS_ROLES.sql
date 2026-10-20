@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS PERMISOS (
 /*
 TABLA ROL_PERMISO
 Une cada rol con los permisos que tiene. La clave compuesta evita repetir
-permisos, y el rol tiene que ser ADMIN, RRHH o EMPLEADO.
+permisos. Cualquier rol de ROLES puede tener permisos (C-3, 20/10/2026:
+se elimino el CHECK que limitaba a ADMIN/RRHH/EMPLEADO).
 */
 CREATE TABLE IF NOT EXISTS ROL_PERMISO (
     -- (09/10/2026) VARCHAR(50) para igualar ROLES.NOMBRE_ROL y poder atar el FK;
@@ -31,18 +32,24 @@ CREATE TABLE IF NOT EXISTS ROL_PERMISO (
     CONSTRAINT FK_ROL_PERMISO_PERMISO FOREIGN KEY (ID_PERMISO)
         REFERENCES PERMISOS(ID_PERMISO)
         ON DELETE CASCADE,
-    -- (09/10/2026) FK al rol: los nombres de aqui deben existir en ROLES
-    -- (alineados con el C++: ADMIN/RRHH/EMPLEADO).
+    -- (09/10/2026) FK al rol: los nombres de aqui deben existir en ROLES.
+    -- (20/10/2026) ON UPDATE CASCADE: renombrar un rol arrastra sus permisos.
     CONSTRAINT FK_ROL_PERMISO_ROL FOREIGN KEY (ROL_NOMBRE)
-        REFERENCES ROLES(NOMBRE_ROL),
-    CONSTRAINT CHK_ROL_NOMBRE CHECK (
-        ROL_NOMBRE IN ('ADMIN', 'RRHH', 'EMPLEADO')
-    )
+        REFERENCES ROLES(NOMBRE_ROL)
+        ON UPDATE CASCADE
 ) ENGINE = InnoDB;
+
+-- Migracion para bases ya existentes (C-3, 20/10/2026): CREATE TABLE IF NOT
+-- EXISTS no toca una tabla vieja, asi que el CHECK y la FK se ajustan aparte.
+-- Idempotente: los IF EXISTS permiten reimportar el modulo sin romper.
+ALTER TABLE ROL_PERMISO DROP CONSTRAINT IF EXISTS CHK_ROL_NOMBRE;
+ALTER TABLE ROL_PERMISO DROP FOREIGN KEY IF EXISTS FK_ROL_PERMISO_ROL;
+ALTER TABLE ROL_PERMISO
+    ADD CONSTRAINT FK_ROL_PERMISO_ROL FOREIGN KEY (ROL_NOMBRE)
+    REFERENCES ROLES (NOMBRE_ROL) ON UPDATE CASCADE;
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- ================================================================
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('GESTIONAR_USUARIOS', 'Administrar usuarios del sistema'),
@@ -52,6 +59,7 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_CATEGORIAS', 'Gestionar categorias'),
 ('GESTIONAR_MARCAS', 'Gestionar marcas'),
 ('GESTIONAR_PRODUCTOS', 'Gestionar productos'),
+('GESTIONAR_METODOS_PAGO', 'Gestionar metodos de pago'),
 ('GESTIONAR_INVENTARIO', 'Administrar inventario'),
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
 ('GESTIONAR_COMPRAS', 'Gestionar compras del sistema'),
@@ -70,7 +78,7 @@ INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
--- RRHH: personal, usuarios, clientes y reportes
+-- RRHH: personal, usuarios, clientes, ventas y reportes
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'RRHH', ID_PERMISO
 FROM PERMISOS
@@ -79,17 +87,19 @@ WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_ROLES',
     'GESTIONAR_USUARIOS',
     'GESTIONAR_CLIENTES',
+    'GESTIONAR_VENTAS',
     'CONSULTAR_REPORTES'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
--- EMPLEADO: solo consultas y permisos básicos
+-- EMPLEADO: consultas, ventas y permisos basicos
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'EMPLEADO', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'CONSULTAR_PRODUCTOS',
     'CONSULTAR_CLIENTES',
+    'GESTIONAR_VENTAS',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
 )
@@ -108,7 +118,7 @@ Revisa que el rol y el permiso existan; si estan bien, los une y si ya
 estaba unido no duplica nada.
 */
 CREATE PROCEDURE SP_ASIGNAR_PERMISO_A_ROL(
-    IN P_ROL_NOMBRE VARCHAR(30),
+    IN P_ROL_NOMBRE VARCHAR(50),
     IN P_NOMBRE_PERMISO VARCHAR(80)
 )
 BEGIN
@@ -134,6 +144,44 @@ BEGIN
 END//
 DELIMITER ;
 
+-- Quita un permiso concreto a un rol. Si no lo tenia, avisa sin romper.
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_QUITAR_PERMISO_A_ROL;//
+/*
+SP_QUITAR_PERMISO_A_ROL
+Borra la relacion rol-permiso. Valida que el rol y el permiso existan.
+Si el rol no tenia ese permiso devuelve un aviso, no un error.
+*/
+CREATE PROCEDURE SP_QUITAR_PERMISO_A_ROL(
+    IN P_ROL_NOMBRE VARCHAR(50),
+    IN P_NOMBRE_PERMISO VARCHAR(80)
+)
+BEGIN
+    DECLARE v_id_permiso INT DEFAULT NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM ROLES WHERE NOMBRE_ROL = P_ROL_NOMBRE) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL ROL NO EXISTE EN EL SISTEMA.';
+    END IF;
+
+    SELECT ID_PERMISO INTO v_id_permiso
+    FROM PERMISOS
+    WHERE NOMBRE_PERMISO = P_NOMBRE_PERMISO;
+
+    IF v_id_permiso IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PERMISO NO EXISTE.';
+    END IF;
+
+    DELETE FROM ROL_PERMISO
+    WHERE ROL_NOMBRE = P_ROL_NOMBRE AND ID_PERMISO = v_id_permiso;
+
+    IF ROW_COUNT() = 0 THEN
+        SELECT CONCAT('AVISO: ', P_ROL_NOMBRE, ' NO TENIA EL PERMISO ', P_NOMBRE_PERMISO, '.') AS MENSAJE;
+    ELSE
+        SELECT CONCAT('EXITO: PERMISO ', P_NOMBRE_PERMISO, ' QUITADO A ', P_ROL_NOMBRE, '.') AS MENSAJE;
+    END IF;
+END//
+DELIMITER ;
+
 -- Muestra todos los permisos asociados a un rol específico para consulta y auditoría.
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_LISTAR_PERMISOS_POR_ROL;//
@@ -143,7 +191,7 @@ Lista los permisos que tiene un rol, ordenados por nombre.
 Sirve para consultar y auditar el acceso de cada rol.
 */
 CREATE PROCEDURE SP_LISTAR_PERMISOS_POR_ROL(
-    IN P_ROL_NOMBRE VARCHAR(30)
+    IN P_ROL_NOMBRE VARCHAR(50)
 )
 BEGIN
     SELECT P.ID_PERMISO, P.NOMBRE_PERMISO, P.DESCRIPCION
@@ -166,11 +214,11 @@ Dice si un usuario tiene permitida una accion segun su rol.
 Devuelve verdadero si el rol tiene ese permiso, y falso en cualquier
 otro caso (usuario inexistente o sin permiso).
 */
-CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(20))
+CREATE FUNCTION FN_TIENE_PERMISO(P_USERNAME VARCHAR(50), P_ACCION VARCHAR(80))
 RETURNS BOOLEAN
 DETERMINISTIC
 BEGIN
-    DECLARE v_rol VARCHAR(30);
+    DECLARE v_rol VARCHAR(50);
     DECLARE v_existe INT DEFAULT 0;
 
     -- Rol via esquema unificado USUARIOS -> ROLES (era USUARIOS_SISTEMA, no existe).
