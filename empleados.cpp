@@ -494,7 +494,9 @@ static void asistenciaHoyUI() {
             const string &c = (est == "PRESENTE") ? VERDE
                             : (est == "TARDE") ? AMARILLO
                             : (est == "PERMISO") ? CIAN : ROJO;
-            cout << c << est << RESET;
+            string estCelda = est;
+            estCelda.resize(10, ' ');  // ancho fijo 10: mantiene alineadas las columnas siguientes
+            cout << c << estCelda << RESET;
             printf(" | %-10.10s | %-6.2f\n", ent.c_str(), hs);
         }
         if (!hay) cout << "[!] Sin empleados activos." << endl;
