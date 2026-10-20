@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <vector>
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <filesystem>
 #include <map>
@@ -122,7 +123,10 @@ string armarContrato(const DatosPersonaContrato &persona, const string &tipoCont
     string email    = persona.email;
     string fIngreso = persona.fechaIngreso;
 
-    // Datos de la empresa (CONFIGURACION)
+    // Datos de la empresa: todo sale de CONFIGURACION (BALBU_TECH es la
+    // empresa). Las claves RNC/CIUDAD/DIRECCION_EMPRESA/REPRESENTANTE/
+    // CEDULA_REPRESENTANTE existen vacias hasta que se carguen; mientras
+    // tanto el documento muestra el placeholder para completar a mano.
     map<string, string> cfg = leerConfiguracion();
     string nomEmpresa = cfgO(cfg, "NOMBRE_TIENDA", "BALBU_TECH");
     string rnc        = cfgO(cfg, "RNC", "____________");
@@ -225,17 +229,27 @@ static string textoDuracion(long meses) {
     return to_string(meses) + (meses == 1 ? " mes" : " meses");
 }
 
-void ejecutarSubmenuContratos() {
+// Recorta espacios de los extremos (seguridad.cpp no las exporta).
+static string recortar(const string &s) {
+    size_t i = s.find_first_not_of(" \t\r\n");
+    if (i == string::npos) return "";
+    size_t f = s.find_last_not_of(" \t\r\n");
+    return s.substr(i, f - i + 1);
+}
+
+void generarContratoUI() {
     try {
         cout << "\n=== GENERAR CONTRATO DE TRABAJO ===" << endl;
         cout << "(Solo genera el documento: nada se registra en la BD hasta la firma.)" << endl;
 
-        // --- DATOS DE LA PERSONA ---
-        // Sin ID: puede ser alguien que aun no esta registrado como empleado.
-        cout << "\n--- DATOS DE LA PERSONA ---" << endl;
+        // --- DATOS DEL EMPLEADO ---
+        // La 12 es la OFERTA: la persona todavia no esta en EMPLEADOS (acaba de
+        // firmar o ni siquiera firmo). La cedula se escribe en el contrato, pero
+        // no se busca en la base: no hace falta que exista.
+        cout << "\n--- DATOS DEL EMPLEADO ---" << endl;
         auto requerido = [](const string &etiqueta) {
             while (true) {
-                string v = leerDatoSeguro(etiqueta);
+                string v = recortar(leerDatoSeguro(etiqueta));
                 if (!v.empty()) return v;
                 // (18/10/2026) Con la entrada agotada leerDatoSeguro() devuelve
                 // "" para siempre: sin esto el bucle gira sin fin (misma clase
@@ -244,25 +258,66 @@ void ejecutarSubmenuContratos() {
                 cout << ROJO << "No puede quedar vacio." << RESET << endl;
             }
         };
-        DatosPersonaContrato p;
-        p.nombre = requerido("Nombre completo: ");
-        p.cedula = requerido("Cedula: ");
-        p.cargo  = requerido("Cargo: ");
 
-        double sal = leerNumeroConIntentos("Salario: ", 0, 999999999);
-        {
-            ostringstream ss;
-            ss << fixed << setprecision(2) << sal;
-            p.salario = ss.str();
+        string cedula;
+        while (true) {
+            cedula = requerido("Cedula del empleado (11 digitos): ");
+            if (cedula.size() == 11 &&
+                all_of(cedula.begin(), cedula.end(),
+                       [](char c) { return c >= '0' && c <= '9'; })) break;
+            cout << ROJO << "La cedula debe tener 11 digitos, sin guiones ni espacios."
+                 << RESET << endl;
         }
 
-        p.telefono = leerDatoSeguro("Telefono (Enter = -): ");
+        DatosPersonaContrato p;
+        p.cedula = cedula;
+        p.nombre = requerido("Nombre completo: ");
+        p.cargo  = requerido("Cargo que se le ofrece: ");
+
+        // Ofrecido y pactado no tienen por que coincidir: el empleado puede
+        // pedir mas (y se le da) o la empresa puede ofrecer menos. El contrato
+        // guarda el pactado; el ofrecido queda en el borrador como referencia.
+        auto pedirMonto = [](const string &etiqueta, double defecto) {
+            while (true) {
+                string s = recortar(leerDatoSeguro(etiqueta));
+                if (s.empty()) {
+                    if (cin.eof()) throw CancelarOperacionException();
+                    if (defecto > 0) return defecto;
+                    cout << ROJO << "Este monto es obligatorio." << RESET << endl;
+                    continue;
+                }
+                try {
+                    size_t usado = 0;
+                    double v = stod(s, &usado);
+                    if (usado != s.size() || v <= 0) throw invalid_argument("rango");
+                    return v;
+                } catch (const exception &) {
+                    if (cin.eof()) throw CancelarOperacionException();
+                    cout << ROJO << "Monto invalido (ej. 15000 o 15000.50)." << RESET << endl;
+                }
+            }
+        };
+
+        {
+            double ofrecido = pedirMonto("Salario ofrecido: ", 0);
+            ostringstream so;
+            so << fixed << setprecision(2) << ofrecido;
+            p.salarioOfrecido = so.str();
+
+            double pactado = pedirMonto(
+                "Salario pactado (Enter = " + so.str() + "): ", ofrecido);
+            ostringstream sp;
+            sp << fixed << setprecision(2) << pactado;
+            p.salario = sp.str();
+        }
+
+        p.telefono = recortar(leerDatoSeguro("Telefono (Enter = -): "));
         if (p.telefono.empty()) p.telefono = "-";
-        p.email = leerDatoSeguro("Email (Enter = -): ");
+        p.email = recortar(leerDatoSeguro("Email (Enter = -): "));
         if (p.email.empty()) p.email = "-";
 
         while (true) {
-            p.fechaIngreso = leerDatoSeguro("Fecha de ingreso (AAAA-MM-DD, Enter = hoy): ");
+            p.fechaIngreso = recortar(leerDatoSeguro("Fecha de ingreso (AAAA-MM-DD, Enter = hoy): "));
             if (p.fechaIngreso.empty()) { p.fechaIngreso = fechaHoyISO(); break; }
             if (esFechaISO(p.fechaIngreso)) break;
             cout << ROJO << "Formato invalido: use AAAA-MM-DD (ej. 2026-10-17)." << RESET << endl;
@@ -325,6 +380,7 @@ void ejecutarSubmenuContratos() {
                    << "cedula=" << p.cedula << "\n"
                    << "cargo=" << p.cargo << "\n"
                    << "salario=" << p.salario << "\n"
+                   << "salario_ofrecido=" << p.salarioOfrecido << "\n"
                    << "telefono=" << p.telefono << "\n"
                    << "email=" << p.email << "\n"
                    << "fecha_ingreso=" << p.fechaIngreso << "\n"
@@ -369,36 +425,189 @@ void ejecutarSubmenuContratos() {
     }
 }
 
-// Historial de contratos de un empleado, mas reciente primero.
+// ---------------------------------------------------------------------------
+// Registro del contrato firmado (19/10/2026)
+// ---------------------------------------------------------------------------
+
+// Cedula dominicana: 11 digitos, sin guiones ni espacios.
+static bool esCedulaValida(const string &c) {
+    if (c.size() != 11) return false;
+    for (char ch : c) if (ch < '0' || ch > '9') return false;
+    return true;
+}
+
+// Pregunta un campo con el valor del borrador como default. Enter lo deja.
+static string cotejarCampo(const string &etiqueta, const string &actual) {
+    string v = recortar(leerDatoSeguro(etiqueta + " [" + actual + "]: "));
+    if (cin.eof()) throw CancelarOperacionException();
+    return v.empty() ? actual : v;
+}
+
+// S/N. Con la entrada agotada corta (no gira).
+static bool confirmarSiNo(const string &pregunta) {
+    while (true) {
+        string r = recortar(leerDatoSeguro(pregunta + " (S/N): "));
+        if (cin.eof()) throw CancelarOperacionException();
+        if (r == "S" || r == "s") return true;
+        if (r == "N" || r == "n") return false;
+        cout << ROJO << "Responda S o N." << RESET << endl;
+    }
+}
+
+// Monto obligatorio con default visible. Con EOF corta.
+static double pedirMontoObligatorio(const string &etiqueta, const string &porDefecto) {
+    while (true) {
+        string s = recortar(leerDatoSeguro(etiqueta + " [" + porDefecto + "]: "));
+        if (cin.eof()) throw CancelarOperacionException();
+        if (s.empty()) s = porDefecto;
+        try {
+            size_t usado = 0;
+            double v = stod(s, &usado);
+            if (usado != s.size() || v <= 0) throw invalid_argument("rango");
+            return v;
+        } catch (const exception &) {
+            cout << ROJO << "Monto invalido (ej. 18000 o 18000.50)." << RESET << endl;
+        }
+    }
+}
+
+// Copia el escaneo del papel a contratos/firmados/ y devuelve la ruta.
+// Enter = sin escaneo (devuelve ""). La app no guarda el archivo en la base.
+static string copiarEscaneo(const string &cedula, const string &fechaISO) {
+    namespace fs = std::filesystem;
+    while (true) {
+        string ruta = recortar(leerDatoSeguro("Ruta del PDF firmado (Enter = sin escaneo): "));
+        if (cin.eof()) throw CancelarOperacionException();
+        if (ruta.empty()) return "";
+
+        error_code ec;
+        if (!fs::is_regular_file(ruta, ec)) {
+            cout << ROJO << "No existe ese archivo. Proba de nuevo o Enter para "
+                 << "seguir sin escaneo." << RESET << endl;
+            continue;
+        }
+        string ext = fs::path(ruta).extension().string();
+        for (char &c : ext) c = (char)tolower((unsigned char)c);
+        if (ext != ".pdf" && ext != ".jpg" && ext != ".jpeg" && ext != ".png") {
+            cout << ROJO << "Tiene que ser un PDF, JPG o PNG." << RESET << endl;
+            continue;
+        }
+        if (fs::file_size(ruta, ec) > 20u * 1024u * 1024u) {
+            cout << ROJO << "El archivo pasa de 20 MB." << RESET << endl;
+            continue;
+        }
+
+        fs::create_directories("contratos/firmados", ec);
+        string destino = "contratos/firmados/FIRMADO_" + cedula + "_" + fechaISO + ext;
+        int n = 2;
+        while (fs::exists(destino, ec)) {
+            destino = "contratos/firmados/FIRMADO_" + cedula + "_" + fechaISO +
+                      "_" + to_string(n) + ext;
+            ++n;
+        }
+        fs::copy_file(ruta, destino, fs::copy_options::none, ec);
+        if (ec) {
+            cout << ROJO << "No se pudo copiar el escaneo: " << ec.message() << RESET << endl;
+            continue;
+        }
+        cout << "Escaneo guardado en: " << destino << endl;
+        return destino;
+    }
+}
+
+// Historial de contratos de una persona. Busca por cedula: funciona antes y
+// despues del alta (ID_EMPLEADO puede ser NULL).
 void consultarContratosUI() {
     try {
-        cout << "\n=== CONTRATOS DEL EMPLEADO ===" << endl;
-        int idEmp = (int)leerNumeroConIntentos("Empleado (ID): ", 1, 999999999);
+        cout << "\n=== CONTRATOS DE LA PERSONA ===" << endl;
+
+        string cedula;
+        while (true) {
+            cedula = recortar(leerDatoSeguro("Cedula (11 digitos): "));
+            if (cin.eof()) throw CancelarOperacionException();
+            if (esCedulaValida(cedula)) break;
+            cout << ROJO << "La cedula debe tener 11 digitos, sin guiones ni espacios."
+                 << RESET << endl;
+        }
 
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
-            "CALL SP_CONTRATOS_POR_EMPLEADO(?)"));
-        ps->setInt(1, idEmp);
+            "CALL SP_CONTRATOS_POR_CEDULA(?)"));
+        ps->setString(1, cedula);
         std::unique_ptr<sql::ResultSet> r(ps->executeQuery());
 
-        bool hay = false;
-        printf("\n%-4s | %-11s | %-10s | %-10s | %-10s | %-11s | %s\n",
-               "ID", "TIPO", "INICIO", "FIN", "SALARIO", "ESTADO", "DOCUMENTO");
-        printf("%s\n", string(95, '-').c_str());
+        struct Fila {
+            int id;
+            string nombre, cargo, tipo, inicio, fin, estado, vinculo, doc;
+            double salario;
+        };
+        vector<Fila> filas;
         while (r->next()) {
-            hay = true;
-            string fin = r->isNull("FECHA_FIN") ? "indefinido" : r->getString("FECHA_FIN");
-            string doc = r->isNull("RUTA_DOCUMENTO") ? "-" : r->getString("RUTA_DOCUMENTO");
-            printf("%-4d | %-11s | %-10s | %-10s | %10.2f | %-11s | %s\n",
-                   r->getInt("ID_CONTRATO"),
-                   r->getString("TIPO").c_str(),
-                   r->getString("FECHA_INICIO").c_str(),
-                   fin.c_str(),
-                   (double)r->getDouble("SALARIO"),
-                   r->getString("ESTADO").c_str(),
-                   doc.c_str());
+            Fila f;
+            f.id = r->getInt("ID_CONTRATO");
+            f.nombre = r->isNull("NOMBRE") ? "-" : r->getString("NOMBRE");
+            f.cargo = r->isNull("CARGO") ? "-" : r->getString("CARGO");
+            f.tipo = r->getString("TIPO");
+            f.inicio = r->getString("FECHA_INICIO");
+            f.fin = r->isNull("FECHA_FIN") ? "indefinido" : r->getString("FECHA_FIN");
+            f.salario = r->getDouble("SALARIO");
+            f.estado = r->getString("ESTADO");
+            f.vinculo = r->getString("VINCULO");
+            f.doc = r->isNull("RUTA_DOCUMENTO") ? "-" : r->getString("RUTA_DOCUMENTO");
+            filas.push_back(f);
         }
         drenarResultados(ps.get());
-        if (!hay) cout << "El empleado no tiene contratos registrados." << endl;
+
+        if (filas.empty()) {
+            cout << "Esa cedula no tiene contratos registrados." << endl;
+            return;
+        }
+
+        // El nombre y el cargo salen del contrato: puede que el empleado
+        // todavia no exista en EMPLEADOS (contrato firmado antes del alta).
+        cout << "\nPersona: " << filas.front().nombre << " - " << filas.front().cargo << endl;
+        printf("%-4s | %-9s | %-10s | %-10s | %10s | %-10s | %-10s | %s\n",
+               "ID", "TIPO", "INICIO", "FIN", "SALARIO", "ESTADO", "VINCULO", "DOCUMENTO");
+        printf("%s\n", string(108, '-').c_str());
+        for (const Fila &f : filas) {
+            printf("%-4d | %-9s | %-10s | %-10s | %10.2f | %-10s | %-10s | %s\n",
+                   f.id, f.tipo.c_str(), f.inicio.c_str(), f.fin.c_str(),
+                   f.salario, f.estado.c_str(), f.vinculo.c_str(), f.doc.c_str());
+        }
+
+        // El papel se escanea cuando se puede: se adjunta despues.
+        if (!confirmarSiNo("\n¿Adjuntar el escaneo firmado a un contrato?")) return;
+
+        int idCont = (int)leerNumeroConIntentos("Contrato (ID): ", 1, 999999999);
+
+        string fechaInicio;
+        {
+            std::unique_ptr<sql::PreparedStatement> pf(globalCon->prepareStatement(
+                "SELECT FECHA_INICIO FROM CONTRATOS "
+                "WHERE ID_CONTRATO = ? AND CEDULA = ?"));
+            pf->setInt(1, idCont);
+            pf->setString(2, cedula);
+            std::unique_ptr<sql::ResultSet> rf(pf->executeQuery());
+            if (rf->next()) fechaInicio = rf->getString("FECHA_INICIO");
+            drenarResultados(pf.get());
+        }
+        if (fechaInicio.empty()) {
+            cout << ROJO << "Ese contrato no es de esa cedula." << RESET << endl;
+            return;
+        }
+
+        string ruta = copiarEscaneo(cedula, fechaInicio);
+        if (ruta.empty()) {
+            cout << "No se adjunto nada." << endl;
+            return;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> pu(globalCon->prepareStatement(
+            "UPDATE CONTRATOS SET RUTA_DOCUMENTO = ? WHERE ID_CONTRATO = ?"));
+        pu->setString(1, ruta);
+        pu->setInt(2, idCont);
+        pu->executeUpdate();
+        drenarResultados(pu.get());
+        cout << VERDE << "Escaneo adjuntado al contrato #" << idCont << "." << RESET << endl;
 
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
@@ -407,12 +616,39 @@ void consultarContratosUI() {
     }
 }
 
-// Pasa un contrato de ACTIVO a FINALIZADO (a mano, p.ej. al despedir).
+// Finaliza el contrato ACTIVO de una persona (a mano, p.ej. al despedir).
 void finalizarContratoUI() {
     try {
         cout << "\n=== FINALIZAR CONTRATO ===" << endl;
         cout << "(Al despedir a un empleado, finaliza aqui su contrato.)" << endl;
-        int idCont = (int)leerNumeroConIntentos("Contrato (ID): ", 1, 999999999);
+
+        string cedula;
+        while (true) {
+            cedula = recortar(leerDatoSeguro("Cedula (11 digitos): "));
+            if (cin.eof()) throw CancelarOperacionException();
+            if (esCedulaValida(cedula)) break;
+            cout << ROJO << "La cedula debe tener 11 digitos, sin guiones ni espacios."
+                 << RESET << endl;
+        }
+
+        int idCont = 0;
+        {
+            std::unique_ptr<sql::PreparedStatement> pb(globalCon->prepareStatement(
+                "SELECT ID_CONTRATO FROM CONTRATOS "
+                "WHERE CEDULA = ? AND ESTADO = 'ACTIVO' "
+                "ORDER BY ID_CONTRATO DESC LIMIT 1"));
+            pb->setString(1, cedula);
+            std::unique_ptr<sql::ResultSet> rb(pb->executeQuery());
+            if (rb->next()) idCont = rb->getInt("ID_CONTRATO");
+            drenarResultados(pb.get());
+        }
+        if (idCont == 0) {
+            cout << "Esa cedula no tiene un contrato ACTIVO." << endl;
+            return;
+        }
+
+        cout << "Contrato activo: #" << idCont << endl;
+        if (!confirmarSiNo("¿Finalizarlo?")) return;
 
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_FINALIZAR_CONTRATO(?)"));
@@ -439,14 +675,14 @@ static bool leerBorrador(const string &ruta, map<string, string> &datos) {
     return !datos.empty();
 }
 
-// Sube (registra) el contrato cuando la persona firma. Usa el .borrador de la
-// opcion 12 para no repetir datos; el trigger crea o vincula al empleado.
+// Registra el contrato firmado: coteja el borrador contra el papel, guarda lo
+// que se firmo y deja la evidencia. No da de alta empleados.
 void subirContratoUI() {
     try {
         namespace fs = std::filesystem;
-        cout << "\n=== SUBIR CONTRATO (AL FIRMAR) ===" << endl;
+        cout << "\n=== REGISTRAR CONTRATO FIRMADO ===" << endl;
 
-        // 1. Borradores pendientes (los ya subidos quedan como .subido)
+        // 1. Borradores pendientes (los ya registrados quedan como .subido)
         vector<pair<string, map<string, string>>> pendientes;
         if (fs::exists("contratos")) {
             vector<string> rutas;
@@ -470,18 +706,17 @@ void subirContratoUI() {
         for (size_t i = 0; i < pendientes.size(); i++) {
             const auto &d = pendientes[i].second;
             string nombre = d.count("nombre") ? d.at("nombre") : "?";
-            string tipo = d.count("tipo") ? d.at("tipo") : "?";
-            string meses = d.count("meses") ? d.at("meses") : "0";
-            cout << "  " << (i + 1) << ". " << nombre << " - " << tipo;
-            if (tipo == "TEMPORAL" && meses != "0") cout << " " << meses << " meses";
-            cout << "  (" << pendientes[i].first << ")" << endl;
+            string ced = d.count("cedula") ? d.at("cedula") : "?";
+            string car = d.count("cargo") ? d.at("cargo") : "?";
+            string fec = d.count("fecha_ingreso") ? d.at("fecha_ingreso") : "?";
+            cout << "  " << (i + 1) << ". " << nombre << " - " << ced
+                 << " - " << car << " - ingreso " << fec << endl;
         }
         // (18/10/2026) Salida para el borrador que ya no sirve. Sin esto, uno
-        // que no se pudo marcar como .subido (falla el rename de mas abajo)
-        // quedaba en esta lista para siempre: el SP lo frena con "ESA CEDULA
-        // YA TIENE UN CONTRATO ACTIVO" y no habia forma de sacarlo de aca.
+        // que no se pudo marcar como .subido quedaba en esta lista para
+        // siempre y no habia forma de sacarlo.
         const int opDescartar = (int)pendientes.size() + 1;
-        cout << "  " << opDescartar << ". Descartar un borrador (no sube nada)" << endl;
+        cout << "  " << opDescartar << ". Descartar un borrador (no registra nada)" << endl;
         cout << "  0. Volver" << endl;
 
         int op = (int)leerNumeroConIntentos("Elegir: ", 0, (double)opDescartar);
@@ -499,7 +734,7 @@ void subirContratoUI() {
             else destino += ".descartado";
 
             // No se borra: se renombra, igual que .subido, para no perder el
-            // registro de quien lo genero.
+            // registro de lo que se genero.
             if (std::rename(origen.c_str(), destino.c_str()) == 0)
                 cout << VERDE << "Borrador descartado (queda como " << destino
                      << ")." << RESET << endl;
@@ -512,20 +747,15 @@ void subirContratoUI() {
         const string rutaBorrador = pendientes[op - 1].first;
         map<string, string> b = pendientes[op - 1].second;
 
-        // 2. Campos que el SP necesita a toda costa
+        // 2. Campos que el borrador tiene que traer
         for (const char *clave : {"nombre", "cedula", "cargo", "salario",
-                                   "telefono", "email", "fecha_ingreso", "tipo"}) {
+                                   "fecha_ingreso", "tipo"}) {
             if (!b.count(clave) || b.at(clave).empty()) {
                 cout << ROJO << "El borrador esta incompleto (falta '" << clave
                      << "'). Genere el contrato de nuevo con la opcion 12." << RESET << endl;
                 return;
             }
         }
-
-        // (18/10/2026) Antes esto era "== TEMPORAL" y todo lo demas caia como
-        // FIJO sin avisar: un borrador corrupto registraba un contrato fijo
-        // que nadie pidio, y el freno del SP ("EL TIPO DEBE SER TEMPORAL O
-        // FIJO") era inalcanzable desde aca. Se valida antes de tocar la BD.
         if (b.at("tipo") != "TEMPORAL" && b.at("tipo") != "FIJO") {
             cout << ROJO << "El borrador tiene un tipo invalido: '" << b.at("tipo")
                  << "'. Debe ser TEMPORAL o FIJO. Genere el contrato de nuevo con "
@@ -533,71 +763,136 @@ void subirContratoUI() {
             return;
         }
 
-        double salario = 0;
-        try {
-            salario = stod(b.at("salario"));
-        } catch (const exception &) {
-            cout << ROJO << "El borrador tiene un salario invalido: '"
-                 << b.at("salario") << "'." << RESET << endl;
-            return;
+        const map<string, string> original = b;
+
+        // 3. Cotejo contra el papel firmado
+        cout << "\n--- COTEJO CONTRA EL PAPEL FIRMADO ---" << endl;
+        cout << "(Enter deja el valor del borrador; escribi el valor si el papel "
+                "dice otra cosa.)" << endl;
+
+        string nombre = cotejarCampo("Nombre", b.at("nombre"));
+
+        string cedula;
+        while (true) {
+            cedula = cotejarCampo("Cedula", b.at("cedula"));
+            if (esCedulaValida(cedula)) break;
+            cout << ROJO << "La cedula debe tener 11 digitos, sin guiones ni espacios."
+                 << RESET << endl;
         }
 
-        // 3. Si la cedula aun no es de nadie, es un empleado NUEVO: EMPLEADOS
-        //    guarda su telefono y email unicos, asi que "-" no entra.
-        string telefono = b.at("telefono");
-        string email = b.at("email");
-        {
-            std::unique_ptr<sql::PreparedStatement> pc(globalCon->prepareStatement(
-                "SELECT COUNT(*) FROM EMPLEADOS WHERE CEDULA = ?"));
-            pc->setString(1, b.at("cedula"));
-            std::unique_ptr<sql::ResultSet> rc(pc->executeQuery());
-            bool esNuevo = true;
-            if (rc->next()) esNuevo = (rc->getInt(1) == 0);
-            drenarResultados(pc.get());
+        string cargo = cotejarCampo("Cargo", b.at("cargo"));
 
-            if (esNuevo) {
-                while (telefono.empty() || telefono == "-") {
-                    telefono = leerDatoSeguro("Telefono real del empleado nuevo (unico en la BD): ");
-                    // (18/10/2026) Entrada agotada -> leerDatoSeguro() devuelve
-                    // "" y este bucle giraba sin fin.
-                    if (cin.eof()) throw CancelarOperacionException();
-                    if (telefono.empty() || telefono == "-")
-                        cout << ROJO << "El empleado nuevo necesita un telefono real." << RESET << endl;
-                }
-                while (email.empty() || email == "-") {
-                    email = leerDatoSeguro("Email real del empleado nuevo (unico en la BD): ");
-                    if (cin.eof()) throw CancelarOperacionException();
-                    if (email.empty() || email == "-")
-                        cout << ROJO << "El empleado nuevo necesita un email real." << RESET << endl;
+        double salario = 0;
+        {
+            double originalMonto = 0;
+            try {
+                originalMonto = stod(b.at("salario"));
+            } catch (const exception &) {
+                cout << ROJO << "El borrador tiene un salario invalido: '"
+                     << b.at("salario") << "'." << RESET << endl;
+                return;
+            }
+            ostringstream porDef;
+            porDef << fixed << setprecision(2) << originalMonto;
+            salario = pedirMontoObligatorio("Salario pactado", porDef.str());
+        }
+
+        string tipo;
+        while (true) {
+            tipo = cotejarCampo("Tipo (FIJO/TEMPORAL)", b.at("tipo"));
+            for (char &c : tipo) c = (char)toupper((unsigned char)c);
+            if (tipo == "FIJO" || tipo == "TEMPORAL") break;
+            cout << ROJO << "El tipo debe ser FIJO o TEMPORAL." << RESET << endl;
+        }
+
+        long meses = 0;
+        if (tipo == "TEMPORAL") {
+            string porDef = (b.count("meses") && !b.at("meses").empty()) ? b.at("meses") : "12";
+            while (true) {
+                string s = cotejarCampo("Duracion en meses", porDef);
+                try {
+                    size_t usado = 0;
+                    long v = stol(s, &usado);
+                    if (usado != s.size() || v < 1) throw invalid_argument("rango");
+                    meses = v;
+                    break;
+                } catch (const exception &) {
+                    cout << ROJO << "Duracion invalida: use meses (12 = 1 año)." << RESET << endl;
                 }
             }
         }
 
-        // 4. Registrar: el SP frena lo que haga falta y el trigger resuelve
-        //    el empleado (lo crea o lo vincula).
-        bool esTemporal = (b.at("tipo") == "TEMPORAL");
-        long meses = 0;
-        if (esTemporal && b.count("meses") && !b.at("meses").empty()) {
-            try { meses = stol(b.at("meses")); } catch (const exception &) { meses = 0; }
+        string fecha;
+        while (true) {
+            fecha = cotejarCampo("Fecha de ingreso (AAAA-MM-DD)", b.at("fecha_ingreso"));
+            if (esFechaISO(fecha)) break;
+            cout << ROJO << "Formato invalido: use AAAA-MM-DD (ej. 2026-11-01)." << RESET << endl;
         }
 
+        string telefono = cotejarCampo(
+            "Telefono", (b.count("telefono") && !b.at("telefono").empty()) ? b.at("telefono") : "-");
+        string email = cotejarCampo(
+            "Email", (b.count("email") && !b.at("email").empty()) ? b.at("email") : "-");
+
+        // 4. Resumen de diferencias
+        vector<string> cambios;
+        auto comparar = [&cambios](const string &campo, const string &antes,
+                                   const string &despues) {
+            if (antes != despues)
+                cambios.push_back("  - " + campo + ": " + antes + " -> " + despues);
+        };
+        comparar("nombre", original.at("nombre"), nombre);
+        comparar("cedula", original.at("cedula"), cedula);
+        comparar("cargo", original.at("cargo"), cargo);
+        {
+            ostringstream a, d;
+            a << fixed << setprecision(2) << stod(original.at("salario"));
+            d << fixed << setprecision(2) << salario;
+            comparar("salario", a.str(), d.str());
+        }
+        comparar("tipo", original.at("tipo"), tipo);
+        comparar("meses", (original.count("meses") ? original.at("meses") : "0"),
+                 tipo == "TEMPORAL" ? to_string(meses) : "0");
+        comparar("fecha de ingreso", original.at("fecha_ingreso"), fecha);
+        comparar("telefono", (original.count("telefono") ? original.at("telefono") : "-"),
+                 telefono);
+        comparar("email", (original.count("email") ? original.at("email") : "-"), email);
+
+        if (cambios.empty()) {
+            cout << "\nEl papel coincide con el borrador." << endl;
+        } else {
+            cout << "\nCambios detectados:" << endl;
+            for (const string &c : cambios) cout << c << endl;
+        }
+
+        if (!confirmarSiNo("\n¿Registrar el contrato con estos valores?")) {
+            cout << "No se registro nada." << endl;
+            return;
+        }
+
+        // 5. Escaneo opcional (lo archiva RRHH; la app solo guarda la ruta)
+        string rutaDoc = copiarEscaneo(cedula, fecha);
+        if (rutaDoc.empty()) rutaDoc = b.count("html") ? b.at("html") : "";
+
+        // 6. Registrar: el SP vincula si el empleado ya existe; si no, deja
+        //    ID_EMPLEADO NULL y el alta lo engancha despues.
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_SUBIR_CONTRATO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
-        ps->setString(1, b.at("nombre"));
-        ps->setString(2, b.at("cedula"));
-        ps->setString(3, b.at("cargo"));
+        ps->setString(1, nombre);
+        ps->setString(2, cedula);
+        ps->setString(3, cargo);
         ps->setDouble(4, salario);
         ps->setString(5, telefono);
         ps->setString(6, email);
-        ps->setString(7, b.at("fecha_ingreso"));
-        ps->setString(8, esTemporal ? "TEMPORAL" : "FIJO");
-        if (esTemporal) ps->setInt(9, (int)meses);
+        ps->setString(7, fecha);
+        ps->setString(8, tipo);
+        if (tipo == "TEMPORAL") ps->setInt(9, (int)meses);
         else ps->setNull(9, sql::DataType::INTEGER);
-        ps->setString(10, b.count("html") ? b.at("html") : "");
+        ps->setString(10, rutaDoc);
         string msg = Recogermensaje(ps.get());
         cout << "\n" << msg << endl;
 
-        // 5. Si salio bien, el borrador deja de estar pendiente
+        // 7. Si salio bien, el borrador deja de estar pendiente
         if (msg.rfind("EXITO", 0) == 0) {
             string destino = rutaBorrador;
             size_t punto = destino.rfind(".borrador");
@@ -605,10 +900,6 @@ void subirContratoUI() {
             if (std::rename(rutaBorrador.c_str(), destino.c_str()) == 0) {
                 cout << "Borrador marcado: " << destino << endl;
             } else {
-                // El contrato YA quedo en la BD: reintentar la subida la frena
-                // el SP ("esa cedula ya tiene un contrato activo"). El borrador
-                // se queda en la lista, asi que hay que decir donde esta y como
-                // sacarlo, o es una trampa para siempre.
                 cout << AMARILLO
                      << "[Aviso] No se pudo marcar el borrador; el contrato ya "
                         "quedo registrado." << endl
@@ -622,6 +913,6 @@ void subirContratoUI() {
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
-        cout << ROJO << "No se pudo subir el contrato: " << e.what() << RESET << endl;
+        cout << ROJO << "No se pudo registrar el contrato: " << e.what() << RESET << endl;
     }
 }

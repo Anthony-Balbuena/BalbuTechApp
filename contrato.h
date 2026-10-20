@@ -3,16 +3,18 @@
 
 #include <string>
 
-// Datos de la persona para el documento. Se piden a mano al generar: la BD
-// no interviene (el contrato se registra recien cuando la persona firma).
+// Datos de la persona para el documento. Al generar se pide la cedula y se
+// consulta EMPLEADOS para precargar nombre/cargo; registrar en la BD sigue
+// pasando recien cuando la persona firma (opcion 13).
 struct DatosPersonaContrato {
     std::string nombre;
     std::string cedula;
     std::string cargo;
-    std::string salario;      // ya formateado con 2 decimales
+    std::string salario;         // pactado, ya formateado con 2 decimales
+    std::string salarioOfrecido; // referencia de la oferta (no va al contrato)
     std::string telefono;
     std::string email;
-    std::string fechaIngreso; // ISO YYYY-MM-DD
+    std::string fechaIngreso;    // ISO YYYY-MM-DD
 };
 
 // Backend puro: junta los datos y rellena la plantilla. No depende de la
@@ -34,9 +36,9 @@ std::string escribirContrato(const std::string &html,
                              const std::string &nombrePersona,
                              const std::string &fechaISO);
 
-// Pantalla: pide los datos de la persona y genera el HTML (sin registrar nada
-// en la BD).
-void ejecutarSubmenuContratos();
+// Pantalla: pide los datos del empleado (por cedula) y genera el HTML + el
+// borrador (sin registrar nada en la BD).
+void generarContratoUI();
 
 // Pantalla: historial de contratos de un empleado (SP_CONTRATOS_POR_EMPLEADO).
 void consultarContratosUI();
@@ -45,8 +47,8 @@ void consultarContratosUI();
 void finalizarContratoUI();
 
 // Pantalla: sube (registra) un contrato cuando la persona firma, a partir del
-// .borrador que dejo la opcion 12. Si la cedula no existe en EMPLEADOS, el
-// trigger TR_ALTA_EMPLEADO crea al empleado sola (alta directa).
+// .borrador que dejo la opcion 12. La cedula tiene que existir en EMPLEADOS:
+// el contrato vincula, no crea empleados.
 void subirContratoUI();
 
 #endif

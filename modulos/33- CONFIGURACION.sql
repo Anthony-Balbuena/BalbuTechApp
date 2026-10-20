@@ -17,7 +17,14 @@ CREATE TABLE CONFIGURACION (
 INSERT IGNORE INTO CONFIGURACION (CLAVE, VALOR, DESCRIPCION) VALUES 
 ('ITBIS', '18', 'Impuesto sobre transferencia de bienes y servicios'),
 ('DIAS_GARANTIA', '30', 'Días de garantía por defecto en productos'),
-('NOMBRE_TIENDA', 'BALBU_TECH', 'Nombre que aparecerá en los tickets');
+('NOMBRE_TIENDA', 'BALBU_TECH', 'Nombre que aparecerá en los tickets'),
+-- Datos de la empresa que se imprimen en los contratos. Nacen vacios: se
+-- completan con un UPDATE cuando el dueño los tenga (no hay que tocar codigo).
+('RNC', '', 'RNC de la empresa (contratos)'),
+('CIUDAD', '', 'Ciudad de la empresa (contratos)'),
+('DIRECCION_EMPRESA', '', 'Direccion fiscal de la empresa (contratos)'),
+('REPRESENTANTE', '', 'Representante legal que firma los contratos'),
+('CEDULA_REPRESENTANTE', '', 'Cedula del representante legal');
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNCION TASA ITBIS}------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------

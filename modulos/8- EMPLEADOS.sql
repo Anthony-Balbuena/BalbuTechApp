@@ -41,7 +41,8 @@ CREATE OR REPLACE PROCEDURE SP_INSERTAR_EMPLEADO(
     IN P_CARGO     VARCHAR(50),
     IN P_SALARIO   DECIMAL(10, 2),
     IN P_TELEFONO  VARCHAR(20),
-    IN P_EMAIL     VARCHAR(100)
+    IN P_EMAIL     VARCHAR(100),
+    IN P_FECHA_INGRESO DATE
 )
 proc_label: BEGIN 
     DECLARE v_nombre_limpio   VARCHAR(100);
@@ -85,8 +86,11 @@ proc_label: BEGIN
     END IF;
 
     -- 4. INSERCIÓN FINAL
- INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
-VALUES (v_nombre_limpio, v_cedula_limpia, P_CARGO, P_SALARIO, v_telefono_limpio, v_email_limpio, CURDATE());
+ -- (19/10/2026) La fecha de ingreso puede venir del contrato firmado; si no
+-- viene, se usa hoy.
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES (v_nombre_limpio, v_cedula_limpia, P_CARGO, P_SALARIO, v_telefono_limpio, v_email_limpio,
+        COALESCE(P_FECHA_INGRESO, CURDATE()));
 
     SELECT CONCAT('EXITO: EMPLEADO "', v_nombre_limpio, '" INSERTADO. ID: ', LAST_INSERT_ID()) AS MENSAJE;
 
