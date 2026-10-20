@@ -18,6 +18,17 @@
 using namespace std;
 
 void mostrarMenuEmpleados() {
+    // (20/10/2026, C-3) Las opciones de contratos (12 a 15) solo se imprimen
+    // si el usuario tiene el permiso GESTIONAR_CONTRATOS. La numeracion no
+    // cambia: 16 sigue siendo "Volver al Menu Principal" y las opciones 1 a 11
+    // tampoco se mueven.
+    // Version anterior (las cuatro opciones se imprimian siempre):
+    // cout << "12. Generar contrato" << endl;
+    // cout << "13. Subir contrato (al firmar)" << endl;
+    // cout << "14. Ver contratos" << endl;
+    // cout << "15. Finalizar contrato" << endl;
+    bool conContratos = tienePermiso("GESTIONAR_CONTRATOS");
+
     cout << "\n=== MODULO DE EMPLEADOS ===" << endl;
     cout << "1. Agregar Empleado" << endl;
     cout << "2. Actualizar Datos" << endl;
@@ -30,10 +41,12 @@ void mostrarMenuEmpleados() {
     cout << "9. Justificar asistencia" << endl;
     cout << "10. Asistencia del dia" << endl;
     cout << "11. Historial de asistencia" << endl;
-    cout << "12. Generar contrato" << endl;
-    cout << "13. Subir contrato (al firmar)" << endl;
-    cout << "14. Ver contratos" << endl;
-    cout << "15. Finalizar contrato" << endl;
+    if (conContratos) {
+        cout << "12. Generar contrato" << endl;
+        cout << "13. Subir contrato (al firmar)" << endl;
+        cout << "14. Ver contratos" << endl;
+        cout << "15. Finalizar contrato" << endl;
+    }
     cout << "16. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
@@ -617,16 +630,30 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
                 break;
             case 12:
-                generarContratoUI();
+                // (20/10/2026, C-3) GESTIONAR_CONTRATOS es obligatorio para
+                // las cuatro opciones de contrato (12 a 15).
+                // Version anterior (sin control de permiso):
+                // generarContratoUI();
+                if (tienePermiso("GESTIONAR_CONTRATOS")) generarContratoUI();
+                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
                 break;
             case 13:
-                subirContratoUI();
+                // Version anterior (sin control de permiso):
+                // subirContratoUI();
+                if (tienePermiso("GESTIONAR_CONTRATOS")) subirContratoUI();
+                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
                 break;
             case 14:
-                consultarContratosUI();
+                // Version anterior (sin control de permiso):
+                // consultarContratosUI();
+                if (tienePermiso("GESTIONAR_CONTRATOS")) consultarContratosUI();
+                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
                 break;
             case 15:
-                finalizarContratoUI();
+                // Version anterior (sin control de permiso):
+                // finalizarContratoUI();
+                if (tienePermiso("GESTIONAR_CONTRATOS")) finalizarContratoUI();
+                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
                 break;
             case 16:
                 break;
