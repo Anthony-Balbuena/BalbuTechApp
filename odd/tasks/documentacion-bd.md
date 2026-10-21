@@ -27,8 +27,8 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
 
 - [x] **T1 — Lote 1: catálogo y maestros** (módulos 1, 2, 4, 5, 7, 9, 17, 40;
   63 objetos). 8 `.md`. Commit `docs(modulos): lote 1 — catálogo y maestros`.
-- [ ] **T2 — Lote 2: RRHH y usuarios** (8, 10, 11, 12, 13, 14, 15, 16, 41;
-  ~65 objetos).
+- [x] **T2 — Lote 2: RRHH y usuarios** (8, 10, 11, 12, 13, 14, 15, 16, 41;
+  88 objetos). 9 `.md`. Commit `docs(modulos): lote 2 — RRHH y usuarios`.
 - [ ] **T3 — Lote 3: compras** (19, 19.1, 19.5, 19.6, 22; ~50 objetos).
 - [ ] **T4 — Lote 4: ventas y postventa** (21, 21.5, 23, 24, 25, 26, 27, 35,
   38, 39; ~71 objetos).
@@ -56,3 +56,19 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   distinta entre alta y edición en CLIENTES; `LENGTH` vs `CHAR_LENGTH` en
   PRODUCTOS; seed no idempotente en 2, 4 y 7; sentencias sueltas de migración
   en PRODUCTOS.
+- **L6** — Lote 2 documentado: 9 `.md` (8, 10, 11, 12, 13, 14, 15, 16, 41),
+  **88 objetos** cubiertos, `git diff -- 'modulos/*.sql'` vacío.
+- **L7** — Corrección del método de verificación: el regex anclado en
+  `^CREATE` **subcontaba** (los SP de varios archivos van indentados). El
+  chequeo pasa a `^[[:space:]]*CREATE ...` y con eso 12 apareció con 8 objetos
+  reales en vez de 2. Hallazgos del lote, anotados sin tocar el SQL:
+  `CEDULA` sin UNIQUE en EMPLEADOS (solo la valida el SP) y salario `NULL` que
+  esquiva la validación; `IX_ASISTENCIA_EMPLEADO` redundante y hora tope
+  `08:30` hardcodeada; la actualización de vacaciones no re-valida
+  solapamiento y `SP_VALIDAR_CUPO_VACACIONES` cuenta inactivos;
+  `VISTA_TOTAL_BONOS_POR_EMPLEADO` promete 0 y devuelve `NULL`; el cargo del
+  historial es `VARCHAR(30)` contra `VARCHAR(50)` en EMPLEADOS (riesgo de
+  truncar el `UPDATE`); el cálculo de LIQUIDACIONES es un placeholder (no Ley
+  16-92) y bloquea el `DELETE` del empleado por el trigger de auditoría; el
+  cuadre de TURNO_CAJA suma **todos** los pagos del período, no los de la caja.
+  Módulos 12, 13, 14, 15 y 16 **no los consume la app** hoy.
