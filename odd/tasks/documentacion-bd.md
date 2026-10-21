@@ -39,7 +39,8 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
 - [x] **T6 — Lote 6: seguridad, logs y config** (3, 6, 28, 29, 30, 33, 34, 36;
   36 objetos).
   8 `.md`. Commit `docs(modulos): lote 6 — seguridad, logs y configuración`.
-- [ ] **T7 — Lote 7: vistas de reportes** (43; 5 objetos).
+- [x] **T7 — Lote 7: vistas de reportes** (43; 5 objetos).
+  1 `.md`. Commit `docs(modulos): lote 7 — vistas de reportes`.
 
 ## Log
 
@@ -126,3 +127,44 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
     `VENTAS` y `CLIENTES` (mismo patrón que el 22).
   - Varios `.sql` arrancan con `-- Active: <id>@@127.0.0.1@3306@BALBU_TECH`,
     rastro de un cliente SQL, no sintaxis del proyecto.
+- **L11** — *"hazlos todos"*: se cierran los lotes 5, 6 y 7. Lote 5 → 3 `.md`
+  (18, 20, 32), 19 objetos; Lote 6 → 8 `.md` (3, 6, 28, 29, 30, 33, 34, 36), 36
+  objetos; Lote 7 → 1 `.md` (43), 5 objetos. **Quedan los 45 `.md` al lado de los
+  45 `.sql`, 363 objetos `CREATE` verificados nombre por nombre (0 faltantes)** y
+  `git diff -- 'modulos/*.sql'` vacío.
+  Hallazgos de estos lotes, anotados sin tocar el SQL:
+  - **El 18/34 no los usa la app**: el historial de estados de producto solo se
+    alimenta si alguien llama al `SP` o hace `UPDATE` directo, y ese `SP` no
+    valida nada (producto inexistente = éxito silencioso) ni limpia sus variables
+    de sesión si el `UPDATE` falla. El trigger rellena el empleado con **`1`
+    hardcodeado** y el motivo con un texto genérico.
+  - **La asignación de reclamos es un módulo muerto**: la app cierra con
+    `27_SP_FINALIZAR_RECLAMO_TOTAL`, que no toca `ASIGNACIONES_RECLAMOS`, así que
+    las asignaciones quedan `EN_PROCESO` para siempre. Además la tabla tiene **dos
+    índices idénticos**, `PENDIENTE` nunca se usa, `SP_FINALIZAR_RECLAMO` deja
+    finalizar una asignación `CANCELADO` y su `CONCAT` con `OBSERVACIONES NULL`
+    **borra las notas previas**. La validación de "una sola asignación en curso"
+    no tiene respaldo en la base.
+  - `MOVIMIENTOS_INVENTARIO` y `HISTORIAL_MOVIMIENTOS_PRODUCTO` **no comparten
+    dominio**: la venta es `SALIDA` en una y `VENTA` en la otra; la segunda no
+    tiene `CHECK` de cantidad y su FK borra en cascada el historial.
+  - **`AJUSTE` en el kardex solo resta**: no existe ajuste al alza; el `SP` de
+    ajuste no bloquea la fila (`FOR UPDATE`) ni valida que el producto esté activo.
+  - `LOG_ACCESOS` **no se escribe**: el login no llama al `SP`; `ESTADO_INTENTO`
+    es texto libre y el comentario de la limpieza que dice "sin parámetro usa 120"
+    es falso (`P_DIAS` no tiene default).
+  - `LOG_USUARIOS`: **`ID_USUARIO_ADMIN` queda siempre `NULL`**, `CAMBIO_USUARIO`
+    nunca se genera y cambiar rol+estado deja dos filas.
+  - `AUDITORIA_SISTEMA`: los dos `DROP` de sus `SP` **no coinciden** con los
+    `CREATE` (prefijo `6_`), `DATE(FECHA_HORA)` anula el índice de fecha, no hay
+    auditoría de `DELETE` y `USUARIO_SISTEMA` guarda el usuario de MySQL
+    (`balbu_app`), no la persona.
+  - `CONFIGURACION`: `DIAS_GARANTIA` es una semilla muerta y `FN_TASA_ITBIS`
+    **no permite 0 %** (cae al 18 por diseño).
+  - `IX_ROLES_NOMBRE` es redundante con el `UNIQUE`; `PERMISOS` **no se
+    administra desde la app** (solo semilla) y el import **borra cuatro pares de
+    `RRHH`** en cada corrida; `FN_TIENE_PERMISO` está declarada `DETERMINISTIC`
+    leyendo tablas y **no mira si el usuario está activo**.
+  - `43- VISTAS_REPORTES`: la fórmula del BRUTO llega a **6 lugares** con estas
+    vistas; `VISTA_COMPRAS_PENDIENTES_PAGO` la escribe **dos veces en la misma
+    vista** (`SELECT` y `WHERE`) y usa subconsultas correlacionadas por fila.
