@@ -6,8 +6,11 @@ qué estado a cuál y por qué. Ningún cambio de estado queda sin rastro.
 **Depende de:** `PRODUCTOS` (9) y `EMPLEADOS` (8).
 
 > **La app no usa este módulo**: ni el SP ni la vista aparecen en el código C++.
-> Los productos se dan de alta y de baja por otros caminos, así que el historial
-> solo se alimenta si alguien llama al SP o actualiza `PRODUCTOS.ESTADO`.
+> **Pero la tabla sí se llena**: la app cambia el estado con
+> `SP_TOGGLE_ESTADO_PRODUCTOS` (9), que hace `UPDATE PRODUCTOS SET ESTADO` y
+> dispara el trigger. Como nunca se llamó a este SP, las variables de sesión
+> están vacías y **todas las filas quedan atribuidas al empleado `1`** con el
+> motivo `'Cambio de estado automático'`.
 
 Fuente: `modulos/18- HISTORIAL_ESTADOS_PRODUCTO.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
 
@@ -44,7 +47,9 @@ trigger del módulo lee de ahí.
 > **Es el único camino que deja un historial con datos útiles**, y aun así no
 > valida nada: producto inexistente devuelve éxito silencioso (el `UPDATE`
 > afecta 0 filas), empleado inexistente termina en el `1452` del FK del trigger,
-> y cambiar al mismo estado **no escribe historial ni avisa**.
+> y cambiar al mismo estado **no escribe historial ni avisa**. **La app no lo
+> llama**: el cambio de estado real pasa por `SP_TOGGLE_ESTADO_PRODUCTOS` (9), que
+> no setea estas variables.
 >
 > **No hay `EXIT HANDLER`:** si el `UPDATE` falla, las variables de sesión quedan
 > prendidas con el último empleado y motivo, y el próximo cambio de estado por

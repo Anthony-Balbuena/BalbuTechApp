@@ -174,13 +174,19 @@ estados de compra), **28** (log de accesos), **29** (log de usuarios), **30** (l
 de permisos), **32** (historial de stock), **34** (asignación de reclamos) y
 **35** (detalle de reparaciones).
 
+> **"No usa" significa que la app no lee ni llama sus objetos**, no que estén
+> vacíos. Varios **se llenan solos** por triggers de otros módulos (6, 15, 18,
+> 19.1, 29 y 32): borrarlos rompe el negocio que los alimenta.
+
 Parciales, que conviene mirar antes de tocarlos:
 
 - **8 EMPLEADOS**: la app usa 4 de sus 10 `SP` (insertar, actualizar, despedir,
   reactivar) y lee la tabla directo.
 - **17 INVENTARIO**: el `SP` de alta no se llama; la tabla sí se usa.
-- **19.5 PAGOS_COMPRA**: 2 de 4 `SP`.
-- **22 DETALLE_COMPRA**: 1 de 3 `SP`; el resto lo mueven los triggers.
+- **19.5 PAGOS_COMPRA**: 2 de 4 `SP` (`SP_REGISTRAR_PAGO_COMPRA` y
+  `SP_COMPRAS_PENDIENTES`). Anular un pago y la nota de crédito no tienen pantalla.
+- **22 DETALLE_COMPRA**: 1 de 3 `SP` (`22_SP_AGREGAR_DETALLE_COMPRA`); quitar y
+  modificar línea no se llaman, y el resto lo mueven los triggers.
 - **38 GANANCIAS**: el `SP` de período se usa; las dos vistas, no.
 
 ## Dónde buscar qué
