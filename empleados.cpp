@@ -13,15 +13,17 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "contrato.h"
+#include "permisos.h"
+#include "vacaciones.h"
 #include "colores.h"
 
 using namespace std;
 
 void mostrarMenuEmpleados() {
     // (20/10/2026, C-3) Las opciones de contratos (12 a 15) solo se imprimen
-    // si el usuario tiene el permiso GESTIONAR_CONTRATOS. La numeracion no
-    // cambia: 16 sigue siendo "Volver al Menu Principal" y las opciones 1 a 11
-    // tampoco se mueven.
+    // si el usuario tiene el permiso GESTIONAR_CONTRATOS. La numeracion de
+    // 1 a 15 no cambia: 16 es "Gestionar permisos", 17 "Gestionar vacaciones"
+    // y 18 "Volver al Menu Principal" (21/10/2026).
     // Version anterior (las cuatro opciones se imprimian siempre):
     // cout << "12. Generar contrato" << endl;
     // cout << "13. Subir contrato (al firmar)" << endl;
@@ -47,7 +49,9 @@ void mostrarMenuEmpleados() {
         cout << "14. Ver contratos" << endl;
         cout << "15. Finalizar contrato" << endl;
     }
-    cout << "16. Volver al Menu Principal" << endl;
+    cout << "16. Gestionar permisos" << endl;
+    cout << "17. Gestionar vacaciones" << endl;
+    cout << "18. Volver al Menu Principal" << endl;
     cout << "=============================" << endl;
 }
 
@@ -656,12 +660,24 @@ void ejecutarSubmenuEmpleados() {    int opcion = 0;
                 else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
                 break;
             case 16:
+                // (21/10/2026) Defensa en profundidad: el submenu ya exige
+                // GESTIONAR_EMPLEADOS, pero la accion lo vuelve a verificar.
+                if (tienePermiso("GESTIONAR_EMPLEADOS")) gestionarPermisosUI();
+                else cout << ROJO << "No tienes permiso para gestionar permisos." << RESET << endl;
+                break;
+            case 17:
+                // (21/10/2026) Mismo gate que "Gestionar permisos": el
+                // submenu ya exige GESTIONAR_EMPLEADOS y la accion lo repite.
+                if (tienePermiso("GESTIONAR_EMPLEADOS")) gestionarVacacionesUI();
+                else cout << ROJO << "No tienes permiso para gestionar vacaciones." << RESET << endl;
+                break;
+            case 18:
                 break;
             default:
                 cout << ROJO << "Opcion no valida." << RESET << endl;
                 break;
         }
-        if (opcion != 16) pausar();
-    } while (opcion != 16);
+        if (opcion != 18) pausar();
+    } while (opcion != 18);
 }
 

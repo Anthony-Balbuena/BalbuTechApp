@@ -8,12 +8,14 @@ rechazado del mismo empleado.
 **Depende de:** `EMPLEADOS` (8).
 **Es consultado por:** `ASISTENCIA_EMPLEADOS` (11) — un permiso `APROBADO`
 bloquea el registro de asistencia.
+**La usa la app:** `permisos.cpp` — `misPermisosUI()` para el historial y el
+alta propia; `gestionarPermisosUI()` para que RRHH/ADMIN resuelva pendientes.
 
-> **La app todavía no consume este módulo**: no hay pantalla de permisos ni
-> `CALL` en el C++. Los SP y la vista existen para el cliente actual/futuro y
-> para las validaciones de asistencia.
+> **Pantallas:** "Mis permisos" en el menú principal (permiso
+> `SOLICITAR_PERMISO`) y "16. Gestionar permisos" dentro del submenú de
+> Empleados (gate `GESTIONAR_EMPLEADOS`).
 
-Fuente: `modulos/13- PERMISOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/13- PERMISOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 21/10/2026.
 
 ## Tablas
 
@@ -58,20 +60,66 @@ Inserta con la descripción limpia (`TRIM` + colapso de espacios) y devuelve
 > si llega `NULL`, el resultado es `NULL` y la columna lo acepta (es
 > nullable).
 
+### `SP_LISTAR_PERMISOS_PENDIENTES()`
+
+Sin parámetros. Devuelve `ID_PERMISO`, `ID_EMPLEADO`, `NOMBRE` (del empleado),
+`TIPO_PERMISO`, `FECHA_INICIO`, `FECHA_FIN`,
+`IFNULL(DESCRIPCION,'') AS DESCRIPCION` y `FECHA_SOLICITUD` de todo lo que está
+`PENDIENTE`, ordenado por `FECHA_SOLICITUD ASC, ID_PERMISO ASC` (el ID
+desempata solicitudes de la misma fecha). Es la lista que consume la
+pantalla de gestión de RRHH.
+
 ### `SP_GESTIONAR_PERMISO(P_ID_PERMISO, P_NUEVO_ESTADO)`
 
-Cambia el estado a `PENDIENTE`, `APROBADO` o `RECHAZADO`. ID inexistente →
-`ERROR: PERMISO NO ENCONTRADO.` Devuelve
-`EXITO: PERMISO ID <id> ACTUALIZADO A ESTADO: <estado>`
+Resuelve una solicitud **pendiente**. Validaciones en orden (`SIGNAL 45000`):
 
-> No hay validación de transiciones (se puede pasar de `RECHAZADO` a
-> `APROBADO` sin problema) ni de quién gestiona: el control de permisos lo
-> hace la app.
+1. ID inexistente → `ERROR: PERMISO NO ENCONTRADO.`
+2. estado actual distinto de `PENDIENTE` →
+   `ERROR: SOLO SE PUEDEN GESTIONAR PERMISOS PENDIENTES.`
+3. estado nuevo `NULL` o distinto de `APROBADO` o `RECHAZADO` →
+   `ERROR: ESTADO NO VALIDO. SOLO SE PUEDE APROBAR O RECHAZAR.`
+
+Si pasa, actualiza con `AND ESTADO = 'PENDIENTE'` y verifica
+`ROW_COUNT()`: si otra gestión lo resolvió entre el `SELECT` y el `UPDATE`,
+también falla con "solo pendientes". Devuelve
+`EXITO: PERMISO ID <id> ACTUALIZADO A ESTADO: <estado>`.
+
+> **Una sola resolución:** la app filtra los ya resueltos (la lista de
+> `SP_LISTAR_PERMISOS_PENDIENTES` solo trae `PENDIENTE`) y el SP también los
+> bloquea: el `SELECT` previo corta el caso normal y el `UPDATE ... AND
+> ESTADO = 'PENDIENTE'` + `ROW_COUNT()` cubre la carrera entre dos gestiones.
+> El parámetro sigue siendo `ENUM` (acepta `PENDIENTE` a nivel de tipo), pero
+> el SP lo rechaza en la validación 3; un `NULL` también cae ahí con el
+> mensaje amigable.
+>
+> **Quién gestiona:** el SP no sabe quién llama. El control lo hace la app con
+> el gate `GESTIONAR_EMPLEADOS` del submenú de Empleados. El trigger del
+> módulo 30 registra el antes/después, **no el actor**.
 
 ### `SP_HISTORIAL_PERMISOS_EMPLEADO(P_ID_EMPLEADO)`
 
 Lista `TIPO_PERMISO, FECHA_INICIO, FECHA_FIN, ESTADO, DESCRIPCION` del
-empleado, del más reciente al más antiguo.
+empleado, del más reciente al más antiguo. La usa `misPermisosUI()` para
+refrescar el historial propio después de cada alta.
+
+## Flujo y UI
+
+1. **Solicitud (empleado):** "Mis permisos" en el menú principal. La app
+   obtiene el `ID_EMPLEADO` desde `USUARIOS.ID_EMPLEADO` usando el usuario de la
+   sesión (si el usuario no está vinculado, avisa y no deja pedir). Muestra el
+   historial con `SP_HISTORIAL_PERMISOS_EMPLEADO` y ofrece "Nueva solicitud":
+   tipo (1 `MEDICO`, 2 `PERSONAL`, 3 `ESTUDIO`, 4 `LICENCIA`, 5 `SIN_SUELDO`),
+   fecha inicio, fecha fin (`YYYY-MM-DD`) y descripción. Llama a
+   `SP_SOLICITAR_PERMISO`, muestra `MENSAJE` o el error SQL y refresca el
+   historial. No edita ni borra.
+2. **Gestión (RRHH/ADMIN):** "Empleados" → "16. Gestionar permisos". Lista los
+   pendientes con `SP_LISTAR_PERMISOS_PENDIENTES`, pide el ID y la acción
+   (1 aprobar / 2 rechazar), llama a `SP_GESTIONAR_PERMISO` y muestra
+   `MENSAJE` o el error SQL. Repite hasta que el usuario elige 0. Un permiso
+   ya resuelto vuelve a fallar con "solo se pueden gestionar permisos
+   pendientes": no hay doble resolución.
+3. **Efecto:** un permiso `APROBADO` que cubre hoy bloquea el registro y la
+   justificación de asistencia (módulo 11). Uno `RECHAZADO` no bloquea.
 
 ## Vistas
 
@@ -88,5 +136,7 @@ tipo, fechas y estado. Sirve para ver quién está ausente en este momento.
   bloquean).
 - **Rango válido** (`FECHA_FIN >= FECHA_INICIO`) por CHECK.
 - **Estados**: `PENDIENTE` (default), `APROBADO`, `RECHAZADO`.
+- **Una sola resolución**: solo un permiso `PENDIENTE` pasa a `APROBADO` o
+  `RECHAZADO`; el SP no permite volver a gestionarlo.
 - **Un permiso aprobado bloquea la asistencia** del día (módulo 11).
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.

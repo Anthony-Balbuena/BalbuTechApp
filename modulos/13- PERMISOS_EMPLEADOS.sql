@@ -115,10 +115,39 @@ END //
 DELIMITER ;
 
 /*
+SP_LISTAR_PERMISOS_PENDIENTES
+Lista las solicitudes que todavia no se resolvieron, con el nombre del
+empleado, para la pantalla de gestion de RRHH. Va de la mas vieja a la
+mas nueva: la primera que llego se atiende primero.
+*/
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_LISTAR_PERMISOS_PENDIENTES //
+CREATE PROCEDURE SP_LISTAR_PERMISOS_PENDIENTES()
+BEGIN
+    SELECT
+        P.ID_PERMISO,
+        P.ID_EMPLEADO,
+        E.NOMBRE,
+        P.TIPO_PERMISO,
+        P.FECHA_INICIO,
+        P.FECHA_FIN,
+        IFNULL(P.DESCRIPCION, '') AS DESCRIPCION,
+        P.FECHA_SOLICITUD
+    FROM PERMISOS_EMPLEADOS P
+    INNER JOIN EMPLEADOS E ON E.ID_EMPLEADO = P.ID_EMPLEADO
+    WHERE P.ESTADO = 'PENDIENTE'
+    ORDER BY P.FECHA_SOLICITUD ASC, P.ID_PERMISO ASC;
+END //
+DELIMITER ;
+
+/*
 SP_GESTIONAR_PERMISO
-Aprueba, rechaza o deja pendiente un permiso existente.
-Si el ID no existe manda un error; si existe cambia el estado y confirma
-con un mensaje que trae el ID y el nuevo estado.
+Aprueba o rechaza una solicitud pendiente. Solo se puede resolver una
+vez: si el ID no existe o el permiso ya fue aprobado o rechazado, manda
+un error y no toca nada. La actualizacion vuelve a exigir PENDIENTE para
+que dos gestiones simultaneas no pisen el estado. Si todo esta bien
+cambia el estado y confirma con un mensaje que trae el ID y el nuevo
+estado.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_GESTIONAR_PERMISO ;
@@ -127,16 +156,40 @@ CREATE PROCEDURE SP_GESTIONAR_PERMISO(
     IN P_NUEVO_ESTADO ENUM('PENDIENTE', 'APROBADO','RECHAZADO')
 )
 proc_label: BEGIN
+    DECLARE v_estado_actual VARCHAR(20);
+
     -- 1. VALIDAR EXISTENCIA
-    IF NOT EXISTS (SELECT 1 FROM PERMISOS_EMPLEADOS WHERE ID_PERMISO = P_ID_PERMISO) THEN
+    SELECT ESTADO INTO v_estado_actual
+    FROM PERMISOS_EMPLEADOS
+    WHERE ID_PERMISO = P_ID_PERMISO;
+
+    IF v_estado_actual IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: PERMISO NO ENCONTRADO.';
         LEAVE proc_label;
     END IF;
- 
-    -- 2. ACTUALIZAR ESTADO
-    UPDATE PERMISOS_EMPLEADOS 
-    SET ESTADO = P_NUEVO_ESTADO 
-    WHERE ID_PERMISO = P_ID_PERMISO;
+
+    -- 2. SOLO SE RESUELVE UNA VEZ: LA SOLICITUD DEBE ESTAR PENDIENTE
+    IF v_estado_actual <> 'PENDIENTE' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: SOLO SE PUEDEN GESTIONAR PERMISOS PENDIENTES.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. EL NUEVO ESTADO SOLO PUEDE SER APROBADO O RECHAZADO
+    IF P_NUEVO_ESTADO IS NULL OR P_NUEVO_ESTADO NOT IN ('APROBADO', 'RECHAZADO') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTADO NO VALIDO. SOLO SE PUEDE APROBAR O RECHAZAR.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 4. ACTUALIZAR SOLO SI SIGUE PENDIENTE (ATOMICO)
+    UPDATE PERMISOS_EMPLEADOS
+    SET ESTADO = P_NUEVO_ESTADO
+    WHERE ID_PERMISO = P_ID_PERMISO
+      AND ESTADO = 'PENDIENTE';
+
+    IF ROW_COUNT() = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: SOLO SE PUEDEN GESTIONAR PERMISOS PENDIENTES.';
+        LEAVE proc_label;
+    END IF;
 
     SELECT CONCAT('EXITO: PERMISO ID ', P_ID_PERMISO, ' ACTUALIZADO A ESTADO: ', P_NUEVO_ESTADO) AS MENSAJE;
 END //

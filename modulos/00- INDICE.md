@@ -7,19 +7,19 @@ nombre.
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 20/10/2026 · 45 `.sql` + 45 `.md` · 363 objetos documentados.
+Última revisión: 21/10/2026 · 45 `.sql` + 45 `.md` · 367 objetos documentados.
 
 ## Resumen
 
 | Tipo de objeto | Cantidad |
 |---|---|
 | Tablas | 43 |
-| Procedimientos almacenados | 155 |
+| Procedimientos almacenados | 159 |
 | Triggers | 77 |
 | Vistas | 23 |
 | Funciones | 5 |
 | Índices | 60 |
-| **Total `CREATE`** | **363** |
+| **Total `CREATE`** | **367** |
 
 ## Cómo leer un módulo
 
@@ -93,8 +93,8 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [EMPLEADOS](<8- EMPLEADOS.md>) | 1T · 10SP · 2TR | Empleados, cargo, salario y estado. | ◐ |
 | [USUARIOS](<10- USUARIOS.md>) | 1T · 12SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
 | [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 7SP · 1TR | Entrada y salida por día. | ✅ |
-| [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 5SP · 2TR | Solicitudes y cupo de vacaciones. | — |
-| [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 1T · 3SP · 1V | Permisos y ausencias del empleado. | — |
+| [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 8SP · 2TR | Solicitudes y cupo de vacaciones. | ✅ |
+| [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 1T · 4SP · 1V | Permisos y ausencias del empleado. | ✅ |
 | [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 5SP · 2TR · 1V | Bonos y descuentos de nómina. | — |
 | [HISTORIAL_LABORAL_EMPLEADO](<15- HISTORIAL_LABORAL_EMPLEADO.md>) | 1T · 1TR | Cambios de cargo y salario. | — |
 | [LIQUIDACIONES](<16- LIQUIDACIONES.md>) | 1T · 1SP · 3TR · 2V | Liquidación al despedir. | — |
@@ -109,7 +109,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [PERMISOS_ROLES](<36- PERMISOS_ROLES.md>) | 2T · 3SP · 1FN | Permisos y qué rol los tiene. | ✅ |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 2TR | Bitácora genérica por tabla y registro. | — |
-| [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | — |
+| [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |
 | [LOG_USUARIOS](<29- LOG_USUARIOS.md>) | 1T · 1SP · 1TR · 1V | Cambios de rol y estado de usuarios. | — |
 | [LOG_AUDITORIA_PERMISOS](<30- LOG_AUDITORIA_PERMISOS.md>) | 1T · 1TR | Cambios de estado de los permisos. | — |
 | [ASIGNAR RECLAMOS](<34- ASIGNAR RECLAMOS.md>) | 1T · 2SP | Técnico asignado a un reclamo. | — |
@@ -167,12 +167,11 @@ repetida de la base:
 
 ## Qué no usa la app
 
-Catorce módulos completos: **6** (auditoría), **12** (vacaciones), **13**
-(permisos de empleado), **14** (bonos), **15** (historial laboral), **16**
-(liquidaciones), **18** (historial de estados de producto), **19.1** (historial de
-estados de compra), **28** (log de accesos), **29** (log de usuarios), **30** (log
-de permisos), **32** (historial de stock), **34** (asignación de reclamos) y
-**35** (detalle de reparaciones).
+Once módulos completos: **6** (auditoría), **14** (bonos),
+**15** (historial laboral), **16** (liquidaciones), **18** (historial de estados
+de producto), **19.1** (historial de estados de compra), **29** (log de
+usuarios), **30** (log de permisos), **32** (historial de stock), **34**
+(asignación de reclamos) y **35** (detalle de reparaciones).
 
 > **"No usa" significa que la app no lee ni llama sus objetos**, no que estén
 > vacíos. Varios **se llenan solos** por triggers de otros módulos (6, 15, 18,
@@ -206,7 +205,7 @@ Parciales, que conviene mirar antes de tocarlos:
 ## Estado de la documentación
 
 - **45 de 45** módulos documentados, un `.md` por `.sql`.
-- **363 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
+- **367 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
 - Los `.sql` **no se tocaron** para documentar.
 - Los hallazgos están anotados en cada documento y en
   `odd/tasks/documentacion-bd.md`, **sin arreglar**: son deuda técnica

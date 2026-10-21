@@ -11,6 +11,34 @@
 
 using namespace std;
 
+// (21/10/2026) Corta a maxBytes sin partir un caracter UTF-8: si el byte
+// siguiente es de continuacion (10xxxxxx), retrocede hasta el inicio del caracter.
+static string truncarUtf8(const string& texto, size_t maxBytes) {
+    if (texto.size() <= maxBytes) return texto;
+    size_t corte = maxBytes;
+    while (corte > 0 && (static_cast<unsigned char>(texto[corte]) & 0xC0) == 0x80) {
+        --corte;
+    }
+    return texto.substr(0, corte);
+}
+
+// (21/10/2026) Deja el intento en LOG_ACCESOS. Nunca debe tumbar el login:
+// si el log falla, se ignora y el acceso sigue su curso.
+static void registrarAcceso(int idUsuario, const string& usuario, const char* estado) {
+    if (globalCon == nullptr) return;
+    try {
+        unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
+            "CALL SP_REGISTRAR_ACCESO(?, ?, ?)"));
+        if (idUsuario > 0) p->setInt(1, idUsuario);
+        else p->setNull(1, sql::DataType::INTEGER);
+        p->setString(2, usuario.empty() ? "(vacio)" : truncarUtf8(usuario, 50));
+        p->setString(3, estado);
+        p->execute();
+        drenarResultados(p.get());
+    } catch (...) {
+    }
+}
+
 bool intentarLogin(const string& usuario, const string& password) {
     if (globalCon == nullptr) {
         cout << "[!] No hay conexión activa a la base de datos." << endl;
@@ -59,12 +87,19 @@ bool intentarLogin(const string& usuario, const string& password) {
                     }
                 }
 
+                registrarAcceso(idUsuario, usuario, "EXITOSO");
                 guardarSesion(idUsuario, usuario, idRol, rol, estadoCuenta);
                 return true;
             }
+
+            registrarAcceso(idUsuario, usuario, ok ? "INACTIVO" : "FALLIDO");
+            return false;
         }
 
-        // No fallback SP: autenticación manejada por PBKDF2/legacy rehash arriba
+        // No encontrado: el SELECT ya no hace falta y el intento queda en el log.
+        rsel.reset();
+        drenarResultados(pSelect.get());
+        registrarAcceso(0, usuario, "FALLIDO");
         return false;
 
     } catch (const exception &e) {

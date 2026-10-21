@@ -89,11 +89,14 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. VALIDAR SI TIENE VACACIONES
+    -- 2. VALIDAR SI TIENE VACACIONES APROBADAS
+    -- (21/10/2026) Solo las APROBADAS bloquean: una solicitud PENDIENTE no
+    -- debe impedir marcar asistencia.
     IF EXISTS (
         SELECT 1 FROM VACACIONES_EMPLEADOS 
         WHERE ID_EMPLEADO = P_ID_EMPLEADO 
         AND CURDATE() BETWEEN FECHA_INICIO AND FECHA_FIN
+        AND ESTADO = 'APROBADO'
     ) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EMPLEADO DE VACACIONES. NO REQUIERE REGISTRO DE ASISTENCIA.';
         LEAVE proc_label;
@@ -197,14 +200,26 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. Actualizar estado y guardar la razón detallada
+    -- 2. (21/10/2026) No justificar un dia cubierto por vacaciones APROBADAS.
+    -- Una solicitud PENDIENTE no bloquea: todavia no es una ausencia firme.
+    IF EXISTS (
+        SELECT 1 FROM VACACIONES_EMPLEADOS
+        WHERE ID_EMPLEADO = P_ID_EMPLEADO
+        AND P_FECHA BETWEEN FECHA_INICIO AND FECHA_FIN
+        AND ESTADO = 'APROBADO'
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EMPLEADO CON VACACIONES APROBADAS EN LA FECHA. NO SE PUEDE JUSTIFICAR ASISTENCIA.';
+        LEAVE proc_label;
+    END IF;
+
+    -- 3. Actualizar estado y guardar la razón detallada
     -- Usamos CONCAT para que quede claro qué se justificó
     UPDATE ASISTENCIA_EMPLEADOS
     SET ESTADO = P_NUEVO_ESTADO,
         OBSERVACION = CONCAT('JUSTIFICACIÓN: ', P_JUSTIFICACION)
     WHERE ID_EMPLEADO = P_ID_EMPLEADO AND FECHA = P_FECHA;
 
-    -- 3. Mensaje de éxito
+    -- 4. Mensaje de éxito
     SELECT CONCAT('EXITO: ASISTENCIA DE ID ', P_ID_EMPLEADO, ' JUSTIFICADA COMO ', P_NUEVO_ESTADO) AS MENSAJE;
 END //
 DELIMITER ;
@@ -285,12 +300,14 @@ CREATE TRIGGER TR_BLOQUEAR_ASISTENCIA_INAPROPIADA
 BEFORE INSERT ON ASISTENCIA_EMPLEADOS
 FOR EACH ROW
 BEGIN
-    -- 1. Verificar si tiene Vacaciones
+    -- 1. Verificar si tiene Vacaciones APROBADAS
     -- (09/10/2026) NEW.FECHA en vez de CURDATE(): con otra fecha el chequeo se saltaba.
+    -- (21/10/2026) Solo APROBADO: una solicitud pendiente no bloquea la asistencia.
     IF EXISTS (
         SELECT 1 FROM VACACIONES_EMPLEADOS 
         WHERE ID_EMPLEADO = NEW.ID_EMPLEADO 
         AND NEW.FECHA BETWEEN FECHA_INICIO AND FECHA_FIN
+        AND ESTADO = 'APROBADO'
     ) THEN
         SIGNAL SQLSTATE '45000' 
         SET MESSAGE_TEXT = 'ERROR: REGISTRO DENEGADO. EL EMPLEADO SE ENCUENTRA DE VACACIONES.';

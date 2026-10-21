@@ -19,12 +19,15 @@
 #include "proveedores.h"
 #include "metodos_pago.h"
 #include "empleados.h"
+#include "permisos.h"
+#include "vacaciones.h"
 #include "caja.h"
 #include "clientes.h"
 #include "usuarios.h"
 #include "ventas.h"
 #include "compras.h"
 #include "inventario.h"
+#include "accesos.h"
 
 using namespace std;
 
@@ -145,9 +148,9 @@ void mostrarPermisosActuales() {
 // ---------------------------------------------------------------------------
 
 enum class AccionMenu {
-    Roles, Usuarios, Empleados, Clientes, Proveedores, Categorias, Marcas,
+    Roles, Usuarios, Empleados, MisPermisos, MisVacaciones, Clientes, Proveedores, Categorias, Marcas,
     Productos, MetodosPago, Ventas, Compras, Inventario, Caja,
-    VerPermisos, CerrarSesion
+    LogAccesos, VerPermisos, CerrarSesion
 };
 
 struct ItemMenu {
@@ -163,6 +166,8 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
         {"Usuarios",         {"GESTIONAR_USUARIOS"},                       AccionMenu::Usuarios},
         {"Empleados",        {"GESTIONAR_EMPLEADOS"},                      AccionMenu::Empleados},
+        {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
+        {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},
         {"Clientes",         {"GESTIONAR_CLIENTES", "CONSULTAR_CLIENTES"}, AccionMenu::Clientes},
         {"Proveedores",      {"GESTIONAR_PROVEEDORES"},                    AccionMenu::Proveedores},
         {"Categorias",       {"GESTIONAR_CATEGORIAS"},                     AccionMenu::Categorias},
@@ -173,6 +178,7 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Compras",          {"GESTIONAR_COMPRAS"},                        AccionMenu::Compras},
         {"Inventario",       {"GESTIONAR_INVENTARIO"},                     AccionMenu::Inventario},
         {"Caja (turnos)",    {"GESTIONAR_VENTAS"},                         AccionMenu::Caja},
+        {"Accesos",          {"GESTIONAR_ROLES"},                          AccionMenu::LogAccesos},
         {"Ver permisos",     {},                                           AccionMenu::VerPermisos},
         {"Cerrar sesión",    {},                                           AccionMenu::CerrarSesion}
     };
@@ -239,6 +245,8 @@ void ejecutarMenuSegunRol() {
             case AccionMenu::Roles:       ejecutarSubmenuRoles(); break;
             case AccionMenu::Usuarios:    ejecutarSubmenuUsuarios(); break;
             case AccionMenu::Empleados:   ejecutarSubmenuEmpleados(); break;
+            case AccionMenu::MisPermisos: misPermisosUI(); break;
+            case AccionMenu::MisVacaciones: misVacacionesUI(); break;
             case AccionMenu::Clientes:    ejecutarSubmenuClientes(); break;
             case AccionMenu::Proveedores: ejecutarSubmenuProveedores(); break;
             case AccionMenu::Categorias:  ejecutarSubmenuCategorias(); break;
@@ -249,6 +257,7 @@ void ejecutarMenuSegunRol() {
             case AccionMenu::Compras:     ejecutarSubmenuCompras(); break;
             case AccionMenu::Inventario:  ejecutarSubmenuInventario(); break;
             case AccionMenu::Caja:        ejecutarSubmenuCaja(); break;
+            case AccionMenu::LogAccesos:  ejecutarSubmenuAccesos(); break;
             case AccionMenu::VerPermisos: mostrarPermisosActuales(); break;
             case AccionMenu::CerrarSesion:
                 cerrarSesion();

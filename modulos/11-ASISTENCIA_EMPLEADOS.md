@@ -6,10 +6,10 @@ hora de salida, horas trabajadas (calculadas solas) y estado
 
 **Depende de:** `EMPLEADOS` (8), `VACACIONES_EMPLEADOS` (12) y
 `PERMISOS_EMPLEADOS` (13) — estas dos últimas solo se consultan dentro de los
-SP y del trigger.
+SP y del trigger, y **solo sus estados `APROBADO` bloquean**.
 **Es usado por:** liquidaciones (16) y reportes de RRHH.
 
-Fuente: `modulos/11-ASISTENCIA_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/11-ASISTENCIA_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 21/10/2026.
 
 ## Tablas
 
@@ -50,8 +50,9 @@ registro por empleado por día.
 **Bloqueos previos (para ambos movimientos):**
 - permiso `APROBADO` que cubra hoy →
   `ERROR: EMPLEADO CON PERMISO APROBADO. NO REQUIERE REGISTRO DE ASISTENCIA.`
-- vacaciones que cubran hoy →
+- vacaciones **`APROBADO`** que cubran hoy →
   `ERROR: EMPLEADO DE VACACIONES. NO REQUIERE REGISTRO DE ASISTENCIA.`
+  (una solicitud `PENDIENTE` o `RECHAZADO` no bloquea).
 
 **Entrada:**
 - ya hay registro hoy → `ERROR: YA TIENE REGISTRO DE ENTRADA HOY.`
@@ -80,6 +81,9 @@ salida", pero **sin** los chequeos de vacaciones/permiso.
 **Usada por la app.** Cambia el estado del día y guarda
 `OBSERVACION = 'JUSTIFICACIÓN: <texto>'`. Si no hay registro para esa
 fecha → `ERROR: NO EXISTE REGISTRO PARA ESTE EMPLEADO EN LA FECHA.`
+Si la fecha está cubierta por vacaciones **`APROBADO`** →
+`ERROR: EMPLEADO CON VACACIONES APROBADAS EN LA FECHA. NO SE PUEDE JUSTIFICAR ASISTENCIA.`
+Una solicitud pendiente o rechazada no bloquea.
 Devuelve `EXITO: ASISTENCIA DE ID <id> JUSTIFICADA COMO <estado>`
 
 > **Ojo:** si el día no tiene fila (p. ej. un ausente que nunca marcó), este
@@ -116,7 +120,8 @@ marca **`AUSENTE`** (`LEFT JOIN` + `IFNULL`). Devuelve
 ### `TR_BLOQUEAR_ASISTENCIA_INAPROPIADA`
 
 `BEFORE INSERT ON ASISTENCIA_EMPLEADOS`. Bloquea el insert si el empleado
-está de vacaciones o tiene permiso `APROBADO` que cubra **`NEW.FECHA`**:
+tiene vacaciones **`APROBADO`** o un permiso `APROBADO` que cubra
+**`NEW.FECHA`**:
 - `ERROR: REGISTRO DENEGADO. EL EMPLEADO SE ENCUENTRA DE VACACIONES.`
 - `ERROR: REGISTRO DENEGADO. EL EMPLEADO TIENE UN PERMISO APROBADO.`
 
@@ -128,7 +133,8 @@ está de vacaciones o tiene permiso `APROBADO` que cubra **`NEW.FECHA`**:
 - **Un registro por empleado y día** (UNIQUE).
 - **Las horas trabajadas se calculan solas** (columna generada `STORED`).
 - **Entrada después de las 08:30 = `TARDE`** (hora tope hardcodeada).
-- **No se puede marcar si está de vacaciones o con permiso aprobado.**
+- **No se puede marcar si tiene vacaciones aprobadas o un permiso aprobado.**
+  Una solicitud de vacaciones pendiente o rechazada no bloquea.
 - **Segunda entrada/salida del día se rechaza** (no se sobrescribe).
 - **Edición limitada a los últimos 7 días** (control de seguridad).
 - **Un día sin marcación se reporta como `AUSENTE`** en el listado diario.
