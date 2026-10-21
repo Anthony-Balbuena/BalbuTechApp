@@ -29,7 +29,8 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   63 objetos). 8 `.md`. Commit `docs(modulos): lote 1 — catálogo y maestros`.
 - [x] **T2 — Lote 2: RRHH y usuarios** (8, 10, 11, 12, 13, 14, 15, 16, 41;
   88 objetos). 9 `.md`. Commit `docs(modulos): lote 2 — RRHH y usuarios`.
-- [ ] **T3 — Lote 3: compras** (19, 19.1, 19.5, 19.6, 22; ~50 objetos).
+- [x] **T3 — Lote 3: compras** (19, 19.1, 19.5, 19.6, 22; 62 objetos).
+  5 `.md`. Commit `docs(modulos): lote 3 — compras`.
 - [ ] **T4 — Lote 4: ventas y postventa** (21, 21.5, 23, 24, 25, 26, 27, 35,
   38, 39; ~71 objetos).
 - [ ] **T5 — Lote 5: inventario y movimientos** (18, 20, 32; 12 objetos).
@@ -72,3 +73,20 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   16-92) y bloquea el `DELETE` del empleado por el trigger de auditoría; el
   cuadre de TURNO_CAJA suma **todos** los pagos del período, no los de la caja.
   Módulos 12, 13, 14, 15 y 16 **no los consume la app** hoy.
+- **L8** — Lote 3 documentado: 5 `.md` (19, 19.1, 19.5, 19.6, 22),
+  **62 objetos** cubiertos, `git diff -- 'modulos/*.sql'` vacío. El chequeo
+  automático marcó 3 índices sin documentar en el 22 (se agregaron); el resto
+  pasó nombre por nombre.
+- **L9** — Hallazgos del lote 3, anotados sin tocar el SQL: **el tope de pago de
+  una compra es el BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) y está repetido
+  en **6 lugares** (2 SP y 4 triggers), así que cualquier cambio hay que
+  hacerlo en todos; `SP_REGISTRAR_NOTA_CREDITO_COMPRA` no valida que la nota
+  deje el saldo pagado en negativo; los candados `@COMPRAS_INTERNO` son
+  variables de sesión que cualquiera puede setear; `FN_CONTAR_ITEMS_COMPRA`
+  promete "productos distintos" y hace `COUNT(*)`, y está declarada
+  `DETERMINISTIC` leyendo tablas; `IX_COMPRA_PROVEEDOR` se crea en el 22 pero
+  vive en `COMPRAS`; `FN_COSTO_COMPRA_VIGENTE` excluye solo `CANCELADA`, así
+  que una compra `DEVUELTA` sigue marcando costo; `SP_MODIFICAR_LINEA_COMPRA`
+  borra y reinserta (cambia el `ID_DETALLE_COMPRA`); el pago de una compra se
+  anula con `DELETE` físico. Orden de triggers de `DETALLE_COMPRA` y de
+  `COMPRAS` declarado con `FOLLOWS` (recrear uno exige rehacer la cadena).
