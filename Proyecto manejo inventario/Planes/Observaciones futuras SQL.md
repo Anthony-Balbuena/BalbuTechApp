@@ -43,3 +43,12 @@ ese `ALTER` va en un script de migración aparte, no en el módulo de esquema.
 
 Ojo: no todos los 25 se pueden borrar sin más; hay que revisar uno por uno
 (algunos crean FK o índices que deben pasar al `CREATE`).
+
+## Documentación de BD: índice general (pendiente, al final)
+
+(20/10/2026) Los módulos se documentan uno por uno en `modulos/NN- NOMBRE.md`
+(piloto: `42- CONTRATOS.md`). Falta la puerta de entrada: un índice general con
+el mapa de la BD — orden de carga de los 45 módulos, dónde vive cada tabla, SP,
+trigger y vista, y qué dependencias hay entre módulos. Se arma cuando existan
+los `.md` de todos los módulos; sin él quedan 45 documentos correctos pero
+invisibles desde afuera.
