@@ -554,6 +554,43 @@ if entroAlMenu "$out" && [ "$rc" != "124" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 15. (20/10/2026) EOF en el telefono del cotejo: caso que se perdio en la
+#     reescritura del 19/10 (antes vivia junto al flujo viejo de "Telefono real
+#     del empleado nuevo", que giraba sin fin). Seis Enter dejan el borrador y
+#     la entrada se agota en Telefono: corta con cancelacion, no gira y no
+#     escribe nada.
+# ---------------------------------------------------------------------------
+echo "--- 15. EOF en el telefono del cotejo ---"
+dir="$(preparar caso15)"
+borrador "$dir/contratos/T15.borrador" \
+  "nombre=Prueba EOF Telefono" \
+  "cedula=30299887820" \
+  "cargo=Tester" \
+  "salario=10000.00" \
+  "telefono=8090000020" \
+  "email=test-eof-telefono@local.test" \
+  "fecha_ingreso=2026-11-01" \
+  "tipo=FIJO" \
+  "meses=0" \
+  "html=contratos/T15.html" \
+  "generado=2026-10-19"
+
+# 1 = elegir el borrador; 6 Enter = nombre..fecha; despues EOF en Telefono.
+out="$TMP/caso15.txt"
+rc="$(correr "$dir" '\n3\n13\n1\n\n\n\n\n\n\n' "$out")"
+if saneado "EOF telefono cotejo" "$rc" "$out"; then
+  problemas=""
+  grep -qF "Telefono [" "$out" || problemas="no llego al prompt del telefono"
+  grep -qF "Operación cancelada" "$out" || problemas="${problemas:+$problemas; }no corto con EOF"
+  [ -f "$dir/contratos/T15.borrador" ] || problemas="${problemas:+$problemas; }el borrador desaparecio"
+  if [ -z "$problemas" ]; then
+    ok "EOF en el telefono del cotejo (corta, no gira)"
+  else
+    fallo "EOF telefono cotejo" "$problemas"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 
 if [ "$fail" -eq 0 ]; then
   echo "TODOS LOS TESTS DE CONTRATO-BORRADOR OK"
