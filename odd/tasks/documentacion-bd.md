@@ -31,8 +31,9 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   88 objetos). 9 `.md`. Commit `docs(modulos): lote 2 — RRHH y usuarios`.
 - [x] **T3 — Lote 3: compras** (19, 19.1, 19.5, 19.6, 22; 62 objetos).
   5 `.md`. Commit `docs(modulos): lote 3 — compras`.
-- [ ] **T4 — Lote 4: ventas y postventa** (21, 21.5, 23, 24, 25, 26, 27, 35,
-  38, 39; ~71 objetos).
+- [x] **T4 — Lote 4: ventas y postventa** (21, 21.5, 23, 24, 25, 26, 27, 35,
+  38, 39; 85 objetos).
+  10 `.md`. Commit `docs(modulos): lote 4 — ventas y postventa`.
 - [ ] **T5 — Lote 5: inventario y movimientos** (18, 20, 32; 12 objetos).
 - [ ] **T6 — Lote 6: seguridad, logs y config** (3, 6, 28, 29, 30, 33, 34, 36;
   ~32 objetos).
@@ -90,3 +91,36 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   borra y reinserta (cambia el `ID_DETALLE_COMPRA`); el pago de una compra se
   anula con `DELETE` físico. Orden de triggers de `DETALLE_COMPRA` y de
   `COMPRAS` declarado con `FOLLOWS` (recrear uno exige rehacer la cadena).
+- **L10** — *"dale"*: arranca el Lote 4. 10 `.md` (21, 21.5, 23, 24, 25, 26, 27,
+  35, 38, 39), **85 objetos** cubiertos, `git diff -- 'modulos/*.sql'` vacío.
+  Hallazgos del lote, anotados sin tocar el SQL:
+  - El **BRUTO de venta** (`TOTAL + ITBIS − ITBIS devuelto`) está duplicado en
+    **6 lugares** (1 SP y 5 triggers de `PAGOS`) y **solo resta el ITBIS
+    devuelto, no el subtotal**: devolver mercancía no baja `VENTAS.TOTAL`.
+  - `TR_VALIDAR_ACTUALIZACION_VENTA` exige cobrar la **base** para marcar
+    `REALIZADA`, mientras el cierre automático de `PAGOS` exige **bruto + ITBIS**.
+  - **`VENCIDA` nunca se escribe**: una garantía con `FECHA_FIN` pasada sigue
+    `ACTIVA`, y `27_SP_REGISTRAR_RECLAMO_GARANTIA` no mira la fecha, solo el
+    estado → se puede reclamar una garantía vencida. Aprobar un reclamo
+    **cancela la garantía entera**.
+  - **La cuota de devoluciones no tiene candado ni índice único**: dos altas
+    simultáneas de la misma línea pueden sobrepasar lo vendido (en compras sí
+    hay `FOR UPDATE`). `25_SP_PROCESAR_DEVOLUCION` tampoco bloquea la fila.
+  - `TR_BLOQUEAR_CAMBIO_DEVOLUCION` no protege `MOTIVO` ni
+    `MONTO_ITBIS_REEMBOLSADO`: cambiarlos en una devolución procesada mueve el
+    bruto de la venta sin candado.
+  - `VISTA_REPORTES_DEVOLUCIONES` no filtra estado (cuenta las `RECHAZADA`).
+  - `VW_GANANCIAS_MENSUAL` y `SP_REPORTE_PERIODO_GANANCIA` solo excluyen
+    `CANCELADA`: **`EN_PROCESO` cuenta como ganancia antes de cobrarse** y
+    `DEVUELTA` también entra. Contradice los reportes de ventas (`REALIZADA`).
+  - Costo desconocido (`NULL`) se convierte en 0 en `GANANCIA_NETA`: subestima
+    sin avisar.
+  - Los SP de devolución y reclamo están **cruzados de archivo**: el prefijo
+    `25_`/`26_` no dice en qué módulo vive cada uno.
+  - `35- DETALLE_REPARACIONES`: **nada de la app lo usa**; el repuesto es texto
+    libre (no descuenta stock), no valida usuario/costo negativos y solo frena
+    la asignación `COMPLETADO` (no `CANCELADO`).
+  - `IX_VENTAS_FECHA` e `IX_CLIENTE_NOMBRE` se crean en el 23 pero pertenecen a
+    `VENTAS` y `CLIENTES` (mismo patrón que el 22).
+  - Varios `.sql` arrancan con `-- Active: <id>@@127.0.0.1@3306@BALBU_TECH`,
+    rastro de un cliente SQL, no sintaxis del proyecto.
