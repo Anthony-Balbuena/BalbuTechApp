@@ -41,6 +41,10 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   8 `.md`. Commit `docs(modulos): lote 6 — seguridad, logs y configuración`.
 - [x] **T7 — Lote 7: vistas de reportes** (43; 5 objetos).
   1 `.md`. Commit `docs(modulos): lote 7 — vistas de reportes`.
+- [x] **T8 — Índice general** (`modulos/00- INDICE.md`): mapa de los 45 módulos,
+  totales, orden de import, objetos cruzados, fórmulas repetidas, qué no usa la
+  app y "dónde buscar qué". 45 enlaces verificados. Commit
+  `docs(modulos): índice general de la base`.
 
 ## Log
 
@@ -165,6 +169,18 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
     administra desde la app** (solo semilla) y el import **borra cuatro pares de
     `RRHH`** en cada corrida; `FN_TIENE_PERMISO` está declarada `DETERMINISTIC`
     leyendo tablas y **no mira si el usuario está activo**.
-  - `43- VISTAS_REPORTES`: la fórmula del BRUTO llega a **6 lugares** con estas
-    vistas; `VISTA_COMPRAS_PENDIENTES_PAGO` la escribe **dos veces en la misma
-    vista** (`SELECT` y `WHERE`) y usa subconsultas correlacionadas por fila.
+  - `43- VISTAS_REPORTES`: repite la fórmula del BRUTO en sus cinco vistas (dos
+    de compras, tres de ventas), que ya estaba en 6 objetos por flujo;
+    `VISTA_COMPRAS_PENDIENTES_PAGO` la escribe **dos veces en la misma vista**
+    (`SELECT` y `WHERE`) y usa subconsultas correlacionadas por fila.
+- **L12** — *"haz el indice general"*: se escribe `modulos/00- INDICE.md`, la
+  puerta de entrada que había quedado como mejora futura. Contenido: totales
+  (43 tablas, 155 SP, 77 triggers, 23 vistas, 5 funciones, 60 índices = 363),
+  mapa por área con enlace a cada `.md` y marca de uso desde la app, orden de
+  import (el 43 al final, `--force` oculta fallos, cadenas `FOLLOWS`), tabla de
+  objetos que viven en otro archivo, las fórmulas repetidas, los 14 módulos que
+  la app no usa, "dónde buscar qué" y estado. Verificación: los 45 enlaces
+  resuelven a archivos existentes y un chequeo automático contrastó el conteo
+  declarado en cada fila contra el `.sql` real (0 descuadres). Se actualizó la
+  nota de `Proyecto manejo inventario/Planes/Observaciones futuras SQL.md` de
+  "pendiente" a "hecho". `git diff -- 'modulos/*.sql'` vacío.
