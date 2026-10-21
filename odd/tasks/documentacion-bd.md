@@ -36,8 +36,9 @@ Rama: `main` (commits locales, sin push). Runner: N/A (documentación pasiva).
   10 `.md`. Commit `docs(modulos): lote 4 — ventas y postventa`.
 - [x] **T5 — Lote 5: inventario y movimientos** (18, 20, 32; 19 objetos).
   3 `.md`. Commit `docs(modulos): lote 5 — inventario y movimientos`.
-- [ ] **T6 — Lote 6: seguridad, logs y config** (3, 6, 28, 29, 30, 33, 34, 36;
-  ~32 objetos).
+- [x] **T6 — Lote 6: seguridad, logs y config** (3, 6, 28, 29, 30, 33, 34, 36;
+  36 objetos).
+  8 `.md`. Commit `docs(modulos): lote 6 — seguridad, logs y configuración`.
 - [ ] **T7 — Lote 7: vistas de reportes** (43; 5 objetos).
 
 ## Log
