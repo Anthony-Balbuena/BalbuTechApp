@@ -143,7 +143,7 @@ borrador "$dir/contratos/T1.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso1.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n13\n1\n\n18\n0\n' "$out")"
 if saneado "tipo invalido" "$rc" "$out"; then
   if grep -qF "tipo invalido: 'INDEFINIDO'" "$out"; then
     if [ -f "$dir/contratos/T1.borrador" ]; then
@@ -175,7 +175,7 @@ borrador "$dir/contratos/T2.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso2.txt"
-rc="$(correr "$dir" '\n3\n13\n2\n1\n\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n13\n2\n1\n\n18\n0\n' "$out")"
 if saneado "descartar" "$rc" "$out"; then
   problemas=""
   grep -qF "Descartar un borrador" "$out" || problemas="no ofrecio descartar en el menu"
@@ -207,7 +207,7 @@ borrador "$dir/contratos/T3.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso3.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n13\n1\n\n18\n0\n' "$out")"
 if saneado "borrador incompleto" "$rc" "$out"; then
   if grep -qF "El borrador esta incompleto (falta 'cargo')" "$out"; then
     ok "borrador incompleto (sigue frenando)"
@@ -286,7 +286,7 @@ borrador "$dir/contratos/T6.borrador" \
   "generado=2026-10-19"
 
 # nombre, cedula, cargo (Enter) + salario 18000 + tipo, fecha, telefono, email (Enter)
-entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nN\n16\n0\n')"
+entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nN\n18\n0\n')"
 out="$TMP/caso6.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if saneado "cambio en cotejo" "$rc" "$out"; then
@@ -323,7 +323,7 @@ borrador "$dir/contratos/T7.borrador" \
   "generado=2026-10-19"
 
 # 8 campos con Enter + S + Enter (sin escaneo) + volver/salir
-entrada="$(printf '\n3\n13\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n\n16\n0\n')"
+entrada="$(printf '\n3\n13\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n\n18\n0\n')"
 out="$TMP/caso7.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
@@ -381,7 +381,7 @@ mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e "
 
 out="$TMP/caso9.txt"
 # 3 = Empleados, 1 = Agregar, 1 = elegir el contrato, 3 Enter (tel/email/fecha)
-rc="$(correr "$dir" '\n3\n1\n1\n\n\n\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n1\n1\n\n\n\n18\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "Contratos firmados sin empleado" "$out" || problemas="no listo los contratos huerfanos"
@@ -420,7 +420,7 @@ borrador "$dir/contratos/T10.borrador" \
   "html=contratos/T10.html" \
   "generado=2026-10-19"
 
-entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nS\n\n16\n0\n')"
+entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nS\n\n18\n0\n')"
 out="$TMP/caso10.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
@@ -518,7 +518,7 @@ mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e "
           'contratos/T13.html');" 2>/dev/null
 
 out="$TMP/caso13.txt"
-rc="$(correr "$dir" '\n3\n14\n30299887808\nN\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n14\n30299887808\nN\n18\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "Persona: Prueba Ver - Tester" "$out" || problemas="no mostro nombre/cargo del contrato"
@@ -536,7 +536,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "--- 14. finalizar contrato por cedula (opcion 15) ---"
 out="$TMP/caso14.txt"
-rc="$(correr "$dir" '\n3\n15\n30299887808\nS\n16\n0\n' "$out")"
+rc="$(correr "$dir" '\n3\n15\n30299887808\nS\n18\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "EXITO: CONTRATO" "$out" || problemas="no finalizo el contrato"
