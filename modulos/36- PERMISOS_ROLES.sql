@@ -58,7 +58,8 @@ ALTER TABLE ROL_PERMISO
 -- Los permisos que el usuario asigno a mano desde la app se respetan.
 -- Idempotente: si el par ya no existe, el DELETE no hace nada.
 -- (RRHH pierde GESTIONAR_ROLES y los permisos finos de Usuarios, que son
--- exclusivos de ADMIN, y tambien GESTIONAR_CLIENTES y GESTIONAR_VENTAS.)
+-- exclusivos de ADMIN, y tambien los 4 permisos finos de Clientes y
+-- GESTIONAR_VENTAS.)
 DELETE RP
 FROM ROL_PERMISO RP
 INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO
@@ -70,7 +71,10 @@ WHERE RP.ROL_NOMBRE = 'RRHH'
       'USUARIOS_EDITAR',
       'USUARIOS_ESTADO',
       'USUARIOS_CLAVE',
-      'GESTIONAR_CLIENTES',
+      'CLIENTES_VER',
+      'CLIENTES_CREAR',
+      'CLIENTES_EDITAR',
+      'CLIENTES_ESTADO',
       'GESTIONAR_VENTAS'
   );
 
@@ -84,14 +88,22 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_USUARIOS';
 -- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO).
 DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_EMPLEADOS';
 
+-- (22/10/2026) Mismo criterio para Clientes: los permisos unicos de gestion y
+-- consulta se reemplazaron por 4 permisos finos (CLIENTES_VER, CREAR, EDITAR y
+-- ESTADO). El ON DELETE CASCADE limpia sus pares en ROL_PERMISO.
+DELETE FROM PERMISOS
+ WHERE NOMBRE_PERMISO IN ('GESTIONAR_CLIENTES', 'CONSULTAR_CLIENTES');
+
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (22/10/2026) 28 permisos: el modulo Usuarios usa 5 permisos finos
--- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE) y el modulo Empleados usa 7
+-- (22/10/2026) 30 permisos: el modulo Usuarios usa 5 permisos finos
+-- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
 -- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, JUSTIFICAR_ASISTENCIA,
--- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO) en lugar de
--- los viejos GESTIONAR_USUARIOS y GESTIONAR_EMPLEADOS. GESTIONAR_CONTRATOS
--- sigue siendo exclusivo del modulo de contratos (20/10/2026, C-3).
+-- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO) y el modulo
+-- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO) en lugar de los viejos
+-- GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES y
+-- CONSULTAR_CLIENTES. GESTIONAR_CONTRATOS sigue siendo exclusivo del modulo
+-- de contratos (20/10/2026, C-3).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -106,7 +118,10 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('JUSTIFICAR_ASISTENCIA', 'Justificar asistencia'),
 ('GESTIONAR_PERMISOS_EMPLEADO', 'Aprobar o rechazar permisos de empleados'),
 ('GESTIONAR_VACACIONES_EMPLEADO', 'Aprobar o rechazar vacaciones'),
-('GESTIONAR_CLIENTES', 'Gestionar clientes'),
+('CLIENTES_VER', 'Consultar y buscar clientes'),
+('CLIENTES_CREAR', 'Registrar clientes'),
+('CLIENTES_EDITAR', 'Actualizar datos de clientes'),
+('CLIENTES_ESTADO', 'Activar o desactivar clientes'),
 ('GESTIONAR_PROVEEDORES', 'Gestionar proveedores'),
 ('GESTIONAR_CATEGORIAS', 'Gestionar categorias'),
 ('GESTIONAR_MARCAS', 'Gestionar marcas'),
@@ -117,7 +132,6 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_COMPRAS', 'Gestionar compras del sistema'),
 ('CONSULTAR_REPORTES', 'Consultar reportes y dashboards'),
 ('CONSULTAR_PRODUCTOS', 'Consultar catalogo de productos'),
-('CONSULTAR_CLIENTES', 'Consultar clientes'),
 ('REGISTRAR_ASISTENCIA', 'Registrar asistencia de empleados'),
 ('SOLICITAR_PERMISO', 'Solicitar permisos o ausencias'),
 ('GESTIONAR_CONTRATOS', 'Gestionar contratos de empleados')
@@ -131,14 +145,14 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 28 permisos del sistema).
+-- ADMIN: acceso total (los 30 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- GERENTE: todo lo operativo, menos la administracion de roles y usuarios
 -- (crear roles y usuarios es exclusivo de ADMIN). Los 7 permisos finos de
--- Empleados entran por este SELECT (no estan en el NOT IN).
+-- Empleados y los 4 de Clientes entran por este SELECT (no estan en el NOT IN).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'GERENTE', ID_PERMISO
 FROM PERMISOS
@@ -153,6 +167,7 @@ WHERE NOMBRE_PERMISO NOT IN (
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- SUBGERENTE: el GERENTE sin empleados ni contratos (RRHH conserva esas dos).
+-- (22/10/2026) Conserva los 4 permisos finos de Clientes: no estan en el NOT IN.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'SUBGERENTE', ID_PERMISO
 FROM PERMISOS
@@ -196,16 +211,20 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- VENDEDOR: atiende el mostrador. Toma los permisos de EMPLEADO y los de
 -- CAJERO (que se elimina): ventas, caja, clientes, metodos de pago y consultas.
+-- (22/10/2026) Clientes pasa a los 4 permisos finos: el vendedor puede ver,
+-- crear, editar y cambiar el estado.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'VENDEDOR', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_VENTAS',
-    'GESTIONAR_CLIENTES',
+    'CLIENTES_VER',
+    'CLIENTES_CREAR',
+    'CLIENTES_EDITAR',
+    'CLIENTES_ESTADO',
     'GESTIONAR_METODOS_PAGO',
     'CONSULTAR_REPORTES',
     'CONSULTAR_PRODUCTOS',
-    'CONSULTAR_CLIENTES',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
 )
@@ -229,13 +248,14 @@ WHERE NOMBRE_PERMISO IN (
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- CONTABILIDAD: solo consulta. Sin ventas, stock, personal ni permisos.
+-- (22/10/2026) Clientes: solo CLIENTES_VER (antes CONSULTAR_CLIENTES).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'CONTABILIDAD', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'CONSULTAR_REPORTES',
     'CONSULTAR_PRODUCTOS',
-    'CONSULTAR_CLIENTES'
+    'CLIENTES_VER'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 

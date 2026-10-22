@@ -3,26 +3,69 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuClientes() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y los submenus de Usuarios y Empleados, la lista
+// visible se arma antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionCliente { Agregar, Actualizar, Estado, Buscar, Listar, Volver };
+
+struct OpcionCliente {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionCliente accion;
+};
+
+static const vector<OpcionCliente>& opcionesClientes() {
+    static const vector<OpcionCliente> opciones = {
+        {"Agregar Cliente",           "CLIENTES_CREAR",  AccionCliente::Agregar},
+        {"Actualizar Cliente",        "CLIENTES_EDITAR", AccionCliente::Actualizar},
+        {"Cambiar Estado",            "CLIENTES_ESTADO", AccionCliente::Estado},
+        {"Buscar Cliente",            "CLIENTES_VER",    AccionCliente::Buscar},
+        {"Listar Clientes",           "CLIENTES_VER",    AccionCliente::Listar},
+        {"Volver al Menu Principal",  "",                AccionCliente::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionCliente& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionCliente*> opcionesVisibles() {
+    vector<const OpcionCliente*> visibles;
+    for (const OpcionCliente& opcion : opcionesClientes()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuClientes(const vector<const OpcionCliente*>& visibles) {
     cout << "\n=== MODULO DE CLIENTES ===" << endl;
-    cout << "1. Agregar Cliente" << endl;
-    cout << "2. Actualizar Cliente" << endl;
-    cout << "3. Cambiar Estado" << endl;
-    cout << "4. Buscar Cliente" << endl;
-    cout << "5. Listar Clientes" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionCliente* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=========================" << endl;
 }
+
+}  // namespace
 
 void registrarCliente() {
     cout << "\n--- REGISTRO DE CLIENTE ---" << endl;
@@ -183,42 +226,36 @@ void listarClientes() {
     }
 }
 
-// Submenú de clientes: muestra el menú, lee la opción y llama a la acción.
-// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+// Submenu de clientes: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion.
 void ejecutarSubmenuClientes() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionCliente*> visibles = opcionesVisibles();
+        imprimirMenuClientes(visibles);
 
-    do {
-        mostrarMenuClientes();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion == 0) return;
+
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarCliente();
-                break;
-            case 2:
-                actualizarCliente();
-                break;
-            case 3:
-                cambiarEstadoCliente();
-                break;
-            case 4:
-                buscarCliente();
-                break;
-            case 5:
-                listarClientes();
-                break;
-            case 6:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionCliente& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionCliente::Agregar:     registrarCliente(); break;
+            case AccionCliente::Actualizar:  actualizarCliente(); break;
+            case AccionCliente::Estado:      cambiarEstadoCliente(); break;
+            case AccionCliente::Buscar:      buscarCliente(); break;
+            case AccionCliente::Listar:      listarClientes(); break;
+            case AccionCliente::Volver:      return;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        pausar();
+    }
 }
 

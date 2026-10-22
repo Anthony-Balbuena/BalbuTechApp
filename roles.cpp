@@ -170,7 +170,7 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
                               "GESTIONAR_CONTRATOS"},                     AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},
-        {"Clientes",         {"GESTIONAR_CLIENTES", "CONSULTAR_CLIENTES"}, AccionMenu::Clientes},
+        {"Clientes",         {"CLIENTES_VER", "CLIENTES_CREAR", "CLIENTES_EDITAR", "CLIENTES_ESTADO"}, AccionMenu::Clientes},
         {"Proveedores",      {"GESTIONAR_PROVEEDORES"},                    AccionMenu::Proveedores},
         {"Categorias",       {"GESTIONAR_CATEGORIAS"},                     AccionMenu::Categorias},
         {"Marcas",           {"GESTIONAR_MARCAS"},                         AccionMenu::Marcas},

@@ -22,15 +22,16 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (28, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (30, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
 `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO`,
-`GESTIONAR_CLIENTES`, `GESTIONAR_PROVEEDORES`, `GESTIONAR_CATEGORIAS`,
+`CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`,
+`GESTIONAR_PROVEEDORES`, `GESTIONAR_CATEGORIAS`,
 `GESTIONAR_MARCAS`, `GESTIONAR_PRODUCTOS`, `GESTIONAR_METODOS_PAGO`,
 `GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `GESTIONAR_COMPRAS`,
-`CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`,
+`CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`,
 `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` y `GESTIONAR_CONTRATOS`.
 
 > **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `USUARIOS_CREAR`,
@@ -43,6 +44,11 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 > `JUSTIFICAR_ASISTENCIA`, `GESTIONAR_PERMISOS_EMPLEADO` y
 > `GESTIONAR_VACACIONES_EMPLEADO`). El viejo `GESTIONAR_EMPLEADOS` **ya no
 > existe**: mismo borrado en cascada que `GESTIONAR_USUARIOS`.
+
+> **El módulo Clientes usa 4 permisos finos** (`CLIENTES_VER`, `CLIENTES_CREAR`,
+> `CLIENTES_EDITAR` y `CLIENTES_ESTADO`). Los viejos `GESTIONAR_CLIENTES` y
+> `CONSULTAR_CLIENTES` **ya no existen**: el import los borra del catálogo y el
+> `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 >
 > **`CONSULTAR_REPORTES` y `REGISTRAR_ASISTENCIA` no dan acceso al módulo**:
 > solo filtran opciones una vez adentro. `VENDEDOR` tiene los dos y **no** debe
@@ -52,9 +58,10 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 28 se consultan en el código**: los de Empleados en `empleados.cpp` y
-> `roles.cpp`; `REGISTRAR_ASISTENCIA` ya no queda suelto (opción 7 del submenú
-> de Empleados). `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
+> **Los 30 se consultan en el código**: los de Empleados en `empleados.cpp`, los
+> de Clientes en `clientes.cpp` y el menú principal en `roles.cpp`;
+> `REGISTRAR_ASISTENCIA` ya no queda suelto (opción 7 del submenú de Empleados).
+> `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
 > `Mis vacaciones`).
 
 ### ROL_PERMISO
@@ -77,13 +84,27 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 28** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (22) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, los 7 `EMPLEADOS_*` finos y `GESTIONAR_CONTRATOS` (14) |
+| `ADMIN` | **los 30** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (24) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, los 7 `EMPLEADOS_*` finos y `GESTIONAR_CONTRATOS` (16) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES` y `SOLICITAR_PERMISO` (10) |
-| `VENDEDOR` | `GESTIONAR_VENTAS`, `GESTIONAR_CLIENTES`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (8) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (10) |
 | `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS`, `SOLICITAR_PERMISO` (8) |
-| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES` (3) |
+| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER` (3) |
+
+### Mapa del submenú de Clientes
+
+El submenú conserva el orden histórico de 6 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar Cliente | `CLIENTES_CREAR` |
+| 2 | Actualizar Cliente | `CLIENTES_EDITAR` |
+| 3 | Cambiar Estado | `CLIENTES_ESTADO` |
+| 4 | Buscar Cliente | `CLIENTES_VER` |
+| 5 | Listar Clientes | `CLIENTES_VER` |
+| 6 | Volver al Menu Principal | *(siempre)* |
 
 ### Mapa del submenú de Empleados
 
@@ -112,21 +133,24 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 | 18 | Volver al Menu Principal | *(siempre)* |
 
 **Migraciones incluidas** (idempotentes; las 3 primeras son `C-3` del
-20/10/2026, la 4.ª y la 5.ª del 22/10/2026):
+20/10/2026, las 3 últimas del 22/10/2026):
 1. `DROP CONSTRAINT IF EXISTS CHK_ROL_NOMBRE` — saca el `CHECK` que limitaba los
    roles a `ADMIN`/`RRHH`/`EMPLEADO`.
 2. Recrea el FK del rol con `ON UPDATE CASCADE`.
 3. **Borra los pares de `RRHH`** que el set final ya no le da
-   (`GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `GESTIONAR_CLIENTES` y
+   (`GESTIONAR_ROLES`, los 5 `USUARIOS_*`, los 4 `CLIENTES_*` finos y
    `GESTIONAR_VENTAS`).
 4. **Borra del catálogo `GESTIONAR_USUARIOS`**, el permiso único que reemplazan
    los 5 permisos finos de Usuarios (`ON DELETE CASCADE` limpia sus pares).
 5. **Borra del catálogo `GESTIONAR_EMPLEADOS`**, el permiso único que reemplazan
    los 7 permisos finos de Empleados (mismo `ON DELETE CASCADE`).
+6. **Borra del catálogo `GESTIONAR_CLIENTES` y `CONSULTAR_CLIENTES`**, los
+   permisos viejos que reemplazan los 4 permisos finos de Clientes (mismo
+   `ON DELETE CASCADE`).
 
 > **Esos `DELETE` corren en cada import.** Los permisos que el dueño haya cargado
 > a mano para `RRHH` **se respetan** (solo borra esos pares), pero si
-> alguien vuelve a asignarle `GESTIONAR_CLIENTES` a `RRHH` desde la app, el
+> alguien vuelve a asignarle `CLIENTES_EDITAR` a `RRHH` desde la app, el
 > próximo import se lo saca.
 
 ## Procedimientos almacenados
@@ -141,7 +165,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 28 sembrados.
+> 30 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 
@@ -181,12 +205,17 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
 - **La base manda**: los permisos se leen de `ROL_PERMISO`, no del nombre del rol
   en el código.
 - **`ADMIN` tiene todo**; `GERENTE` todo lo operativo salvo roles y los 5
-  permisos de Usuarios (22); `SUBGERENTE` además no toca empleados ni contratos
-  (14); `RRHH` conserva personal, contratos y reportes (10).
+  permisos de Usuarios (24); `SUBGERENTE` además no toca empleados ni contratos
+  (16); `RRHH` conserva personal, contratos y reportes (10).
 - **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `CREAR`,
   `EDITAR`, `ESTADO`, `CLAVE`); el submenú muestra solo las acciones habilitadas.
 - **El módulo Empleados usa 7 permisos finos**; el submenú muestra solo las
   acciones habilitadas y renumera sobre lo visible.
+- **El módulo Clientes usa 4 permisos finos** (`CLIENTES_VER`, `CREAR`,
+  `EDITAR`, `ESTADO`); el submenú muestra solo las acciones habilitadas y
+  renumera sobre lo visible.
+- **`CLIENTES_VER` abre el módulo**; `CLIENTES_CREAR`, `CLIENTES_EDITAR` y
+  `CLIENTES_ESTADO` solo habilitan su opción adentro.
 - **`CONSULTAR_REPORTES` y `REGISTRAR_ASISTENCIA` no abren Empleados**: son
   opciones adentro, no llave del módulo.
 - **Renombrar un rol arrastra sus permisos** (`ON UPDATE CASCADE`).

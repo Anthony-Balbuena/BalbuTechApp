@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test del menu principal por rol (22/10/2026).
-# Crea 6 empleados/usuarios de prueba en BALBU_TECH_TEST (el ADMIN usa el
+# Crea 9 empleados/usuarios de prueba en BALBU_TECH_TEST (el ADMIN usa el
 # usuario admin existente), corre la app con el atajo DEV y verifica que el
 # menu muestre exactamente las opciones que da la matriz de permisos.
 # Uso dentro del contenedor app:
@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -295,6 +295,128 @@ else
 
     if [ "$fail" -eq 0 ]; then
         echo "OK $ROL_EMP (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Clientes con permisos finos (22/10/2026): un rol con SOLO
+# CLIENTES_VER ve Clientes en el menu principal y, adentro, solo las dos
+# acciones de consulta mas Volver.
+# ---------------------------------------------------------------------------
+ROL_CLI="PRUEBA_CLI_VER"
+USR_CLI="prueba_cli_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_CLI';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCV001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_CLI';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_CLI')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_CLI', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='CLIENTES_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA CLI VER','TESTCV001','PRUEBA',1000,'T-CV-001','cv-001@test.local','2026-10-22');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_CLI', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCV001' AND R.NOMBRE_ROL='$ROL_CLI';
+EOF
+
+salida_cli="$TMP/out-clientes-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Clientes (con este rol es la
+# primera opcion visible: el menu queda Clientes, Ver permisos y Cerrar
+# sesion), 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_CLI" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_cli" 2>&1
+rc_cli=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_cli"; then
+    echo "FALLO $ROL_CLI: no entro al menu (¿usuario/clave/BD?)"
+    fail=1
+elif [ "$rc_cli" -ne 0 ]; then
+    echo "FALLO $ROL_CLI: la app salio con $rc_cli"
+    fail=1
+else
+    # Solo la primera tirada del menu principal (hasta el submenu): contarlo
+    # sobre toda la salida mezclaria las dos listas numeradas.
+    principal_cli=$(sed -n '1,/=== MODULO DE CLIENTES ===/p' "$salida_cli")
+    n_principal_cli=$(printf '%s\n' "$principal_cli" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_cli" -ne 3 ]; then
+        echo "FALLO $ROL_CLI: $n_principal_cli opciones en el menu principal, se esperaban 3"
+        fail=1
+    fi
+    for label in "Clientes" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_cli" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CLI: el menu principal no muestra '$label'"
+            fail=1
+        fi
+    done
+
+    # Solo la primera tirada del submenu (titulo -> linea de cierre).
+    submenu_cli=$(awk '/=== MODULO DE CLIENTES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_cli")
+    n_sub_cli=$(printf '%s\n' "$submenu_cli" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_cli" -ne 3 ]; then
+        echo "FALLO $ROL_CLI: $n_sub_cli opciones en el submenu, se esperaban 3"
+        fail=1
+    fi
+    for label in "Buscar Cliente" "Listar Clientes" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_cli" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CLI: falta la opcion '$label' en el submenu"
+            fail=1
+        fi
+    done
+    for label in "Agregar Cliente" "Actualizar Cliente" "Cambiar Estado"; do
+        if printf '%s\n' "$submenu_cli" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CLI: el submenu muestra '$label' sin permiso"
+            fail=1
+        fi
+    done
+
+    if [ "$fail" -eq 0 ]; then
+        echo "OK $ROL_CLI (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# CONTABILIDAD con permisos finos de Clientes (22/10/2026): reutiliza el
+# usuario prueba_r7_con. Entra a Clientes y debe ver exactamente las dos
+# consultas mas Volver.
+# ---------------------------------------------------------------------------
+salida_con="$TMP/out-clientes-contabilidad.txt"
+# Entrada: Enter del "Presione Enter", 1 = Clientes (en su menu queda primero:
+# Clientes, Productos, Ver permisos y Cerrar sesion), 3 = Volver.
+printf '\n1\n3\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_con" 2>&1
+rc_con=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_con"; then
+    echo "FALLO CONTABILIDAD/Clientes: no entro al menu (¿usuario/clave/BD?)"
+    fail=1
+elif [ "$rc_con" -ne 0 ]; then
+    echo "FALLO CONTABILIDAD/Clientes: la app salio con $rc_con"
+    fail=1
+else
+    submenu_con=$(awk '/=== MODULO DE CLIENTES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_con")
+    n_sub_con=$(printf '%s\n' "$submenu_con" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_con" -ne 3 ]; then
+        echo "FALLO CONTABILIDAD/Clientes: $n_sub_con opciones en el submenu, se esperaban 3"
+        fail=1
+    fi
+    for label in "Buscar Cliente" "Listar Clientes" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_con" | grep -Fq "$label"; then
+            echo "FALLO CONTABILIDAD/Clientes: falta la opcion '$label' en el submenu"
+            fail=1
+        fi
+    done
+    for label in "Agregar Cliente" "Actualizar Cliente" "Cambiar Estado"; do
+        if printf '%s\n' "$submenu_con" | grep -Fq "$label"; then
+            echo "FALLO CONTABILIDAD/Clientes: el submenu muestra '$label' sin permiso"
+            fail=1
+        fi
+    done
+
+    if [ "$fail" -eq 0 ]; then
+        echo "OK CONTABILIDAD/Clientes (3 opciones en el submenu)"
     fi
 fi
 
