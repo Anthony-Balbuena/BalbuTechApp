@@ -2,6 +2,10 @@
     "chat.byokUtilityModelDefault": "mainAgent",
     "code-runner.saveFileBeforeRun": true,
     "code-runner.runInTerminal": true,
+    // (21/10/2026) Code Runner no hereda el .env: se carga aca. DB_HOST se
+    // fuerza a 127.0.0.1 porque en .env vale "db", que solo resuelve dentro
+    // del contenedor; el binario corre en el host.
     "code-runner.executorMap": {
-        "cpp": "cd $dir && bash build.sh && ./output/app"
+        "cpp": "cd $dir && set -a && . ./.env && set +a && export DB_HOST=127.0.0.1 && bash build.sh && ./output/app"
     }
+}
