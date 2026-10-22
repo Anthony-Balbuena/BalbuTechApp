@@ -92,40 +92,41 @@ SELECT 'prueba_r7_con', '$HASH', E.ID_EMPLEADO, R.ID_ROL
 EOF
 
 fail=0
+fallos=0
 
 revisar() {
     local rol="$1" usuario="$2" cant="$3" labels="$4"
-    local salida="$TMP/out-$rol.txt" rc n
+    local salida="$TMP/out-$rol.txt" rc n fallos_previos=$fallos
     printf '\n0\n' | BALBU_USER="$usuario" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
         timeout "$LIMITE" "$APP" >"$salida" 2>&1
     rc=$?
 
     if ! grep -q "Acceso concedido \[DEV\]" "$salida"; then
         echo "FALLO $rol: no entro al menu (¿usuario/clave/BD?)"
-        fail=1
+        fail=1; fallos=$((fallos+1))
         return
     fi
     if [ "$rc" -ne 0 ]; then
         echo "FALLO $rol: la app salio con $rc"
-        fail=1
+        fail=1; fallos=$((fallos+1))
         return
     fi
 
     n=$(grep -c '^[0-9]\+\. ' "$salida" || true)
     if [ "$n" -ne "$cant" ]; then
         echo "FALLO $rol: $n opciones, se esperaban $cant"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
 
     local IFS='|'
     for label in $labels; do
         if ! grep -Fq "$label" "$salida"; then
             echo "FALLO $rol: falta la opcion '$label'"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
-    if [ "$fail" -eq 0 ]; then
+    if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $rol ($n opciones)"
     fi
 }
@@ -133,9 +134,9 @@ revisar() {
 # Las listas usan | como separador; tienen que coincidir con itemsMenuPrincipal().
 revisar "ADMIN" "$BALBU_USER" 18 "Roles|Usuarios|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Accesos|Ver permisos|Cerrar sesión"
 revisar "GERENTE" "prueba_r7_ger" 15 "Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "SUBGERENTE" "prueba_r7_sub" 14 "Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
+revisar "SUBGERENTE" "prueba_r7_sub" 15 "Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
 revisar "RRHH" "prueba_r7_rrhh" 5 "Empleados|Mis permisos|Mis vacaciones|Ver permisos|Cerrar sesión"
-revisar "VENDEDOR" "prueba_r7_ven" 9 "Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
+revisar "VENDEDOR" "prueba_r7_ven" 10 "Empleados|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
 revisar "ALMACEN" "prueba_r7_alm" 10 "Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Ver permisos|Cerrar sesión"
 revisar "CONTABILIDAD" "prueba_r7_con" 4 "Clientes|Productos|Ver permisos|Cerrar sesión"
 
@@ -163,6 +164,7 @@ SELECT '$USR_VER', '$HASH', E.ID_EMPLEADO, R.ID_ROL
  WHERE E.CEDULA='TESTUV001' AND R.NOMBRE_ROL='$ROL_VER';
 EOF
 
+fallos_previos=$fallos
 salida_usr="$TMP/out-usuarios-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Usuarios, 3 = Volver al Menu
 # Principal (el submenu filtrado solo tiene 3 opciones; el viejo 7 ya no existe).
@@ -172,10 +174,10 @@ rc_usr=$?
 
 if ! grep -q "Acceso concedido \[DEV\]" "$salida_usr"; then
     echo "FALLO $ROL_VER: no entro al menu (¿usuario/clave/BD?)"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 elif [ "$rc_usr" -ne 0 ]; then
     echo "FALLO $ROL_VER: la app salio con $rc_usr"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 else
     # Solo la primera tirada del menu principal (hasta el submenu): contarlo
     # sobre toda la salida mezclaria las dos listas numeradas.
@@ -183,12 +185,12 @@ else
     n_principal=$(printf '%s\n' "$principal" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_principal" -ne 3 ]; then
         echo "FALLO $ROL_VER: $n_principal opciones en el menu principal, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Usuarios" "Ver permisos" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal" | grep -Fq "$label"; then
             echo "FALLO $ROL_VER: el menu principal no muestra '$label'"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
@@ -197,22 +199,22 @@ else
     n_sub=$(printf '%s\n' "$submenu" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_sub" -ne 3 ]; then
         echo "FALLO $ROL_VER: $n_sub opciones en el submenu, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Buscar Usuario" "Listar Usuarios" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu" | grep -Fq "$label"; then
             echo "FALLO $ROL_VER: falta la opcion '$label' en el submenu"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
     for label in "Agregar Usuario" "Actualizar Usuario" "Cambiar Estado" "Cambiar Clave"; do
         if printf '%s\n' "$submenu" | grep -Fq "$label"; then
             echo "FALLO $ROL_VER: el submenu muestra '$label' sin permiso"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
-    if [ "$fail" -eq 0 ]; then
+    if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_VER (3 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
@@ -241,6 +243,7 @@ SELECT '$USR_EMP', '$HASH', E.ID_EMPLEADO, R.ID_ROL
  WHERE E.CEDULA='TESTEV001' AND R.NOMBRE_ROL='$ROL_EMP';
 EOF
 
+fallos_previos=$fallos
 salida_emp="$TMP/out-empleados-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Empleados (con este rol es la
 # primera opcion visible: el menu queda Empleados, Ver permisos y Cerrar
@@ -251,10 +254,10 @@ rc_emp=$?
 
 if ! grep -q "Acceso concedido \[DEV\]" "$salida_emp"; then
     echo "FALLO $ROL_EMP: no entro al menu (¿usuario/clave/BD?)"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 elif [ "$rc_emp" -ne 0 ]; then
     echo "FALLO $ROL_EMP: la app salio con $rc_emp"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 else
     # Solo la primera tirada del menu principal (hasta el submenu): contarlo
     # sobre toda la salida mezclaria las dos listas numeradas.
@@ -262,12 +265,12 @@ else
     n_principal_emp=$(printf '%s\n' "$principal_emp" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_principal_emp" -ne 3 ]; then
         echo "FALLO $ROL_EMP: $n_principal_emp opciones en el menu principal, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Empleados" "Ver permisos" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: el menu principal no muestra '$label'"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
@@ -276,12 +279,12 @@ else
     n_sub_emp=$(printf '%s\n' "$submenu_emp" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_sub_emp" -ne 3 ]; then
         echo "FALLO $ROL_EMP: $n_sub_emp opciones en el submenu, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Buscar Empleado" "Listar Empleados" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: falta la opcion '$label' en el submenu"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
     for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
@@ -289,11 +292,11 @@ else
                  "Gestionar vacaciones" "Generar contrato"; do
         if printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: el submenu muestra '$label' sin permiso"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
-    if [ "$fail" -eq 0 ]; then
+    if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_EMP (3 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
@@ -322,6 +325,7 @@ SELECT '$USR_CLI', '$HASH', E.ID_EMPLEADO, R.ID_ROL
  WHERE E.CEDULA='TESTCV001' AND R.NOMBRE_ROL='$ROL_CLI';
 EOF
 
+fallos_previos=$fallos
 salida_cli="$TMP/out-clientes-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Clientes (con este rol es la
 # primera opcion visible: el menu queda Clientes, Ver permisos y Cerrar
@@ -332,10 +336,10 @@ rc_cli=$?
 
 if ! grep -q "Acceso concedido \[DEV\]" "$salida_cli"; then
     echo "FALLO $ROL_CLI: no entro al menu (¿usuario/clave/BD?)"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 elif [ "$rc_cli" -ne 0 ]; then
     echo "FALLO $ROL_CLI: la app salio con $rc_cli"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 else
     # Solo la primera tirada del menu principal (hasta el submenu): contarlo
     # sobre toda la salida mezclaria las dos listas numeradas.
@@ -343,12 +347,12 @@ else
     n_principal_cli=$(printf '%s\n' "$principal_cli" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_principal_cli" -ne 3 ]; then
         echo "FALLO $ROL_CLI: $n_principal_cli opciones en el menu principal, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Clientes" "Ver permisos" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_cli" | grep -Fq "$label"; then
             echo "FALLO $ROL_CLI: el menu principal no muestra '$label'"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
@@ -357,22 +361,22 @@ else
     n_sub_cli=$(printf '%s\n' "$submenu_cli" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_sub_cli" -ne 3 ]; then
         echo "FALLO $ROL_CLI: $n_sub_cli opciones en el submenu, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Buscar Cliente" "Listar Clientes" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_cli" | grep -Fq "$label"; then
             echo "FALLO $ROL_CLI: falta la opcion '$label' en el submenu"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
     for label in "Agregar Cliente" "Actualizar Cliente" "Cambiar Estado"; do
         if printf '%s\n' "$submenu_cli" | grep -Fq "$label"; then
             echo "FALLO $ROL_CLI: el submenu muestra '$label' sin permiso"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
-    if [ "$fail" -eq 0 ]; then
+    if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_CLI (3 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
@@ -382,6 +386,7 @@ fi
 # usuario prueba_r7_con. Entra a Clientes y debe ver exactamente las dos
 # consultas mas Volver.
 # ---------------------------------------------------------------------------
+fallos_previos=$fallos
 salida_con="$TMP/out-clientes-contabilidad.txt"
 # Entrada: Enter del "Presione Enter", 1 = Clientes (en su menu queda primero:
 # Clientes, Productos, Ver permisos y Cerrar sesion), 3 = Volver.
@@ -391,32 +396,78 @@ rc_con=$?
 
 if ! grep -q "Acceso concedido \[DEV\]" "$salida_con"; then
     echo "FALLO CONTABILIDAD/Clientes: no entro al menu (¿usuario/clave/BD?)"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 elif [ "$rc_con" -ne 0 ]; then
     echo "FALLO CONTABILIDAD/Clientes: la app salio con $rc_con"
-    fail=1
+    fail=1; fallos=$((fallos+1))
 else
     submenu_con=$(awk '/=== MODULO DE CLIENTES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_con")
     n_sub_con=$(printf '%s\n' "$submenu_con" | grep -c '^[0-9]\+\. ' || true)
     if [ "$n_sub_con" -ne 3 ]; then
         echo "FALLO CONTABILIDAD/Clientes: $n_sub_con opciones en el submenu, se esperaban 3"
-        fail=1
+        fail=1; fallos=$((fallos+1))
     fi
     for label in "Buscar Cliente" "Listar Clientes" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_con" | grep -Fq "$label"; then
             echo "FALLO CONTABILIDAD/Clientes: falta la opcion '$label' en el submenu"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
     for label in "Agregar Cliente" "Actualizar Cliente" "Cambiar Estado"; do
         if printf '%s\n' "$submenu_con" | grep -Fq "$label"; then
             echo "FALLO CONTABILIDAD/Clientes: el submenu muestra '$label' sin permiso"
-            fail=1
+            fail=1; fallos=$((fallos+1))
         fi
     done
 
-    if [ "$fail" -eq 0 ]; then
+    if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK CONTABILIDAD/Clientes (3 opciones en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# VENDEDOR en Empleados (22/10/2026): el rol tiene REGISTRAR_ASISTENCIA, asi que
+# el item "Empleados" del menu principal tambien lo acepta. Sin esa condicion el
+# vendedor no podia fichar: el permiso existia y era inalcanzable.
+# Entrada: Enter del "Presione Enter", 1 = Empleados, 5 = Volver (son 5 opciones).
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_ven="$TMP/out-empleados-vendedor.txt"
+printf '\n1\n5\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_ven" 2>&1
+rc_ven=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_ven"; then
+    echo "FALLO VENDEDOR/Empleados: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_ven" -ne 0 ]; then
+    echo "FALLO VENDEDOR/Empleados: la app salio con $rc_ven"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_ven=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=============================$/ && f{exit}' "$salida_ven")
+    n_sub_ven=$(printf '%s\n' "$submenu_ven" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_ven" -ne 5 ]; then
+        echo "FALLO VENDEDOR/Empleados: $n_sub_ven opciones en el submenu, se esperaban 5"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Marcar asistencia" "Ver asistencia" "Asistencia del dia" \
+                 "Historial de asistencia" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Empleados: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
+                 "Reactivar Empleado" "Justificar asistencia" "Generar contrato" \
+                 "Gestionar permisos" "Gestionar vacaciones"; do
+        if printf '%s\n' "$submenu_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Empleados: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK VENDEDOR/Empleados (5 opciones, puede marcar asistencia)"
     fi
 fi
 

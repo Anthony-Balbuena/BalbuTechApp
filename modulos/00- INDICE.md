@@ -1,13 +1,13 @@
 # Índice general — módulos de la base de datos
 
-Los **45 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
+Los **46 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
 app lo usa. Cada módulo tiene su documento al lado del `.sql`, con el mismo
 nombre.
 
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 21/10/2026 · 45 `.sql` + 45 `.md` · 367 objetos documentados.
+Última revisión: 22/10/2026 · 46 `.sql` + 46 `.md` · 367 objetos documentados.
 
 ## Resumen
 
@@ -107,6 +107,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 |---|---|---|---|
 | [ROLES](<3- ROLES.md>) | 1T · 4SP | Roles del sistema. | ✅ |
 | [PERMISOS_ROLES](<36- PERMISOS_ROLES.md>) | 2T · 3SP · 1FN | Permisos y qué rol los tiene. | ✅ |
+| [MIGRACION_ROLES](<44- MIGRACION_ROLES.md>) | — | Retira `EMPLEADO` y `CAJERO` y pasa sus usuarios a `VENDEDOR`. | — |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 2TR | Bitácora genérica por tabla y registro. | — |
 | [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |
@@ -204,7 +205,7 @@ Parciales, que conviene mirar antes de tocarlos:
 
 ## Estado de la documentación
 
-- **45 de 45** módulos documentados, un `.md` por `.sql`.
+- **46 de 46** módulos documentados, un `.md` por `.sql`.
 - **367 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
 - Los `.sql` **no se tocaron** para documentar.
 - Los hallazgos están anotados en cada documento y en
