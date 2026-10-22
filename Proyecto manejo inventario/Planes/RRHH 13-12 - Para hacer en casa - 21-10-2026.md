@@ -11,7 +11,7 @@
 | Módulo | Estado | Evidencia |
 |---|---|---|
 | **13 — Permisos** | ✅ Implementado y verificado | `permisos.cpp/h`, `SP_LISTAR_PERMISOS_PENDIENTES`, `SP_GESTIONAR_PERMISO` atómico; PASS del verificador; warning de concurrencia corregido |
-| **12 — Vacaciones** | ✅ Implementado, ⏳ verificación independiente pendiente | `vacaciones.cpp/h`, `ESTADO`, 8 SPs, 2 triggers; build OK; `check-app-sps` 93/0; pruebas SQL OK |
+| **12 — Vacaciones** | ✅ Implementado y verificado | `vacaciones.cpp/h`, `ESTADO`, 8 SPs, 2 triggers; verificación independiente PASS el 21/10 (dos huecos del SP de edición anotados, no alcanzables desde la UI) |
 | **28 — LOG_ACCESOS** | ✅ Commiteado, ⏳ prueba visual | `accesos.cpp/h`, `login.cpp`, 28 SQL/MD |
 | **30 — Auditoría de permisos** | ◐ Tabla + trigger; sin lector | `LOG_AUDITORIA_PERMISOS` + `TR_LOG_GESTION_PERMISO`; registra, no se muestra |
 
