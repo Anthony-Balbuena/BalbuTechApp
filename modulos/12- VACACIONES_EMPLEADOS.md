@@ -115,11 +115,15 @@ Actualiza con `COALESCE` (NULL conserva) y repite `AND ESTADO = 'PENDIENTE'`
 como guarda atómica. Devuelve
 `EXITO: VACACIONES (ID: <id>) ACTUALIZADAS CORRECTAMENTE PARA EL EMPLEADO ID: <id>.`
 
-> La UI no edita vacaciones; el SP igual protege las aprobadas y rechazadas.
+> **Huecos conocidos (21/10/2026, verificados ejecutando el SP):**
+> - **No re-valida el solapamiento** con otras vacaciones (el alta sí): una
+>   pendiente se puede mover encima de una aprobada y devuelve `EXITO`.
+> - **No valida que la fecha nueva sea futura**: solo mira que la vacación no
+>   haya terminado, así que se puede editar hacia el pasado.
 >
-> **Hueco conocido:** la actualización **no re-valida el solapamiento** con
-> otras vacaciones (el alta sí). El tope de 15 días sí se re-valida por el
-> trigger `TR_VALIDAR_LIMITE_VACACIONES_UPDATE`.
+> El tope de 15 días sí se re-valida por el trigger
+> `TR_VALIDAR_LIMITE_VACACIONES_UPDATE`. Ninguno de los dos huecos es alcanzable
+> desde la app: la pantalla de vacaciones solo lista y da de alta.
 
 ### `SP_REPORTE_DIAS_CONSUMIDOS(P_ID_EMPLEADO)`
 

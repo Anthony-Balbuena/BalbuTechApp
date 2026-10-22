@@ -1,9 +1,10 @@
 # RRHH 13/12 — Estado y plan para casa — 21/10/2026
 
 > Estado real al cerrar el 21/10: **13 y 12 implementados y commiteados** en `d623ac0`.
-> El 13 pasó la verificación independiente. **El 12 quedó sin esa verificación**
-> (se cortó al final). Lo primero al retomar es terminar esa lectura; después,
-> prueba visual y seguir con 14/15/30.
+> **Verificación independiente de los dos: PASS** (la del 12 se hizo el 21/10
+> contra `BALBU_TECH_TEST`; detalle en la sección 1). Única excepción: el hueco
+> de `SP_ACTUALIZAR_VACACIONES`, que no es alcanzable desde la UI.
+> Queda la prueba visual y seguir con 14/15/30.
 
 ## Estado actual
 
@@ -23,7 +24,7 @@
 
 ## Lo que falta, en orden
 
-- [ ] **1. Verificación independiente de 12** (5–10 min, solo lectura).
+- [x] **1. Verificación independiente de 12** — PASS el 21/10 (ver sección 1).
 - [ ] **2. Prueba visual 13 + 12 con `admin`** (ver abajo).
 - [ ] **3. Prueba visual 28** ("Accesos"; quedó sin probar).
 - [ ] **4. 14 Bonos** — pantalla mínima (20–30 min).
@@ -32,28 +33,41 @@
 - [ ] **7. 30 Auditoría** — lector + decidir actor (15–20 min).
 - [ ] **8. Pendientes chicos** (lista al final).
 
-## 1. Verificación de 12 — qué mirar
+## 1. Verificación de 12 — HECHA (21/10/2026)
 
-El writer self-verificó, pero **no hay PASS independiente**. Revisar:
+**PASS.** Corrida contra `BALBU_TECH_TEST` recreada desde cero: import 45/45 sin
+errores, `check-app-sps` 93/0, suite de contratos 15/15, más ejecución directa de
+cada `SP` y trigger. Lo que se comprobó:
 
-- [ ] `SP_GESTIONAR_VACACION` solo acepta `PENDIENTE` → `APROBADO`/`RECHAZADO`;
-      atómico (`AND ESTADO='PENDIENTE'` + `ROW_COUNT()`); segundo intento amable.
-- [ ] `SP_ACTUALIZAR_VACACIONES` solo permite editar pendientes.
-- [ ] `SP_REPORTE_DIAS_CONSUMIDOS`, `SP_CONSULTAR_EMPLEADOS_DE_VACACIONES` y
-      `SP_VALIDAR_CUPO_VACACIONES` cuentan **solo `APROBADO`**.
-- [ ] Tope/solapamiento (triggers `TR_VALIDAR_LIMITE_VACACIONES*`) cuentan
-      `PENDIENTE` + `APROBADO`; un `RECHAZADO` libera.
-- [ ] 11: `SP_REGISTRAR_ASISTENCIA`, `11_SP_JUSTIFICAR_ASISTENCIA` y
+- [x] `SP_GESTIONAR_VACACION` solo acepta `PENDIENTE` → `APROBADO`/`RECHAZADO`;
+      atómico (`AND ESTADO='PENDIENTE'` + `ROW_COUNT()`); segundo intento amable
+      ("SOLO SE PUEDEN GESTIONAR VACACIONES PENDIENTES").
+- [x] `SP_ACTUALIZAR_VACACIONES` solo permite editar pendientes — **con dos
+      huecos**: no re-valida solapamiento (mover una pendiente encima de una
+      aprobada devuelve `EXITO`) ni valida fecha nueva futura. No son
+      alcanzables desde la UI.
+- [x] `SP_REPORTE_DIAS_CONSUMIDOS`, `SP_CONSULTAR_EMPLEADOS_DE_VACACIONES` y
+      `SP_VALIDAR_CUPO_VACACIONES` cuentan **solo `APROBADO`** (5 días tomados y
+      10 restantes con una aprobada de 5; la consulta lista solo a quien está
+      fuera hoy).
+- [x] Tope/solapamiento (triggers `TR_VALIDAR_LIMITE_VACACIONES*`) cuentan
+      `PENDIENTE` + `APROBADO`; un `RECHAZADO` libera. Un `INSERT` directo de 15
+      días con 5 ya aprobados queda bloqueado.
+- [x] 11: `SP_REGISTRAR_ASISTENCIA`, `11_SP_JUSTIFICAR_ASISTENCIA` y
       `TR_BLOQUEAR_ASISTENCIA_INAPROPIADA` filtran `APROBADO`;
-      pendiente/rechazada **no** bloquea.
-- [ ] Menú: "Mis vacaciones" + Empleados 17 "Gestionar vacaciones" + 18 volver;
-      1–15 intactos.
-- [ ] Docs: `12- VACACIONES_EMPLEADOS.md`, `11-ASISTENCIA_EMPLEADOS.md`,
-      `00- INDICE.md`, `db/check-app-sps.sh`.
-- [ ] Falso positivo conocido: `vacaciones.cpp` repite `empleadoDeSesion`
-      (SUGGESTION, no bloqueante). Confirmar si el verificador lo marca.
+      pendiente/rechazada **no** bloquea (probado con `INSERT` directo a
+      `ASISTENCIA_EMPLEADOS` en las tres fechas).
+- [x] Menú: "Mis vacaciones" + Empleados 17 "Gestionar vacaciones" + 18 volver;
+      1–15 intactos (corrida real de la app).
+- [x] Docs: `12- VACACIONES_EMPLEADOS.md`, `11-ASISTENCIA_EMPLEADOS.md`,
+      `00- INDICE.md`, `db/check-app-sps.sh` (0 descuadres, 0 objetos sin
+      mención).
+- [x] Falso positivo conocido: `vacaciones.cpp` repite `empleadoDeSesion`
+      (SUGGESTION, no bloqueante). Confirmado.
 
-Si encuentra algo: corregir, rebuild, `check-app-sps`, y commit `fix(vacaciones): ...`.
+Cierre del 21/10: se corrigió el login que giraba con EOF (dejaba 3 filas
+`(vacio)` por corrida, con test nuevo `db/test-login-eof.sh`) y la suite de
+contratos pasó a usar 18 para volver de Empleados.
 
 ## 2. Prueba visual con `admin`
 
@@ -113,6 +127,13 @@ habilita ambas de gestión.
 
 ## 4. Pendientes chicos
 
+- [x] **Login con EOF** — cortaba gastando los 3 intentos y dejaba 3 filas
+  `(vacio) / FALLIDO` en `LOG_ACCESOS`. Corregido el 21/10 con
+  `db/test-login-eof.sh`.
+- [x] **Suite de contratos** — enviaba `16` para volver de Empleados; ahora 16 es
+  "Gestionar permisos". Pasada a `18` (9 envíos).
+- [ ] **12** — al cablear la edición de vacaciones, que `SP_ACTUALIZAR_VACACIONES`
+  valide solapamiento y fecha futura.
 - [ ] **34 ASIGNAR RECLAMOS** — decisión: asignar o borrar.
 - [ ] 11: `DROP IF EXISTS` en los `CREATE` (idempotencia).
 - [ ] 3 tests shell pendientes.
@@ -130,6 +151,9 @@ docker compose exec -T app bash -lc "cd /workspace && ./build.sh"
 
 # SPs de la app (debe dar 93/0)
 docker compose exec -T app bash -lc "cd /workspace && bash db/check-app-sps.sh"
+
+# login con entrada agotada (no gira, no ensucia LOG_ACCESOS)
+docker compose exec -T app bash -lc "cd /workspace && DB_NAME=BALBU_TECH_TEST bash db/test-login-eof.sh"
 ```
 
 La base viva ya tiene 95/96; **no re-aplicar** salvo que se reconstruya.
@@ -137,7 +161,8 @@ La base viva ya tiene 95/96; **no re-aplicar** salvo que se reconstruya.
 
 ## Criterio de cierre
 
-1. Verificación de 12 PASS (o hallazgos corregidos y re-verificados).
+1. ~~Verificación de 12 PASS~~ — hecha el 21/10; quedan dos huecos del `SP` de
+   edición anotados (no alcanzables desde la UI).
 2. Build OK y `check-app-sps` 93/0.
 3. Prueba visual 13 + 12 OK; sin datos de prueba.
 4. 28 probado (o anotado como pendiente aparte).
