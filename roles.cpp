@@ -165,7 +165,9 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
     static const vector<ItemMenu> items = {
         {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
         {"Usuarios",         {"USUARIOS_VER", "USUARIOS_CREAR", "USUARIOS_EDITAR", "USUARIOS_ESTADO", "USUARIOS_CLAVE"}, AccionMenu::Usuarios},
-        {"Empleados",        {"GESTIONAR_EMPLEADOS"},                      AccionMenu::Empleados},
+        {"Empleados",        {"EMPLEADOS_VER", "EMPLEADOS_CREAR", "EMPLEADOS_EDITAR", "EMPLEADOS_BAJA",
+                              "GESTIONAR_PERMISOS_EMPLEADO", "GESTIONAR_VACACIONES_EMPLEADO",
+                              "GESTIONAR_CONTRATOS"},                     AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},
         {"Clientes",         {"GESTIONAR_CLIENTES", "CONSULTAR_CLIENTES"}, AccionMenu::Clientes},

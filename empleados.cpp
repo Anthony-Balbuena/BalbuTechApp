@@ -19,41 +19,74 @@
 
 using namespace std;
 
-void mostrarMenuEmpleados() {
-    // (20/10/2026, C-3) Las opciones de contratos (12 a 15) solo se imprimen
-    // si el usuario tiene el permiso GESTIONAR_CONTRATOS. La numeracion de
-    // 1 a 15 no cambia: 16 es "Gestionar permisos", 17 "Gestionar vacaciones"
-    // y 18 "Volver al Menu Principal" (21/10/2026).
-    // Version anterior (las cuatro opciones se imprimian siempre):
-    // cout << "12. Generar contrato" << endl;
-    // cout << "13. Subir contrato (al firmar)" << endl;
-    // cout << "14. Ver contratos" << endl;
-    // cout << "15. Finalizar contrato" << endl;
-    bool conContratos = tienePermiso("GESTIONAR_CONTRATOS");
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y el submenu de Usuarios, la lista visible se arma
+// antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
 
-    cout << "\n=== MODULO DE EMPLEADOS ===" << endl;
-    cout << "1. Agregar Empleado" << endl;
-    cout << "2. Actualizar Datos" << endl;
-    cout << "3. Despedir Empleado" << endl;
-    cout << "4. Reactivar Empleado" << endl;
-    cout << "5. Buscar Empleado" << endl;
-    cout << "6. Listar Empleados" << endl;
-    cout << "7. Marcar asistencia" << endl;
-    cout << "8. Ver asistencia" << endl;
-    cout << "9. Justificar asistencia" << endl;
-    cout << "10. Asistencia del dia" << endl;
-    cout << "11. Historial de asistencia" << endl;
-    if (conContratos) {
-        cout << "12. Generar contrato" << endl;
-        cout << "13. Subir contrato (al firmar)" << endl;
-        cout << "14. Ver contratos" << endl;
-        cout << "15. Finalizar contrato" << endl;
+enum class AccionEmpleado {
+    Agregar, Actualizar, Despedir, Reactivar, Buscar, Listar,
+    MarcarAsistencia, VerAsistencia, Justificar, AsistenciaHoy, Historial,
+    GenerarContrato, SubirContrato, VerContratos, FinalizarContrato,
+    Permisos, Vacaciones, Volver
+};
+
+struct OpcionEmpleado {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionEmpleado accion;
+};
+
+static const vector<OpcionEmpleado>& opcionesEmpleados() {
+    static const vector<OpcionEmpleado> opciones = {
+        {"Agregar Empleado",             "EMPLEADOS_CREAR",                 AccionEmpleado::Agregar},
+        {"Actualizar Datos",             "EMPLEADOS_EDITAR",                AccionEmpleado::Actualizar},
+        {"Despedir Empleado",            "EMPLEADOS_BAJA",                  AccionEmpleado::Despedir},
+        {"Reactivar Empleado",           "EMPLEADOS_BAJA",                  AccionEmpleado::Reactivar},
+        {"Buscar Empleado",              "EMPLEADOS_VER",                   AccionEmpleado::Buscar},
+        {"Listar Empleados",             "EMPLEADOS_VER",                   AccionEmpleado::Listar},
+        {"Marcar asistencia",            "REGISTRAR_ASISTENCIA",            AccionEmpleado::MarcarAsistencia},
+        {"Ver asistencia",               "CONSULTAR_REPORTES",              AccionEmpleado::VerAsistencia},
+        {"Justificar asistencia",        "JUSTIFICAR_ASISTENCIA",           AccionEmpleado::Justificar},
+        {"Asistencia del dia",           "CONSULTAR_REPORTES",              AccionEmpleado::AsistenciaHoy},
+        {"Historial de asistencia",      "CONSULTAR_REPORTES",              AccionEmpleado::Historial},
+        {"Generar contrato",             "GESTIONAR_CONTRATOS",             AccionEmpleado::GenerarContrato},
+        {"Subir contrato (al firmar)",   "GESTIONAR_CONTRATOS",             AccionEmpleado::SubirContrato},
+        {"Ver contratos",                "GESTIONAR_CONTRATOS",             AccionEmpleado::VerContratos},
+        {"Finalizar contrato",           "GESTIONAR_CONTRATOS",             AccionEmpleado::FinalizarContrato},
+        {"Gestionar permisos",           "GESTIONAR_PERMISOS_EMPLEADO",     AccionEmpleado::Permisos},
+        {"Gestionar vacaciones",         "GESTIONAR_VACACIONES_EMPLEADO",   AccionEmpleado::Vacaciones},
+        {"Volver al Menu Principal",     "",                                AccionEmpleado::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionEmpleado& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionEmpleado*> opcionesVisibles() {
+    vector<const OpcionEmpleado*> visibles;
+    for (const OpcionEmpleado& opcion : opcionesEmpleados()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
     }
-    cout << "16. Gestionar permisos" << endl;
-    cout << "17. Gestionar vacaciones" << endl;
-    cout << "18. Volver al Menu Principal" << endl;
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuEmpleados(const vector<const OpcionEmpleado*>& visibles) {
+    cout << "\n=== MODULO DE EMPLEADOS ===" << endl;
+    int n = 0;
+    for (const OpcionEmpleado* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=============================" << endl;
 }
+
+}  // namespace
 
 void registrarEmpleado() {
     cout << "\n--- REGISTRO DE EMPLEADO ---" << endl;
@@ -329,8 +362,6 @@ void listarEmpleados() {
     }
 }
 
-// Submenú de empleados: muestra el menú, lee la opción y llama a la acción.
-// (Antes el menú solo se imprimía y volvía sin hacer nada.)
 static int identificarEmpleado() {
     // EL CORTE: hoy pide el ID; manana la huella entra aqui sin tocar lo demas.
     return (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
@@ -586,98 +617,48 @@ static void historialAsistenciaUI() {
     }
 }
 
-void ejecutarSubmenuEmpleados() {    int opcion = 0;
+// Submenu de empleados: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion.
+void ejecutarSubmenuEmpleados() {
+    for (;;) {
+        vector<const OpcionEmpleado*> visibles = opcionesVisibles();
+        imprimirMenuEmpleados(visibles);
 
-    do {
-        mostrarMenuEmpleados();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion == 0) return;
+
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarEmpleado();
-                break;
-            case 2:
-                actualizarEmpleado();
-                break;
-            case 3:
-                despedirEmpleado();
-                break;
-            case 4:
-                reactivarEmpleado();
-                break;
-            case 5:
-                buscarEmpleado();
-                break;
-            case 6:
-                listarEmpleados();
-                break;
-            case 7:
-                marcarAsistenciaAuto();
-                break;
-            case 8:
-                verAsistenciaUI();
-                break;
-            case 9:
-                if (tienePermiso("CONSULTAR_REPORTES")) justificarAsistenciaUI();
-                else cout << ROJO << "Solo administracion justifica asistencia." << RESET << endl;
-                break;
-            case 10:
-                if (tienePermiso("CONSULTAR_REPORTES")) asistenciaHoyUI();
-                else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
-                break;
-            case 11:
-                if (tienePermiso("CONSULTAR_REPORTES")) historialAsistenciaUI();
-                else cout << ROJO << "No tienes permiso para ver reportes." << RESET << endl;
-                break;
-            case 12:
-                // (20/10/2026, C-3) GESTIONAR_CONTRATOS es obligatorio para
-                // las cuatro opciones de contrato (12 a 15).
-                // Version anterior (sin control de permiso):
-                // generarContratoUI();
-                if (tienePermiso("GESTIONAR_CONTRATOS")) generarContratoUI();
-                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
-                break;
-            case 13:
-                // Version anterior (sin control de permiso):
-                // subirContratoUI();
-                if (tienePermiso("GESTIONAR_CONTRATOS")) subirContratoUI();
-                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
-                break;
-            case 14:
-                // Version anterior (sin control de permiso):
-                // consultarContratosUI();
-                if (tienePermiso("GESTIONAR_CONTRATOS")) consultarContratosUI();
-                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
-                break;
-            case 15:
-                // Version anterior (sin control de permiso):
-                // finalizarContratoUI();
-                if (tienePermiso("GESTIONAR_CONTRATOS")) finalizarContratoUI();
-                else cout << ROJO << "No tienes permiso para gestionar contratos." << RESET << endl;
-                break;
-            case 16:
-                // (21/10/2026) Defensa en profundidad: el submenu ya exige
-                // GESTIONAR_EMPLEADOS, pero la accion lo vuelve a verificar.
-                if (tienePermiso("GESTIONAR_EMPLEADOS")) gestionarPermisosUI();
-                else cout << ROJO << "No tienes permiso para gestionar permisos." << RESET << endl;
-                break;
-            case 17:
-                // (21/10/2026) Mismo gate que "Gestionar permisos": el
-                // submenu ya exige GESTIONAR_EMPLEADOS y la accion lo repite.
-                if (tienePermiso("GESTIONAR_EMPLEADOS")) gestionarVacacionesUI();
-                else cout << ROJO << "No tienes permiso para gestionar vacaciones." << RESET << endl;
-                break;
-            case 18:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionEmpleado& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionEmpleado::Agregar:           registrarEmpleado(); break;
+            case AccionEmpleado::Actualizar:        actualizarEmpleado(); break;
+            case AccionEmpleado::Despedir:          despedirEmpleado(); break;
+            case AccionEmpleado::Reactivar:         reactivarEmpleado(); break;
+            case AccionEmpleado::Buscar:            buscarEmpleado(); break;
+            case AccionEmpleado::Listar:            listarEmpleados(); break;
+            case AccionEmpleado::MarcarAsistencia:  marcarAsistenciaAuto(); break;
+            case AccionEmpleado::VerAsistencia:     verAsistenciaUI(); break;
+            case AccionEmpleado::Justificar:        justificarAsistenciaUI(); break;
+            case AccionEmpleado::AsistenciaHoy:     asistenciaHoyUI(); break;
+            case AccionEmpleado::Historial:         historialAsistenciaUI(); break;
+            case AccionEmpleado::GenerarContrato:   generarContratoUI(); break;
+            case AccionEmpleado::SubirContrato:     subirContratoUI(); break;
+            case AccionEmpleado::VerContratos:      consultarContratosUI(); break;
+            case AccionEmpleado::FinalizarContrato: finalizarContratoUI(); break;
+            case AccionEmpleado::Permisos:          gestionarPermisosUI(); break;
+            case AccionEmpleado::Vacaciones:        gestionarVacacionesUI(); break;
+            case AccionEmpleado::Volver:            return;
         }
-        if (opcion != 18) pausar();
-    } while (opcion != 18);
+        pausar();
+    }
 }
 

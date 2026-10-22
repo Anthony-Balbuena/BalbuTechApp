@@ -14,7 +14,7 @@ rechace pendientes.
 
 > **Pantallas:** "Mis vacaciones" en el menú principal (permiso
 > `SOLICITAR_PERMISO`, el mismo de "Mis permisos") y "17. Gestionar
-> vacaciones" dentro del submenú de Empleados (gate `GESTIONAR_EMPLEADOS`).
+> vacaciones" dentro del submenú de Empleados (gate `GESTIONAR_VACACIONES_EMPLEADO`).
 
 Fuente: `modulos/12- VACACIONES_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 21/10/2026.
 
@@ -87,7 +87,7 @@ otra gestión la resolvió entre el `SELECT` y el `UPDATE`, también falla con
 > carrera entre dos gestiones.
 >
 > **Quién gestiona:** el SP no sabe quién llama. El control lo hace la app con
-> el gate `GESTIONAR_EMPLEADOS` del submenú de Empleados.
+> el gate `GESTIONAR_VACACIONES_EMPLEADO` del submenú de Empleados.
 
 ### `SP_LISTAR_VACACIONES_PENDIENTES()`
 

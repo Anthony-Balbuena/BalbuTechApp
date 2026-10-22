@@ -79,13 +79,19 @@ WHERE RP.ROL_NOMBRE = 'RRHH'
 -- los pares rol-permiso del permiso viejo se limpian solos.
 DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_USUARIOS';
 
+-- (22/10/2026) Mismo criterio para Empleados: el permiso unico se reemplazo
+-- por 7 permisos finos (EMPLEADOS_VER/CREAR/EDITAR/BAJA, JUSTIFICAR_ASISTENCIA,
+-- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO).
+DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_EMPLEADOS';
+
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (22/10/2026) 22 permisos: el modulo Usuarios usa 5 permisos finos
--- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE) en lugar del viejo
--- GESTIONAR_USUARIOS. GESTIONAR_CONTRATOS sigue siendo el ultimo agregado
--- (20/10/2026, C-3; contratos de empleados, con su propia opcion en el
--- submenu de Empleados).
+-- (22/10/2026) 28 permisos: el modulo Usuarios usa 5 permisos finos
+-- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE) y el modulo Empleados usa 7
+-- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, JUSTIFICAR_ASISTENCIA,
+-- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO) en lugar de
+-- los viejos GESTIONAR_USUARIOS y GESTIONAR_EMPLEADOS. GESTIONAR_CONTRATOS
+-- sigue siendo exclusivo del modulo de contratos (20/10/2026, C-3).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -93,7 +99,13 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('USUARIOS_EDITAR', 'Actualizar datos de usuarios'),
 ('USUARIOS_ESTADO', 'Activar o desactivar usuarios'),
 ('USUARIOS_CLAVE', 'Cambiar la clave de usuarios'),
-('GESTIONAR_EMPLEADOS', 'Administrar empleados y personal'),
+('EMPLEADOS_VER', 'Consultar y buscar empleados'),
+('EMPLEADOS_CREAR', 'Registrar empleados'),
+('EMPLEADOS_EDITAR', 'Actualizar datos de empleados'),
+('EMPLEADOS_BAJA', 'Despedir y reactivar empleados'),
+('JUSTIFICAR_ASISTENCIA', 'Justificar asistencia'),
+('GESTIONAR_PERMISOS_EMPLEADO', 'Aprobar o rechazar permisos de empleados'),
+('GESTIONAR_VACACIONES_EMPLEADO', 'Aprobar o rechazar vacaciones'),
 ('GESTIONAR_CLIENTES', 'Gestionar clientes'),
 ('GESTIONAR_PROVEEDORES', 'Gestionar proveedores'),
 ('GESTIONAR_CATEGORIAS', 'Gestionar categorias'),
@@ -119,13 +131,14 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 22 permisos del sistema).
+-- ADMIN: acceso total (los 28 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- GERENTE: todo lo operativo, menos la administracion de roles y usuarios
--- (crear roles y usuarios es exclusivo de ADMIN).
+-- (crear roles y usuarios es exclusivo de ADMIN). Los 7 permisos finos de
+-- Empleados entran por este SELECT (no estan en el NOT IN).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'GERENTE', ID_PERMISO
 FROM PERMISOS
@@ -150,35 +163,31 @@ WHERE NOMBRE_PERMISO NOT IN (
     'USUARIOS_EDITAR',
     'USUARIOS_ESTADO',
     'USUARIOS_CLAVE',
-    'GESTIONAR_EMPLEADOS',
+    'EMPLEADOS_VER',
+    'EMPLEADOS_CREAR',
+    'EMPLEADOS_EDITAR',
+    'EMPLEADOS_BAJA',
+    'JUSTIFICAR_ASISTENCIA',
+    'GESTIONAR_PERMISOS_EMPLEADO',
+    'GESTIONAR_VACACIONES_EMPLEADO',
     'GESTIONAR_CONTRATOS'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- RRHH: personal, contratos y reportes. Sin roles, usuarios, clientes ni ventas.
--- Version anterior (set viejo de RRHH: personal, usuarios, clientes, ventas y
--- reportes); hoy "usuarios" son los 5 permisos finos USUARIOS_*:
--- INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
--- SELECT 'RRHH', ID_PERMISO
--- FROM PERMISOS
--- WHERE NOMBRE_PERMISO IN (
---     'GESTIONAR_EMPLEADOS',
---     'GESTIONAR_ROLES',
---     'USUARIOS_VER',
---     'USUARIOS_CREAR',
---     'USUARIOS_EDITAR',
---     'USUARIOS_ESTADO',
---     'USUARIOS_CLAVE',
---     'GESTIONAR_CLIENTES',
---     'GESTIONAR_VENTAS',
---     'CONSULTAR_REPORTES'
--- )
--- ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
+-- (22/10/2026) Suma los 7 permisos finos de Empleados; el viejo
+-- GESTIONAR_EMPLEADOS ya no existe.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'RRHH', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
-    'GESTIONAR_EMPLEADOS',
+    'EMPLEADOS_VER',
+    'EMPLEADOS_CREAR',
+    'EMPLEADOS_EDITAR',
+    'EMPLEADOS_BAJA',
+    'JUSTIFICAR_ASISTENCIA',
+    'GESTIONAR_PERMISOS_EMPLEADO',
+    'GESTIONAR_VACACIONES_EMPLEADO',
     'GESTIONAR_CONTRATOS',
     'CONSULTAR_REPORTES',
     'SOLICITAR_PERMISO'

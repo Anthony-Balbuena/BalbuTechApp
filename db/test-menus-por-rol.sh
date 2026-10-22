@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO = 'prueba_usr_ver';
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE = 'PRUEBA_USR_VER';
-            DELETE FROM ROLES WHERE NOMBRE_ROL = 'PRUEBA_USR_VER';
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA = 'TESTUV001';" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -214,6 +214,87 @@ else
 
     if [ "$fail" -eq 0 ]; then
         echo "OK $ROL_VER (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Empleados con permisos finos (22/10/2026): un rol con SOLO
+# EMPLEADOS_VER ve Empleados en el menu principal y, adentro, solo las dos
+# acciones de consulta mas Volver.
+# ---------------------------------------------------------------------------
+ROL_EMP="PRUEBA_EMP_VER"
+USR_EMP="prueba_emp_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_EMP';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTEV001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_EMP';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_EMP')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_EMP', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='EMPLEADOS_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA EMP VER','TESTEV001','PRUEBA',1000,'T-EV-001','ev-001@test.local','2026-10-22');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_EMP', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTEV001' AND R.NOMBRE_ROL='$ROL_EMP';
+EOF
+
+salida_emp="$TMP/out-empleados-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Empleados (con este rol es la
+# primera opcion visible: el menu queda Empleados, Ver permisos y Cerrar
+# sesion), 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_EMP" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_emp" 2>&1
+rc_emp=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_emp"; then
+    echo "FALLO $ROL_EMP: no entro al menu (¿usuario/clave/BD?)"
+    fail=1
+elif [ "$rc_emp" -ne 0 ]; then
+    echo "FALLO $ROL_EMP: la app salio con $rc_emp"
+    fail=1
+else
+    # Solo la primera tirada del menu principal (hasta el submenu): contarlo
+    # sobre toda la salida mezclaria las dos listas numeradas.
+    principal_emp=$(sed -n '1,/=== MODULO DE EMPLEADOS ===/p' "$salida_emp")
+    n_principal_emp=$(printf '%s\n' "$principal_emp" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_emp" -ne 3 ]; then
+        echo "FALLO $ROL_EMP: $n_principal_emp opciones en el menu principal, se esperaban 3"
+        fail=1
+    fi
+    for label in "Empleados" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_emp" | grep -Fq "$label"; then
+            echo "FALLO $ROL_EMP: el menu principal no muestra '$label'"
+            fail=1
+        fi
+    done
+
+    # Solo la primera tirada del submenu (titulo -> linea de cierre).
+    submenu_emp=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=============================$/ && f{exit}' "$salida_emp")
+    n_sub_emp=$(printf '%s\n' "$submenu_emp" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_emp" -ne 3 ]; then
+        echo "FALLO $ROL_EMP: $n_sub_emp opciones en el submenu, se esperaban 3"
+        fail=1
+    fi
+    for label in "Buscar Empleado" "Listar Empleados" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
+            echo "FALLO $ROL_EMP: falta la opcion '$label' en el submenu"
+            fail=1
+        fi
+    done
+    for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
+                 "Reactivar Empleado" "Marcar asistencia" "Gestionar permisos" \
+                 "Gestionar vacaciones" "Generar contrato"; do
+        if printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
+            echo "FALLO $ROL_EMP: el submenu muestra '$label' sin permiso"
+            fail=1
+        fi
+    done
+
+    if [ "$fail" -eq 0 ]; then
+        echo "OK $ROL_EMP (3 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 

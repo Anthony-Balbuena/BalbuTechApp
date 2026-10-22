@@ -13,7 +13,7 @@ alta propia; `gestionarPermisosUI()` para que RRHH/ADMIN resuelva pendientes.
 
 > **Pantallas:** "Mis permisos" en el menú principal (permiso
 > `SOLICITAR_PERMISO`) y "16. Gestionar permisos" dentro del submenú de
-> Empleados (gate `GESTIONAR_EMPLEADOS`).
+> Empleados (gate `GESTIONAR_PERMISOS_EMPLEADO`).
 
 Fuente: `modulos/13- PERMISOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 21/10/2026.
 
@@ -93,7 +93,7 @@ también falla con "solo pendientes". Devuelve
 > mensaje amigable.
 >
 > **Quién gestiona:** el SP no sabe quién llama. El control lo hace la app con
-> el gate `GESTIONAR_EMPLEADOS` del submenú de Empleados. El trigger del
+> el gate `GESTIONAR_PERMISOS_EMPLEADO` del submenú de Empleados. El trigger del
 > módulo 30 registra el antes/después, **no el actor**.
 
 ### `SP_HISTORIAL_PERMISOS_EMPLEADO(P_ID_EMPLEADO)`
