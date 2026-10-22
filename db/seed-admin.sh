@@ -18,8 +18,8 @@ DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD (revisar .env)}"
 Q() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -N -e "$1"; }
 
 HASH=$(printf '%s' "$PASS" | sha256sum | cut -d' ' -f1)
-# Roles que la app compara tal cual (roles.cpp: ADMIN/RRHH/EMPLEADO). Se crean si faltan.
-for R in ADMIN RRHH EMPLEADO; do
+# Roles base que el seed asegura (el resto los crean los modulos 3/36). Se crean si faltan.
+for R in ADMIN RRHH VENDEDOR; do
   mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
     -e "INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('$R');"
 done

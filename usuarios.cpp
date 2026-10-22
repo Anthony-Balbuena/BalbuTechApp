@@ -3,6 +3,7 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
@@ -10,20 +11,62 @@
 #include "database.h"
 #include "seguridad.h"
 #include "colores.h"
+#include "roles.h"
 
 using namespace std;
 
-void mostrarMenuUsuarios() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp), la lista visible se arma antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionUsuario { Agregar, Actualizar, Estado, Buscar, Clave, Listar, Volver };
+
+struct OpcionUsuario {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionUsuario accion;
+};
+
+static const vector<OpcionUsuario>& opcionesUsuarios() {
+    static const vector<OpcionUsuario> opciones = {
+        {"Agregar Usuario",           "USUARIOS_CREAR",  AccionUsuario::Agregar},
+        {"Actualizar Usuario",        "USUARIOS_EDITAR", AccionUsuario::Actualizar},
+        {"Cambiar Estado",            "USUARIOS_ESTADO", AccionUsuario::Estado},
+        {"Buscar Usuario",            "USUARIOS_VER",    AccionUsuario::Buscar},
+        {"Cambiar Clave",             "USUARIOS_CLAVE",  AccionUsuario::Clave},
+        {"Listar Usuarios",           "USUARIOS_VER",    AccionUsuario::Listar},
+        {"Volver al Menu Principal",  "",                AccionUsuario::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionUsuario& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionUsuario*> opcionesVisibles() {
+    vector<const OpcionUsuario*> visibles;
+    for (const OpcionUsuario& opcion : opcionesUsuarios()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuUsuarios(const vector<const OpcionUsuario*>& visibles) {
     cout << "\n=== MODULO DE USUARIOS ===" << endl;
-    cout << "1. Agregar Usuario" << endl;
-    cout << "2. Actualizar Usuario" << endl;
-    cout << "3. Cambiar Estado" << endl;
-    cout << "4. Buscar Usuario" << endl;
-    cout << "5. Cambiar Clave" << endl;
-    cout << "6. Listar Usuarios" << endl;
-    cout << "7. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionUsuario* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=========================" << endl;
 }
+
+}  // namespace
+
 
 void registrarUsuario() {
     cout << "\n--- REGISTRO DE USUARIO ---" << endl;
@@ -186,7 +229,7 @@ void buscarUsuario() {
         while (res->next()) {
             encontrado = true;
             cout << res->getInt("ID_USUARIO") << " | "
-                 << res->getString("USUARIO") << " | "
+                 << res->getString("NOMBRE_USUARIO") << " | "
                  << res->getString("ESTADO") << endl;
         }
 
@@ -255,45 +298,37 @@ void listarUsuarios() {
     }
 }
 
-// Submenú de usuarios: muestra el menú, lee la opción y llama a la acción.
-// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+// Submenu de usuarios: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion.
 void ejecutarSubmenuUsuarios() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionUsuario*> visibles = opcionesVisibles();
+        imprimirMenuUsuarios(visibles);
 
-    do {
-        mostrarMenuUsuarios();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion == 0) return;
+
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarUsuario();
-                break;
-            case 2:
-                actualizarUsuario();
-                break;
-            case 3:
-                cambiarEstadoUsuario();
-                break;
-            case 4:
-                buscarUsuario();
-                break;
-            case 5:
-                cambiarClaveUsuario();
-                break;
-            case 6:
-                listarUsuarios();
-                break;
-            case 7:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionUsuario& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionUsuario::Agregar:    registrarUsuario(); break;
+            case AccionUsuario::Actualizar: actualizarUsuario(); break;
+            case AccionUsuario::Estado:     cambiarEstadoUsuario(); break;
+            case AccionUsuario::Buscar:     buscarUsuario(); break;
+            case AccionUsuario::Clave:      cambiarClaveUsuario(); break;
+            case AccionUsuario::Listar:     listarUsuarios(); break;
+            case AccionUsuario::Volver:     return;
         }
-        if (opcion != 7) pausar();
-    } while (opcion != 7);
+        pausar();
+    }
 }
 

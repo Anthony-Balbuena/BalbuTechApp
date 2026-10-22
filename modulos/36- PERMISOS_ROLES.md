@@ -10,7 +10,7 @@ código.
 `empleados.cpp` y el resto de los módulos de UI (cada uno pregunta por su
 permiso).
 
-Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/10/2026.
 
 ## Tablas
 
@@ -22,21 +22,27 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 20/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (18, idempotentes con `ON DUPLICATE KEY UPDATE`):**
-`GESTIONAR_ROLES`, `GESTIONAR_USUARIOS`, `GESTIONAR_EMPLEADOS`,
+**Semillas (22, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+`GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
+`USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `GESTIONAR_EMPLEADOS`,
 `GESTIONAR_CLIENTES`, `GESTIONAR_PROVEEDORES`, `GESTIONAR_CATEGORIAS`,
 `GESTIONAR_MARCAS`, `GESTIONAR_PRODUCTOS`, `GESTIONAR_METODOS_PAGO`,
 `GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `GESTIONAR_COMPRAS`,
 `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`,
-`REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` y `GESTIONAR_CONTRATOS` (el último,
-nuevo).
+`REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` y `GESTIONAR_CONTRATOS`.
+
+> **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `USUARIOS_CREAR`,
+> `USUARIOS_EDITAR`, `USUARIOS_ESTADO` y `USUARIOS_CLAVE`). El viejo
+> `GESTIONAR_USUARIOS` **ya no existe**: el import lo borra del catálogo y el
+> `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 
 > **El catálogo de permisos no se administra desde la app**: no hay SP de alta,
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **16 de los 18 se consultan en el código**; `REGISTRAR_ASISTENCIA` y
-> `SOLICITAR_PERMISO` están en la matriz pero ningún `cpp` los pide todavía.
+> **21 de los 22 se consultan en el código**; solo `REGISTRAR_ASISTENCIA`
+> está en la matriz pero ningún `cpp` lo pide todavía. `SOLICITAR_PERMISO`
+> lo usa el menú principal (`Mis permisos` y `Mis vacaciones`).
 
 ### ROL_PERMISO
 
@@ -58,22 +64,27 @@ nuevo).
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 18** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y `GESTIONAR_USUARIOS` |
-| `CAJERO` | `GESTIONAR_VENTAS`, `GESTIONAR_CLIENTES`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`, `CONSULTAR_REPORTES` |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS` |
-| `RRHH` | `GESTIONAR_EMPLEADOS`, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES` |
-| `EMPLEADO` | `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`, `GESTIONAR_VENTAS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` |
+| `ADMIN` | **los 22** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (16) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `GESTIONAR_EMPLEADOS` y `GESTIONAR_CONTRATOS` (14) |
+| `RRHH` | `GESTIONAR_EMPLEADOS`, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `SOLICITAR_PERMISO` (4) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `GESTIONAR_CLIENTES`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (8) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS`, `SOLICITAR_PERMISO` (8) |
+| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CONSULTAR_CLIENTES` (3) |
 
-**Migraciones incluidas** (idempotentes, `C-3` del 20/10/2026):
+**Migraciones incluidas** (idempotentes; las 3 primeras son `C-3` del
+20/10/2026, la última del 22/10/2026):
 1. `DROP CONSTRAINT IF EXISTS CHK_ROL_NOMBRE` — saca el `CHECK` que limitaba los
    roles a `ADMIN`/`RRHH`/`EMPLEADO`.
 2. Recrea el FK del rol con `ON UPDATE CASCADE`.
-3. **Borra cuatro pares de `RRHH`** (`GESTIONAR_ROLES`, `GESTIONAR_USUARIOS`,
-   `GESTIONAR_CLIENTES`, `GESTIONAR_VENTAS`) que el set final ya no le da.
+3. **Borra los pares de `RRHH`** que el set final ya no le da
+   (`GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `GESTIONAR_CLIENTES` y
+   `GESTIONAR_VENTAS`).
+4. **Borra del catálogo `GESTIONAR_USUARIOS`**, el permiso único que reemplazan
+   los 5 permisos finos de Usuarios (`ON DELETE CASCADE` limpia sus pares).
 
-> **Ese `DELETE` corre en cada import.** Los permisos que el dueño haya cargado
-> a mano para `RRHH` **se respetan** (solo borra esos cuatro pares), pero si
+> **Esos `DELETE` corren en cada import.** Los permisos que el dueño haya cargado
+> a mano para `RRHH` **se respetan** (solo borra esos pares), pero si
 > alguien vuelve a asignarle `GESTIONAR_CLIENTES` a `RRHH` desde la app, el
 > próximo import se lo saca.
 
@@ -89,7 +100,7 @@ nuevo).
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 18 sembrados.
+> 22 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 
@@ -128,9 +139,12 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
 
 - **La base manda**: los permisos se leen de `ROL_PERMISO`, no del nombre del rol
   en el código.
-- **`ADMIN` tiene todo**; `GERENTE` todo lo operativo salvo roles y usuarios.
+- **`ADMIN` tiene todo**; `GERENTE` todo lo operativo salvo roles y los 5
+  permisos de Usuarios; `SUBGERENTE` además no toca empleados ni contratos.
+- **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `CREAR`,
+  `EDITAR`, `ESTADO`, `CLAVE`); el submenú muestra solo las acciones habilitadas.
 - **Renombrar un rol arrastra sus permisos** (`ON UPDATE CASCADE`).
 - **Un permiso nuevo solo entra por semilla**; la app solo asigna y quita.
 - **Quitar un permiso que no estaba no es error**, es aviso.
-- **El import re-aplica la matriz y borra cuatro pares de `RRHH`.**
+- **El import re-aplica la matriz y borra los pares viejos de `RRHH`.**
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.

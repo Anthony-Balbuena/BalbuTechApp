@@ -164,7 +164,7 @@ struct ItemMenu {
 static const vector<ItemMenu>& itemsMenuPrincipal() {
     static const vector<ItemMenu> items = {
         {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
-        {"Usuarios",         {"GESTIONAR_USUARIOS"},                       AccionMenu::Usuarios},
+        {"Usuarios",         {"USUARIOS_VER", "USUARIOS_CREAR", "USUARIOS_EDITAR", "USUARIOS_ESTADO", "USUARIOS_CLAVE"}, AccionMenu::Usuarios},
         {"Empleados",        {"GESTIONAR_EMPLEADOS"},                      AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},

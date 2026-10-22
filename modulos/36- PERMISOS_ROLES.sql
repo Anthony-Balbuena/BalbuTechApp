@@ -4,7 +4,7 @@
 -- ================================================================
 -- Este módulo define los permisos del sistema y los asocia a cada rol.
 -- La idea es proteger el menú y las acciones con autenticación real y control por roles.
--- Set final de roles (20/10/2026, C-3): ADMIN, GERENTE, RRHH, CAJERO, ALMACEN y EMPLEADO.
+-- Set final de roles (22/10/2026): ADMIN, GERENTE, SUBGERENTE, RRHH, VENDEDOR, ALMACEN y CONTABILIDAD.
 
 /*
 TABLA PERMISOS
@@ -57,26 +57,42 @@ ALTER TABLE ROL_PERMISO
 -- borra SOLO los pares rol-permiso que el set final deja afuera.
 -- Los permisos que el usuario asigno a mano desde la app se respetan.
 -- Idempotente: si el par ya no existe, el DELETE no hace nada.
--- (RRHH pierde GESTIONAR_ROLES y GESTIONAR_USUARIOS, que son exclusivos de
--- ADMIN, y tambien GESTIONAR_CLIENTES y GESTIONAR_VENTAS.)
+-- (RRHH pierde GESTIONAR_ROLES y los permisos finos de Usuarios, que son
+-- exclusivos de ADMIN, y tambien GESTIONAR_CLIENTES y GESTIONAR_VENTAS.)
 DELETE RP
 FROM ROL_PERMISO RP
 INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO
 WHERE RP.ROL_NOMBRE = 'RRHH'
   AND P.NOMBRE_PERMISO IN (
       'GESTIONAR_ROLES',
-      'GESTIONAR_USUARIOS',
+      'USUARIOS_VER',
+      'USUARIOS_CREAR',
+      'USUARIOS_EDITAR',
+      'USUARIOS_ESTADO',
+      'USUARIOS_CLAVE',
       'GESTIONAR_CLIENTES',
       'GESTIONAR_VENTAS'
   );
 
+-- (22/10/2026) El permiso unico de Usuarios se reemplazo por los 5 permisos
+-- finos USUARIOS_*. FK_ROL_PERMISO_PERMISO tiene ON DELETE CASCADE, asi que
+-- los pares rol-permiso del permiso viejo se limpian solos.
+DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_USUARIOS';
+
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (20/10/2026, C-3) 18 permisos: GESTIONAR_CONTRATOS es el nuevo (contratos
--- de empleados, con su propia opcion en el submenu de Empleados).
+-- (22/10/2026) 22 permisos: el modulo Usuarios usa 5 permisos finos
+-- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE) en lugar del viejo
+-- GESTIONAR_USUARIOS. GESTIONAR_CONTRATOS sigue siendo el ultimo agregado
+-- (20/10/2026, C-3; contratos de empleados, con su propia opcion en el
+-- submenu de Empleados).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
-('GESTIONAR_USUARIOS', 'Administrar usuarios del sistema'),
+('USUARIOS_VER', 'Consultar y buscar usuarios'),
+('USUARIOS_CREAR', 'Registrar usuarios'),
+('USUARIOS_EDITAR', 'Actualizar datos de usuarios'),
+('USUARIOS_ESTADO', 'Activar o desactivar usuarios'),
+('USUARIOS_CLAVE', 'Cambiar la clave de usuarios'),
 ('GESTIONAR_EMPLEADOS', 'Administrar empleados y personal'),
 ('GESTIONAR_CLIENTES', 'Gestionar clientes'),
 ('GESTIONAR_PROVEEDORES', 'Gestionar proveedores'),
@@ -98,12 +114,12 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- ================================================================
 -- ASIGNACION DE PERMISOS POR ROL
 -- ================================================================
--- (20/10/2026, C-3) Set final de roles de la tienda. La base es la unica
+-- (22/10/2026) Set final de roles de la tienda (7). La base es la unica
 -- fuente de verdad de los permisos: esta es la matriz que queda al importar
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 18 permisos del sistema).
+-- ADMIN: acceso total (los 22 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -115,48 +131,44 @@ SELECT 'GERENTE', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO NOT IN (
     'GESTIONAR_ROLES',
-    'GESTIONAR_USUARIOS'
+    'USUARIOS_VER',
+    'USUARIOS_CREAR',
+    'USUARIOS_EDITAR',
+    'USUARIOS_ESTADO',
+    'USUARIOS_CLAVE'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
--- CAJERO: ventas y caja, clientes, metodos de pago y consultas.
+-- SUBGERENTE: el GERENTE sin empleados ni contratos (RRHH conserva esas dos).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
-SELECT 'CAJERO', ID_PERMISO
+SELECT 'SUBGERENTE', ID_PERMISO
 FROM PERMISOS
-WHERE NOMBRE_PERMISO IN (
-    'GESTIONAR_VENTAS',
-    'GESTIONAR_CLIENTES',
-    'GESTIONAR_METODOS_PAGO',
-    'CONSULTAR_PRODUCTOS',
-    'CONSULTAR_CLIENTES',
-    'CONSULTAR_REPORTES'
-)
-ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
-
--- ALMACEN: stock, compras y proveedores. Sin ventas, usuarios ni roles.
-INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
-SELECT 'ALMACEN', ID_PERMISO
-FROM PERMISOS
-WHERE NOMBRE_PERMISO IN (
-    'GESTIONAR_PRODUCTOS',
-    'GESTIONAR_CATEGORIAS',
-    'GESTIONAR_MARCAS',
-    'GESTIONAR_INVENTARIO',
-    'GESTIONAR_COMPRAS',
-    'GESTIONAR_PROVEEDORES',
-    'CONSULTAR_PRODUCTOS'
+WHERE NOMBRE_PERMISO NOT IN (
+    'GESTIONAR_ROLES',
+    'USUARIOS_VER',
+    'USUARIOS_CREAR',
+    'USUARIOS_EDITAR',
+    'USUARIOS_ESTADO',
+    'USUARIOS_CLAVE',
+    'GESTIONAR_EMPLEADOS',
+    'GESTIONAR_CONTRATOS'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- RRHH: personal, contratos y reportes. Sin roles, usuarios, clientes ni ventas.
--- Version anterior (set viejo de RRHH: personal, usuarios, clientes, ventas y reportes):
+-- Version anterior (set viejo de RRHH: personal, usuarios, clientes, ventas y
+-- reportes); hoy "usuarios" son los 5 permisos finos USUARIOS_*:
 -- INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 -- SELECT 'RRHH', ID_PERMISO
 -- FROM PERMISOS
 -- WHERE NOMBRE_PERMISO IN (
 --     'GESTIONAR_EMPLEADOS',
 --     'GESTIONAR_ROLES',
---     'GESTIONAR_USUARIOS',
+--     'USUARIOS_VER',
+--     'USUARIOS_CREAR',
+--     'USUARIOS_EDITAR',
+--     'USUARIOS_ESTADO',
+--     'USUARIOS_CLAVE',
 --     'GESTIONAR_CLIENTES',
 --     'GESTIONAR_VENTAS',
 --     'CONSULTAR_REPORTES'
@@ -168,20 +180,53 @@ FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_EMPLEADOS',
     'GESTIONAR_CONTRATOS',
-    'CONSULTAR_REPORTES'
+    'CONSULTAR_REPORTES',
+    'SOLICITAR_PERMISO'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
--- EMPLEADO: consultas, ventas y permisos basicos.
+-- VENDEDOR: atiende el mostrador. Toma los permisos de EMPLEADO y los de
+-- CAJERO (que se elimina): ventas, caja, clientes, metodos de pago y consultas.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
-SELECT 'EMPLEADO', ID_PERMISO
+SELECT 'VENDEDOR', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
+    'GESTIONAR_VENTAS',
+    'GESTIONAR_CLIENTES',
+    'GESTIONAR_METODOS_PAGO',
+    'CONSULTAR_REPORTES',
     'CONSULTAR_PRODUCTOS',
     'CONSULTAR_CLIENTES',
-    'GESTIONAR_VENTAS',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
+)
+ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
+
+-- ALMACEN: stock, compras y proveedores. Sin ventas, usuarios ni roles.
+-- (22/10/2026) Suma SOLICITAR_PERMISO para que pueda pedir permisos/ausencias.
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT 'ALMACEN', ID_PERMISO
+FROM PERMISOS
+WHERE NOMBRE_PERMISO IN (
+    'GESTIONAR_PRODUCTOS',
+    'GESTIONAR_CATEGORIAS',
+    'GESTIONAR_MARCAS',
+    'GESTIONAR_INVENTARIO',
+    'GESTIONAR_COMPRAS',
+    'GESTIONAR_PROVEEDORES',
+    'CONSULTAR_PRODUCTOS',
+    'SOLICITAR_PERMISO'
+)
+ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
+
+-- CONTABILIDAD: solo consulta. Sin ventas, stock, personal ni permisos.
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT 'CONTABILIDAD', ID_PERMISO
+FROM PERMISOS
+WHERE NOMBRE_PERMISO IN (
+    'CONSULTAR_REPORTES',
+    'CONSULTAR_PRODUCTOS',
+    'CONSULTAR_CLIENTES'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 

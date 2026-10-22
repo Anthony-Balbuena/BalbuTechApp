@@ -1,13 +1,13 @@
 # Módulo 3 — ROLES
 
-Los roles del sistema (`ADMIN`, `RRHH`, `EMPLEADO`, `GERENTE`, `CAJERO`,
-`ALMACEN`). El nombre es único y de acá cuelgan los permisos (`36`) y los
-usuarios (`10`).
+Los roles del sistema (`ADMIN`, `RRHH`, `VENDEDOR`, `GERENTE`, `SUBGERENTE`,
+`ALMACEN`, `CONTABILIDAD`). El nombre es único y de acá cuelgan los permisos
+(`36`) y los usuarios (`10`).
 
 **Es usado por:** `roles.cpp` (alta, edición y búsqueda), `login.cpp` y
 `usuarios.cpp` (combo de roles).
 
-Fuente: `modulos/3- ROLES.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/3- ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/10/2026.
 
 ## Tablas
 
@@ -24,9 +24,10 @@ crea el `UNIQUE`.
 > `IX_ROLES_NOMBRE` es **redundante**: el `UNIQUE` de la columna ya genera un
 > índice con la misma columna. Solo agrega costura de escritura.
 
-**Semillas (idempotentes):** `ADMIN`, `RRHH`, `EMPLEADO`, `GERENTE`, `CAJERO`,
-`ALMACEN`, con `INSERT IGNORE`. Los tres primeros van **primero** a propósito,
-para no cambiar los `ID_ROL` que ya existían.
+**Semillas (idempotentes):** `ADMIN`, `RRHH`, `VENDEDOR`, `GERENTE`,
+`SUBGERENTE`, `ALMACEN`, `CONTABILIDAD`, con `INSERT IGNORE`. En una base ya
+migrada no cambia los `ID_ROL` existentes; el renombre de `EMPLEADO` a
+`VENDEDOR` y la baja de `CAJERO` van en la migración viva (`backups/`).
 
 > Sin esas filas fallan los seeds de `ROL_PERMISO` (FK) y el login. Los permisos
 > por rol salen de la base (`36`); el nombre del rol ya **no** se compara en el
