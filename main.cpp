@@ -50,10 +50,19 @@ int main() {
         string password;
 
         cout << AZUL << "\nUsuario: " << RESET;
-        getline(cin, usuario);
+        // (21/10/2026) Con EOF (Ctrl+D o entrada agotada) getline falla y el
+        // usuario queda vacio: sin este corte se gastaban los tres intentos y
+        // cada uno dejaba una fila '(vacio) / FALLIDO' en LOG_ACCESOS.
+        if (!getline(cin, usuario)) {
+            cout << "\n[!] Entrada agotada. Saliendo del sistema..." << RESET << endl;
+            return 0;
+        }
 
         cout << AZUL << "Contraseña: " << RESET;
-        getline(cin, password);
+        if (!getline(cin, password)) {
+            cout << "\n[!] Entrada agotada. Saliendo del sistema..." << RESET << endl;
+            return 0;
+        }
 
         if (intentarLogin(usuario, password)) {
             cout << VERDE << "\nAcceso concedido." << RESET << endl;

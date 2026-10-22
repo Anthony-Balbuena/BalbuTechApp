@@ -45,6 +45,12 @@ bool intentarLogin(const string& usuario, const string& password) {
         return false;
     }
 
+    // (21/10/2026) Un Enter en blanco no es un intento de acceso: no consulta
+    // ni escribe en LOG_ACCESOS. Antes dejaba una fila '(vacio) / FALLIDO'.
+    if (usuario.empty()) {
+        return false;
+    }
+
     try {
         // 1) Intentar autenticación en la tabla USUARIOS (esquema unificado)
         std::unique_ptr<sql::PreparedStatement> pSelect(globalCon->prepareStatement(
