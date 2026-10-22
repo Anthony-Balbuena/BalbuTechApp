@@ -41,6 +41,7 @@ DROP PROCEDURE IF EXISTS SP_SOLICITAR_VACACIONES ;
         DECLARE v_dias_solicitados INT;
         DECLARE v_dias_acumulados INT;
         DECLARE v_nombre_empleado VARCHAR(100);
+        DECLARE v_id_vacacion INT;
 
         -- 1. LIMPIEZA Y VALIDACIONES PREVIAS
         SELECT NOMBRE INTO v_nombre_empleado FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO;
@@ -94,10 +95,16 @@ DROP PROCEDURE IF EXISTS SP_SOLICITAR_VACACIONES ;
         INSERT INTO VACACIONES_EMPLEADOS (ID_EMPLEADO, FECHA_INICIO, FECHA_FIN, ESTADO)
         VALUES (P_ID_EMPLEADO, P_FECHA_INICIO, P_FECHA_FIN, 'PENDIENTE');
 
+        -- (21/10/2026) El mensaje informaba P_ID_EMPLEADO (el empleado) como si
+        -- fuera el ID de la vacacion: con admin siempre decia "(ID: 1)" aunque
+        -- la fila creada fuera la 6. Los triggers del modulo son BEFORE y no
+        -- insertan en otras tablas, asi que LAST_INSERT_ID() es el de esta fila.
+        SET v_id_vacacion = LAST_INSERT_ID();
+
         -- 5. MENSAJE FINAL
         SELECT CONCAT(
             'EXITO: SOLICITUD DE VACACIONES CREADA PARA "', v_nombre_empleado,
-            '" (ID: ', P_ID_EMPLEADO, ') DEL ', P_FECHA_INICIO, ' AL ', P_FECHA_FIN,
+            '" (ID: ', v_id_vacacion, ') DEL ', P_FECHA_INICIO, ' AL ', P_FECHA_FIN,
             '. QUEDA PENDIENTE DE APROBACION.'
         ) AS MENSAJE;
 

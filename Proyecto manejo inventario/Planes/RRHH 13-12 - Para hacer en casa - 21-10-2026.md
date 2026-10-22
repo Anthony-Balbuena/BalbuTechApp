@@ -132,6 +132,9 @@ habilita ambas de gestión.
   `db/test-login-eof.sh`.
 - [x] **Suite de contratos** — enviaba `16` para volver de Empleados; ahora 16 es
   "Gestionar permisos". Pasada a `18` (9 envíos).
+- [x] **Mensaje del 12** — `SP_SOLICITAR_VACACIONES` devolvía el ID del empleado
+  como si fuera el de la vacación (con admin siempre `(ID: 1)`); ahora usa
+  `LAST_INSERT_ID()`. Probado con dos altas del empleado 1 → `(ID: 1)` y `(ID: 2)`.
 - [ ] **12** — al cablear la edición de vacaciones, que `SP_ACTUALIZAR_VACACIONES`
   valide solapamiento y fecha futura.
 - [ ] **34 ASIGNAR RECLAMOS** — decisión: asignar o borrar.

@@ -56,8 +56,10 @@ existe. Toda solicitud nace **`PENDIENTE`**.
    pedidos (`DATEDIFF + 1`, extremos inclusive) > 15 →
    `ERROR: EL EMPLEADO SUPERA EL LÍMITE DE 15 DÍAS POR AÑO.`
 
-Inserta `PENDIENTE` y devuelve
-`EXITO: SOLICITUD DE VACACIONES CREADA PARA "<nombre>" (ID: <id>) DEL <inicio> AL <fin>. QUEDA PENDIENTE DE APROBACION.`
+Inserta `PENDIENTE` y devuelve, con el **ID de la vacación creada**
+(`v_id_vacacion = LAST_INSERT_ID()`, no el del empleado):
+
+`EXITO: SOLICITUD DE VACACIONES CREADA PARA "<nombre>" (ID: <id de la vacación>) DEL <inicio> AL <fin>. QUEDA PENDIENTE DE APROBACION.`
 
 > No valida que el empleado esté `ACTIVO` (se pueden cargar vacaciones a un
 > inactivo).
