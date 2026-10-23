@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -470,6 +470,288 @@ else
         echo "OK VENDEDOR/Empleados (5 opciones, puede marcar asistencia)"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Submenu Productos con permisos finos (22/10/2026): dos cortes con los dos
+# permisos que ya existen. CONTABILIDAD solo tiene CONSULTAR_PRODUCTOS y antes
+# veia igual el alta, la baja y la actualizacion; un rol con solo
+# GESTIONAR_PRODUCTOS tiene que ver el caso inverso.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_prod_con="$TMP/out-productos-contabilidad.txt"
+# Entrada: Enter del "Presione Enter", 2 = Productos (su menu queda Clientes,
+# Productos, Ver permisos y Cerrar sesion), 4 = Volver en un submenu de 4.
+printf '\n2\n4\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_prod_con" 2>&1
+rc_prod_con=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_prod_con"; then
+    echo "FALLO CONTABILIDAD/Productos: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_prod_con" -ne 0 ]; then
+    echo "FALLO CONTABILIDAD/Productos: la app salio con $rc_prod_con"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_prod_con=$(awk '/=== MODULO DE PRODUCTOS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_prod_con")
+    n_sub_prod_con=$(printf '%s\n' "$submenu_prod_con" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_prod_con" -ne 4 ]; then
+        echo "FALLO CONTABILIDAD/Productos: $n_sub_prod_con opciones en el submenu, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar Producto" "Consultar Inventario" "Reporte De Stock" "Volver Al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_prod_con" | grep -Fq "$label"; then
+            echo "FALLO CONTABILIDAD/Productos: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Productos" "Actualizar Datos" "Activar/Desactivar Producto"; do
+        if printf '%s\n' "$submenu_prod_con" | grep -Fq "$label"; then
+            echo "FALLO CONTABILIDAD/Productos: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK CONTABILIDAD/Productos (4 opciones, solo consulta)"
+    fi
+fi
+
+ROL_PROD="PRUEBA_PROD_GEST"
+USR_PROD="prueba_prod_gest"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_PROD';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTPG001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_PROD';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_PROD')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_PROD', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='GESTIONAR_PRODUCTOS';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA PROD GEST','TESTPG001','PRUEBA',1000,'T-PG-001','pg-001@test.local','2026-10-22');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_PROD', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTPG001' AND R.NOMBRE_ROL='$ROL_PROD';
+EOF
+
+fallos_previos=$fallos
+salida_prod_gest="$TMP/out-productos-gest.txt"
+# Entrada: Enter del "Presione Enter", 1 = Productos (unico modulo visible),
+# 4 = Volver en un submenu de 4.
+printf '\n1\n4\n' | BALBU_USER="$USR_PROD" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_prod_gest" 2>&1
+rc_prod_gest=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_prod_gest"; then
+    echo "FALLO $ROL_PROD: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_prod_gest" -ne 0 ]; then
+    echo "FALLO $ROL_PROD: la app salio con $rc_prod_gest"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_prod_gest=$(awk '/=== MODULO DE PRODUCTOS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_prod_gest")
+    n_sub_prod_gest=$(printf '%s\n' "$submenu_prod_gest" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_prod_gest" -ne 4 ]; then
+        echo "FALLO $ROL_PROD: $n_sub_prod_gest opciones en el submenu, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Productos" "Actualizar Datos" "Activar/Desactivar Producto" "Volver Al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_prod_gest" | grep -Fq "$label"; then
+            echo "FALLO $ROL_PROD: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Buscar Producto" "Consultar Inventario" "Reporte De Stock"; do
+        if printf '%s\n' "$submenu_prod_gest" | grep -Fq "$label"; then
+            echo "FALLO $ROL_PROD: el submenu muestra '$label' sin CONSULTAR_PRODUCTOS"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_PROD (4 opciones, solo gestion)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Ventas con permisos finos (22/10/2026): un rol con solo
+# GESTIONAR_VENTAS ve las acciones sobre ventas pero no los reportes, que piden
+# CONSULTAR_REPORTES. Hoy ningun rol real tiene uno sin el otro, por eso el caso
+# usa un rol sintetico: asi el corte queda fijado igual.
+# ---------------------------------------------------------------------------
+ROL_VEN="PRUEBA_VEN_GEST"
+USR_VEN="prueba_ven_gest"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_VEN';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTVG001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_VEN';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_VEN')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_VEN', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='GESTIONAR_VENTAS';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA VEN GEST','TESTVG001','PRUEBA',1000,'T-VG-001','vg-001@test.local','2026-10-22');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_VEN', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTVG001' AND R.NOMBRE_ROL='$ROL_VEN';
+EOF
+
+fallos_previos=$fallos
+salida_ven_gest="$TMP/out-ventas-gest.txt"
+# Entrada: Enter del "Presione Enter", 1 = Ventas (su menu queda Ventas, Caja
+# (turnos), Ver permisos y Cerrar sesion), 9 = Volver en un submenu de 9.
+printf '\n1\n9\n' | BALBU_USER="$USR_VEN" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_ven_gest" 2>&1
+rc_ven_gest=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_ven_gest"; then
+    echo "FALLO $ROL_VEN: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_ven_gest" -ne 0 ]; then
+    echo "FALLO $ROL_VEN: la app salio con $rc_ven_gest"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_ven_gest=$(awk '/=== MODULO DE VENTAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_ven_gest")
+    n_sub_ven_gest=$(printf '%s\n' "$submenu_ven_gest" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_ven_gest" -ne 9 ]; then
+        echo "FALLO $ROL_VEN: $n_sub_ven_gest opciones en el submenu, se esperaban 9"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Venta rapida (carrito)" "Ver venta con IVA" "Cancelar venta" \
+                 "Anular pago" "Devolucion de venta" "Cierre de caja" "Cobrar venta" \
+                 "Garantias" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_ven_gest" | grep -Fq "$label"; then
+            echo "FALLO $ROL_VEN: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Reporte por rango" "Ganancias" "Reporte por periodo" \
+                 "Ganancias por periodo" "Historial de venta" "Exportar datos para la web"; do
+        if printf '%s\n' "$submenu_ven_gest" | grep -Fq "$label"; then
+            echo "FALLO $ROL_VEN: el submenu muestra '$label' sin CONSULTAR_REPORTES"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_VEN (9 opciones, sin reportes)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Los dos permisos juntos (22/10/2026): el corte tiene que mostrar el submenu
+# historico completo. Sin este caso, un typo en el permiso de una opcion de
+# consulta la esconde para todos y los tests de arriba igual pasan (un rol que
+# solo gestiona ya espera no verla).
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_prod_alm="$TMP/out-productos-almacen.txt"
+# Entrada: Enter del "Presione Enter", 6 = Productos (su menu queda Mis
+# permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos, Compras,
+# Inventario, Ver permisos y Cerrar sesion), 7 = Volver en el submenu completo.
+printf '\n6\n7\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_prod_alm" 2>&1
+rc_prod_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_prod_alm"; then
+    echo "FALLO ALMACEN/Productos: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_prod_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Productos: la app salio con $rc_prod_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_prod_alm=$(awk '/=== MODULO DE PRODUCTOS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_prod_alm")
+    n_sub_prod_alm=$(printf '%s\n' "$submenu_prod_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_prod_alm" -ne 7 ]; then
+        echo "FALLO ALMACEN/Productos: $n_sub_prod_alm opciones, se esperaban 7"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Productos" "Actualizar Datos" "Activar/Desactivar Producto" \
+                 "Buscar Producto" "Consultar Inventario" "Reporte De Stock" \
+                 "Volver Al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_prod_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Productos: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Productos (7 opciones, gestion y consulta)"
+    fi
+fi
+
+fallos_previos=$fallos
+salida_ven_ven="$TMP/out-ventas-vendedor.txt"
+# Entrada: Enter del "Presione Enter", 7 = Ventas (su menu queda Empleados, Mis
+# permisos, Mis vacaciones, Clientes, Productos, Metodos de pago, Ventas, Caja
+# (turnos), Ver permisos y Cerrar sesion), 15 = Volver en el submenu completo.
+printf '\n7\n15\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_ven_ven" 2>&1
+rc_ven_ven=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_ven_ven"; then
+    echo "FALLO VENDEDOR/Ventas: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_ven_ven" -ne 0 ]; then
+    echo "FALLO VENDEDOR/Ventas: la app salio con $rc_ven_ven"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_ven_ven=$(awk '/=== MODULO DE VENTAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_ven_ven")
+    n_sub_ven_ven=$(printf '%s\n' "$submenu_ven_ven" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_ven_ven" -ne 15 ]; then
+        echo "FALLO VENDEDOR/Ventas: $n_sub_ven_ven opciones, se esperaban 15"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Venta rapida (carrito)" "Cierre de caja" "Cobrar venta" "Garantias" \
+                 "Reporte por rango" "Ganancias" "Reporte por periodo" \
+                 "Ganancias por periodo" "Historial de venta" "Exportar datos para la web"; do
+        if ! printf '%s\n' "$submenu_ven_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Ventas: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK VENDEDOR/Ventas (15 opciones, con reportes)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Opcion 0 (22/10/2026): tiene que caer en "Opcion no valida" como cualquier
+# numero fuera de rango, igual que el menu principal. Antes el submenu volvia
+# atras en silencio y parecia que la app se habia saltado un paso.
+# ---------------------------------------------------------------------------
+for caso in "$USR_PROD:4" "$USR_VEN:9"; do
+    usuario="${caso%%:*}"
+    volver="${caso##*:}"
+    fallos_previos=$fallos
+    salida_cero="$TMP/out-cero-$usuario.txt"
+    printf '\n1\n0\n%s\n' "$volver" | BALBU_USER="$usuario" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+        timeout "$LIMITE" "$APP" >"$salida_cero" 2>&1
+
+    if ! grep -q "Acceso concedido \[DEV\]" "$salida_cero"; then
+        echo "FALLO $usuario/opcion 0: no entro al menu (¿usuario/clave/BD?)"
+        fail=1; fallos=$((fallos+1))
+    else
+        if ! grep -q "Opcion no valida" "$salida_cero"; then
+            echo "FALLO $usuario/opcion 0: no mostro 'Opcion no valida'"
+            fail=1; fallos=$((fallos+1))
+        fi
+        # El submenu tiene que reimprimirse despues del 0 y seguir vivo.
+        repeticiones=$(grep -cE '^=== MODULO DE (PRODUCTOS|VENTAS) ===$' "$salida_cero" || true)
+        if [ "$repeticiones" -lt 2 ]; then
+            echo "FALLO $usuario/opcion 0: el 0 corto el submenu ($repeticiones menu(s))"
+            fail=1; fallos=$((fallos+1))
+        fi
+
+        if [ "$fallos" -eq "$fallos_previos" ]; then
+            echo "OK $usuario/opcion 0 (avisa y sigue en el submenu)"
+        fi
+    fi
+done
 
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"

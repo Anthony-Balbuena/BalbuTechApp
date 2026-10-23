@@ -4,7 +4,8 @@
 #include <mysql_connection.h>
 
 // Declaración de las funciones del módulo de productos
-void mostrarMenuProductos();
+// (22/10/2026) El menu se arma por permisos dentro de productos.cpp: el orden y
+// la cantidad de opciones dependen del rol, asi que no se declara aca.
 void ejecutarSubmenuProductos();
 void registrarProducto();
 void actualizarProducto();

@@ -13,21 +13,65 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuProductos() {
+namespace {
+
+enum class AccionProducto {
+    Agregar, Actualizar, Estado, Buscar, ConsultarInventario, ReporteStock, Volver
+};
+
+struct OpcionProducto {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionProducto accion;
+};
+
+// (22/10/2026) Menu por permisos: las tres acciones de escritura piden
+// GESTIONAR_PRODUCTOS y las tres de consulta CONSULTAR_PRODUCTOS. Antes la lista
+// era fija y despachaba por numero, asi que un rol que solo consulta
+// (CONTABILIDAD tiene CONSULTAR_PRODUCTOS) veia igual el alta, la baja y la
+// actualizacion.
+static const vector<OpcionProducto>& opcionesProductos() {
+    static const vector<OpcionProducto> opciones = {
+        {"Agregar Productos",           "GESTIONAR_PRODUCTOS", AccionProducto::Agregar},
+        {"Actualizar Datos",            "GESTIONAR_PRODUCTOS", AccionProducto::Actualizar},
+        {"Activar/Desactivar Producto", "GESTIONAR_PRODUCTOS", AccionProducto::Estado},
+        {"Buscar Producto",             "CONSULTAR_PRODUCTOS", AccionProducto::Buscar},
+        {"Consultar Inventario",        "CONSULTAR_PRODUCTOS", AccionProducto::ConsultarInventario},
+        {"Reporte De Stock",            "CONSULTAR_PRODUCTOS", AccionProducto::ReporteStock},
+        {"Volver Al Menu Principal",    "",                     AccionProducto::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionProducto& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionProducto*> opcionesVisibles() {
+    vector<const OpcionProducto*> visibles;
+    for (const OpcionProducto& opcion : opcionesProductos()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuProductos(const vector<const OpcionProducto*>& visibles) {
     cout << "\n=== MODULO DE PRODUCTOS ===" << endl;
-    cout << "1. Agregar Productos" << endl;
-    cout << "2. Actualizar Datos" << endl;
-    cout << "3. Activar/Desactivar Producto" << endl;
-    cout << "4. Buscar Producto" << endl;
-    cout << "5. Consultar Inventario" << endl;
-    cout << "6. Reporte De Stock" << endl;
-    cout << "7. Volver Al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionProducto* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "===========================" << endl;
 }
+
+}  // namespace
 
 void registrarProducto() {
     cout << "\n---- REGISTRO DE PRODUCTO ---" << endl;
@@ -409,40 +453,30 @@ void reporteStockCritico() {
 void ejecutarSubmenuProductos() {
     int opcion = 0;
 
-    do {
-        mostrarMenuProductos();
+    while (true) {
+        vector<const OpcionProducto*> visibles = opcionesVisibles();
+        imprimirMenuProductos(visibles);
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-
-        switch (opcion) {
-            case 1:
-                registrarProducto();
-                break;
-            case 2:
-                actualizarProducto();
-                break;
-            case 3:
-                cambiarEstadoProducto();
-                break;
-            case 4:
-                buscarProducto();
-                break;
-            case 5:
-                consultarInventario();
-                break;
-            case 6:
-                reporteStockCritico();
-                break;
-            case 7:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 7) pausar();
-    } while (opcion != 7);
+
+        const OpcionProducto& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionProducto::Agregar:  registrarProducto(); break;
+            case AccionProducto::Actualizar: actualizarProducto(); break;
+            case AccionProducto::Estado:   cambiarEstadoProducto(); break;
+            case AccionProducto::Buscar:   buscarProducto(); break;
+            case AccionProducto::ConsultarInventario: consultarInventario(); break;
+            case AccionProducto::ReporteStock: reporteStockCritico(); break;
+            case AccionProducto::Volver:   return;
+        }
+        pausar();
+    }
 }
 

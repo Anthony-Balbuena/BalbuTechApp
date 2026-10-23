@@ -239,8 +239,6 @@ void ejecutarSubmenuClientes() {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             return;
         }
-        if (opcion == 0) return;
-
         if (opcion < 1 || opcion > (int)visibles.size()) {
             cout << ROJO << "Opcion no valida." << RESET << endl;
             continue;

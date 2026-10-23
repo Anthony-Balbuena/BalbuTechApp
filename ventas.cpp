@@ -27,25 +27,70 @@ struct LineaCarrito {
     double descuento = 0.0; // % de descuento de la línea (16/10/2026)
 };
 
-void mostrarMenuVentas() {
+namespace {
+
+enum class AccionVenta {
+    VentaRapida, VerVentaIVA, CancelarVenta, AnularPago, Devolucion,
+    ReporteRango, CierreCaja, Ganancias, CobrarVenta, ReportePeriodo,
+    GananciasPeriodo, Garantias, Historial, ExportarWeb, Volver
+};
+
+struct OpcionVenta {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionVenta accion;
+};
+
+// (22/10/2026) Menu por permisos: las acciones sobre una venta piden
+// GESTIONAR_VENTAS y las de lectura/reportes CONSULTAR_REPORTES. Antes la lista
+// era fija y despachaba por numero, asi que un rol con GESTIONAR_VENTAS pero sin
+// CONSULTAR_REPORTES veia igual los reportes (y la exportacion web, que era el
+// unico caso con chequeo adentro del switch).
+static const vector<OpcionVenta>& opcionesVentas() {
+    static const vector<OpcionVenta> opciones = {
+        {"Venta rapida (carrito)",       "GESTIONAR_VENTAS",   AccionVenta::VentaRapida},
+        {"Ver venta con IVA",            "GESTIONAR_VENTAS",   AccionVenta::VerVentaIVA},
+        {"Cancelar venta",               "GESTIONAR_VENTAS",   AccionVenta::CancelarVenta},
+        {"Anular pago",                  "GESTIONAR_VENTAS",   AccionVenta::AnularPago},
+        {"Devolucion de venta",          "GESTIONAR_VENTAS",   AccionVenta::Devolucion},
+        {"Reporte por rango",            "CONSULTAR_REPORTES", AccionVenta::ReporteRango},
+        {"Cierre de caja",               "GESTIONAR_VENTAS",   AccionVenta::CierreCaja},
+        {"Ganancias",                    "CONSULTAR_REPORTES", AccionVenta::Ganancias},
+        {"Cobrar venta",                 "GESTIONAR_VENTAS",   AccionVenta::CobrarVenta},
+        {"Reporte por periodo",          "CONSULTAR_REPORTES", AccionVenta::ReportePeriodo},
+        {"Ganancias por periodo",        "CONSULTAR_REPORTES", AccionVenta::GananciasPeriodo},
+        {"Garantias",                    "GESTIONAR_VENTAS",   AccionVenta::Garantias},
+        {"Historial de venta",           "CONSULTAR_REPORTES", AccionVenta::Historial},
+        {"Exportar datos para la web",   "CONSULTAR_REPORTES", AccionVenta::ExportarWeb},
+        {"Volver al Menu Principal",     "",                   AccionVenta::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionVenta& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionVenta*> opcionesVisibles() {
+    vector<const OpcionVenta*> visibles;
+    for (const OpcionVenta& opcion : opcionesVentas()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuVentas(const vector<const OpcionVenta*>& visibles) {
     cout << "\n=== MODULO DE VENTAS ===" << endl;
-    cout << "1. Venta rapida (carrito)" << endl;
-    cout << "2. Ver venta con IVA" << endl;
-    cout << "3. Cancelar venta" << endl;
-    cout << "4. Anular pago" << endl;
-    cout << "5. Devolucion de venta" << endl;
-    cout << "6. Reporte por rango" << endl;
-    cout << "7. Cierre de caja" << endl;
-    cout << "8. Ganancias" << endl;
-    cout << "9. Cobrar venta" << endl;
-    cout << "10. Reporte por periodo" << endl;
-    cout << "11. Ganancias por periodo" << endl;
-    cout << "12. Garantias" << endl;
-    cout << "13. Historial de venta" << endl;
-    cout << "14. Exportar datos para la web" << endl;
-    cout << "15. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionVenta* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "========================" << endl;
 }
+
+}  // namespace
 
 static bool buscarPorId(int id, LineaCarrito &out) {
     try {
@@ -1273,63 +1318,37 @@ static void historialVentaUI() {
 
 void ejecutarSubmenuVentas() {
     int opcion = 0;
-    do {
-        mostrarMenuVentas();
+    while (true) {
+        vector<const OpcionVenta*> visibles = opcionesVisibles();
+        imprimirMenuVentas(visibles);
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-        switch (opcion) {
-            case 1:
-                ventaRapida();
-                break;
-            case 2:
-                verVentaConIVA();
-                break;
-            case 3:
-                cancelarVentaUI();
-                break;
-            case 4:
-                anularPagoUI();
-                break;
-            case 5:
-                devolucionVentaUI();
-                break;
-            case 6:
-                reporteVentasUI();
-                break;
-            case 7:
-                cierreCajaUI();
-                break;
-            case 8:
-                verGananciasUI();
-                break;
-            case 9:
-                cobrarVentaUI();
-                break;
-            case 10:
-                reportePeriodoUI();
-                break;
-            case 11:
-                reportePeriodoGananciaUI();
-                break;
-            case 12:
-                ejecutarSubmenuGarantias();
-                break;
-            case 13:
-                historialVentaUI();
-                break;
-            case 14:
-                if (tienePermiso("CONSULTAR_REPORTES")) exportarDatosWeb();
-                else cout << ROJO << "No tienes permiso para exportar reportes." << RESET << endl;
-                break;
-            case 15:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 15) pausar();
-    } while (opcion != 15);
+
+        const OpcionVenta& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionVenta::VentaRapida:      ventaRapida(); break;
+            case AccionVenta::VerVentaIVA:      verVentaConIVA(); break;
+            case AccionVenta::CancelarVenta:    cancelarVentaUI(); break;
+            case AccionVenta::AnularPago:       anularPagoUI(); break;
+            case AccionVenta::Devolucion:       devolucionVentaUI(); break;
+            case AccionVenta::ReporteRango:     reporteVentasUI(); break;
+            case AccionVenta::CierreCaja:       cierreCajaUI(); break;
+            case AccionVenta::Ganancias:        verGananciasUI(); break;
+            case AccionVenta::CobrarVenta:      cobrarVentaUI(); break;
+            case AccionVenta::ReportePeriodo:   reportePeriodoUI(); break;
+            case AccionVenta::GananciasPeriodo: reportePeriodoGananciaUI(); break;
+            case AccionVenta::Garantias:        ejecutarSubmenuGarantias(); break;
+            case AccionVenta::Historial:        historialVentaUI(); break;
+            case AccionVenta::ExportarWeb:      exportarDatosWeb(); break;
+            case AccionVenta::Volver:           return;
+        }
+        pausar();
+    }
 }

@@ -50,16 +50,21 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 > `CONSULTAR_CLIENTES` **ya no existen**: el import los borra del catálogo y el
 > `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 >
-> **`CONSULTAR_REPORTES` y `REGISTRAR_ASISTENCIA` no dan acceso al módulo**:
-> solo filtran opciones una vez adentro. `VENDEDOR` tiene los dos y **no** debe
-> entrar a ver la asistencia de todos.
+> **`CONSULTAR_REPORTES` no da acceso a ningún módulo**: solo filtra opciones una
+> vez adentro. **`REGISTRAR_ASISTENCIA` sí abre `Empleados`** —sin eso el
+> vendedor no podía fichar— y adentro habilita únicamente `Marcar asistencia`.
+> `VENDEDOR` tiene los dos, así que hoy también ve `Ver asistencia`,
+> `Asistencia del dia` e `Historial de asistencia` por `CONSULTAR_REPORTES`;
+> **eso sigue pendiente de decisión** (si el vendedor no debe ver la asistencia
+> ajena, hace falta un permiso propio para esas tres opciones).
 
 > **El catálogo de permisos no se administra desde la app**: no hay SP de alta,
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
 > **Los 30 se consultan en el código**: los de Empleados en `empleados.cpp`, los
-> de Clientes en `clientes.cpp` y el menú principal en `roles.cpp`;
+> de Clientes en `clientes.cpp`, los de Productos en `productos.cpp` y los de
+> Ventas en `ventas.cpp`; el menú principal, en `roles.cpp`;
 > `REGISTRAR_ASISTENCIA` ya no queda suelto (opción 7 del submenú de Empleados).
 > `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
 > `Mis vacaciones`).
@@ -131,6 +136,62 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 | 16 | Gestionar permisos | `GESTIONAR_PERMISOS_EMPLEADO` |
 | 17 | Gestionar vacaciones | `GESTIONAR_VACACIONES_EMPLEADO` |
 | 18 | Volver al Menu Principal | *(siempre)* |
+
+### Mapa del submenú de Productos
+
+El submenú conserva el orden histórico de 7 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar Productos | `GESTIONAR_PRODUCTOS` |
+| 2 | Actualizar Datos | `GESTIONAR_PRODUCTOS` |
+| 3 | Activar/Desactivar Producto | `GESTIONAR_PRODUCTOS` |
+| 4 | Buscar Producto | `CONSULTAR_PRODUCTOS` |
+| 5 | Consultar Inventario | `CONSULTAR_PRODUCTOS` |
+| 6 | Reporte De Stock | `CONSULTAR_PRODUCTOS` |
+| 7 | Volver al Menu Principal | *(siempre)* |
+
+> **El corte cae justo donde el módulo solo tenía un permiso de acceso.**
+> `CONTABILIDAD` entra a Productos con `CONSULTAR_PRODUCTOS` y hasta el 22/10/2026
+> veía igual el alta, la actualización y la baja. `ALMACEN` tiene los dos, así que
+> no cambia: sigue viendo las 7.
+
+### Mapa del submenú de Ventas
+
+El submenú conserva el orden histórico de 15 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Venta rapida (carrito) | `GESTIONAR_VENTAS` |
+| 2 | Ver venta con IVA | `GESTIONAR_VENTAS` |
+| 3 | Cancelar venta | `GESTIONAR_VENTAS` |
+| 4 | Anular pago | `GESTIONAR_VENTAS` |
+| 5 | Devolucion de venta | `GESTIONAR_VENTAS` |
+| 6 | Reporte por rango | `CONSULTAR_REPORTES` |
+| 7 | Cierre de caja | `GESTIONAR_VENTAS` |
+| 8 | Ganancias | `CONSULTAR_REPORTES` |
+| 9 | Cobrar venta | `GESTIONAR_VENTAS` |
+| 10 | Reporte por periodo | `CONSULTAR_REPORTES` |
+| 11 | Ganancias por periodo | `CONSULTAR_REPORTES` |
+| 12 | Garantias | `GESTIONAR_VENTAS` |
+| 13 | Historial de venta | `CONSULTAR_REPORTES` |
+| 14 | Exportar datos para la web | `CONSULTAR_REPORTES` |
+| 15 | Volver al Menu Principal | *(siempre)* |
+
+> **Hoy el corte no se ve desde la app**: el ítem `Ventas` del menú principal
+> pide `GESTIONAR_VENTAS`, y los cuatro roles que lo tienen (ADMIN, GERENTE,
+> SUBGERENTE, VENDEDOR) también tienen `CONSULTAR_REPORTES`. Queda preparado para
+> un rol que solo consulte, y fijado en `db/test-menus-por-rol.sh` con un rol
+> sintético. `Exportar datos para la web` perdió el chequeo interno que tenía
+> dentro del `switch`: ahora la opción ni se muestra sin el permiso.
+
+> **Número fuera de rango no ejecuta nada**: `0`, un negativo o uno mayor que la
+> última opción visible muestran `Opcion no valida` y reimprimen el submenú. El
+> `0` ya no vuelve atrás en silencio (antes solo pasaba en los submenús; el menú
+> principal nunca lo aceptó). Las cinco pantallas con el patrón —Usuarios,
+> Empleados, Clientes, Productos y Ventas— se comportan igual.
 
 **Migraciones incluidas** (idempotentes; las 3 primeras son `C-3` del
 20/10/2026, las 3 últimas del 22/10/2026):
@@ -216,6 +277,10 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
   renumera sobre lo visible.
 - **`CLIENTES_VER` abre el módulo**; `CLIENTES_CREAR`, `CLIENTES_EDITAR` y
   `CLIENTES_ESTADO` solo habilitan su opción adentro.
+- **Productos y Ventas también filtran por permiso** sin permisos nuevos:
+  `GESTIONAR_PRODUCTOS` habilita alta/cambio de estado y `CONSULTAR_PRODUCTOS`
+  las consultas; en Ventas, `GESTIONAR_VENTAS` habilita operar y
+  `CONSULTAR_REPORTES` los reportes, las ganancias y la exportación web.
 - **`CONSULTAR_REPORTES` y `REGISTRAR_ASISTENCIA` no abren Empleados**: son
   opciones adentro, no llave del módulo.
 - **Renombrar un rol arrastra sus permisos** (`ON UPDATE CASCADE`).
