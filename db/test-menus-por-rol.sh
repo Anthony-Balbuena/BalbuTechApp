@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -838,6 +838,65 @@ for caso in "$USR_PROD:4" "$USR_VEN:9"; do
         fi
     fi
 done
+
+# ---------------------------------------------------------------------------
+# Asistencia como item propio (23/10/2026): un rol con SOLO
+# CONSULTAR_ASISTENCIA tiene que ver el item Asistencia en el menu principal.
+# Antes el item se abria solo con REGISTRAR_ASISTENCIA, asi que ese permiso
+# quedaba inerte (R3-1 de la review del 23/10).
+# ---------------------------------------------------------------------------
+ROL_ASI="PRUEBA_ASI_VER"
+USR_ASI="prueba_asi_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_ASI';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTAV001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_ASI';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_ASI';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_ASI')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_ASI', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='CONSULTAR_ASISTENCIA';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA ASI VER','TESTAV001','PRUEBA',1000,'T-AV-001','av-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_ASI', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTAV001' AND R.NOMBRE_ROL='$ROL_ASI';
+EOF
+
+fallos_previos=$fallos
+salida_asi="$TMP/out-asistencia-ver.txt"
+printf '\n0\n' | BALBU_USER="$USR_ASI" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_asi" 2>&1
+rc_asi=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_asi"; then
+    echo "FALLO $ROL_ASI: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_asi" -ne 0 ]; then
+    echo "FALLO $ROL_ASI: la app salio con $rc_asi"
+    fail=1; fallos=$((fallos+1))
+else
+    n_asi=$(grep -c '^[0-9]\+\. ' "$salida_asi" || true)
+    if [ "$n_asi" -ne 3 ]; then
+        echo "FALLO $ROL_ASI: $n_asi opciones, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Asistencia" "Ver permisos" "Cerrar sesión"; do
+        if ! grep -Fq "$label" "$salida_asi"; then
+            echo "FALLO $ROL_ASI: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if grep -Fq "Empleados" "$salida_asi"; then
+        echo "FALLO $ROL_ASI: muestra Empleados sin EMPLEADOS_VER"
+        fail=1; fallos=$((fallos+1))
+    fi
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_ASI (CONSULTAR_ASISTENCIA abre Asistencia sin REGISTRAR_ASISTENCIA)"
+    fi
+fi
 
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"

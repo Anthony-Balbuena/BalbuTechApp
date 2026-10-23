@@ -163,7 +163,8 @@ struct ItemMenu {
 // le permiten sus permisos. Agregar un modulo = agregar un item aca.
 static const vector<ItemMenu>& itemsMenuPrincipal() {
     static const vector<ItemMenu> items = {
-        {"Asistencia",       {"REGISTRAR_ASISTENCIA"},                     AccionMenu::Asistencia},
+        {"Asistencia",       {"REGISTRAR_ASISTENCIA", "CONSULTAR_ASISTENCIA",
+                              "JUSTIFICAR_ASISTENCIA"},                     AccionMenu::Asistencia},
         {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
         {"Usuarios",         {"USUARIOS_VER", "USUARIOS_CREAR", "USUARIOS_EDITAR", "USUARIOS_ESTADO", "USUARIOS_CLAVE"}, AccionMenu::Usuarios},
         {"Empleados",        {"EMPLEADOS_VER", "EMPLEADOS_CREAR", "EMPLEADOS_EDITAR", "EMPLEADOS_BAJA",

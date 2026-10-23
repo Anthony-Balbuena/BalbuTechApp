@@ -5,7 +5,7 @@
 # sin pedir el ID a mano.
 # Uso local:
 #   DB_HOST=127.0.0.1 DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root \
-#   DB_ADMIN_PASSWORD=linux01 BALBU_PASS=admin123 bash db/test-asistencia-propia.sh
+#   DB_ADMIN_PASSWORD=<clave-admin> BALBU_PASS=<clave-app> bash db/test-asistencia-propia.sh
 set -u
 
 APP="${APP:-./output/app}"
