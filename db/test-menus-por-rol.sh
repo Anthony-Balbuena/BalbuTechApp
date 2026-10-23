@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -542,6 +542,357 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Submenu Categorias con permisos finos (23/10/2026): un rol con SOLO
+# CATEGORIAS_VER ve Categorias en el menu principal y, adentro, solo la
+# consulta mas Volver.
+# ---------------------------------------------------------------------------
+ROL_CAT="PRUEBA_CAT_VER"
+USR_CAT="prueba_cat_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_CAT';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCA001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_CAT';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_CAT';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_CAT')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_CAT', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='CATEGORIAS_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA CAT VER','TESTCA001','PRUEBA',1000,'T-CA-001','ca-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_CAT', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCA001' AND R.NOMBRE_ROL='$ROL_CAT';
+EOF
+
+fallos_previos=$fallos
+salida_cat="$TMP/out-categorias-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Categorias (con este rol es la
+# primera opcion visible: el menu queda Categorias, Ver permisos y Cerrar
+# sesion), 2 = Volver en un submenu de 2 opciones.
+printf '\n1\n2\n' | BALBU_USER="$USR_CAT" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_cat" 2>&1
+rc_cat=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_cat"; then
+    echo "FALLO $ROL_CAT: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_cat" -ne 0 ]; then
+    echo "FALLO $ROL_CAT: la app salio con $rc_cat"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_cat=$(sed -n '1,/=== MODULO DE CATEGORIAS ===/p' "$salida_cat")
+    n_principal_cat=$(printf '%s\n' "$principal_cat" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_cat" -ne 3 ]; then
+        echo "FALLO $ROL_CAT: $n_principal_cat opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Categorias" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_cat" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAT: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_cat=$(awk '/=== MODULO DE CATEGORIAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_cat")
+    n_sub_cat=$(printf '%s\n' "$submenu_cat" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_cat" -ne 2 ]; then
+        echo "FALLO $ROL_CAT: $n_sub_cat opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar Categoria" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_cat" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAT: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Categoria" "Actualizar Categoria" "Activar/Desactivar Categoria"; do
+        if printf '%s\n' "$submenu_cat" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAT: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_CAT (3 opciones en el menu principal y 2 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# ALMACEN con los 4 permisos de Categorias (23/10/2026): ve el submenu
+# historico completo de 5 opciones.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_cat_alm="$TMP/out-categorias-almacen.txt"
+# Entrada: Enter del "Presione Enter", 5 = Categorias (su menu queda
+# Asistencia, Mis permisos, Mis vacaciones, Proveedores, Categorias, ...),
+# 5 = Volver.
+printf '\n5\n5\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_cat_alm" 2>&1
+rc_cat_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_cat_alm"; then
+    echo "FALLO ALMACEN/Categorias: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_cat_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Categorias: la app salio con $rc_cat_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_cat_alm=$(awk '/=== MODULO DE CATEGORIAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_cat_alm")
+    n_sub_cat_alm=$(printf '%s\n' "$submenu_cat_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_cat_alm" -ne 5 ]; then
+        echo "FALLO ALMACEN/Categorias: $n_sub_cat_alm opciones en el submenu, se esperaban 5"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Categoria" "Actualizar Categoria" \
+                 "Activar/Desactivar Categoria" "Buscar Categoria" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_cat_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Categorias: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Categorias (5 opciones)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Marcas con permisos finos (23/10/2026): un rol con SOLO MARCAS_VER
+# ve Marcas en el menu principal y, adentro, solo las dos consultas mas Volver.
+# ---------------------------------------------------------------------------
+ROL_MAR="PRUEBA_MAR_VER"
+USR_MAR="prueba_mar_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_MAR';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTMA001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_MAR';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_MAR';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_MAR')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_MAR', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='MARCAS_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA MAR VER','TESTMA001','PRUEBA',1000,'T-MA-001','ma-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_MAR', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTMA001' AND R.NOMBRE_ROL='$ROL_MAR';
+EOF
+
+fallos_previos=$fallos
+salida_mar="$TMP/out-marcas-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Marcas (con este rol es la primera
+# opcion visible: el menu queda Marcas, Ver permisos y Cerrar sesion),
+# 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_MAR" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_mar" 2>&1
+rc_mar=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_mar"; then
+    echo "FALLO $ROL_MAR: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_mar" -ne 0 ]; then
+    echo "FALLO $ROL_MAR: la app salio con $rc_mar"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_mar=$(sed -n '1,/=== MODULO DE MARCAS ===/p' "$salida_mar")
+    n_principal_mar=$(printf '%s\n' "$principal_mar" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_mar" -ne 3 ]; then
+        echo "FALLO $ROL_MAR: $n_principal_mar opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Marcas" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_mar" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MAR: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_mar=$(awk '/=== MODULO DE MARCAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_mar")
+    n_sub_mar=$(printf '%s\n' "$submenu_mar" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_mar" -ne 3 ]; then
+        echo "FALLO $ROL_MAR: $n_sub_mar opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar Marca" "Listar Marcas" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_mar" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MAR: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Marca" "Actualizar Marca" "Activar/Desactivar Marca"; do
+        if printf '%s\n' "$submenu_mar" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MAR: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_MAR (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# ALMACEN con los 4 permisos de Marcas (23/10/2026): ve el submenu historico
+# completo de 6 opciones.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_mar_alm="$TMP/out-marcas-almacen.txt"
+# Entrada: Enter del "Presione Enter", 6 = Marcas (su menu queda Asistencia,
+# Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, ...),
+# 6 = Volver.
+printf '\n6\n6\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_mar_alm" 2>&1
+rc_mar_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_mar_alm"; then
+    echo "FALLO ALMACEN/Marcas: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_mar_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Marcas: la app salio con $rc_mar_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_mar_alm=$(awk '/=== MODULO DE MARCAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_mar_alm")
+    n_sub_mar_alm=$(printf '%s\n' "$submenu_mar_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_mar_alm" -ne 6 ]; then
+        echo "FALLO ALMACEN/Marcas: $n_sub_mar_alm opciones en el submenu, se esperaban 6"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Marca" "Actualizar Marca" "Activar/Desactivar Marca" \
+                 "Buscar Marca" "Listar Marcas" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_mar_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Marcas: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Marcas (6 opciones)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Metodos de pago con permisos finos (23/10/2026): un rol con SOLO
+# METODOS_PAGO_VER ve Metodos de pago en el menu principal y, adentro, solo las
+# dos consultas mas Volver.
+# ---------------------------------------------------------------------------
+ROL_MET="PRUEBA_MET_VER"
+USR_MET="prueba_met_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_MET';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTME001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_MET';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_MET';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_MET')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_MET', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='METODOS_PAGO_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA MET VER','TESTME001','PRUEBA',1000,'T-ME-001','me-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_MET', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTME001' AND R.NOMBRE_ROL='$ROL_MET';
+EOF
+
+fallos_previos=$fallos
+salida_met="$TMP/out-metodos-pago-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Metodos de pago (con este rol es la
+# primera opcion visible: el menu queda Metodos de pago, Ver permisos y Cerrar
+# sesion), 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_MET" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_met" 2>&1
+rc_met=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_met"; then
+    echo "FALLO $ROL_MET: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_met" -ne 0 ]; then
+    echo "FALLO $ROL_MET: la app salio con $rc_met"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_met=$(sed -n '1,/=== MODULO DE METODOS DE PAGO ===/p' "$salida_met")
+    n_principal_met=$(printf '%s\n' "$principal_met" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_met" -ne 3 ]; then
+        echo "FALLO $ROL_MET: $n_principal_met opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Metodos de pago" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_met" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MET: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_met=$(awk '/=== MODULO DE METODOS DE PAGO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_met")
+    n_sub_met=$(printf '%s\n' "$submenu_met" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_met" -ne 3 ]; then
+        echo "FALLO $ROL_MET: $n_sub_met opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar Metodo" "Listar Metodos" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_met" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MET: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Metodo" "Actualizar Datos" "Activar/Desactivar Metodo"; do
+        if printf '%s\n' "$submenu_met" | grep -Fq "$label"; then
+            echo "FALLO $ROL_MET: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_MET (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# VENDEDOR con los 4 permisos de Metodos de pago (23/10/2026): ve el submenu
+# historico completo de 6 opciones.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_met_ven="$TMP/out-metodos-pago-vendedor.txt"
+# Entrada: Enter del "Presione Enter", 6 = Metodos de pago (su menu queda
+# Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos de
+# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 6 = Volver.
+printf '\n6\n6\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_met_ven" 2>&1
+rc_met_ven=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_met_ven"; then
+    echo "FALLO VENDEDOR/Metodos de pago: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_met_ven" -ne 0 ]; then
+    echo "FALLO VENDEDOR/Metodos de pago: la app salio con $rc_met_ven"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_met_ven=$(awk '/=== MODULO DE METODOS DE PAGO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_met_ven")
+    n_sub_met_ven=$(printf '%s\n' "$submenu_met_ven" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_met_ven" -ne 6 ]; then
+        echo "FALLO VENDEDOR/Metodos de pago: $n_sub_met_ven opciones, se esperaban 6"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Metodo" "Actualizar Datos" "Activar/Desactivar Metodo" \
+                 "Buscar Metodo" "Listar Metodos" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_met_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Metodos de pago: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK VENDEDOR/Metodos de pago (6 opciones)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # VENDEDOR en Asistencia (23/10/2026): el vendedor ficha desde el item propio
 # y NO ve los reportes de asistencia. Entrada: Enter del "Presione Enter",
 # 1 = Asistencia, 3 = Volver (son 3 opciones).
@@ -1022,6 +1373,200 @@ else
     fi
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_ASI (CONSULTAR_ASISTENCIA abre Asistencia sin REGISTRAR_ASISTENCIA)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Compras con permisos finos (23/10/2026): un rol con SOLO COMPRAS_VER
+# ve Compras en el menu principal y, adentro, solo "Ver compra con IVA" mas
+# Volver. No debe ver ninguna accion de registro, pago, devolucion ni reporte.
+# ---------------------------------------------------------------------------
+ROL_COM="PRUEBA_COM_VER"
+USR_COM="prueba_com_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_COM';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCO001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_COM';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_COM';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_COM')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_COM', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='COMPRAS_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA COM VER','TESTCO001','PRUEBA',1000,'T-CO-001','co-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_COM', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCO001' AND R.NOMBRE_ROL='$ROL_COM';
+EOF
+
+fallos_previos=$fallos
+salida_com="$TMP/out-compras-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Compras (con este rol es la primera
+# opcion visible: el menu queda Compras, Ver permisos y Cerrar sesion),
+# 2 = Volver en un submenu de 2 opciones.
+printf '\n1\n2\n' | BALBU_USER="$USR_COM" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_com" 2>&1
+rc_com=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_com"; then
+    echo "FALLO $ROL_COM: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_com" -ne 0 ]; then
+    echo "FALLO $ROL_COM: la app salio con $rc_com"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_com=$(sed -n '1,/=== MODULO DE COMPRAS ===/p' "$salida_com")
+    n_principal_com=$(printf '%s\n' "$principal_com" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_com" -ne 3 ]; then
+        echo "FALLO $ROL_COM: $n_principal_com opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Compras" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_com" | grep -Fq "$label"; then
+            echo "FALLO $ROL_COM: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_com=$(awk '/=== MODULO DE COMPRAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_com")
+    n_sub_com=$(printf '%s\n' "$submenu_com" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_com" -ne 2 ]; then
+        echo "FALLO $ROL_COM: $n_sub_com opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Ver compra con IVA" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_com" | grep -Fq "$label"; then
+            echo "FALLO $ROL_COM: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Compra rapida (carrito)" "Devolucion de compra" \
+                 "Reporte por periodo" "Pagar compra" "Precios por suplidor" \
+                 "Cancelar compra"; do
+        if printf '%s\n' "$submenu_com" | grep -Fq "$label"; then
+            echo "FALLO $ROL_COM: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_COM (3 opciones en el menu principal y 2 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Compras: un rol con COMPRAS_REGISTRAR y COMPRAS_PAGAR ve solo esas
+# dos acciones mas Volver. Fija que registrar y pagar son permisos separados.
+# ---------------------------------------------------------------------------
+ROL_COM_RP="PRUEBA_COM_REG_PAG"
+USR_COM_RP="prueba_com_reg_pag"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_COM_RP';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCO002';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_COM_RP';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_COM_RP';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_COM_RP')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_COM_RP', ID_PERMISO FROM PERMISOS
+ WHERE NOMBRE_PERMISO IN ('COMPRAS_REGISTRAR', 'COMPRAS_PAGAR');
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA COM REG PAG','TESTCO002','PRUEBA',1000,'T-CO-002','co-002@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_COM_RP', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCO002' AND R.NOMBRE_ROL='$ROL_COM_RP';
+EOF
+
+fallos_previos=$fallos
+salida_com_rp="$TMP/out-compras-reg-pag.txt"
+# Entrada: Enter del "Presione Enter", 1 = Compras (con este rol es la primera
+# opcion visible: el menu queda Compras, Ver permisos y Cerrar sesion),
+# 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_COM_RP" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_com_rp" 2>&1
+rc_com_rp=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_com_rp"; then
+    echo "FALLO $ROL_COM_RP: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_com_rp" -ne 0 ]; then
+    echo "FALLO $ROL_COM_RP: la app salio con $rc_com_rp"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_com_rp=$(sed -n '1,/=== MODULO DE COMPRAS ===/p' "$salida_com_rp")
+    n_principal_com_rp=$(printf '%s\n' "$principal_com_rp" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_com_rp" -ne 3 ]; then
+        echo "FALLO $ROL_COM_RP: $n_principal_com_rp opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    submenu_com_rp=$(awk '/=== MODULO DE COMPRAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_com_rp")
+    n_sub_com_rp=$(printf '%s\n' "$submenu_com_rp" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_com_rp" -ne 3 ]; then
+        echo "FALLO $ROL_COM_RP: $n_sub_com_rp opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Compra rapida (carrito)" "Pagar compra" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_com_rp" | grep -Fq "$label"; then
+            echo "FALLO $ROL_COM_RP: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Ver compra con IVA" "Devolucion de compra" "Reporte por periodo" \
+                 "Precios por suplidor" "Cancelar compra"; do
+        if printf '%s\n' "$submenu_com_rp" | grep -Fq "$label"; then
+            echo "FALLO $ROL_COM_RP: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_COM_RP (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# ALMACEN con los 6 permisos de Compras (23/10/2026): ve el submenu historico
+# completo de 8 opciones (las 7 acciones mas Volver).
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_com_alm="$TMP/out-compras-almacen.txt"
+# Entrada: Enter del "Presione Enter", 8 = Compras (su menu queda Asistencia,
+# Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
+# Compras, Inventario, Ver permisos y Cerrar sesion), 8 = Volver.
+printf '\n8\n8\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_com_alm" 2>&1
+rc_com_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_com_alm"; then
+    echo "FALLO ALMACEN/Compras: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_com_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Compras: la app salio con $rc_com_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_com_alm=$(awk '/=== MODULO DE COMPRAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_com_alm")
+    n_sub_com_alm=$(printf '%s\n' "$submenu_com_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_com_alm" -ne 8 ]; then
+        echo "FALLO ALMACEN/Compras: $n_sub_com_alm opciones en el submenu, se esperaban 8"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Compra rapida (carrito)" "Ver compra con IVA" \
+                 "Devolucion de compra" "Reporte por periodo" "Pagar compra" \
+                 "Precios por suplidor" "Cancelar compra" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_com_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Compras: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Compras (8 opciones)"
     fi
 fi
 

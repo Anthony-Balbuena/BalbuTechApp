@@ -12,6 +12,7 @@
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "compras.h"
 
 using namespace std;
@@ -33,18 +34,61 @@ struct CierreCompra {
     double bruto = 0.0;
 };
 
-void mostrarMenuCompras() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y los submenus de Usuarios, Empleados, Clientes,
+// Proveedores, Categorias, Marcas y Metodos de pago, la lista visible se arma
+// antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionCompra { Registrar, Ver, Devolver, Reportes, Pagar, Precios, Cancelar, Volver };
+
+struct OpcionCompra {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionCompra accion;
+};
+
+static const vector<OpcionCompra>& opcionesCompras() {
+    static const vector<OpcionCompra> opciones = {
+        {"Compra rapida (carrito)",      "COMPRAS_REGISTRAR", AccionCompra::Registrar},
+        {"Ver compra con IVA",           "COMPRAS_VER",       AccionCompra::Ver},
+        {"Devolucion de compra",         "COMPRAS_DEVOLVER",  AccionCompra::Devolver},
+        {"Reporte por periodo",          "COMPRAS_REPORTES",  AccionCompra::Reportes},
+        {"Pagar compra",                 "COMPRAS_PAGAR",     AccionCompra::Pagar},
+        {"Precios por suplidor",         "COMPRAS_REPORTES",  AccionCompra::Precios},
+        {"Cancelar compra",              "COMPRAS_CANCELAR",  AccionCompra::Cancelar},
+        {"Volver al Menu Principal",     "",                  AccionCompra::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionCompra& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionCompra*> opcionesVisibles() {
+    vector<const OpcionCompra*> visibles;
+    for (const OpcionCompra& opcion : opcionesCompras()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuCompras(const vector<const OpcionCompra*>& visibles) {
     cout << "\n=== MODULO DE COMPRAS ===" << endl;
-    cout << "1. Compra rapida (carrito)" << endl;
-    cout << "2. Ver compra con IVA" << endl;
-    cout << "3. Devolucion de compra" << endl;
-    cout << "4. Reporte por periodo" << endl;
-    cout << "5. Pagar compra" << endl;
-    cout << "6. Precios por suplidor" << endl;
-    cout << "7. Cancelar compra" << endl;
-    cout << "8. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionCompra* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=========================" << endl;
 }
+
+}  // namespace
+
 
 static double tasaIVAC() {
     try {
@@ -158,6 +202,10 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         if (exacto) return true;
         if (lista.empty()) {
             if (esNumerico(entrada)) return false;
+            if (!tienePermiso("GESTIONAR_PRODUCTOS")) {
+                cout << ROJO << "No existe y no tenes permiso para crear productos." << RESET << endl;
+                return false;
+            }
             string r = leerDatoSeguro("No existe. Registrar rapido? (s/n): ");
             if (r != "s" && r != "S") return false;
             return registroRapidoC(entrada, out);
@@ -257,6 +305,8 @@ static bool registroRapidoS(LineaCompra &l, const string &sugerido = "") {
 }
 
 static bool elegirSuplidor(LineaCompra &l) {
+    // Las altas rapidas de suplidor exigen el permiso del modulo Proveedores.
+    bool puedeCrearProv = tienePermiso("PROVEEDORES_CREAR");
     try {
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_PRODUCTO_SUPLIDORES(?)"));
@@ -311,7 +361,9 @@ static bool elegirSuplidor(LineaCompra &l) {
                 }
             } catch (const exception &) {}
         }
-        string sStr = leerDatoSeguro("ID suplidor (Enter = mas barato, 0 = nuevo): ");
+        string sStr = leerDatoSeguro(puedeCrearProv
+            ? "ID suplidor (Enter = mas barato, 0 = nuevo): "
+            : "ID suplidor (Enter = mas barato): ");
         if (sStr.empty()) {
             if (lista.empty()) {
                 cout << ROJO << "Sin historial: elegi un ID de la lista." << RESET << endl;
@@ -321,8 +373,16 @@ static bool elegirSuplidor(LineaCompra &l) {
             l.nombreProveedor = lista[0].nombre;
             return true;
         }
-        if (sStr == "0") return registroRapidoS(l);
+        if (sStr == "0") {
+            if (puedeCrearProv) return registroRapidoS(l);
+            cout << ROJO << "ID invalido." << RESET << endl;
+            return false;
+        }
         if (!esNumerico(sStr)) {
+            if (!puedeCrearProv) {
+                cout << ROJO << "No existe y no tenes permiso para crear suplidores." << RESET << endl;
+                return false;
+            }
             string r = leerDatoSeguro("Registrar '" + sStr + "' como nuevo suplidor? (s/n): ");
             if (r != "s" && r != "S") return false;
             return registroRapidoS(l, sStr);
@@ -341,6 +401,10 @@ static bool elegirSuplidor(LineaCompra &l) {
             cout << ROJO << "Suplidor inexistente o inactivo." << RESET << endl;
             // Drenar ANTES de otro comando en la misma conexion (si no: Commands out of sync).
             drenarResultados(pv.get());
+            if (!puedeCrearProv) {
+                cout << ROJO << "No tenes permiso para crear suplidores." << RESET << endl;
+                return false;
+            }
             string r = leerDatoSeguro("Registrar uno nuevo sin salir de la compra? (s/n): ");
             if (r == "s" || r == "S") return registroRapidoS(l);
             return false;
@@ -1068,43 +1132,36 @@ static void verPreciosCompraUI() {
     }
 }
 
+// Submenu de compras: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion. Cada accion pide su permiso
+// fino (COMPRAS_REGISTRAR, VER, DEVOLVER, REPORTES, PAGAR o CANCELAR).
 void ejecutarSubmenuCompras() {
-    int opcion = 0;
-    do {
-        mostrarMenuCompras();
+    for (;;) {
+        vector<const OpcionCompra*> visibles = opcionesVisibles();
+        imprimirMenuCompras(visibles);
+
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
         }
-        switch (opcion) {
-            case 1:
-                compraRapida();
-                break;
-            case 2:
-                verCompraConIVA();
-                break;
-            case 3:
-                devolucionCompraUI();
-                break;
-            case 4:
-                reportePeriodoCompraUI();
-                break;
-            case 5:
-                pagarCompraPendienteUI();
-                break;
-            case 6:
-                verPreciosCompraUI();
-                break;
-            case 7:
-                cancelarCompraUI();
-                break;
-            case 8:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 8) pausar();
-    } while (opcion != 8);
+
+        const OpcionCompra& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionCompra::Registrar: compraRapida(); break;
+            case AccionCompra::Ver:       verCompraConIVA(); break;
+            case AccionCompra::Devolver:  devolucionCompraUI(); break;
+            case AccionCompra::Reportes:  reportePeriodoCompraUI(); break;
+            case AccionCompra::Pagar:     pagarCompraPendienteUI(); break;
+            case AccionCompra::Precios:   verPreciosCompraUI(); break;
+            case AccionCompra::Cancelar:  cancelarCompraUI(); break;
+            case AccionCompra::Volver:    return;
+        }
+        pausar();
+    }
 }

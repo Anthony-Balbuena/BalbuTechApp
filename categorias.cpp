@@ -3,27 +3,68 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuCategorias() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y los submenus de Usuarios, Empleados, Clientes y
+// Proveedores, la lista visible se arma antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionCategoria { Agregar, Actualizar, Estado, Buscar, Volver };
+
+struct OpcionCategoria {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionCategoria accion;
+};
+
+static const vector<OpcionCategoria>& opcionesCategorias() {
+    static const vector<OpcionCategoria> opciones = {
+        {"Agregar Categoria",            "CATEGORIAS_CREAR",  AccionCategoria::Agregar},
+        {"Actualizar Categoria",         "CATEGORIAS_EDITAR", AccionCategoria::Actualizar},
+        {"Activar/Desactivar Categoria", "CATEGORIAS_ESTADO", AccionCategoria::Estado},
+        {"Buscar Categoria",             "CATEGORIAS_VER",    AccionCategoria::Buscar},
+        {"Volver al Menu Principal",     "",                  AccionCategoria::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionCategoria& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionCategoria*> opcionesVisibles() {
+    vector<const OpcionCategoria*> visibles;
+    for (const OpcionCategoria& opcion : opcionesCategorias()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuCategorias(const vector<const OpcionCategoria*>& visibles) {
     cout << "\n=== MODULO DE CATEGORIAS ===" << endl;
-    cout << "1. Agregar Categoria" << endl;
-    cout << "2. Actualizar Categoria" << endl;
-    cout << "3. Activar/Desactivar Categoria" << endl;
-    cout << "4. Buscar Categoria" << endl;
-    // (11/10/2026) Listar comentado: buscar-con-Enter cubre lo mismo.
-    // cout << "5. Listar Categorias" << endl;
-    cout << "5. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionCategoria* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=============================" << endl;
 }
+
+}  // namespace
 
 void registrarCategoria() {
     cout << "\n--- REGISTRO DE CATEGORIA ---" << endl;
@@ -194,43 +235,34 @@ void listarCategorias() {
 }
 #endif
 
-// Submenú de categorías: muestra el menú, lee la opción y llama a la acción.
-// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+// Submenu de categorias: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion. Cada accion pide su permiso
+// fino (CATEGORIAS_CREAR, EDITAR, ESTADO o VER).
 void ejecutarSubmenuCategorias() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionCategoria*> visibles = opcionesVisibles();
+        imprimirMenuCategorias(visibles);
 
-    do {
-        mostrarMenuCategorias();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarCategoria();
-                break;
-            case 2:
-                actualizarCategoria();
-                break;
-            case 3:
-                cambiarEstadoCategoria();
-                break;
-            case 4:
-                buscarCategoria();
-                break;
-            // (11/10/2026) Listar comentado: ver arriba.
-            // case 5:
-            //     listarCategorias();
-            //     break;
-            case 5:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionCategoria& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionCategoria::Agregar:     registrarCategoria(); break;
+            case AccionCategoria::Actualizar:  actualizarCategoria(); break;
+            case AccionCategoria::Estado:      cambiarEstadoCategoria(); break;
+            case AccionCategoria::Buscar:      buscarCategoria(); break;
+            case AccionCategoria::Volver:      return;
         }
-        if (opcion != 5) pausar();
-    } while (opcion != 5);
+        pausar();
+    }
 }
 

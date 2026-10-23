@@ -103,17 +103,23 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (23/10/2026) 35 permisos: el modulo Usuarios usa 5 permisos finos
+-- (23/10/2026) 49 permisos: el modulo Usuarios usa 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
 -- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, GESTIONAR_CONTRATOS,
 -- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO), el modulo
--- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO) y el modulo
--- Proveedores usa 4 (PROVEEDORES_VER, CREAR, EDITAR y ESTADO) en lugar de los
--- viejos GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES,
--- CONSULTAR_CLIENTES y GESTIONAR_PROVEEDORES. La asistencia tiene sus propios
--- permisos (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y
--- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45). El historial de venta
--- usa CONSULTAR_HISTORIAL_VENTA, separado de CONSULTAR_REPORTES (modulo 47).
+-- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO), el modulo Proveedores
+-- usa 4 (PROVEEDORES_VER, CREAR, EDITAR y ESTADO), el modulo Categorias usa 4
+-- (CATEGORIAS_VER, CREAR, EDITAR y ESTADO), el modulo Marcas usa 4
+-- (MARCAS_VER, CREAR, EDITAR y ESTADO), el modulo Metodos de pago usa 4
+-- (METODOS_PAGO_VER, CREAR, EDITAR y ESTADO) y el modulo Compras usa 6
+-- (COMPRAS_VER, REGISTRAR, PAGAR, CANCELAR, DEVOLVER y REPORTES) en lugar de
+-- los viejos GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES,
+-- CONSULTAR_CLIENTES, GESTIONAR_PROVEEDORES, GESTIONAR_CATEGORIAS,
+-- GESTIONAR_MARCAS, GESTIONAR_METODOS_PAGO y GESTIONAR_COMPRAS. La asistencia
+-- tiene sus propios permisos (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y
+-- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45).
+-- El historial de venta usa CONSULTAR_HISTORIAL_VENTA, separado de
+-- CONSULTAR_REPORTES (modulo 47).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -136,14 +142,28 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('PROVEEDORES_CREAR', 'Registrar proveedores'),
 ('PROVEEDORES_EDITAR', 'Actualizar datos de proveedores'),
 ('PROVEEDORES_ESTADO', 'Activar o desactivar proveedores'),
-('GESTIONAR_CATEGORIAS', 'Gestionar categorias'),
-('GESTIONAR_MARCAS', 'Gestionar marcas'),
+('CATEGORIAS_VER', 'Consultar y buscar categorias'),
+('CATEGORIAS_CREAR', 'Registrar categorias'),
+('CATEGORIAS_EDITAR', 'Actualizar datos de categorias'),
+('CATEGORIAS_ESTADO', 'Activar o desactivar categorias'),
+('MARCAS_VER', 'Consultar y buscar marcas'),
+('MARCAS_CREAR', 'Registrar marcas'),
+('MARCAS_EDITAR', 'Actualizar datos de marcas'),
+('MARCAS_ESTADO', 'Activar o desactivar marcas'),
 ('GESTIONAR_PRODUCTOS', 'Gestionar productos'),
-('GESTIONAR_METODOS_PAGO', 'Gestionar metodos de pago'),
+('METODOS_PAGO_VER', 'Consultar y buscar metodos de pago'),
+('METODOS_PAGO_CREAR', 'Registrar metodos de pago'),
+('METODOS_PAGO_EDITAR', 'Actualizar datos de metodos de pago'),
+('METODOS_PAGO_ESTADO', 'Activar o desactivar metodos de pago'),
 ('GESTIONAR_INVENTARIO', 'Administrar inventario'),
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
 ('CONSULTAR_HISTORIAL_VENTA', 'Consultar el historial de una venta'),
-('GESTIONAR_COMPRAS', 'Gestionar compras del sistema'),
+('COMPRAS_VER', 'Consultar compras'),
+('COMPRAS_REGISTRAR', 'Registrar compras'),
+('COMPRAS_PAGAR', 'Pagar compras'),
+('COMPRAS_CANCELAR', 'Cancelar compras'),
+('COMPRAS_DEVOLVER', 'Registrar devoluciones de compra'),
+('COMPRAS_REPORTES', 'Consultar reportes y precios de compras'),
 ('CONSULTAR_REPORTES', 'Consultar reportes y dashboards'),
 ('CONSULTAR_ASISTENCIA', 'Consultar reportes de asistencia'),
 ('CONSULTAR_PRODUCTOS', 'Consultar catalogo de productos'),
@@ -160,7 +180,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 35 permisos del sistema).
+-- ADMIN: acceso total (los 49 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -242,7 +262,10 @@ WHERE NOMBRE_PERMISO IN (
     'CLIENTES_CREAR',
     'CLIENTES_EDITAR',
     'CLIENTES_ESTADO',
-    'GESTIONAR_METODOS_PAGO',
+    'METODOS_PAGO_VER',
+    'METODOS_PAGO_CREAR',
+    'METODOS_PAGO_EDITAR',
+    'METODOS_PAGO_ESTADO',
     'CONSULTAR_HISTORIAL_VENTA',
     'CONSULTAR_PRODUCTOS',
     'REGISTRAR_ASISTENCIA',
@@ -257,10 +280,21 @@ SELECT 'ALMACEN', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_PRODUCTOS',
-    'GESTIONAR_CATEGORIAS',
-    'GESTIONAR_MARCAS',
+    'CATEGORIAS_VER',
+    'CATEGORIAS_CREAR',
+    'CATEGORIAS_EDITAR',
+    'CATEGORIAS_ESTADO',
+    'MARCAS_VER',
+    'MARCAS_CREAR',
+    'MARCAS_EDITAR',
+    'MARCAS_ESTADO',
     'GESTIONAR_INVENTARIO',
-    'GESTIONAR_COMPRAS',
+    'COMPRAS_VER',
+    'COMPRAS_REGISTRAR',
+    'COMPRAS_PAGAR',
+    'COMPRAS_CANCELAR',
+    'COMPRAS_DEVOLVER',
+    'COMPRAS_REPORTES',
     'PROVEEDORES_VER',
     'PROVEEDORES_CREAR',
     'PROVEEDORES_EDITAR',

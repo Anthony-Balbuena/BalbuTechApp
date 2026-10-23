@@ -465,7 +465,212 @@ paraguas: `GESTIONAR_PROVEEDORES` abría el ítem y las 6 opciones a la vez.
   otro modelo si se quiere el sello.
 
 **Pendiente**
-- Commit y push (los hace el usuario). El commit de este módulo queda en la rama
-  `feat/permisos-finos-proveedores`.
-- Seguir con Categorías, Marcas, Productos, Métodos de pago, Compras,
-  Inventario, Ventas y Caja.
+- Commit y push (los hace el usuario). El commit de este módulo quedó en la rama
+  `feat/permisos-finos-proveedores`, mergeada en `67acf9f`.
+- Seguir con Categorías, Marcas, Métodos de pago, Compras, Inventario y Caja.
+
+## 23/10 — Cierre del primer bloque de la Tanda B: permisos finos y submenús filtrados
+
+El primer bloque de la Tanda B quedó cerrado. La matriz quedó en
+**35 permisos y 125 pares**
+(ADMIN 35, GERENTE 29, SUBGERENTE 23, RRHH 12, VENDEDOR 10, ALMACEN 12,
+CONTABILIDAD 4), aplicada en TEST y en la viva.
+
+- **Usuarios (5 finos):** `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
+  `USUARIOS_ESTADO` y `USUARIOS_CLAVE`. El ítem del menú se muestra con
+  cualquiera de los cinco; cada opción pide el suyo.
+- **Empleados (7 finos):** `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
+  `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_CONTRATOS`,
+  `GESTIONAR_PERMISOS_EMPLEADO` y `GESTIONAR_VACACIONES_EMPLEADO`.
+- **Clientes (4 finos):** `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR` y
+  `CLIENTES_ESTADO` (`615270e`).
+- **Proveedores (4 finos):** `PROVEEDORES_VER`, `PROVEEDORES_CREAR`,
+  `PROVEEDORES_EDITAR` y `PROVEEDORES_ESTADO` (módulo 46).
+- **Asistencia:** ítem propio con `REGISTRAR_ASISTENCIA` y
+  `CONSULTAR_ASISTENCIA` (módulo 45). Detalle completo más arriba.
+- **Productos y Ventas (`615270e`):** los submenús se filtran con
+  `tienePermiso()` y se despachan por `accion`, nunca por número absoluto.
+- **Ventas: historial con permiso propio (módulo 47).** `CONSULTAR_HISTORIAL_VENTA`
+  abre solo `Historial de venta`. VENDEDOR perdió `CONSULTAR_REPORTES`: ve 10
+  opciones (7 de gestión, historial, Garantías y Volver) y deja de ver reportes,
+  ganancias y exportación web. Garantías sigue con `GESTIONAR_VENTAS`.
+- **Viva:** backup `backups/101-antes-asistencia-proveedores-historial-23-10-2026.sql`
+  (556 KB, dump completo con rutinas y triggers). Se aplicaron los módulos 45, 46
+  y 47 en orden; `check-app-sps` contra la viva: 93/0. El usuario vendedor
+  `j.feliz` quedó con `CONSULTAR_HISTORIAL_VENTA = 1`, `CONSULTAR_REPORTES = 0`
+  y `GESTIONAR_VENTAS = 1`.
+- **Verificación:** `build.sh` OK, `test-menus-por-rol.sh` 24/24 (VENDEDOR/Ventas
+  10, `PRUEBA_VEN_GEST` 9), `check-app-sps` 93/0 en TEST y en la viva.
+- Commit: `7024c79`, pusheado a `origin/main`. Incluye, además del cambio, los
+  tres archivos de UML que estaban untracked.
+
+**Pendiente**
+- Pruebas manuales de aceptación: ver `PENDIENTES.md`, sección 2.
+- Garantías: flujo estructurado con permisos propios: ver `PENDIENTES.md`, P1.
+
+## 23/10 — Permisos finos de Categorías (Tanda B, módulo 2)
+
+Categorías era el siguiente módulo de la Tanda B que seguía con un permiso
+paraguas: `GESTIONAR_CATEGORIAS` abría el ítem y las 5 opciones a la vez.
+
+- `categorias.cpp` pasó al patrón de `clientes.cpp`: enum de acciones, vector
+  `{etiqueta, permiso, accion}`, lista visible filtrada con `tienePermiso()`,
+  numeración sobre lo visible y despacho por `accion`. `Volver` siempre visible.
+  Se eliminó `mostrarMenuCategorias()` y su declaración en `categorias.h`.
+- `roles.cpp`: el ítem Categorias se muestra con cualquiera de los cuatro
+  permisos finos, no con el paraguas.
+- Permisos: `CATEGORIAS_VER` (Buscar), `CATEGORIAS_CREAR`,
+  `CATEGORIAS_EDITAR` y `CATEGORIAS_ESTADO`. Los tienen ADMIN, GERENTE,
+  SUBGERENTE y ALMACEN; RRHH, VENDEDOR y CONTABILIDAD no ven el ítem.
+- `modulos/36- PERMISOS_ROLES.sql` y su `.md`: 38 permisos / 137 pares
+  (ADMIN 38, GERENTE 32, SUBGERENTE 26, RRHH 12, VENDEDOR 10, ALMACEN 15,
+  CONTABILIDAD 4). `modulos/49- PERMISOS_CATEGORIAS.sql` (idempotente) migra
+  bases existentes: crea los 4, los asigna a los cuatro roles y borra el
+  paraguas en cualquier rol. Orden: binario nuevo antes del SQL. El 48 queda
+  reservado para Garantías.
+- `modulos/00- INDICE.md` queda en 50 módulos.
+- Tests: `build.sh` OK; `test-menus-por-rol.sh` 26/26 (nuevo `PRUEBA_CAT_VER`
+  con solo `CATEGORIAS_VER` → 3 opciones en el menú principal y 2 en el
+  submenú, y `ALMACEN/Categorias` → 5 opciones); `check-app-sps` 93/0.
+- SQL en TEST: 38 permisos, 137 pares, matriz 38/32/26/12/10/15/4,
+  `GESTIONAR_CATEGORIAS` ausente y los 4 `CATEGORIAS_*` en ALMACEN. El `49` se
+  aplicó dos veces (idempotente).
+- Viva: backup `backups/102-antes-permisos-categorias-23-10-2026.sql`
+  (557 KB, dump completo con rutinas y triggers); `49` aplicado. Quedó en
+  38 permisos / 137 pares, con la misma matriz. `check-app-sps` contra la viva:
+  93/0.
+
+**Pendiente**
+- Commit y push (los hace el usuario).
+- Seguir con Métodos de pago, Compras, Inventario y Caja.
+
+## 23/10 - Permisos finos de Marcas (Tanda B, módulo 3)
+
+Marcas era el siguiente módulo de la Tanda B que seguía con un permiso
+paraguas: `GESTIONAR_MARCAS` abría el ítem y las 6 opciones a la vez.
+
+- `marcas.cpp` pasó al patrón de `categorias.cpp`: enum de acciones, vector
+  `{etiqueta, permiso, accion}`, lista visible filtrada con `tienePermiso()`,
+  numeración sobre lo visible y despacho por `accion`. `Volver` siempre visible.
+  Se eliminó `mostrarMenuMarcas()` y su declaración en `marcas.h`.
+- `roles.cpp`: el ítem Marcas se muestra con cualquiera de los cuatro
+  permisos finos, no con el paraguas.
+- Permisos: `MARCAS_VER` (Buscar y Listar), `MARCAS_CREAR`, `MARCAS_EDITAR` y
+  `MARCAS_ESTADO`. Los tienen ADMIN, GERENTE, SUBGERENTE y ALMACEN; RRHH,
+  VENDEDOR y CONTABILIDAD no ven el ítem.
+- `modulos/36- PERMISOS_ROLES.sql` y su `.md`: 41 permisos / 149 pares
+  (ADMIN 41, GERENTE 35, SUBGERENTE 29, RRHH 12, VENDEDOR 10, ALMACEN 18,
+  CONTABILIDAD 4). `modulos/50- PERMISOS_MARCAS.sql` (idempotente) migra
+  bases existentes: crea los 4, los asigna a los cuatro roles y borra el
+  paraguas en cualquier rol. Orden: binario nuevo antes del SQL. El 48 queda
+  reservado para Garantías.
+- `modulos/00- INDICE.md` queda en 51 módulos.
+- Tests: `build.sh` OK; `test-menus-por-rol.sh` 28/28 (nuevo `PRUEBA_MAR_VER`
+  con solo `MARCAS_VER` → 3 opciones en el menú principal y 3 en el
+  submenú, y `ALMACEN/Marcas` → 6 opciones); `check-app-sps` 93/0.
+- SQL en TEST: 41 permisos, 149 pares, matriz 41/35/29/12/10/18/4,
+  `GESTIONAR_MARCAS` ausente y los 4 `MARCAS_*` en ALMACEN. El `50` se
+  aplicó dos veces (idempotente).
+- Viva: backup `backups/103-antes-permisos-marcas-23-10-2026.sql`
+  (557 KB, dump completo con rutinas y triggers); `50` aplicado. Quedó en
+  41 permisos / 149 pares, con la misma matriz. `check-app-sps` contra la viva:
+  93/0.
+
+**Pendiente**
+- Commit y push (los hace el usuario).
+- Seguir con Compras, Inventario y Caja.
+
+## 23/10 - Permisos finos de Métodos de pago (Tanda B, módulo 4)
+
+Métodos de pago era el último módulo simple de la Tanda B que seguía con un
+permiso paraguas: `GESTIONAR_METODOS_PAGO` abría el ítem y las 6 opciones a la
+vez.
+
+- `metodos_pago.cpp` pasó al patrón de `marcas.cpp`: enum de acciones, vector
+  `{etiqueta, permiso, accion}`, lista visible filtrada con `tienePermiso()`,
+  numeración sobre lo visible y despacho por `accion`. `Volver` siempre visible.
+  Se eliminó `mostrarMenuMetodosPago()` y su declaración en `metodos_pago.h`.
+- `roles.cpp`: el ítem Métodos de pago se muestra con cualquiera de los cuatro
+  permisos finos, no con el paraguas.
+- Permisos: `METODOS_PAGO_VER` (Buscar y Listar), `METODOS_PAGO_CREAR`,
+  `METODOS_PAGO_EDITAR` y `METODOS_PAGO_ESTADO`. Los tienen ADMIN, GERENTE,
+  SUBGERENTE y VENDEDOR; RRHH, ALMACEN y CONTABILIDAD no ven el ítem.
+- `modulos/36- PERMISOS_ROLES.sql` y su `.md`: 44 permisos / 161 pares
+  (ADMIN 44, GERENTE 38, SUBGERENTE 32, RRHH 12, VENDEDOR 13, ALMACEN 18,
+  CONTABILIDAD 4). `modulos/51- PERMISOS_METODOS_PAGO.sql` (idempotente) migra
+  bases existentes: crea los 4, los asigna a los cuatro roles y borra el
+  paraguas en cualquier rol. Orden: binario nuevo antes del SQL. El 48 sigue
+  reservado para Garantías.
+- `modulos/00- INDICE.md` queda en 52 módulos.
+- Tests: `build.sh` OK; `test-menus-por-rol.sh` 30/30 (nuevo `PRUEBA_MET_VER`
+  con solo `METODOS_PAGO_VER` → 3 opciones en el menú principal y 3 en el
+  submenú, y `VENDEDOR/Métodos de pago` → 6 opciones); `check-app-sps` 93/0.
+- SQL en TEST: 44 permisos, 161 pares, matriz 44/38/32/12/13/18/4,
+  `GESTIONAR_METODOS_PAGO` ausente y los 4 `METODOS_PAGO_*` en VENDEDOR. El
+  `51` se aplicó dos veces (idempotente).
+- Viva: backup `backups/104-antes-permisos-metodos-pago-23-10-2026.sql`
+  (558 KB, dump completo con rutinas y triggers); `51` aplicado. Quedó en
+  44 permisos / 161 pares, con la misma matriz. `check-app-sps` contra la viva:
+  93/0.
+
+**Pendiente**
+- Commit y push (los hace el usuario).
+- Seguir con Compras, Inventario y Caja.
+
+## 23/10 - Permisos finos de Compras (Tanda B, modulo grande 1)
+
+Compras era el primer modulo grande de la Tanda B que seguia con un permiso
+paraguas: `GESTIONAR_COMPRAS` abria el item y las 8 opciones a la vez.
+
+- `compras.cpp` paso al patron de `marcas.cpp`: enum `AccionCompra`, vector
+  `{etiqueta, permiso, accion}`, lista visible filtrada con `tienePermiso()`,
+  numeracion sobre lo visible y despacho por `accion`. `Volver` siempre visible.
+  Se elimino `mostrarMenuCompras()` y su declaracion en `compras.h`.
+- `roles.cpp`: el item Compras se muestra con cualquiera de los seis permisos
+  finos, no con el paraguas.
+- Permisos: `COMPRAS_VER` (Ver compra con IVA), `COMPRAS_REGISTRAR` (Compra
+  rapida), `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER` y
+  `COMPRAS_REPORTES` (Reporte por periodo y Precios por suplidor). Los tienen
+  ADMIN, GERENTE, SUBGERENTE y ALMACEN; RRHH, VENDEDOR y CONTABILIDAD no ven el
+  item.
+- `modulos/36- PERMISOS_ROLES.sql` y su `.md`: 49 permisos / 181 pares
+  (ADMIN 49, GERENTE 43, SUBGERENTE 37, RRHH 12, VENDEDOR 13, ALMACEN 23,
+  CONTABILIDAD 4). `modulos/52- PERMISOS_COMPRAS.sql` (idempotente) migra bases
+  existentes: crea los 6, los asigna a los cuatro roles y borra el paraguas en
+  cualquier rol. Orden: binario nuevo antes del SQL. El 48 sigue reservado para
+  Garantias.
+- `modulos/00- INDICE.md` queda en 53 modulos.
+
+**Decisiones**
+
+- **Gate de altas rapidas**: la compra rapida ya no crea productos ni
+  suplidores por su cuenta. El producto inexistente exige `GESTIONAR_PRODUCTOS`
+  y el suplidor inexistente exige `PROVEEDORES_CREAR`; sin el permiso la app
+  avisa y no llama al alta rapida. `COMPRAS_REGISTRAR` no implica crear
+  maestros.
+- **Stock por diseno**: registrar una compra mueve inventario
+  (`22_SP_AGREGAR_DETALLE_COMPRA`) y cancelarla lo repone
+  (`SP_CANCELAR_COMPRA`). `COMPRAS_REGISTRAR` no duplica
+  `GESTIONAR_INVENTARIO`; el efecto es parte del flujo de compra.
+- **Devolucion unica**: `COMPRAS_DEVOLVER` cubre todo el flujo de devolucion
+  (registrar, procesar y rechazar), porque la UI lo resuelve en una sola
+  pantalla. No se parte en permisos mas chicos.
+
+**Evidencia**
+
+- `build.sh` OK (`./output/app`).
+- `test-menus-por-rol.sh` 33/33. Casos nuevos: `PRUEBA_COM_VER` (solo
+  `COMPRAS_VER` ? 3 opciones en el menu principal y 2 en el submenu),
+  `PRUEBA_COM_REG_PAG` (`COMPRAS_REGISTRAR` + `COMPRAS_PAGAR` ? 3 opciones) y
+  `ALMACEN/Compras` (8 opciones).
+- `check-app-sps.sh` 93/0.
+- SQL en TEST: 49 permisos, 181 pares, matriz 49/43/37/12/13/23/4,
+  `GESTIONAR_COMPRAS` ausente, los 6 `COMPRAS_*` presentes y ALMACEN con los 6.
+  El `52` se aplico dos veces (idempotente).
+- **La viva NO se toco en esta etapa**: sigue en 44 permisos / 161 pares hasta
+  aplicar el `52` con backup previo.
+
+**Pendiente**
+- Commit y push (los hace el usuario).
+- Aplicar el `52` a la viva con backup previo (binario nuevo primero).
+- Seguir con Inventario y Caja.

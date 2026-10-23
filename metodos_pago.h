@@ -1,7 +1,6 @@
 #ifndef METODOS_PAGO_H
 #define METODOS_PAGO_H
 
-void mostrarMenuMetodosPago();
 void ejecutarSubmenuMetodosPago();
 void registrarMetodoPago();
 void actualizarMetodoPago();

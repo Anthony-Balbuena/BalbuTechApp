@@ -1,7 +1,6 @@
 #ifndef CATEGORIAS_H
 #define CATEGORIAS_H
 
-void mostrarMenuCategorias();
 void ejecutarSubmenuCategorias();
 void registrarCategoria();
 void actualizarCategoria();

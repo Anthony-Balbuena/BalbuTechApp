@@ -3,26 +3,69 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuMarcas() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y los submenus de Usuarios, Empleados, Clientes,
+// Proveedores y Categorias, la lista visible se arma antes de imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionMarca { Agregar, Actualizar, Estado, Buscar, Listar, Volver };
+
+struct OpcionMarca {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionMarca accion;
+};
+
+static const vector<OpcionMarca>& opcionesMarcas() {
+    static const vector<OpcionMarca> opciones = {
+        {"Agregar Marca",              "MARCAS_CREAR",  AccionMarca::Agregar},
+        {"Actualizar Marca",           "MARCAS_EDITAR", AccionMarca::Actualizar},
+        {"Activar/Desactivar Marca",   "MARCAS_ESTADO", AccionMarca::Estado},
+        {"Buscar Marca",               "MARCAS_VER",    AccionMarca::Buscar},
+        {"Listar Marcas",              "MARCAS_VER",    AccionMarca::Listar},
+        {"Volver al Menu Principal",   "",              AccionMarca::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionMarca& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionMarca*> opcionesVisibles() {
+    vector<const OpcionMarca*> visibles;
+    for (const OpcionMarca& opcion : opcionesMarcas()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuMarcas(const vector<const OpcionMarca*>& visibles) {
     cout << "\n=== MODULO DE MARCAS ===" << endl;
-    cout << "1. Agregar Marca" << endl;
-    cout << "2. Actualizar Marca" << endl;
-    cout << "3. Activar/Desactivar Marca" << endl;
-    cout << "4. Buscar Marca" << endl;
-    cout << "5. Listar Marcas" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionMarca* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=========================" << endl;
 }
+
+}  // namespace
 
 void registrarMarca() {
     cout << "\n--- REGISTRO DE MARCA ---" << endl;
@@ -156,42 +199,35 @@ void listarMarcas() {
     }
 }
 
-// Submenú de marcas: muestra el menú, lee la opción y llama a la acción.
-// (Antes el menú solo se imprimía y volvía sin hacer nada.)
+// Submenu de marcas: arma la lista visible con los permisos de la sesion,
+// numera sobre lo visible y despacha por accion. Cada accion pide su permiso
+// fino (MARCAS_CREAR, EDITAR, ESTADO o VER).
 void ejecutarSubmenuMarcas() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionMarca*> visibles = opcionesVisibles();
+        imprimirMenuMarcas(visibles);
 
-    do {
-        mostrarMenuMarcas();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarMarca();
-                break;
-            case 2:
-                actualizarMarca();
-                break;
-            case 3:
-                cambiarEstadoMarca();
-                break;
-            case 4:
-                buscarMarca();
-                break;
-            case 5:
-                listarMarcas();
-                break;
-            case 6:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionMarca& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionMarca::Agregar:     registrarMarca(); break;
+            case AccionMarca::Actualizar:  actualizarMarca(); break;
+            case AccionMarca::Estado:      cambiarEstadoMarca(); break;
+            case AccionMarca::Buscar:      buscarMarca(); break;
+            case AccionMarca::Listar:      listarMarcas(); break;
+            case AccionMarca::Volver:      return;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        pausar();
+    }
 }
 

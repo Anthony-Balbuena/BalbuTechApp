@@ -22,17 +22,22 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (35, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (49, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
 `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO`,
 `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`,
 `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`,
-`PROVEEDORES_ESTADO`, `GESTIONAR_CATEGORIAS`,
-`GESTIONAR_MARCAS`, `GESTIONAR_PRODUCTOS`, `GESTIONAR_METODOS_PAGO`,
+`PROVEEDORES_ESTADO`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`,
+`CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`,
+`MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`,
+`GESTIONAR_PRODUCTOS`,
+`METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`,
+`METODOS_PAGO_ESTADO`,
 `GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `CONSULTAR_HISTORIAL_VENTA`,
-`GESTIONAR_COMPRAS`,
+`COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`,
+`COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`,
 `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `CONSULTAR_PRODUCTOS`,
 `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` y `GESTIONAR_CONTRATOS`.
 
@@ -53,6 +58,30 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > `CLIENTES_EDITAR` y `CLIENTES_ESTADO`). Los viejos `GESTIONAR_CLIENTES` y
 > `CONSULTAR_CLIENTES` **ya no existen**: el import los borra del catálogo y el
 > `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
+>
+> **El módulo Categorías usa 4 permisos finos** (`CATEGORIAS_VER`,
+> `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR` y `CATEGORIAS_ESTADO`). El viejo
+> `GESTIONAR_CATEGORIAS` **ya no existe**: lo borra el módulo 49 (idempotente) y
+> el `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
+>
+> **El módulo Marcas usa 4 permisos finos** (`MARCAS_VER`, `MARCAS_CREAR`,
+> `MARCAS_EDITAR` y `MARCAS_ESTADO`). El viejo `GESTIONAR_MARCAS` **ya no
+> existe**: lo borra el módulo 50 (idempotente) y el `ON DELETE CASCADE` limpia
+> sus pares en `ROL_PERMISO`.
+>
+> **El módulo Métodos de pago usa 4 permisos finos** (`METODOS_PAGO_VER`,
+> `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR` y `METODOS_PAGO_ESTADO`). El viejo
+> `GESTIONAR_METODOS_PAGO` **ya no existe**: lo borra el módulo 51 (idempotente)
+> y el `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
+>
+> **El módulo Compras usa 6 permisos finos** (`COMPRAS_VER`, `COMPRAS_REGISTRAR`,
+> `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER` y `COMPRAS_REPORTES`).
+> El viejo `GESTIONAR_COMPRAS` **ya no existe**: lo borra el módulo 52
+> (idempotente) y el `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
+> `COMPRAS_REPORTES` habilita las dos opciones de reporte (Reporte por periodo y
+> Precios por suplidor). Las altas rápidas dentro de la compra no dependen de
+> Compras: el producto exige `GESTIONAR_PRODUCTOS` y el suplidor
+> `PROVEEDORES_CREAR`.
 >
 > **El módulo Proveedores usa 4 permisos finos** (`PROVEEDORES_VER`,
 > `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR` y `PROVEEDORES_ESTADO`). El viejo
@@ -79,12 +108,15 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 35 se consultan en el código**: los de Empleados y Asistencia en
+> **Los 49 se consultan en el código**: los de Empleados y Asistencia en
 > `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Proveedores en
-> `proveedores.cpp`, los de Productos en `productos.cpp` y los de Ventas en
-> `ventas.cpp`; el menú principal, en `roles.cpp`. `REGISTRAR_ASISTENCIA` abre el ítem propio `Asistencia` (primero
-> del menú), no `Empleados`. `SOLICITAR_PERMISO` lo usa el menú principal
-> (`Mis permisos` y `Mis vacaciones`).
+> `proveedores.cpp`, los de Categorías en `categorias.cpp`, los de Marcas en
+> `marcas.cpp`, los de Métodos de pago en `metodos_pago.cpp`, los de Compras en
+> `compras.cpp`, los de Productos en `productos.cpp` y los de Ventas en
+> `ventas.cpp`; el menú principal, en `roles.cpp`. `REGISTRAR_ASISTENCIA` abre
+> el ítem propio `Asistencia` (primero del menú), no `Empleados`.
+> `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
+> `Mis vacaciones`).
 
 ### ROL_PERMISO
 
@@ -106,13 +138,15 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 35** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (29) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (23) |
+| `ADMIN` | **los 49** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (43) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (37) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
-| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (10) |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (12) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (13) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `GESTIONAR_INVENTARIO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (23) |
 | `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
+
+> Total: **181 pares rol-permiso** (49 + 43 + 37 + 12 + 13 + 23 + 4).
 
 ### Mapa del submenú de Clientes
 
@@ -145,6 +179,94 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 > **El corte cae donde el módulo solo tenía un permiso de acceso.** Un rol con
 > solo `PROVEEDORES_VER` ve 3 opciones (Buscar, Listar, Volver); `ALMACEN`, con
 > los cuatro, sigue viendo las 6.
+
+### Mapa del submenú de Categorías
+
+El submenú conserva el orden histórico de 5 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar Categoria | `CATEGORIAS_CREAR` |
+| 2 | Actualizar Categoria | `CATEGORIAS_EDITAR` |
+| 3 | Activar/Desactivar Categoria | `CATEGORIAS_ESTADO` |
+| 4 | Buscar Categoria | `CATEGORIAS_VER` |
+| 5 | Volver al Menu Principal | *(siempre)* |
+
+> **Categorías deja de usar el paraguas `GESTIONAR_CATEGORIAS`.** Un rol con
+> solo `CATEGORIAS_VER` ve 2 opciones (Buscar, Volver); `ALMACEN`, con los
+> cuatro, ve las 5. La migración de una base existente es el módulo 49.
+
+### Mapa del submenú de Marcas
+
+El submenú conserva el orden histórico de 6 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar Marca | `MARCAS_CREAR` |
+| 2 | Actualizar Marca | `MARCAS_EDITAR` |
+| 3 | Activar/Desactivar Marca | `MARCAS_ESTADO` |
+| 4 | Buscar Marca | `MARCAS_VER` |
+| 5 | Listar Marcas | `MARCAS_VER` |
+| 6 | Volver al Menu Principal | *(siempre)* |
+
+> **Marcas deja de usar el paraguas `GESTIONAR_MARCAS`.** Un rol con solo
+> `MARCAS_VER` ve 3 opciones (Buscar, Listar, Volver); `ALMACEN`, con los
+> cuatro, ve las 6. La migración de una base existente es el módulo 50.
+
+### Mapa del submenú de Métodos de pago
+
+El submenú conserva el orden histórico de 6 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar Metodo | `METODOS_PAGO_CREAR` |
+| 2 | Actualizar Datos | `METODOS_PAGO_EDITAR` |
+| 3 | Activar/Desactivar Metodo | `METODOS_PAGO_ESTADO` |
+| 4 | Buscar Metodo | `METODOS_PAGO_VER` |
+| 5 | Listar Metodos | `METODOS_PAGO_VER` |
+
+> `Volver al Menu Principal` cierra la lista y no pide permiso.
+>
+> **Métodos de pago deja de usar el paraguas `GESTIONAR_METODOS_PAGO`.** Un rol
+> con solo `METODOS_PAGO_VER` ve 3 opciones (Buscar, Listar, Volver);
+> `VENDEDOR`, con los cuatro, ve las 6. La migración de una base existente es el
+> módulo 51.
+
+### Mapa del submenú de Compras
+
+El submenú conserva el orden histórico de 8 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Compra rapida (carrito) | `COMPRAS_REGISTRAR` |
+| 2 | Ver compra con IVA | `COMPRAS_VER` |
+| 3 | Devolucion de compra | `COMPRAS_DEVOLVER` |
+| 4 | Reporte por periodo | `COMPRAS_REPORTES` |
+| 5 | Pagar compra | `COMPRAS_PAGAR` |
+| 6 | Precios por suplidor | `COMPRAS_REPORTES` |
+| 7 | Cancelar compra | `COMPRAS_CANCELAR` |
+| 8 | Volver al Menu Principal | *(siempre)* |
+
+> `COMPRAS_REPORTES` cubre las dos opciones de reporte (Reporte por periodo y
+> Precios por suplidor). `COMPRAS_VER` solo abre `Ver compra con IVA`: no
+> habilita reportes ni pagos.
+>
+> **Compras deja de usar el paraguas `GESTIONAR_COMPRAS`.** Un rol con solo
+> `COMPRAS_VER` ve 2 opciones (Ver compra con IVA y Volver); `ALMACEN`, con los
+> seis, ve las 8. La migración de una base existente es el módulo 52.
+>
+> **El alta rápida dentro de la compra no la habilita Compras**: registrar un
+> producto inexistente exige `GESTIONAR_PRODUCTOS` y registrar un suplidor
+> inexistente exige `PROVEEDORES_CREAR`. Sin esos permisos la app informa que no
+> puede crearlos y no llama al alta rápida.
+>
+> **Registrar una compra mueve stock por diseño**: `22_SP_AGREGAR_DETALLE_COMPRA`
+> suma inventario y `SP_CANCELAR_COMPRA` lo repone. `COMPRAS_REGISTRAR` no
+> duplica `GESTIONAR_INVENTARIO`; el efecto es parte del flujo de compra.
 
 ### Mapa del submenú de Empleados
 
@@ -281,7 +403,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 35 sembrados.
+> 49 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 
@@ -321,8 +443,8 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
 - **La base manda**: los permisos se leen de `ROL_PERMISO`, no del nombre del rol
   en el código.
 - **`ADMIN` tiene todo**; `GERENTE` todo lo operativo salvo roles y los 5
-  permisos de Usuarios (29); `SUBGERENTE` además no toca empleados ni contratos
-  (23); `RRHH` conserva personal, contratos y reportes (12).
+  permisos de Usuarios (43); `SUBGERENTE` además no toca empleados ni contratos
+  (37); `RRHH` conserva personal, contratos y reportes (12).
 - **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `CREAR`,
   `EDITAR`, `ESTADO`, `CLAVE`); el submenú muestra solo las acciones habilitadas.
 - **El módulo Empleados usa 7 permisos finos**; el submenú muestra solo las
@@ -332,6 +454,21 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
   renumera sobre lo visible.
 - **`CLIENTES_VER` abre el módulo**; `CLIENTES_CREAR`, `CLIENTES_EDITAR` y
   `CLIENTES_ESTADO` solo habilitan su opción adentro.
+- **El módulo de Categorías usa 4 permisos finos** (`CATEGORIAS_VER`, `CREAR`,
+  `EDITAR`, `ESTADO`); el submenú muestra solo las acciones habilitadas y
+  renumera sobre lo visible. `CATEGORIAS_VER` abre el ítem del menú principal.
+- **El módulo de Marcas usa 4 permisos finos** (`MARCAS_VER`, `CREAR`, `EDITAR`,
+  `ESTADO`); el submenú muestra solo las acciones habilitadas y renumera sobre
+  lo visible. `MARCAS_VER` abre el ítem del menú principal.
+- **El módulo de Métodos de pago usa 4 permisos finos** (`METODOS_PAGO_VER`,
+  `CREAR`, `EDITAR`, `ESTADO`); el submenú muestra solo las acciones habilitadas
+  y renumera sobre lo visible. `METODOS_PAGO_VER` abre el ítem del menú
+  principal.
+- **El módulo de Compras usa 6 permisos finos** (`COMPRAS_VER`, `REGISTRAR`,
+  `PAGAR`, `CANCELAR`, `DEVOLVER`, `REPORTES`); el submenú muestra solo las
+  acciones habilitadas y renumera sobre lo visible. `COMPRAS_REPORTES` cubre las
+  dos opciones de reporte. Cualquiera de los seis abre el ítem del menú
+  principal.
 - **Productos y Ventas también filtran por permiso**: `GESTIONAR_PRODUCTOS`
   habilita alta/cambio de estado y `CONSULTAR_PRODUCTOS`
   las consultas; en Ventas, `GESTIONAR_VENTAS` habilita operar,

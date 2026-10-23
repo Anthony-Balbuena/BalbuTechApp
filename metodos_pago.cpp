@@ -3,26 +3,70 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuMetodosPago() {
+// ---------------------------------------------------------------------------
+// Submenu dinamico: cada accion pide su permiso fino. Igual que el menu
+// principal (roles.cpp) y los submenus de Usuarios, Empleados, Clientes,
+// Proveedores, Categorias y Marcas, la lista visible se arma antes de
+// imprimir/numerar.
+// ---------------------------------------------------------------------------
+namespace {
+
+enum class AccionMetodoPago { Agregar, Actualizar, Estado, Buscar, Listar, Volver };
+
+struct OpcionMetodoPago {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionMetodoPago accion;
+};
+
+static const vector<OpcionMetodoPago>& opcionesMetodosPago() {
+    static const vector<OpcionMetodoPago> opciones = {
+        {"Agregar Metodo",             "METODOS_PAGO_CREAR",  AccionMetodoPago::Agregar},
+        {"Actualizar Datos",           "METODOS_PAGO_EDITAR", AccionMetodoPago::Actualizar},
+        {"Activar/Desactivar Metodo",  "METODOS_PAGO_ESTADO", AccionMetodoPago::Estado},
+        {"Buscar Metodo",              "METODOS_PAGO_VER",    AccionMetodoPago::Buscar},
+        {"Listar Metodos",             "METODOS_PAGO_VER",    AccionMetodoPago::Listar},
+        {"Volver al Menu Principal",   "",                    AccionMetodoPago::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionMetodoPago& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionMetodoPago*> opcionesVisibles() {
+    vector<const OpcionMetodoPago*> visibles;
+    for (const OpcionMetodoPago& opcion : opcionesMetodosPago()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuMetodosPago(const vector<const OpcionMetodoPago*>& visibles) {
     cout << "\n=== MODULO DE METODOS DE PAGO ===" << endl;
-    cout << "1. Agregar Metodo" << endl;
-    cout << "2. Actualizar Datos" << endl;
-    cout << "3. Activar/Desactivar Metodo" << endl;
-    cout << "4. Buscar Metodo" << endl;
-    cout << "5. Listar Metodos" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionMetodoPago* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "===============================" << endl;
 }
+
+}  // namespace
 
 void registrarMetodoPago() {
     cout << "\n--- REGISTRO DE METODO DE PAGO ---" << endl;
@@ -161,42 +205,35 @@ void listarMetodosPago() {
     }
 }
 
-// Submenú de métodos de pago: muestra el menú, lee la opción y llama a la acción.
-// (Antes el módulo estaba huérfano: con menú pero sin entrada desde ningún lado.)
+// Submenu de metodos de pago: arma la lista visible con los permisos de la
+// sesion, numera sobre lo visible y despacha por accion. Cada accion pide su
+// permiso fino (METODOS_PAGO_CREAR, EDITAR, ESTADO o VER).
 void ejecutarSubmenuMetodosPago() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionMetodoPago*> visibles = opcionesVisibles();
+        imprimirMenuMetodosPago(visibles);
 
-    do {
-        mostrarMenuMetodosPago();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarMetodoPago();
-                break;
-            case 2:
-                actualizarMetodoPago();
-                break;
-            case 3:
-                cambiarEstadoMetodoPago();
-                break;
-            case 4:
-                buscarMetodoPago();
-                break;
-            case 5:
-                listarMetodosPago();
-                break;
-            case 6:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionMetodoPago& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionMetodoPago::Agregar:     registrarMetodoPago(); break;
+            case AccionMetodoPago::Actualizar:  actualizarMetodoPago(); break;
+            case AccionMetodoPago::Estado:      cambiarEstadoMetodoPago(); break;
+            case AccionMetodoPago::Buscar:      buscarMetodoPago(); break;
+            case AccionMetodoPago::Listar:      listarMetodosPago(); break;
+            case AccionMetodoPago::Volver:      return;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        pausar();
+    }
 }
 
