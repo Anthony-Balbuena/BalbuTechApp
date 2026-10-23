@@ -82,3 +82,9 @@ Commit del work unit: `48350c4` (rama `feat/permisos-finos-proveedores`; el amen
   `GESTIONAR_PROVEEDORES` eliminado. Proveedores, empleados y contratos
   intactos.
 - **L6** — Commit: `48350c4` en `feat/permisos-finos-proveedores` (el amend movió el hash original `6c2dad5`).
+- **L7** — Review RDD (`review-4a4672daf469b43b`): consentida; lentes
+  `review-risk` y `review-reliability`; ambas devolvieron salida vacía
+  (`provider_result_empty`, `reviewer_result_not_admissible`). Se declararon
+  no alcanzables y la review terminó en `unachievable_lens_slot`, sin
+  aprobación. No se inventó PASS. El work unit sigue verificado por tests; la
+  review queda para reintentar con otro modelo.
