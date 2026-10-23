@@ -46,6 +46,9 @@ struct OpcionVenta {
 // era fija y despachaba por numero, asi que un rol con GESTIONAR_VENTAS pero sin
 // CONSULTAR_REPORTES veia igual los reportes (y la exportacion web, que era el
 // unico caso con chequeo adentro del switch).
+// (23/10/2026) El historial de venta tiene permiso propio
+// (CONSULTAR_HISTORIAL_VENTA) para que VENDEDOR lo vea sin CONSULTAR_REPORTES.
+// Garantias sigue con GESTIONAR_VENTAS: no se creo un permiso nuevo para ella.
 static const vector<OpcionVenta>& opcionesVentas() {
     static const vector<OpcionVenta> opciones = {
         {"Venta rapida (carrito)",       "GESTIONAR_VENTAS",   AccionVenta::VentaRapida},
@@ -60,7 +63,7 @@ static const vector<OpcionVenta>& opcionesVentas() {
         {"Reporte por periodo",          "CONSULTAR_REPORTES", AccionVenta::ReportePeriodo},
         {"Ganancias por periodo",        "CONSULTAR_REPORTES", AccionVenta::GananciasPeriodo},
         {"Garantias",                    "GESTIONAR_VENTAS",   AccionVenta::Garantias},
-        {"Historial de venta",           "CONSULTAR_REPORTES", AccionVenta::Historial},
+        {"Historial de venta",           "CONSULTAR_HISTORIAL_VENTA", AccionVenta::Historial},
         {"Exportar datos para la web",   "CONSULTAR_REPORTES", AccionVenta::ExportarWeb},
         {"Volver al Menu Principal",     "",                   AccionVenta::Volver}
     };

@@ -10,17 +10,19 @@
 
 ### 1. Permisos finos: terminar la migración (Tanda B)
 
-Estado: **la viva ya está migrada** (22/10: 7 roles, 30 permisos, matriz idéntica a TEST; backup `backups/pre_roles_20261022_200029.sql`). **Usuarios, Empleados, Clientes y Proveedores** ya tienen el patrón; **Proveedores quedó en `feat/permisos-finos-proveedores` con `48350c4` (work unit) + `80e1f14`/`c1cd640` (docs), sin pushear.** La viva quedó en 34 permisos / 122 pares (backup `backups/pre_proveedores_20261022_233409.sql`).
+Estado: **la viva y TEST están migradas** (23/10/2026, cierre: 7 roles, **35 permisos**, matriz **35/29/23/12/10/12/4 = 125 pares**; backup vivo `backups/101-antes-asistencia-proveedores-historial-23-10-2026.sql`). **Usuarios, Empleados, Clientes y Proveedores** ya tienen el patrón; **Productos y Ventas** ya filtran el submenú por permiso. En Ventas, VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`.
 
 - [x] Clientes: `615270e` `feat(permisos): agregar permisos finos al modulo Clientes`
 - [x] Asistencia: `3151fef` + fix `292161a`
-- [x] Proveedores: `48350c4` (work unit) + `80e1f14`/`c1cd640` (docs); push pendiente.
-- [ ] Seguir en este orden: **Categorías → Marcas → Productos → Métodos de pago → Compras → Inventario → Ventas → Caja** (simples primero, grandes al final).
+- [x] Proveedores: `48350c4` (work unit) + `80e1f14`/`c1cd640` (docs). **Mergeado y pusheado** en `67acf9f`.
+- [x] Productos y Ventas: submenús filtrados por permiso (`615270e`). Productos sigue con `GESTIONAR_*` / `CONSULTAR_*`; Ventas sumó `CONSULTAR_HISTORIAL_VENTA` (módulo 47).
+- [ ] Seguir en este orden: **Categorías → Marcas → Métodos de pago → Compras → Inventario → Caja** (simples primero, grandes al final).
 
-**Estimación de esfuerzo (23/10):** Proveedores hecho. Quedan 8 módulos:
+**Estimación de esfuerzo (23/10):** quedan 6 módulos:
 
-- Simples (1 work unit cada uno, como Proveedores): **Categorías, Marcas, Productos, Métodos de pago**.
-- Grandes (varias sesiones cada uno, tocan flujos): **Compras, Inventario, Ventas, Caja**.
+- Simples (1 work unit cada uno, como Proveedores): **Categorías, Marcas, Métodos de pago**.
+- Grandes (varias sesiones cada uno, tocan flujos): **Compras, Inventario, Caja**.
+- **Ventas** solo tiene pendiente el submenú de Garantías, que despacha por número porque es una lista fija sin filtro. No es un bug; se migra si se le agregan permisos propios (ver P1, Garantías).
 - Orden de magnitud: **semanas de trabajo intermitente, no horas**. Sin fecha exacta hasta cerrar Categorías y medir el ritmo real.
 
 **Patrón** (referencia: `clientes.cpp`, el más chico y limpio):
@@ -44,7 +46,103 @@ Estado: **la viva ya está migrada** (22/10: 7 roles, 30 permisos, matriz idént
 - `db/import.sh` no dropea la base; y el `DROP` borra el grant de `balbu_app` (hay que volver a otorgarlo).
 - `ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE` es ambiguo si el `SELECT` también lee `ROL_PERMISO`.
 
-### 2. RRHH: pruebas visuales pendientes
+### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
+
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 35 permisos aplicada (`36`, `44`, `45`, `46`, `47`). La viva se toca recién al cerrar la tanda.
+
+**Automático (ya corre, solo hay que ejecutarlo):**
+
+| Comando | Cubre | Esperado |
+|---|---|---|
+| `bash build.sh` | compila | OK |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 93/0 |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos y Ventas | 24/24 |
+| `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
+| `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
+| `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
+
+**Manual, por área:**
+
+#### 2.1 Sesión y menú principal
+
+- [ ] ADMIN entra y ve **19** opciones.
+- [ ] GERENTE ve **16** y **no** aparecen Roles ni Usuarios.
+- [ ] SUBGERENTE ve **16**, con Empleados (solo 3: buscar, listar, volver) y Asistencia (7, con Justificar).
+- [ ] RRHH ve **6**; VENDEDOR **10**; ALMACEN **11**; CONTABILIDAD **5**.
+- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`).
+- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle `CLIENTES_VER` desde ADMIN y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
+- [ ] Al reingresar después de quitar el permiso, la opción sigue ausente.
+
+#### 2.2 Usuarios (solo ADMIN)
+
+- [ ] Crear usuario con rol VENDEDOR y clave; entrar con él.
+- [ ] Editar el nombre y el rol; verificar que el menú cambie en el siguiente ingreso.
+- [ ] Desactivar la cuenta; el login falla con el aviso correspondiente.
+- [ ] Reactivar; el login vuelve a funcionar.
+- [ ] Cambiar la clave; la vieja deja de servir y la nueva entra.
+- [ ] GERENTE **no** ve el módulo Usuarios.
+
+#### 2.3 Empleados
+
+- [ ] RRHH: crear empleado, editarlo, darlo de baja y reactivarlo.
+- [ ] RRHH: gestionar contrato, permiso y vacaciones desde el submenú.
+- [ ] SUBGERENTE: entra a Empleados pero solo ve consulta; **no** puede crear, editar ni dar de baja.
+- [ ] Un usuario sin ningún permiso `EMPLEADOS_*` no ve el módulo (salvo que tenga `REGISTRAR_ASISTENCIA` o `CONSULTAR_ASISTENCIA`, que abren **Asistencia**, no Empleados).
+
+#### 2.4 Clientes
+
+- [ ] VENDEDOR: ver, crear, editar y cambiar estado. Las cuatro acciones funcionan.
+- [ ] CONTABILIDAD: solo `CLIENTES_VER`; ve la consulta y nada más.
+- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú y **no** queda un hueco en la numeración.
+
+#### 2.5 Proveedores
+
+- [ ] ALMACEN: ver, crear, editar y cambiar estado (6 opciones en el submenú).
+- [ ] Sin `PROVEEDORES_CREAR`, la opción de alta desaparece y el resto sigue funcionando.
+
+#### 2.6 Asistencia
+
+- [ ] Los 7 roles pueden **fichar** (`REGISTRAR_ASISTENCIA`).
+- [ ] VENDEDOR ve 3 opciones, **sin** reportes.
+- [ ] SUBGERENTE ve 7, con Justificar.
+- [ ] ADMIN, GERENTE, SUBGERENTE y RRHH ven los reportes (`CONSULTAR_ASISTENCIA`).
+- [ ] "Mi asistencia" usa el `ID_EMPLEADO` de la sesión, **no** pide ID a mano.
+- [ ] `CONSULTAR_ASISTENCIA` **no** abre Empleados.
+- [ ] Justificar una ausencia y ver el cambio en el reporte.
+
+#### 2.7 Productos
+
+- [ ] ALMACEN ve 7 (gestión + consulta).
+- [ ] CONTABILIDAD ve 4 (solo consulta).
+- [ ] Un rol sin `CONSULTAR_PRODUCTOS` no ve el módulo.
+- [ ] `PRUEBA_PROD_GEST` (solo gestión) ve 4 y no ve las de consulta.
+
+#### 2.8 Ventas
+
+- [ ] VENDEDOR ve 10: las 7 de gestión, historial, garantías y volver, **sin** reportes ni exportación.
+- [ ] `PRUEBA_VEN_GEST` (sin `CONSULTAR_REPORTES`) ve 9: solo las acciones sobre la venta.
+- [ ] **Garantías** se abre con `GESTIONAR_VENTAS`; sus 4 opciones son fijas (registrar, reclamar, finalizar, volver).
+
+#### 2.9 Roles
+
+- [ ] Crear un rol nuevo, asignarle `CLIENTES_VER` y entrar con un usuario de ese rol.
+- [ ] Quitarle el permiso y verificar que el módulo desaparezca.
+- [ ] Borrar el rol: los usuarios que lo tenían no pueden entrar (verificar el mensaje).
+- [ ] Renombrar un rol: los permisos lo siguen (`ON UPDATE CASCADE`).
+
+#### 2.10 Migración de roles (módulo 44)
+
+- [ ] En TEST, el test automático ya lo cubre (11/11).
+- [ ] En la viva, confirmar que no quedan roles `EMPLEADO` ni `CAJERO` y que sus usuarios pasaron a `VENDEDOR`:
+
+```sql
+SELECT NOMBRE_ROL FROM ROLES ORDER BY NOMBRE_ROL;
+SELECT COUNT(*) FROM USUARIOS U LEFT JOIN ROLES R ON R.ID_ROL = U.ID_ROL WHERE R.ID_ROL IS NULL;
+```
+
+Ambas deben dar 7 roles y 0 usuarios huérfanos.
+
+### 3. RRHH: pruebas visuales pendientes
 
 - [ ] **13 Permisos:** solicitar → aprobar uno y rechazar otro → reintentar aprobar el ya aprobado ("solo pendientes") → ver la fila en `LOG_AUDITORIA_PERMISOS`.
 - [ ] **12 Vacaciones:** solicitar → aprobar/rechazar → reintentar; una **aprobada** que cubra hoy bloquea la asistencia, una **pendiente o rechazada** no; cupo de 15 días + solapamiento (rechazar libera).
@@ -53,7 +151,7 @@ Estado: **la viva ya está migrada** (22/10: 7 roles, 30 permisos, matriz idént
 
 Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
 
-### 3. Contratos: cargar los datos de la empresa
+### 4. Contratos: cargar los datos de la empresa
 
 - [ ] `UPDATE` sobre `CONFIGURACION` con `RNC`, `DIRECCION_EMPRESA`, `REPRESENTANTE` y `CEDULA_REPRESENTANTE`. Hoy el contrato los imprime como `____________`.
 - No existe tabla `EMPRESA` (se creó, el dueño la rechazó y se borró el mismo día). Todo va en `CONFIGURACION`.
@@ -62,19 +160,57 @@ Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
 
 ## 🟠 P1 — Alta prioridad (funcionalidad a medias)
 
-### 4. Contratos: campos legales RD + revisión legal
+### 5. Contratos: campos legales RD + revisión legal
 
 - [ ] Agregar a la plantilla: nacionalidad, edad, sexo, estado civil, **RNL** (Registro Nacional del Trabajador), lugar de prestación, provincia y municipio. Checklist y fuentes: `Flujos/Contrato de trabajo - requisitos legales RD.md`.
 - [ ] Revisión legal del texto antes de usarlo con personal real (la plantilla ya lo dice al pie).
 
-### 5. RRHH: módulos que faltan
+### 6. Garantías: estructurar el flujo (diseño acordado 23/10)
+
+Hoy **cualquiera con `GESTIONAR_VENTAS`** (ADMIN, GERENTE, SUBGERENTE, VENDEDOR) registra, reclama y finaliza. No queda autor, `VENCIDA` nunca se escribe y el flujo pide IDs a ciegas.
+
+**Permisos nuevos (4):**
+
+| Permiso | Roles |
+|---|---|
+| `GARANTIAS_REGISTRAR` | ADMIN, GERENTE, SUBGERENTE, VENDEDOR |
+| `GARANTIAS_RECLAMAR` | ADMIN, GERENTE, SUBGERENTE, VENDEDOR |
+| `GARANTIAS_FINALIZAR` | ADMIN, GERENTE, SUBGERENTE |
+| `GARANTIAS_CONSULTAR` | los 4 + CONTABILIDAD |
+
+La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, pero la decisión queda en Gerencia. VENDEDOR conserva `GARANTIAS_REGISTRAR` y `GARANTIAS_RECLAMAR`.
+
+**Datos (módulo 48, idempotente):**
+
+- `GARANTIAS`: `ID_EMPLEADO` (quién registró) y `FECHA_REGISTRO`.
+- `RECLAMOS_GARANTIAS`: `ID_EMPLEADO`, `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE`.
+- Opcional: `PRODUCTOS.DIAS_GARANTIA` para no pedir los días a mano.
+
+**SPs:**
+
+- `SP_REGISTRAR_GARANTIA(detalle, dias, idEmpleado)`.
+- `27_SP_REGISTRAR_RECLAMO_GARANTIA(garantia, descripcion, idEmpleado)`; validar `CURRENT_DATE BETWEEN FECHA_INICIO AND FECHA_FIN`, no solo `ESTADO`.
+- `27_SP_FINALIZAR_RECLAMO_TOTAL(reclamo, idEmpleado)`; validar que el estado sea `PENDIENTE` o `APROBADO`.
+- Nuevo SP de consulta por venta o cliente.
+- Proceso o vista que marque `VENCIDA` cuando pasa `FECHA_FIN`.
+
+**UI:**
+
+- Registrar: pedir **ID de venta** y listar sus detalles, en vez de pedir el ID de detalle.
+- Reclamar y finalizar: listar lo que corresponde, no pedir IDs de memoria.
+
+**Decisión abierta:** registrar a mano o **automático al confirmar la venta** con los días del producto. Lo segundo es más limpio pero toca el flujo de venta.
+
+**Cierre:** build, `check-app-sps`, test de menús, test nuevo de garantías y prueba manual con VENDEDOR (no debe poder finalizar).
+
+### 7. RRHH: módulos que faltan
 
 - [ ] **14 Bonos** — pantalla mínima (listar, pagar, anular). El 1% ya lo genera el trigger de 24.
 - [ ] **15 Historial laboral** — `CARGO_ANTERIOR/NUEVO VARCHAR(30)` vs `EMPLEADOS.CARGO VARCHAR(50)`: ampliar a 50 y migrar.
 - [ ] **30 Auditoría de permisos** — trigger activo; falta el lector y decidir si guarda el actor (hoy no lo tiene).
 - [ ] **16 Liquidaciones** — **no tocar todavía**: la fórmula `SALARIO * AÑOS` es placeholder y "Despedir" vs "Liquidar" no cierra. Decidir el flujo de negocio primero.
 
-### 6. Decisiones de producto (una vez cada una)
+### 8. Decisiones de producto (una vez cada una)
 
 - [ ] **¿RRHH va o no?** (12, 13, 14, 16 y el historial de 15). Con lo ya hecho, va.
 - [ ] **¿28 LOG_ACCESOS?** Ya está cableado y commiteado; solo falta la prueba visual (P0).
@@ -82,7 +218,7 @@ Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
 - [ ] **¿35 DETALLE_REPARACIONES?** ¿Repuesto con stock o texto libre?
 - [ ] **¿19.5 anular pago y 22 quitar/modificar línea?** ¿Pantalla o SQL?
 
-### 7. Bugs y deuda con impacto
+### 9. Bugs y deuda con impacto
 
 - [ ] **Venta multi-línea atómica** (P-4 de la auditoría).
 - [ ] **P-3 validaciones**: 8 errores pintados en verde, advertencia de precio descartada y monto de la liquidación tomado del cliente.
@@ -93,7 +229,7 @@ Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
 - [ ] **Barrido del resto de los `while` con `leerDatoSeguro`** (el 18/10 solo se tocó `contrato.cpp`; los bucles con EOF pueden girar sin fin).
 
-### 8. Hallazgos del mapa de módulos (21/10)
+### 10. Hallazgos del mapa de módulos (21/10)
 
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
 - [ ] **Devolver mercancía no baja el subtotal**: solo descuenta el ITBIS devuelto.

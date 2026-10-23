@@ -1,13 +1,13 @@
 # Índice general — módulos de la base de datos
 
-Los **48 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
+Los **49 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
 app lo usa. Cada módulo tiene su documento al lado del `.sql`, con el mismo
 nombre.
 
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 23/10/2026 · 48 `.sql` + 48 `.md` · 367 objetos documentados.
+Última revisión: 23/10/2026 · 49 `.sql` + 49 `.md` · 367 objetos documentados.
 
 ## Resumen
 
@@ -110,6 +110,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [MIGRACION_ROLES](<44- MIGRACION_ROLES.md>) | — | Retira `EMPLEADO` y `CAJERO` y pasa sus usuarios a `VENDEDOR`. | — |
 | [PERMISO_CONSULTAR_ASISTENCIA](<45- PERMISO_CONSULTAR_ASISTENCIA.md>) | — | Agrega `CONSULTAR_ASISTENCIA` y lo asigna a ADMIN, GERENTE, SUBGERENTE y RRHH. | — |
 | [PERMISOS_PROVEEDORES](<46- PERMISOS_PROVEEDORES.md>) | — | Reemplaza `GESTIONAR_PROVEEDORES` por 4 permisos finos. | — |
+| [PERMISO_HISTORIAL_VENTA](<47- PERMISO_HISTORIAL_VENTA.md>) | — | Agrega `CONSULTAR_HISTORIAL_VENTA` y lo asigna a ADMIN, GERENTE, SUBGERENTE y VENDEDOR. | — |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 2TR | Bitácora genérica por tabla y registro. | — |
 | [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |

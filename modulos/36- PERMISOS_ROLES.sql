@@ -103,7 +103,7 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (23/10/2026) 34 permisos: el modulo Usuarios usa 5 permisos finos
+-- (23/10/2026) 35 permisos: el modulo Usuarios usa 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
 -- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, GESTIONAR_CONTRATOS,
 -- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO), el modulo
@@ -112,7 +112,8 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 -- viejos GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES,
 -- CONSULTAR_CLIENTES y GESTIONAR_PROVEEDORES. La asistencia tiene sus propios
 -- permisos (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y
--- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45).
+-- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45). El historial de venta
+-- usa CONSULTAR_HISTORIAL_VENTA, separado de CONSULTAR_REPORTES (modulo 47).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -141,6 +142,7 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_METODOS_PAGO', 'Gestionar metodos de pago'),
 ('GESTIONAR_INVENTARIO', 'Administrar inventario'),
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
+('CONSULTAR_HISTORIAL_VENTA', 'Consultar el historial de una venta'),
 ('GESTIONAR_COMPRAS', 'Gestionar compras del sistema'),
 ('CONSULTAR_REPORTES', 'Consultar reportes y dashboards'),
 ('CONSULTAR_ASISTENCIA', 'Consultar reportes de asistencia'),
@@ -158,7 +160,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 34 permisos del sistema).
+-- ADMIN: acceso total (los 35 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -228,6 +230,9 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 -- CAJERO (que se elimina): ventas, caja, clientes, metodos de pago y consultas.
 -- (22/10/2026) Clientes pasa a los 4 permisos finos: el vendedor puede ver,
 -- crear, editar y cambiar el estado.
+-- (23/10/2026) Ya no tiene CONSULTAR_REPORTES: no ve reportes ni ganancias.
+-- El historial de venta lo abre CONSULTAR_HISTORIAL_VENTA. Garantias sigue
+-- dentro de GESTIONAR_VENTAS.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'VENDEDOR', ID_PERMISO
 FROM PERMISOS
@@ -238,7 +243,7 @@ WHERE NOMBRE_PERMISO IN (
     'CLIENTES_EDITAR',
     'CLIENTES_ESTADO',
     'GESTIONAR_METODOS_PAGO',
-    'CONSULTAR_REPORTES',
+    'CONSULTAR_HISTORIAL_VENTA',
     'CONSULTAR_PRODUCTOS',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'

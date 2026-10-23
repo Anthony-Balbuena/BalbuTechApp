@@ -887,10 +887,13 @@ fi
 
 fallos_previos=$fallos
 salida_ven_ven="$TMP/out-ventas-vendedor.txt"
-# Entrada: Enter del "Presione Enter", 7 = Ventas (su menu queda Asistencia, Mis
-# permisos, Mis vacaciones, Clientes, Productos, Metodos de pago, Ventas, Caja
-# (turnos), Ver permisos y Cerrar sesion), 15 = Volver en el submenu completo.
-printf '\n7\n15\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+# (23/10/2026) VENDEDOR perdio CONSULTAR_REPORTES y gano
+# CONSULTAR_HISTORIAL_VENTA: ve las 7 acciones de gestion, el historial,
+# Garantias y Volver. Entrada: Enter del "Presione Enter", 7 = Ventas (su menu
+# queda Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos
+# de pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 10 = Volver en
+# el submenu filtrado.
+printf '\n7\n10\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_ven_ven" 2>&1
 rc_ven_ven=$?
 
@@ -903,21 +906,29 @@ elif [ "$rc_ven_ven" -ne 0 ]; then
 else
     submenu_ven_ven=$(awk '/=== MODULO DE VENTAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_ven_ven")
     n_sub_ven_ven=$(printf '%s\n' "$submenu_ven_ven" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_sub_ven_ven" -ne 15 ]; then
-        echo "FALLO VENDEDOR/Ventas: $n_sub_ven_ven opciones, se esperaban 15"
+    if [ "$n_sub_ven_ven" -ne 10 ]; then
+        echo "FALLO VENDEDOR/Ventas: $n_sub_ven_ven opciones, se esperaban 10"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Venta rapida (carrito)" "Cierre de caja" "Cobrar venta" "Garantias" \
-                 "Reporte por rango" "Ganancias" "Reporte por periodo" \
-                 "Ganancias por periodo" "Historial de venta" "Exportar datos para la web"; do
+    for label in "Venta rapida (carrito)" "Ver venta con IVA" "Cancelar venta" \
+                 "Anular pago" "Devolucion de venta" "Cierre de caja" \
+                 "Cobrar venta" "Historial de venta" "Garantias" \
+                 "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_ven_ven" | grep -Fq "$label"; then
             echo "FALLO VENDEDOR/Ventas: falta la opcion '$label'"
             fail=1; fallos=$((fallos+1))
         fi
     done
+    for label in "Reporte por rango" "Ganancias" "Reporte por periodo" \
+                 "Ganancias por periodo" "Exportar datos para la web"; do
+        if printf '%s\n' "$submenu_ven_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Ventas: el submenu muestra '$label' sin CONSULTAR_REPORTES"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK VENDEDOR/Ventas (15 opciones, con reportes)"
+        echo "OK VENDEDOR/Ventas (10 opciones, sin reportes)"
     fi
 fi
 

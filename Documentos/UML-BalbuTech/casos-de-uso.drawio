@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="balbutech-casos-uso" name="Casos de uso">
+    <mxGraphModel dx="100" dy="100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1740" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="sistema" value="BalbuTechApp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;verticalAlign=top;fontStyle=1;fontSize=18;spacingTop=8;" vertex="1" parent="1"><mxGeometry x="380" y="60" width="1180" height="1080" as="geometry"/></mxCell>
+        <mxCell id="a_admin" value="Administrador" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1"><mxGeometry x="150" y="290" width="40" height="70" as="geometry"/></mxCell>
+        <mxCell id="a_vendedor" value="Vendedor / Cajero" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1"><mxGeometry x="150" y="700" width="40" height="70" as="geometry"/></mxCell>
+        <mxCell id="a_rrhh" value="RRHH" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1"><mxGeometry x="1640" y="350" width="40" height="70" as="geometry"/></mxCell>
+        <mxCell id="u_sesion" value="Iniciar sesión" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="100" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_cerrar" value="Cerrar sesión" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="190" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_roles" value="Gestionar roles&lt;br&gt;y permisos" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="290" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_usuarios" value="Gestionar usuarios" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="376" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_catalogo" value="Gestionar catálogo y maestros&lt;br&gt;(productos, marcas, categorías,&lt;br&gt;proveedores, métodos de pago)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="462" width="200" height="88" as="geometry"/></mxCell>
+        <mxCell id="u_compras" value="Gestionar compras&lt;br&gt;a proveedores" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="580" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_pagar" value="Pagar a proveedores" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="666" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_devolverProv" value="Devolver mercancía&lt;br&gt;al proveedor" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="752" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_ajustarInv" value="Ajustar inventario" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="838" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_logs" value="Ver logs de accesos" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="924" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_reportes" value="Ver reportes&lt;br&gt;y ganancias" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="430" y="1010" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_venta" value="Registrar venta" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="290" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_cobrar" value="Cobrar venta" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="376" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_descontar" value="Descontar stock&lt;br&gt;(automático)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="462" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_garantia" value="Emitir garantía" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="548" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_reclamo" value="Registrar reclamo&lt;br&gt;de garantía" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="634" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_devolCliente" value="Atender devolución&lt;br&gt;de cliente" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="720" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_clientes" value="Gestionar clientes" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="806" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_consultarInv" value="Consultar inventario&lt;br&gt;y stock crítico" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="892" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_exportar" value="Exportar datos&lt;br&gt;a la página web" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="978" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_empleados" value="Gestionar empleados" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1150" y="290" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_asistencia" value="Registrar y justificar&lt;br&gt;asistencia" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1150" y="376" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_vacaciones" value="Gestionar vacaciones&lt;br&gt;y permisos laborales" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1150" y="462" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="u_contratos" value="Generar contratos" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1150" y="548" width="200" height="66" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_sesion" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_sesion"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_cerrar" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_cerrar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_venta" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_venta"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_devolCliente" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_devolCliente"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_reclamo" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_reclamo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_garantia" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_garantia"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_clientes" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_clientes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_consultarInv" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_consultarInv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_reportes" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_reportes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_vendedor_exportar" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_vendedor" target="u_exportar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_sesion" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_sesion"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_cerrar" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_cerrar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_roles" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_roles"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_usuarios" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_usuarios"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_catalogo" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_catalogo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_compras" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_compras"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_ajustarInv" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_ajustarInv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_logs" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_logs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_admin_reportes" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_admin" target="u_reportes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_sesion" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_sesion"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_cerrar" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_cerrar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_empleados" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_empleados"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_asistencia" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_asistencia"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_vacaciones" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_vacaciones"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l_rrhh_contratos" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="a_rrhh" target="u_contratos"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="io1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="u_venta" target="u_cobrar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="io2" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="u_venta" target="u_descontar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="io3" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="u_compras" target="u_pagar"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="io4" value="«extend»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="u_garantia" target="u_venta"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="io5" value="«extend»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="u_devolverProv" target="u_compras"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
