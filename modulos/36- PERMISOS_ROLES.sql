@@ -94,17 +94,25 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_EMPLEADOS';
 DELETE FROM PERMISOS
  WHERE NOMBRE_PERMISO IN ('GESTIONAR_CLIENTES', 'CONSULTAR_CLIENTES');
 
+-- (23/10/2026) Proveedores: el permiso unico GESTIONAR_PROVEEDORES se
+-- reemplazo por 4 permisos finos (PROVEEDORES_VER, CREAR, EDITAR y ESTADO).
+-- El ON DELETE CASCADE limpia sus pares en ROL_PERMISO. El binario nuevo debe
+-- estar desplegado antes de reimportar este modulo (modulo 46 hace lo mismo
+-- para la base viva sin reimportar toda la matriz).
+DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
+
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (22/10/2026) 31 permisos: el modulo Usuarios usa 5 permisos finos
+-- (23/10/2026) 34 permisos: el modulo Usuarios usa 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
 -- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, GESTIONAR_CONTRATOS,
--- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO) y el modulo
--- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO) en lugar de los viejos
--- GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES y
--- CONSULTAR_CLIENTES. La asistencia tiene sus propios permisos
--- (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y JUSTIFICAR_ASISTENCIA) desde
--- el 23/10/2026 (modulo 45).
+-- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO), el modulo
+-- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO) y el modulo
+-- Proveedores usa 4 (PROVEEDORES_VER, CREAR, EDITAR y ESTADO) en lugar de los
+-- viejos GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES,
+-- CONSULTAR_CLIENTES y GESTIONAR_PROVEEDORES. La asistencia tiene sus propios
+-- permisos (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y
+-- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -123,7 +131,10 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('CLIENTES_CREAR', 'Registrar clientes'),
 ('CLIENTES_EDITAR', 'Actualizar datos de clientes'),
 ('CLIENTES_ESTADO', 'Activar o desactivar clientes'),
-('GESTIONAR_PROVEEDORES', 'Gestionar proveedores'),
+('PROVEEDORES_VER', 'Consultar y buscar proveedores'),
+('PROVEEDORES_CREAR', 'Registrar proveedores'),
+('PROVEEDORES_EDITAR', 'Actualizar datos de proveedores'),
+('PROVEEDORES_ESTADO', 'Activar o desactivar proveedores'),
 ('GESTIONAR_CATEGORIAS', 'Gestionar categorias'),
 ('GESTIONAR_MARCAS', 'Gestionar marcas'),
 ('GESTIONAR_PRODUCTOS', 'Gestionar productos'),
@@ -147,7 +158,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 31 permisos del sistema).
+-- ADMIN: acceso total (los 34 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -245,7 +256,10 @@ WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_MARCAS',
     'GESTIONAR_INVENTARIO',
     'GESTIONAR_COMPRAS',
-    'GESTIONAR_PROVEEDORES',
+    'PROVEEDORES_VER',
+    'PROVEEDORES_CREAR',
+    'PROVEEDORES_EDITAR',
+    'PROVEEDORES_ESTADO',
     'CONSULTAR_PRODUCTOS',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'

@@ -22,13 +22,14 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (31, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (34, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
 `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO`,
 `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`,
-`GESTIONAR_PROVEEDORES`, `GESTIONAR_CATEGORIAS`,
+`PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`,
+`PROVEEDORES_ESTADO`, `GESTIONAR_CATEGORIAS`,
 `GESTIONAR_MARCAS`, `GESTIONAR_PRODUCTOS`, `GESTIONAR_METODOS_PAGO`,
 `GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `GESTIONAR_COMPRAS`,
 `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `CONSULTAR_PRODUCTOS`,
@@ -52,6 +53,12 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > `CONSULTAR_CLIENTES` **ya no existen**: el import los borra del catálogo y el
 > `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 >
+> **El módulo Proveedores usa 4 permisos finos** (`PROVEEDORES_VER`,
+> `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR` y `PROVEEDORES_ESTADO`). El viejo
+> `GESTIONAR_PROVEEDORES` **ya no existe**: el import lo borra del catálogo y el
+> `ON DELETE CASCADE` limpia sus pares. La migración de una base existente es
+> el módulo 46, que preserva los roles personalizados que tenían el paraguas.
+>
 > **`CONSULTAR_REPORTES` no da acceso a ningún módulo**: solo filtra opciones una
 > vez adentro. **`REGISTRAR_ASISTENCIA` abre el ítem `Asistencia` del menú
 > principal** y adentro habilita `Marcar entrada/salida` y `Mi asistencia`.
@@ -65,10 +72,10 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 31 se consultan en el código**: los de Empleados y Asistencia en
-> `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Productos en
-> `productos.cpp` y los de Ventas en `ventas.cpp`; el menú principal, en
-> `roles.cpp`. `REGISTRAR_ASISTENCIA` abre el ítem propio `Asistencia` (primero
+> **Los 34 se consultan en el código**: los de Empleados y Asistencia en
+> `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Proveedores en
+> `proveedores.cpp`, los de Productos en `productos.cpp` y los de Ventas en
+> `ventas.cpp`; el menú principal, en `roles.cpp`. `REGISTRAR_ASISTENCIA` abre el ítem propio `Asistencia` (primero
 > del menú), no `Empleados`. `SOLICITAR_PERMISO` lo usa el menú principal
 > (`Mis permisos` y `Mis vacaciones`).
 
@@ -92,12 +99,12 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 31** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (25) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (19) |
+| `ADMIN` | **los 34** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (28) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (22) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
 | `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (10) |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (9) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (12) |
 | `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
 
 ### Mapa del submenú de Clientes
@@ -113,6 +120,24 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 | 4 | Buscar Cliente | `CLIENTES_VER` |
 | 5 | Listar Clientes | `CLIENTES_VER` |
 | 6 | Volver al Menu Principal | *(siempre)* |
+
+### Mapa del submenú de Proveedores
+
+El submenú conserva el orden histórico de 6 opciones, pero **numera solo lo
+visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Agregar proveedor | `PROVEEDORES_CREAR` |
+| 2 | Actualizar proveedor | `PROVEEDORES_EDITAR` |
+| 3 | Activar/Desactivar proveedor | `PROVEEDORES_ESTADO` |
+| 4 | Buscar proveedor | `PROVEEDORES_VER` |
+| 5 | Listar proveedores | `PROVEEDORES_VER` |
+| 6 | Volver al Menu Principal | *(siempre)* |
+
+> **El corte cae donde el módulo solo tenía un permiso de acceso.** Un rol con
+> solo `PROVEEDORES_VER` ve 3 opciones (Buscar, Listar, Volver); `ALMACEN`, con
+> los cuatro, sigue viendo las 6.
 
 ### Mapa del submenú de Empleados
 
@@ -248,7 +273,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 31 sembrados.
+> 34 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 

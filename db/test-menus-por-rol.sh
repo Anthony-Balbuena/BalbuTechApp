@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -422,6 +422,122 @@ else
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK CONTABILIDAD/Clientes (3 opciones en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Proveedores con permisos finos (23/10/2026): un rol con SOLO
+# PROVEEDORES_VER ve Proveedores en el menu principal y, adentro, solo las dos
+# consultas mas Volver.
+# ---------------------------------------------------------------------------
+ROL_PROV="PRUEBA_PROV_VER"
+USR_PROV="prueba_prov_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_PROV';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTPV001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_PROV';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_PROV';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_PROV')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_PROV', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='PROVEEDORES_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA PROV VER','TESTPV001','PRUEBA',1000,'T-PV-001','pv-001@test.local','2026-10-23');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_PROV', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTPV001' AND R.NOMBRE_ROL='$ROL_PROV';
+EOF
+
+fallos_previos=$fallos
+salida_prov="$TMP/out-proveedores-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Proveedores (con este rol es la
+# primera opcion visible: el menu queda Proveedores, Ver permisos y Cerrar
+# sesion), 3 = Volver en un submenu de 3 opciones.
+printf '\n1\n3\n' | BALBU_USER="$USR_PROV" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_prov" 2>&1
+rc_prov=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_prov"; then
+    echo "FALLO $ROL_PROV: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_prov" -ne 0 ]; then
+    echo "FALLO $ROL_PROV: la app salio con $rc_prov"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_prov=$(sed -n '1,/=== MODULO PROVEEDORES ===/p' "$salida_prov")
+    n_principal_prov=$(printf '%s\n' "$principal_prov" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_prov" -ne 3 ]; then
+        echo "FALLO $ROL_PROV: $n_principal_prov opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Proveedores" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_prov" | grep -Fq "$label"; then
+            echo "FALLO $ROL_PROV: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_prov=$(awk '/=== MODULO PROVEEDORES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_prov")
+    n_sub_prov=$(printf '%s\n' "$submenu_prov" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_prov" -ne 3 ]; then
+        echo "FALLO $ROL_PROV: $n_sub_prov opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar proveedor" "Listar proveedores" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_prov" | grep -Fq "$label"; then
+            echo "FALLO $ROL_PROV: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar proveedor" "Actualizar proveedor" "Activar/Desactivar proveedor"; do
+        if printf '%s\n' "$submenu_prov" | grep -Fq "$label"; then
+            echo "FALLO $ROL_PROV: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_PROV (3 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# ALMACEN con los 4 permisos de Proveedores (23/10/2026): ve el submenu
+# historico completo de 6 opciones.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_prov_alm="$TMP/out-proveedores-almacen.txt"
+# Entrada: Enter del "Presione Enter", 4 = Proveedores (su menu queda
+# Asistencia, Mis permisos, Mis vacaciones, Proveedores, ...), 6 = Volver.
+printf '\n4\n6\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_prov_alm" 2>&1
+rc_prov_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_prov_alm"; then
+    echo "FALLO ALMACEN/Proveedores: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_prov_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Proveedores: la app salio con $rc_prov_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_prov_alm=$(awk '/=== MODULO PROVEEDORES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_prov_alm")
+    n_sub_prov_alm=$(printf '%s\n' "$submenu_prov_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_prov_alm" -ne 6 ]; then
+        echo "FALLO ALMACEN/Proveedores: $n_sub_prov_alm opciones en el submenu, se esperaban 6"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar proveedor" "Actualizar proveedor" "Activar/Desactivar proveedor" \
+                 "Buscar proveedor" "Listar proveedores" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_prov_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Proveedores: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Proveedores (6 opciones)"
     fi
 fi
 

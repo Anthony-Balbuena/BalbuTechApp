@@ -7,7 +7,7 @@ pero únicos si se usan**; dirección opcional. Todo proveedor arranca
 Es referenciado por `PRODUCTOS.ID_PROVEEDOR` (proveedor preferido) y por
 `PRODUCTO_PROVEEDOR` (mapa producto–proveedor, módulo 40).
 
-Fuente: `modulos/5- PROVEEDORES.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/5- PROVEEDORES.sql` · Base: `BALBU_TECH` · Revisado: 23/10/2026.
 
 ## Tablas
 
@@ -81,6 +81,23 @@ Inserta y devuelve
 Devuelve `ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, DIRECCION, ESTADO`
 (sin fecha), ordenado por ID. Con filtro vacío/`NULL` trae todos; con texto
 busca `LIKE '%<texto>%'` en **nombre o teléfono**.
+
+## Permisos (app)
+
+Desde el 23/10/2026 el módulo usa 4 permisos finos (módulo 46) en lugar del
+paraguas `GESTIONAR_PROVEEDORES`:
+
+| Permiso | Acción |
+|---|---|
+| `PROVEEDORES_VER` | Buscar y listar |
+| `PROVEEDORES_CREAR` | Agregar |
+| `PROVEEDORES_EDITAR` | Actualizar |
+| `PROVEEDORES_ESTADO` | Activar/Desactivar |
+
+`ADMIN`, `GERENTE`, `SUBGERENTE` y `ALMACEN` tienen los cuatro; `VENDEDOR`,
+`RRHH` y `CONTABILIDAD` no ven el ítem. El submenú numera solo lo visible: un
+rol con solo `PROVEEDORES_VER` ve Buscar, Listar y Volver (3 opciones);
+`ALMACEN` ve las 6.
 
 ## Reglas de negocio
 

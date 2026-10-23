@@ -3,26 +3,63 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <vector>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
 
-void mostrarMenuProveedores() {
+namespace {
+
+enum class AccionProveedor { Agregar, Actualizar, Estado, Buscar, Listar, Volver };
+
+struct OpcionProveedor {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionProveedor accion;
+};
+
+static const vector<OpcionProveedor>& opcionesProveedores() {
+    static const vector<OpcionProveedor> opciones = {
+        {"Agregar proveedor",            "PROVEEDORES_CREAR",  AccionProveedor::Agregar},
+        {"Actualizar proveedor",         "PROVEEDORES_EDITAR", AccionProveedor::Actualizar},
+        {"Activar/Desactivar proveedor", "PROVEEDORES_ESTADO", AccionProveedor::Estado},
+        {"Buscar proveedor",             "PROVEEDORES_VER",    AccionProveedor::Buscar},
+        {"Listar proveedores",           "PROVEEDORES_VER",    AccionProveedor::Listar},
+        {"Volver al Menu Principal",     "",                   AccionProveedor::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionProveedor& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionProveedor*> opcionesVisibles() {
+    vector<const OpcionProveedor*> visibles;
+    for (const OpcionProveedor& opcion : opcionesProveedores()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+static void imprimirMenuProveedores(const vector<const OpcionProveedor*>& visibles) {
     cout << "\n=== MODULO PROVEEDORES ===" << endl;
-    cout << "1. Agregar proveedor" << endl;
-    cout << "2. Actualizar proveedor" << endl;
-    cout << "3. Activar/Desactivar proveedor" << endl;
-    cout << "4. Buscar proveedor" << endl;
-    cout << "5. Listar proveedores" << endl;
-    cout << "6. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionProveedor* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "===========================" << endl;
 }
+
+}  // namespace
 
 void registrarProveedor() {
     cout << "\n--- REGISTRO DE PROVEEDOR ---" << endl;
@@ -185,39 +222,31 @@ void listarProveedores() {
 }
 
 void ejecutarSubmenuProveedores() {
-    int opcion = 0;
+    for (;;) {
+        vector<const OpcionProveedor*> visibles = opcionesVisibles();
+        imprimirMenuProveedores(visibles);
 
-    do {
-        mostrarMenuProveedores();
+        int opcion = 0;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
+            return;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
 
-        switch (opcion) {
-            case 1:
-                registrarProveedor();
-                break;
-            case 2:
-                actualizarProveedor();
-                break;
-            case 3:
-                cambiarEstadoProveedor();
-                break;
-            case 4:
-                buscarProveedor();
-                break;
-            case 5:
-                listarProveedores();
-                break;
-            case 6:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        const OpcionProveedor& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionProveedor::Agregar:    registrarProveedor(); break;
+            case AccionProveedor::Actualizar: actualizarProveedor(); break;
+            case AccionProveedor::Estado:     cambiarEstadoProveedor(); break;
+            case AccionProveedor::Buscar:     buscarProveedor(); break;
+            case AccionProveedor::Listar:     listarProveedores(); break;
+            case AccionProveedor::Volver:     return;
         }
-        if (opcion != 6) pausar();
-    } while (opcion != 6);
+        pausar();
+    }
 }
 
