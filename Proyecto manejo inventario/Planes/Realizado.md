@@ -42,7 +42,7 @@
 ## C++ — app
 
 - Base 10-11/10: submenús 9/9, `unique_ptr`, drenaje de resultados, pausa, autologin de pruebas.
-- Ventas Partes 1–4 (11/10): botón 10 por rol, carrito en memoria (sin tabla CARRITO), cierre con cancelación automática, pago por BRUTO + ticket. Detalle histórico en `Modulo Ventas Caja - 11-10-2026.md`.
+- Ventas Partes 1–4 (11/10): botón 10 por rol, carrito en memoria (sin tabla CARRITO), cierre con cancelación automática, pago por BRUTO + ticket. Detalle histórico en los commits del 11/10.
 - Menú ventas 12/10: devolución UI, cierre de caja, reporte por rango `AAAA-MM-DD`, ver pagos.
 - Pantalla de pago 12/10: métodos por ID, `A PAGAR / RECIBIDO / DEVUELTO`.
 - Costo en buscar-productos + `8. Ganancias` (mensual + líneas). Buscar alineado con CANTIDAD (`printf`).
@@ -374,3 +374,98 @@ ganancia o una pérdida que no existía.
   una segunda entrada al costo, fuera de la regla automática.
 - `DETALLES_VENTA.MONTO_GANANCIA` es un snapshot: las ganancias ya registradas
   no se recalculan con este fix (solo las ventas futuras).
+
+## 22/10 — Migración de roles aplicada a la viva
+
+La viva `BALBU_TECH` seguía con el set viejo (6 roles, 18 permisos paraguas)
+mientras el código ya esperaba los permisos finos: el menú de ADMIN escondía
+**Usuarios** y **Clientes** sin dar ningún error. `BALBU_TECH_TEST` sí estaba
+migrada.
+
+- Backup previo: `backups/pre_roles_20261022_200029.sql` (594 KB, 43 tablas, 167 SPs).
+- Orden aplicado: `44- MIGRACION_ROLES.sql` → `36- PERMISOS_ROLES.sql` → `44` otra vez
+  (idempotente). El `3- ROLES.sql` **no** sirve sobre una base existente: su
+  `CREATE TABLE ROLES` no tiene `IF NOT EXISTS` y corta con `ERROR 1050`.
+- Resultado: 7 roles (ADMIN 30, GERENTE 24, SUBGERENTE 16, RRHH 10, VENDEDOR 10,
+  ALMACEN 8, CONTABILIDAD 3), 30 permisos, EMPLEADO y CAJERO retirados.
+- Matriz idéntica a TEST (diff vacío). `FN_TIENE_PERMISO` responde 1 para los
+  permisos nuevos y 0 para uno inexistente.
+- Contrato #4 (Jose Alcantara, cédula 40229519463, empleado 1) y los 9 empleados
+  intactos. `check-app-sps` → `Faltantes: 0 (verificados 93)`.
+- `bash build.sh` → `OK: ./output/app` (el binario estaba viejo: `productos.cpp`
+  y `ventas.cpp` eran más nuevos que el ejecutable).
+
+**Pendiente**
+- Terminar la migración de permisos finos de los módulos que faltan (P0 de
+  `PENDIENTES.md`).
+- `VENDEDOR` ve "Empleados" (necesita `REGISTRAR_ASISTENCIA` para fichar) y
+  dentro ve "Ver asistencia", "Asistencia del día" e "Historial" porque tiene
+  `CONSULTAR_REPORTES`: puede ver la asistencia de todos. Decidir si se separa.
+
+## 23/10 — Asistencia como ítem propio (los 7 roles fichan)
+
+La asistencia vivía dentro de **Empleados**: VENDEDOR no tenía el ítem y
+CONTABILIDAD tampoco, así que no podían fichar; y VENDEDOR veía la asistencia
+de todos por `CONSULTAR_REPORTES`.
+
+- Ítem nuevo **Asistencia**, primero del menú principal, visible con
+  `REGISTRAR_ASISTENCIA`. Adentro: `Marcar entrada/salida` y `Mi asistencia`
+  (usa `USUARIOS.ID_EMPLEADO`; nadie marca por otro).
+- `CONSULTAR_ASISTENCIA` (nuevo): `Ver asistencia`, `Asistencia del día` e
+  `Historial`. Lo tienen ADMIN, GERENTE, SUBGERENTE y RRHH. **VENDEDOR no**:
+  conserva `CONSULTAR_REPORTES` y todos los reportes de venta.
+- `REGISTRAR_ASISTENCIA` se sumó a RRHH, ALMACEN y CONTABILIDAD. Nadie perdió
+  permisos.
+- SUBGERENTE conserva Empleados con `EMPLEADOS_VER` (Buscar, Listar, Volver) y
+  recibió `JUSTIFICAR_ASISTENCIA`.
+- `modulos/45- PERMISO_CONSULTAR_ASISTENCIA.sql` (idempotente) + `36` y su `.md`.
+- Matriz final: ADMIN 31, GERENTE 25, SUBGERENTE 19, RRHH 12, VENDEDOR 10,
+  ALMACEN 9, CONTABILIDAD 4; 31 permisos / 110 pares.
+- Tests: `test-menus-por-rol.sh` OK (menú por rol, VENDEDOR sin reportes,
+  SUBGERENTE en Empleados), `test-asistencia-propia.sh` OK (fichaje sin pedir
+  ID), `test-contrato-borrador.sh` 15/15 (índices actualizados),
+  `check-app-sps` 93/0.
+- Viva: backup `backups/pre_asistencia_20261022_221606.sql` (596 KB, 43 tablas),
+  `45` aplicado dos veces. 9 empleados, 1 contrato y 0 asistencias intactos.
+
+**Pendiente**
+- Commitear el cambio (el usuario hace commit/push).
+- RDD: el assess da `high_risk`; la review nativa queda pendiente para cuando el
+  cambio esté commiteado (el worktree mezcla el vault sin commitear).
+
+## 23/10 — Permisos finos de Proveedores (Tanda B, módulo 1)
+
+Proveedores era el último módulo de la Tanda B que seguía con un permiso
+paraguas: `GESTIONAR_PROVEEDORES` abría el ítem y las 6 opciones a la vez.
+
+- `proveedores.cpp` pasó al patrón de `clientes.cpp`: enum de acciones, vector
+  `{etiqueta, permiso, accion}`, lista visible filtrada con `tienePermiso()`,
+  numeración sobre lo visible y despacho por `accion`. `Volver` siempre visible.
+- `roles.cpp`: el ítem Proveedores se muestra con cualquiera de los cuatro
+  permisos finos, no con el paraguas.
+- Permisos: `PROVEEDORES_VER` (Buscar/Listar), `PROVEEDORES_CREAR`,
+  `PROVEEDORES_EDITAR` y `PROVEEDORES_ESTADO`. Los tienen ADMIN, GERENTE,
+  SUBGERENTE y ALMACEN; VENDEDOR, RRHH y CONTABILIDAD no ven el ítem.
+- `modulos/36- PERMISOS_ROLES.sql` y su `.md`: 34 permisos / 122 pares.
+  `modulos/46- PERMISOS_PROVEEDORES.sql` (idempotente) migra bases existentes,
+  preserva roles personalizados que tenían el paraguas y lo borra. Orden:
+  binario nuevo antes del SQL.
+- `modulos/5- PROVEEDORES.md` documenta el mapa del submenú; `00- INDICE.md`
+  queda en 48 módulos (suma los módulos 45 y 46, que faltaban).
+- Tests: `build.sh` OK; `test-menus-por-rol.sh` OK (nuevo `PRUEBA_PROV_VER` con
+  solo `PROVEEDORES_VER` → 3 opciones, y `ALMACEN/Proveedores` → 6 opciones);
+  `test-migracion-roles.sh` OK; `test-asistencia-propia.sh` OK;
+  `test-contrato-borrador.sh` 15/15; `check-app-sps` 93/0.
+- Viva: backup `backups/pre_proveedores_20261022_233409.sql` (596 KB),
+  `46` aplicado dos veces. 34 permisos / 122 pares; los 4 roles con los 4;
+  proveedores, empleados y contratos intactos.
+- Review RDD: no disponible. Las lentes `risk` y `reliability` devolvieron
+  salida vacía (`provider_result_empty`); se declararon no alcanzables y la
+  review terminó en `unachievable_lens_slot`, sin aprobación. Reintentar con
+  otro modelo si se quiere el sello.
+
+**Pendiente**
+- Commit y push (los hace el usuario). El commit de este módulo queda en la rama
+  `feat/permisos-finos-proveedores`.
+- Seguir con Categorías, Marcas, Productos, Métodos de pago, Compras,
+  Inventario, Ventas y Caja.

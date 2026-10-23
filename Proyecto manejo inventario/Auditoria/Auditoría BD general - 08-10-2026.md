@@ -2,7 +2,7 @@
 
 > **Todo lo cerrado de esta auditoría se movió a `../Planes/Realizado.md`** (sección «18/10 — Auditoría BD general (08/10) cerrada») el 18/10/2026.
 > Acá queda únicamente lo que **seguía abierto** al reverificar contra la viva `BALBU_TECH` el 18/10/2026.
-> Alcance: BD. El único ítem de C++ (el 9) quedó porque nació en esta nota; el resto de C++ va en `../Planes/Pendientes - App C++.md`.
+> Alcance: BD. El único ítem de C++ (el 9) quedó porque nació en esta nota; el resto de C++ va en `../Planes/PENDIENTES.md`.
 
 ## 🔴 Con impacto real
 
