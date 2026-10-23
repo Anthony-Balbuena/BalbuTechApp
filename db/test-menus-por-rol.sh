@@ -132,13 +132,13 @@ revisar() {
 }
 
 # Las listas usan | como separador; tienen que coincidir con itemsMenuPrincipal().
-revisar "ADMIN" "$BALBU_USER" 18 "Roles|Usuarios|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Accesos|Ver permisos|Cerrar sesión"
-revisar "GERENTE" "prueba_r7_ger" 15 "Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "SUBGERENTE" "prueba_r7_sub" 15 "Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "RRHH" "prueba_r7_rrhh" 5 "Empleados|Mis permisos|Mis vacaciones|Ver permisos|Cerrar sesión"
-revisar "VENDEDOR" "prueba_r7_ven" 10 "Empleados|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "ALMACEN" "prueba_r7_alm" 10 "Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Ver permisos|Cerrar sesión"
-revisar "CONTABILIDAD" "prueba_r7_con" 4 "Clientes|Productos|Ver permisos|Cerrar sesión"
+revisar "ADMIN" "$BALBU_USER" 19 "Asistencia|Roles|Usuarios|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Accesos|Ver permisos|Cerrar sesión"
+revisar "GERENTE" "prueba_r7_ger" 16 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
+revisar "SUBGERENTE" "prueba_r7_sub" 16 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
+revisar "RRHH" "prueba_r7_rrhh" 6 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Ver permisos|Cerrar sesión"
+revisar "VENDEDOR" "prueba_r7_ven" 10 "Asistencia|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
+revisar "ALMACEN" "prueba_r7_alm" 11 "Asistencia|Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Ver permisos|Cerrar sesión"
+revisar "CONTABILIDAD" "prueba_r7_con" 5 "Asistencia|Clientes|Productos|Ver permisos|Cerrar sesión"
 
 # ---------------------------------------------------------------------------
 # Submenu Usuarios con permisos finos (22/10/2026): un rol con SOLO
@@ -388,9 +388,9 @@ fi
 # ---------------------------------------------------------------------------
 fallos_previos=$fallos
 salida_con="$TMP/out-clientes-contabilidad.txt"
-# Entrada: Enter del "Presione Enter", 1 = Clientes (en su menu queda primero:
+# Entrada: Enter del "Presione Enter", 2 = Clientes (su menu queda Asistencia,
 # Clientes, Productos, Ver permisos y Cerrar sesion), 3 = Volver.
-printf '\n1\n3\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+printf '\n2\n3\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_con" 2>&1
 rc_con=$?
 
@@ -426,48 +426,134 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# VENDEDOR en Empleados (22/10/2026): el rol tiene REGISTRAR_ASISTENCIA, asi que
-# el item "Empleados" del menu principal tambien lo acepta. Sin esa condicion el
-# vendedor no podia fichar: el permiso existia y era inalcanzable.
-# Entrada: Enter del "Presione Enter", 1 = Empleados, 5 = Volver (son 5 opciones).
+# VENDEDOR en Asistencia (23/10/2026): el vendedor ficha desde el item propio
+# y NO ve los reportes de asistencia. Entrada: Enter del "Presione Enter",
+# 1 = Asistencia, 3 = Volver (son 3 opciones).
 # ---------------------------------------------------------------------------
 fallos_previos=$fallos
-salida_ven="$TMP/out-empleados-vendedor.txt"
-printf '\n1\n5\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+salida_ven="$TMP/out-asistencia-vendedor.txt"
+printf '\n1\n3\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_ven" 2>&1
 rc_ven=$?
 
 if ! grep -q "Acceso concedido \[DEV\]" "$salida_ven"; then
-    echo "FALLO VENDEDOR/Empleados: no entro al menu (¿usuario/clave/BD?)"
+    echo "FALLO VENDEDOR/Asistencia: no entro al menu (¿usuario/clave/BD?)"
     fail=1; fallos=$((fallos+1))
 elif [ "$rc_ven" -ne 0 ]; then
-    echo "FALLO VENDEDOR/Empleados: la app salio con $rc_ven"
+    echo "FALLO VENDEDOR/Asistencia: la app salio con $rc_ven"
     fail=1; fallos=$((fallos+1))
 else
-    submenu_ven=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=============================$/ && f{exit}' "$salida_ven")
-    n_sub_ven=$(printf '%s\n' "$submenu_ven" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_sub_ven" -ne 5 ]; then
-        echo "FALLO VENDEDOR/Empleados: $n_sub_ven opciones en el submenu, se esperaban 5"
+    principal_ven=$(sed -n '1,/=== MODULO DE ASISTENCIA ===/p' "$salida_ven")
+    if printf '%s\n' "$principal_ven" | grep -Fq "Empleados"; then
+        echo "FALLO VENDEDOR/Asistencia: el menu principal sigue mostrando Empleados"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Marcar asistencia" "Ver asistencia" "Asistencia del dia" \
-                 "Historial de asistencia" "Volver al Menu Principal"; do
+    if ! printf '%s\n' "$principal_ven" | grep -Fq "Asistencia"; then
+        echo "FALLO VENDEDOR/Asistencia: el menu principal no muestra Asistencia"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    submenu_ven=$(awk '/=== MODULO DE ASISTENCIA ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_ven")
+    n_sub_ven=$(printf '%s\n' "$submenu_ven" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_ven" -ne 3 ]; then
+        echo "FALLO VENDEDOR/Asistencia: $n_sub_ven opciones, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Marcar entrada/salida" "Mi asistencia" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_ven" | grep -Fq "$label"; then
-            echo "FALLO VENDEDOR/Empleados: falta la opcion '$label'"
+            echo "FALLO VENDEDOR/Asistencia: falta la opcion '$label'"
             fail=1; fallos=$((fallos+1))
         fi
     done
-    for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
-                 "Reactivar Empleado" "Justificar asistencia" "Generar contrato" \
-                 "Gestionar permisos" "Gestionar vacaciones"; do
+    for label in "Ver asistencia" "Asistencia del dia" "Historial de asistencia" "Justificar asistencia"; do
         if printf '%s\n' "$submenu_ven" | grep -Fq "$label"; then
-            echo "FALLO VENDEDOR/Empleados: el submenu muestra '$label' sin permiso"
+            echo "FALLO VENDEDOR/Asistencia: muestra '$label' sin CONSULTAR_ASISTENCIA"
             fail=1; fallos=$((fallos+1))
         fi
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK VENDEDOR/Empleados (5 opciones, puede marcar asistencia)"
+        echo "OK VENDEDOR/Asistencia (3 opciones, sin reportes)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# SUBGERENTE en Empleados (23/10/2026): conserva el item con EMPLEADOS_VER.
+# Entrada: Enter del "Presione Enter", 2 = Empleados (su menu queda Asistencia,
+# Empleados, ...), 3 = Volver en un submenu de 3 opciones.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_sub_emp="$TMP/out-empleados-subgerente.txt"
+printf '\n2\n3\n' | BALBU_USER="prueba_r7_sub" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_sub_emp" 2>&1
+rc_sub_emp=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_sub_emp"; then
+    echo "FALLO SUBGERENTE/Empleados: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_sub_emp" -ne 0 ]; then
+    echo "FALLO SUBGERENTE/Empleados: la app salio con $rc_sub_emp"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_sub_emp=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_sub_emp")
+    n_sub_sub_emp=$(printf '%s\n' "$submenu_sub_emp" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_sub_emp" -ne 3 ]; then
+        echo "FALLO SUBGERENTE/Empleados: $n_sub_sub_emp opciones, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Buscar Empleado" "Listar Empleados" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_sub_emp" | grep -Fq "$label"; then
+            echo "FALLO SUBGERENTE/Empleados: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
+                 "Reactivar Empleado" "Marcar entrada/salida" "Generar contrato"; do
+        if printf '%s\n' "$submenu_sub_emp" | grep -Fq "$label"; then
+            echo "FALLO SUBGERENTE/Empleados: muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK SUBGERENTE/Empleados (3 opciones, solo lectura)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# SUBGERENTE en Asistencia (23/10/2026): tiene las 7 opciones, incluida
+# Justificar. Entrada: Enter, 1 = Asistencia, 7 = Volver.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_sub_asi="$TMP/out-asistencia-subgerente.txt"
+printf '\n1\n7\n' | BALBU_USER="prueba_r7_sub" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_sub_asi" 2>&1
+rc_sub_asi=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_sub_asi"; then
+    echo "FALLO SUBGERENTE/Asistencia: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_sub_asi" -ne 0 ]; then
+    echo "FALLO SUBGERENTE/Asistencia: la app salio con $rc_sub_asi"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_sub_asi=$(awk '/=== MODULO DE ASISTENCIA ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_sub_asi")
+    n_sub_sub_asi=$(printf '%s\n' "$submenu_sub_asi" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_sub_asi" -ne 7 ]; then
+        echo "FALLO SUBGERENTE/Asistencia: $n_sub_sub_asi opciones, se esperaban 7"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Marcar entrada/salida" "Mi asistencia" "Ver asistencia" \
+                 "Asistencia del dia" "Historial de asistencia" \
+                 "Justificar asistencia" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_sub_asi" | grep -Fq "$label"; then
+            echo "FALLO SUBGERENTE/Asistencia: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK SUBGERENTE/Asistencia (7 opciones, con Justificar)"
     fi
 fi
 
@@ -479,9 +565,9 @@ fi
 # ---------------------------------------------------------------------------
 fallos_previos=$fallos
 salida_prod_con="$TMP/out-productos-contabilidad.txt"
-# Entrada: Enter del "Presione Enter", 2 = Productos (su menu queda Clientes,
-# Productos, Ver permisos y Cerrar sesion), 4 = Volver en un submenu de 4.
-printf '\n2\n4\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+# Entrada: Enter del "Presione Enter", 3 = Productos (su menu queda Asistencia,
+# Clientes, Productos, Ver permisos y Cerrar sesion), 4 = Volver en un submenu de 4.
+printf '\n3\n4\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_prod_con" 2>&1
 rc_prod_con=$?
 
@@ -649,10 +735,10 @@ fi
 # ---------------------------------------------------------------------------
 fallos_previos=$fallos
 salida_prod_alm="$TMP/out-productos-almacen.txt"
-# Entrada: Enter del "Presione Enter", 6 = Productos (su menu queda Mis
-# permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos, Compras,
-# Inventario, Ver permisos y Cerrar sesion), 7 = Volver en el submenu completo.
-printf '\n6\n7\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+# Entrada: Enter del "Presione Enter", 7 = Productos (su menu queda Asistencia,
+# Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
+# Compras, Inventario, Ver permisos y Cerrar sesion), 7 = Volver.
+printf '\n7\n7\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_prod_alm" 2>&1
 rc_prod_alm=$?
 
@@ -685,7 +771,7 @@ fi
 
 fallos_previos=$fallos
 salida_ven_ven="$TMP/out-ventas-vendedor.txt"
-# Entrada: Enter del "Presione Enter", 7 = Ventas (su menu queda Empleados, Mis
+# Entrada: Enter del "Presione Enter", 7 = Ventas (su menu queda Asistencia, Mis
 # permisos, Mis vacaciones, Clientes, Productos, Metodos de pago, Ventas, Caja
 # (turnos), Ver permisos y Cerrar sesion), 15 = Volver en el submenu completo.
 printf '\n7\n15\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \

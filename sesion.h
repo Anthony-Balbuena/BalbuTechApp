@@ -6,6 +6,7 @@
 struct SesionActual {
     bool activa;
     int idUsuario;
+    int idEmpleado;
     std::string username;
     std::string nombreUsuario;
     int idRol;
@@ -18,7 +19,7 @@ extern SesionActual sesionActual;
 void inicializarSesion();
 void cerrarSesion();
 bool sesionActiva();
-void guardarSesion(int idUsuario, const std::string& username, int idRol, const std::string& rol, const std::string& estadoCuenta);
+void guardarSesion(int idUsuario, int idEmpleado, const std::string& username, int idRol, const std::string& rol, const std::string& estadoCuenta);
 void mostrarSesionActual();
 
 #endif

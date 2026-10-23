@@ -10,7 +10,7 @@ código.
 `empleados.cpp` y el resto de los módulos de UI (cada uno pregunta por su
 permiso).
 
-Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/10/2026.
+Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/10/2026.
 
 ## Tablas
 
@@ -22,7 +22,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (30, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (31, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
@@ -31,7 +31,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 `GESTIONAR_PROVEEDORES`, `GESTIONAR_CATEGORIAS`,
 `GESTIONAR_MARCAS`, `GESTIONAR_PRODUCTOS`, `GESTIONAR_METODOS_PAGO`,
 `GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `GESTIONAR_COMPRAS`,
-`CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`,
+`CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `CONSULTAR_PRODUCTOS`,
 `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` y `GESTIONAR_CONTRATOS`.
 
 > **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `USUARIOS_CREAR`,
@@ -39,11 +39,13 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 > `GESTIONAR_USUARIOS` **ya no existe**: el import lo borra del catálogo y el
 > `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 
-> **El módulo Empleados usa 7 permisos finos** (`EMPLEADOS_VER`,
+> **El módulo Empleados usa 6 permisos finos** (`EMPLEADOS_VER`,
 > `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`,
-> `JUSTIFICAR_ASISTENCIA`, `GESTIONAR_PERMISOS_EMPLEADO` y
-> `GESTIONAR_VACACIONES_EMPLEADO`). El viejo `GESTIONAR_EMPLEADOS` **ya no
-> existe**: mismo borrado en cascada que `GESTIONAR_USUARIOS`.
+> `GESTIONAR_PERMISOS_EMPLEADO` y `GESTIONAR_VACACIONES_EMPLEADO`) más
+> `GESTIONAR_CONTRATOS` para el bloque de contratos. El viejo
+> `GESTIONAR_EMPLEADOS` **ya no existe**: mismo borrado en cascada que
+> `GESTIONAR_USUARIOS`. La asistencia **ya no vive acá**: desde el 23/10/2026
+> tiene su propio ítem y sus propios permisos (ver más abajo).
 
 > **El módulo Clientes usa 4 permisos finos** (`CLIENTES_VER`, `CLIENTES_CREAR`,
 > `CLIENTES_EDITAR` y `CLIENTES_ESTADO`). Los viejos `GESTIONAR_CLIENTES` y
@@ -51,23 +53,24 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 > `ON DELETE CASCADE` limpia sus pares en `ROL_PERMISO`.
 >
 > **`CONSULTAR_REPORTES` no da acceso a ningún módulo**: solo filtra opciones una
-> vez adentro. **`REGISTRAR_ASISTENCIA` sí abre `Empleados`** —sin eso el
-> vendedor no podía fichar— y adentro habilita únicamente `Marcar asistencia`.
-> `VENDEDOR` tiene los dos, así que hoy también ve `Ver asistencia`,
-> `Asistencia del dia` e `Historial de asistencia` por `CONSULTAR_REPORTES`;
-> **eso sigue pendiente de decisión** (si el vendedor no debe ver la asistencia
-> ajena, hace falta un permiso propio para esas tres opciones).
+> vez adentro. **`REGISTRAR_ASISTENCIA` abre el ítem `Asistencia` del menú
+> principal** y adentro habilita `Marcar entrada/salida` y `Mi asistencia`.
+> **`CONSULTAR_ASISTENCIA`** habilita `Ver asistencia`, `Asistencia del dia` e
+> `Historial de asistencia`; **`JUSTIFICAR_ASISTENCIA`**, `Justificar
+> asistencia`. `VENDEDOR`, `ALMACEN` y `CONTABILIDAD` solo tienen el primero:
+> fichan y ven lo suyo, pero no la asistencia ajena. `VENDEDOR` conserva
+> `CONSULTAR_REPORTES` y todos los reportes de venta.
 
 > **El catálogo de permisos no se administra desde la app**: no hay SP de alta,
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 30 se consultan en el código**: los de Empleados en `empleados.cpp`, los
-> de Clientes en `clientes.cpp`, los de Productos en `productos.cpp` y los de
-> Ventas en `ventas.cpp`; el menú principal, en `roles.cpp`;
-> `REGISTRAR_ASISTENCIA` ya no queda suelto (opción 7 del submenú de Empleados).
-> `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
-> `Mis vacaciones`).
+> **Los 31 se consultan en el código**: los de Empleados y Asistencia en
+> `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Productos en
+> `productos.cpp` y los de Ventas en `ventas.cpp`; el menú principal, en
+> `roles.cpp`. `REGISTRAR_ASISTENCIA` abre el ítem propio `Asistencia` (primero
+> del menú), no `Empleados`. `SOLICITAR_PERMISO` lo usa el menú principal
+> (`Mis permisos` y `Mis vacaciones`).
 
 ### ROL_PERMISO
 
@@ -89,13 +92,13 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 22/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 30** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (24) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, los 7 `EMPLEADOS_*` finos y `GESTIONAR_CONTRATOS` (16) |
-| `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES` y `SOLICITAR_PERMISO` (10) |
+| `ADMIN` | **los 31** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (25) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (19) |
+| `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
 | `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (10) |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS`, `SOLICITAR_PERMISO` (8) |
-| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER` (3) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `GESTIONAR_CATEGORIAS`, `GESTIONAR_MARCAS`, `GESTIONAR_INVENTARIO`, `GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (9) |
+| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
 
 ### Mapa del submenú de Clientes
 
@@ -113,8 +116,9 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 
 ### Mapa del submenú de Empleados
 
-El submenú conserva el orden histórico de 18 opciones, pero **numera solo lo
-visible**. Cada opción pide un permiso; `Volver` es siempre visible.
+El submenú conserva el orden histórico sin las 5 opciones de asistencia, pero
+**numera solo lo visible**. Cada opción pide un permiso; `Volver` es siempre
+visible.
 
 | # | Opción | Permiso |
 |---|---|---|
@@ -124,18 +128,36 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 | 4 | Reactivar Empleado | `EMPLEADOS_BAJA` |
 | 5 | Buscar Empleado | `EMPLEADOS_VER` |
 | 6 | Listar Empleados | `EMPLEADOS_VER` |
-| 7 | Marcar asistencia | `REGISTRAR_ASISTENCIA` |
-| 8 | Ver asistencia | `CONSULTAR_REPORTES` |
-| 9 | Justificar asistencia | `JUSTIFICAR_ASISTENCIA` |
-| 10 | Asistencia del dia | `CONSULTAR_REPORTES` |
-| 11 | Historial de asistencia | `CONSULTAR_REPORTES` |
-| 12 | Generar contrato | `GESTIONAR_CONTRATOS` |
-| 13 | Subir contrato (al firmar) | `GESTIONAR_CONTRATOS` |
-| 14 | Ver contratos | `GESTIONAR_CONTRATOS` |
-| 15 | Finalizar contrato | `GESTIONAR_CONTRATOS` |
-| 16 | Gestionar permisos | `GESTIONAR_PERMISOS_EMPLEADO` |
-| 17 | Gestionar vacaciones | `GESTIONAR_VACACIONES_EMPLEADO` |
-| 18 | Volver al Menu Principal | *(siempre)* |
+| 7 | Generar contrato | `GESTIONAR_CONTRATOS` |
+| 8 | Subir contrato (al firmar) | `GESTIONAR_CONTRATOS` |
+| 9 | Ver contratos | `GESTIONAR_CONTRATOS` |
+| 10 | Finalizar contrato | `GESTIONAR_CONTRATOS` |
+| 11 | Gestionar permisos | `GESTIONAR_PERMISOS_EMPLEADO` |
+| 12 | Gestionar vacaciones | `GESTIONAR_VACACIONES_EMPLEADO` |
+| 13 | Volver al Menu Principal | *(siempre)* |
+
+> `SUBGERENTE` conserva el ítem `Empleados` con `EMPLEADOS_VER`: ve solo
+> `Buscar`, `Listar` y `Volver`. `VENDEDOR` ya no entra a Empleados; ficha desde
+> el ítem `Asistencia`.
+
+### Mapa del submenú de Asistencia
+
+El ítem `Asistencia` es el primero del menú principal y se abre con
+`REGISTRAR_ASISTENCIA`. Numera solo lo visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Marcar entrada/salida | `REGISTRAR_ASISTENCIA` |
+| 2 | Mi asistencia | `REGISTRAR_ASISTENCIA` |
+| 3 | Ver asistencia | `CONSULTAR_ASISTENCIA` |
+| 4 | Asistencia del dia | `CONSULTAR_ASISTENCIA` |
+| 5 | Historial de asistencia | `CONSULTAR_ASISTENCIA` |
+| 6 | Justificar asistencia | `JUSTIFICAR_ASISTENCIA` |
+| 7 | Volver al Menu Principal | *(siempre)* |
+
+> `ADMIN`, `GERENTE`, `SUBGERENTE` y `RRHH` ven las 7. `VENDEDOR`, `ALMACEN` y
+> `CONTABILIDAD` ven 3 (`Marcar`, `Mi asistencia`, `Volver`). `Marcar` usa el
+> `ID_EMPLEADO` de `USUARIOS`: nadie marca por otro.
 
 ### Mapa del submenú de Productos
 
@@ -190,8 +212,8 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 > **Número fuera de rango no ejecuta nada**: `0`, un negativo o uno mayor que la
 > última opción visible muestran `Opcion no valida` y reimprimen el submenú. El
 > `0` ya no vuelve atrás en silencio (antes solo pasaba en los submenús; el menú
-> principal nunca lo aceptó). Las cinco pantallas con el patrón —Usuarios,
-> Empleados, Clientes, Productos y Ventas— se comportan igual.
+> principal nunca lo aceptó). Las seis pantallas con el patrón —Asistencia,
+> Usuarios, Empleados, Clientes, Productos y Ventas— se comportan igual.
 
 **Migraciones incluidas** (idempotentes; las 3 primeras son `C-3` del
 20/10/2026, las 3 últimas del 22/10/2026):
@@ -226,7 +248,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 30 sembrados.
+> 31 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 

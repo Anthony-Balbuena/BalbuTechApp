@@ -148,7 +148,7 @@ void mostrarPermisosActuales() {
 // ---------------------------------------------------------------------------
 
 enum class AccionMenu {
-    Roles, Usuarios, Empleados, MisPermisos, MisVacaciones, Clientes, Proveedores, Categorias, Marcas,
+    Asistencia, Roles, Usuarios, Empleados, MisPermisos, MisVacaciones, Clientes, Proveedores, Categorias, Marcas,
     Productos, MetodosPago, Ventas, Compras, Inventario, Caja,
     LogAccesos, VerPermisos, CerrarSesion
 };
@@ -163,11 +163,12 @@ struct ItemMenu {
 // le permiten sus permisos. Agregar un modulo = agregar un item aca.
 static const vector<ItemMenu>& itemsMenuPrincipal() {
     static const vector<ItemMenu> items = {
+        {"Asistencia",       {"REGISTRAR_ASISTENCIA"},                     AccionMenu::Asistencia},
         {"Roles",            {"GESTIONAR_ROLES"},                          AccionMenu::Roles},
         {"Usuarios",         {"USUARIOS_VER", "USUARIOS_CREAR", "USUARIOS_EDITAR", "USUARIOS_ESTADO", "USUARIOS_CLAVE"}, AccionMenu::Usuarios},
         {"Empleados",        {"EMPLEADOS_VER", "EMPLEADOS_CREAR", "EMPLEADOS_EDITAR", "EMPLEADOS_BAJA",
                               "GESTIONAR_PERMISOS_EMPLEADO", "GESTIONAR_VACACIONES_EMPLEADO",
-                              "GESTIONAR_CONTRATOS", "REGISTRAR_ASISTENCIA"}, AccionMenu::Empleados},
+                              "GESTIONAR_CONTRATOS"}, AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},
         {"Clientes",         {"CLIENTES_VER", "CLIENTES_CREAR", "CLIENTES_EDITAR", "CLIENTES_ESTADO"}, AccionMenu::Clientes},
@@ -244,6 +245,7 @@ void ejecutarMenuSegunRol() {
 
         const ItemMenu& elegido = *visibles[opcion - 1];
         switch (elegido.accion) {
+            case AccionMenu::Asistencia:  ejecutarSubmenuAsistencia(); break;
             case AccionMenu::Roles:       ejecutarSubmenuRoles(); break;
             case AccionMenu::Usuarios:    ejecutarSubmenuUsuarios(); break;
             case AccionMenu::Empleados:   ejecutarSubmenuEmpleados(); break;

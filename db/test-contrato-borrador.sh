@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests del flujo de contratos por UI (opciones 12 y 13).
+# Tests del flujo de contratos por UI (opciones 7 a 10 del modulo Empleados).
 #
 # Cubre, ademas de los arreglos del 18/10/2026:
 #   1. Un tipo que no sea TEMPORAL ni FIJO ya no se registra como FIJO mudo.
@@ -143,7 +143,7 @@ borrador "$dir/contratos/T1.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso1.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n18\n0\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n1\n\n13\n0\n' "$out")"
 if saneado "tipo invalido" "$rc" "$out"; then
   if grep -qF "tipo invalido: 'INDEFINIDO'" "$out"; then
     if [ -f "$dir/contratos/T1.borrador" ]; then
@@ -175,7 +175,7 @@ borrador "$dir/contratos/T2.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso2.txt"
-rc="$(correr "$dir" '\n3\n13\n2\n1\n\n18\n0\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n2\n1\n\n13\n0\n' "$out")"
 if saneado "descartar" "$rc" "$out"; then
   problemas=""
   grep -qF "Descartar un borrador" "$out" || problemas="no ofrecio descartar en el menu"
@@ -207,7 +207,7 @@ borrador "$dir/contratos/T3.borrador" \
   "generado=2026-01-01"
 
 out="$TMP/caso3.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n18\n0\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n1\n\n13\n0\n' "$out")"
 if saneado "borrador incompleto" "$rc" "$out"; then
   if grep -qF "El borrador esta incompleto (falta 'cargo')" "$out"; then
     ok "borrador incompleto (sigue frenando)"
@@ -217,12 +217,12 @@ if saneado "borrador incompleto" "$rc" "$out"; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. EOF generando el contrato (opcion 12): no gira.
+# 4. EOF generando el contrato (opcion 7): no gira.
 # ---------------------------------------------------------------------------
-echo "--- 4. EOF pidiendo los datos del contrato (opcion 12) ---"
+echo "--- 4. EOF pidiendo los datos del contrato (opcion 7) ---"
 dir="$(preparar caso4)"
 out="$TMP/caso4.txt"
-rc="$(correr "$dir" '\n3\n12\n' "$out")"
+rc="$(correr "$dir" '\n4\n7\n' "$out")"
 if saneado "EOF generando contrato" "$rc" "$out"; then
   if grep -qF "Operación cancelada" "$out"; then
     ok "EOF generando contrato (corta, no gira)"
@@ -251,7 +251,7 @@ borrador "$dir/contratos/T5.borrador" \
 
 out="$TMP/caso5.txt"
 # Un Enter (nombre) y despues EOF: asi se ven dos prompts del cotejo.
-rc="$(correr "$dir" '\n3\n13\n1\n\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n1\n\n' "$out")"
 if saneado "cotejo EOF" "$rc" "$out"; then
   problemas=""
   grep -qF "COTEJO CONTRA EL PAPEL FIRMADO" "$out" || problemas="no mostro el cotejo"
@@ -286,7 +286,7 @@ borrador "$dir/contratos/T6.borrador" \
   "generado=2026-10-19"
 
 # nombre, cedula, cargo (Enter) + salario 18000 + tipo, fecha, telefono, email (Enter)
-entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nN\n18\n0\n')"
+entrada="$(printf '\n4\n8\n1\n\n\n\n18000\n\n\n\n\nN\n13\n0\n')"
 out="$TMP/caso6.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if saneado "cambio en cotejo" "$rc" "$out"; then
@@ -323,7 +323,7 @@ borrador "$dir/contratos/T7.borrador" \
   "generado=2026-10-19"
 
 # 8 campos con Enter + S + Enter (sin escaneo) + volver/salir
-entrada="$(printf '\n3\n13\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n\n18\n0\n')"
+entrada="$(printf '\n4\n8\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n\n13\n0\n')"
 out="$TMP/caso7.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
@@ -346,10 +346,10 @@ fi
 # ---------------------------------------------------------------------------
 # 8. Generar (12): no consulta EMPLEADOS y valida la cedula a 11 digitos.
 # ---------------------------------------------------------------------------
-echo "--- 8. generar (12) con cedula que no existe y cedula corta ---"
+echo "--- 8. generar (7) con cedula que no existe y cedula corta ---"
 dir="$(preparar caso8)"
 out="$TMP/caso8.txt"
-rc="$(correr "$dir" '\n3\n12\n123\n' "$out")"
+rc="$(correr "$dir" '\n4\n7\n123\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "La cedula debe tener 11 digitos" "$out" || problemas="no rechazo la cedula corta"
@@ -380,8 +380,8 @@ mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e "
           'contratos/T9.html');" 2>/dev/null
 
 out="$TMP/caso9.txt"
-# 3 = Empleados, 1 = Agregar, 1 = elegir el contrato, 3 Enter (tel/email/fecha)
-rc="$(correr "$dir" '\n3\n1\n1\n\n\n\n18\n0\n' "$out")"
+# 4 = Empleados, 1 = Agregar, 1 = elegir el contrato, 3 Enter (tel/email/fecha)
+rc="$(correr "$dir" '\n4\n1\n1\n\n\n\n13\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "Contratos firmados sin empleado" "$out" || problemas="no listo los contratos huerfanos"
@@ -420,7 +420,7 @@ borrador "$dir/contratos/T10.borrador" \
   "html=contratos/T10.html" \
   "generado=2026-10-19"
 
-entrada="$(printf '\n3\n13\n1\n\n\n\n18000\n\n\n\n\nS\n\n18\n0\n')"
+entrada="$(printf '\n4\n8\n1\n\n\n\n18000\n\n\n\n\nS\n\n13\n0\n')"
 out="$TMP/caso10.txt"
 rc="$(correr "$dir" "$entrada" "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
@@ -457,7 +457,7 @@ borrador "$dir/contratos/T11.borrador" \
   "generado=2026-10-19"
 
 out="$TMP/caso11.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n123\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n1\n\n123\n' "$out")"
 if saneado "cedula invalida en cotejo" "$rc" "$out"; then
   if grep -qF "La cedula debe tener 11 digitos" "$out"; then
     ok "cedula invalida en el cotejo (rechazada, sin escribir)"
@@ -485,7 +485,7 @@ borrador "$dir/contratos/T12.borrador" \
   "html=contratos/T12.html" \
   "generado=2026-10-19"
 
-{ printf '\n3\n13\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n/no/existe.pdf\n'; } > "$TMP/in12.txt"
+{ printf '\n4\n8\n1\n'; printf '\n%.0s' 1 2 3 4 5 6 7 8; printf 'S\n/no/existe.pdf\n'; } > "$TMP/in12.txt"
 out="$TMP/caso12.txt"
 rc="$(correr_archivo "$dir" "$TMP/in12.txt" "$out")"
 if saneado "escaneo inexistente" "$rc" "$out"; then
@@ -506,7 +506,7 @@ fi
 # ---------------------------------------------------------------------------
 # 13. Opcion 14: ver los contratos por cedula (funciona sin empleado).
 # ---------------------------------------------------------------------------
-echo "--- 13. ver contratos por cedula (opcion 14) ---"
+echo "--- 13. ver contratos por cedula (opcion 9) ---"
 dir="$(preparar caso13)"
 mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e "
   DELETE FROM CONTRATOS WHERE CEDULA='30299887808';
@@ -518,7 +518,7 @@ mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e "
           'contratos/T13.html');" 2>/dev/null
 
 out="$TMP/caso13.txt"
-rc="$(correr "$dir" '\n3\n14\n30299887808\nN\n18\n0\n' "$out")"
+rc="$(correr "$dir" '\n4\n9\n30299887808\nN\n13\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "Persona: Prueba Ver - Tester" "$out" || problemas="no mostro nombre/cargo del contrato"
@@ -534,9 +534,9 @@ fi
 # ---------------------------------------------------------------------------
 # 14. Opcion 15: finalizar el contrato ACTIVO de una cedula.
 # ---------------------------------------------------------------------------
-echo "--- 14. finalizar contrato por cedula (opcion 15) ---"
+echo "--- 14. finalizar contrato por cedula (opcion 10) ---"
 out="$TMP/caso14.txt"
-rc="$(correr "$dir" '\n3\n15\n30299887808\nS\n18\n0\n' "$out")"
+rc="$(correr "$dir" '\n4\n10\n30299887808\nS\n13\n0\n' "$out")"
 if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "EXITO: CONTRATO" "$out" || problemas="no finalizo el contrato"
@@ -577,7 +577,7 @@ borrador "$dir/contratos/T15.borrador" \
 
 # 1 = elegir el borrador; 6 Enter = nombre..fecha; despues EOF en Telefono.
 out="$TMP/caso15.txt"
-rc="$(correr "$dir" '\n3\n13\n1\n\n\n\n\n\n\n' "$out")"
+rc="$(correr "$dir" '\n4\n8\n1\n\n\n\n\n\n\n' "$out")"
 if saneado "EOF telefono cotejo" "$rc" "$out"; then
   problemas=""
   grep -qF "Telefono [" "$out" || problemas="no llego al prompt del telefono"

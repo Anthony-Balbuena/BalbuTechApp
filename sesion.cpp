@@ -3,11 +3,12 @@
 
 using namespace std;
 
-SesionActual sesionActual = {false, 0, "", "", 0, "", ""};
+SesionActual sesionActual = {false, 0, 0, "", "", 0, "", ""};
 
 void inicializarSesion() {
     sesionActual.activa = false;
     sesionActual.idUsuario = 0;
+    sesionActual.idEmpleado = 0;
     sesionActual.username = "";
     sesionActual.nombreUsuario = "";
     sesionActual.idRol = 0;
@@ -15,9 +16,10 @@ void inicializarSesion() {
     sesionActual.estadoCuenta = "";
 }
 
-void guardarSesion(int idUsuario, const string& username, int idRol, const string& rol, const string& estadoCuenta) {
+void guardarSesion(int idUsuario, int idEmpleado, const string& username, int idRol, const string& rol, const string& estadoCuenta) {
     sesionActual.activa = true;
     sesionActual.idUsuario = idUsuario;
+    sesionActual.idEmpleado = idEmpleado;
     sesionActual.username = username;
     sesionActual.nombreUsuario = username;
     sesionActual.idRol = idRol;
@@ -41,6 +43,7 @@ void mostrarSesionActual() {
 
     cout << "--- SESION ACTIVA ---" << endl;
     cout << "ID Usuario: " << sesionActual.idUsuario << endl;
+    cout << "ID Empleado: " << sesionActual.idEmpleado << endl;
     cout << "Usuario: " << sesionActual.username << endl;
     cout << "Rol: " << sesionActual.nombreRol << endl;
     cout << "Estado: " << sesionActual.estadoCuenta << endl;

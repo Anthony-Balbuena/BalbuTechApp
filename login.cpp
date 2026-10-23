@@ -54,7 +54,7 @@ bool intentarLogin(const string& usuario, const string& password) {
     try {
         // 1) Intentar autenticación en la tabla USUARIOS (esquema unificado)
         std::unique_ptr<sql::PreparedStatement> pSelect(globalCon->prepareStatement(
-            "SELECT U.ID_USUARIO, U.USUARIO, U.CONTRASENA, U.ESTADO, R.ID_ROL, R.NOMBRE_ROL "
+            "SELECT U.ID_USUARIO, U.ID_EMPLEADO, U.USUARIO, U.CONTRASENA, U.ESTADO, R.ID_ROL, R.NOMBRE_ROL "
             "FROM USUARIOS U LEFT JOIN ROLES R ON U.ID_ROL = R.ID_ROL "
             "WHERE U.USUARIO = ?"
         ));
@@ -65,6 +65,7 @@ bool intentarLogin(const string& usuario, const string& password) {
             string storedHash = rsel->getString("CONTRASENA");
             string estadoCuenta = rsel->getString("ESTADO");
             int idUsuario = rsel->getInt("ID_USUARIO");
+            int idEmpleado = rsel->getInt("ID_EMPLEADO");
             string rol;
             try { rol = rsel->getString("NOMBRE_ROL"); } catch (...) { rol = ""; }
             int idRol = 0;
@@ -94,7 +95,7 @@ bool intentarLogin(const string& usuario, const string& password) {
                 }
 
                 registrarAcceso(idUsuario, usuario, "EXITOSO");
-                guardarSesion(idUsuario, usuario, idRol, rol, estadoCuenta);
+                guardarSesion(idUsuario, idEmpleado, usuario, idRol, rol, estadoCuenta);
                 return true;
             }
 

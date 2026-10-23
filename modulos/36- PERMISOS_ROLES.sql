@@ -96,14 +96,15 @@ DELETE FROM PERMISOS
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (22/10/2026) 30 permisos: el modulo Usuarios usa 5 permisos finos
+-- (22/10/2026) 31 permisos: el modulo Usuarios usa 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
--- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, JUSTIFICAR_ASISTENCIA,
+-- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, GESTIONAR_CONTRATOS,
 -- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO) y el modulo
 -- Clientes usa 4 (CLIENTES_VER, CREAR, EDITAR y ESTADO) en lugar de los viejos
 -- GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES y
--- CONSULTAR_CLIENTES. GESTIONAR_CONTRATOS sigue siendo exclusivo del modulo
--- de contratos (20/10/2026, C-3).
+-- CONSULTAR_CLIENTES. La asistencia tiene sus propios permisos
+-- (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y JUSTIFICAR_ASISTENCIA) desde
+-- el 23/10/2026 (modulo 45).
 INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_ROLES', 'Crear, editar y consultar roles del sistema'),
 ('USUARIOS_VER', 'Consultar y buscar usuarios'),
@@ -131,6 +132,7 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
 ('GESTIONAR_COMPRAS', 'Gestionar compras del sistema'),
 ('CONSULTAR_REPORTES', 'Consultar reportes y dashboards'),
+('CONSULTAR_ASISTENCIA', 'Consultar reportes de asistencia'),
 ('CONSULTAR_PRODUCTOS', 'Consultar catalogo de productos'),
 ('REGISTRAR_ASISTENCIA', 'Registrar asistencia de empleados'),
 ('SOLICITAR_PERMISO', 'Solicitar permisos o ausencias'),
@@ -145,7 +147,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 30 permisos del sistema).
+-- ADMIN: acceso total (los 31 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -166,8 +168,10 @@ WHERE NOMBRE_PERMISO NOT IN (
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
--- SUBGERENTE: el GERENTE sin empleados ni contratos (RRHH conserva esas dos).
+-- SUBGERENTE: el GERENTE sin altas, bajas, contratos ni gestion de personal.
 -- (22/10/2026) Conserva los 4 permisos finos de Clientes: no estan en el NOT IN.
+-- (23/10/2026) Suma EMPLEADOS_VER (solo lectura) y JUSTIFICAR_ASISTENCIA:
+-- conserva el item Empleados y puede justificar asistencia.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'SUBGERENTE', ID_PERMISO
 FROM PERMISOS
@@ -178,11 +182,9 @@ WHERE NOMBRE_PERMISO NOT IN (
     'USUARIOS_EDITAR',
     'USUARIOS_ESTADO',
     'USUARIOS_CLAVE',
-    'EMPLEADOS_VER',
     'EMPLEADOS_CREAR',
     'EMPLEADOS_EDITAR',
     'EMPLEADOS_BAJA',
-    'JUSTIFICAR_ASISTENCIA',
     'GESTIONAR_PERMISOS_EMPLEADO',
     'GESTIONAR_VACACIONES_EMPLEADO',
     'GESTIONAR_CONTRATOS'
@@ -205,6 +207,8 @@ WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_VACACIONES_EMPLEADO',
     'GESTIONAR_CONTRATOS',
     'CONSULTAR_REPORTES',
+    'CONSULTAR_ASISTENCIA',
+    'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -243,6 +247,7 @@ WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_COMPRAS',
     'GESTIONAR_PROVEEDORES',
     'CONSULTAR_PRODUCTOS',
+    'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -255,7 +260,8 @@ FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'CONSULTAR_REPORTES',
     'CONSULTAR_PRODUCTOS',
-    'CLIENTES_VER'
+    'CLIENTES_VER',
+    'REGISTRAR_ASISTENCIA'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 

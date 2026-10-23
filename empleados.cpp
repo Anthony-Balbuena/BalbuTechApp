@@ -12,6 +12,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "roles.h"
+#include "sesion.h"
 #include "contrato.h"
 #include "permisos.h"
 #include "vacaciones.h"
@@ -28,7 +29,6 @@ namespace {
 
 enum class AccionEmpleado {
     Agregar, Actualizar, Despedir, Reactivar, Buscar, Listar,
-    MarcarAsistencia, VerAsistencia, Justificar, AsistenciaHoy, Historial,
     GenerarContrato, SubirContrato, VerContratos, FinalizarContrato,
     Permisos, Vacaciones, Volver
 };
@@ -47,11 +47,6 @@ static const vector<OpcionEmpleado>& opcionesEmpleados() {
         {"Reactivar Empleado",           "EMPLEADOS_BAJA",                  AccionEmpleado::Reactivar},
         {"Buscar Empleado",              "EMPLEADOS_VER",                   AccionEmpleado::Buscar},
         {"Listar Empleados",             "EMPLEADOS_VER",                   AccionEmpleado::Listar},
-        {"Marcar asistencia",            "REGISTRAR_ASISTENCIA",            AccionEmpleado::MarcarAsistencia},
-        {"Ver asistencia",               "CONSULTAR_REPORTES",              AccionEmpleado::VerAsistencia},
-        {"Justificar asistencia",        "JUSTIFICAR_ASISTENCIA",           AccionEmpleado::Justificar},
-        {"Asistencia del dia",           "CONSULTAR_REPORTES",              AccionEmpleado::AsistenciaHoy},
-        {"Historial de asistencia",      "CONSULTAR_REPORTES",              AccionEmpleado::Historial},
         {"Generar contrato",             "GESTIONAR_CONTRATOS",             AccionEmpleado::GenerarContrato},
         {"Subir contrato (al firmar)",   "GESTIONAR_CONTRATOS",             AccionEmpleado::SubirContrato},
         {"Ver contratos",                "GESTIONAR_CONTRATOS",             AccionEmpleado::VerContratos},
@@ -362,15 +357,14 @@ void listarEmpleados() {
     }
 }
 
-static int identificarEmpleado() {
-    // EL CORTE: hoy pide el ID; manana la huella entra aqui sin tocar lo demas.
-    return (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
-}
-
 static void marcarAsistenciaAuto() {
     cout << "\n--- MARCAR ASISTENCIA ---" << endl;
     try {
-        int idEmp = identificarEmpleado();
+        int idEmp = sesionActual.idEmpleado;
+        if (idEmp <= 0) {
+            cout << ROJO << "Tu usuario no tiene un empleado asociado." << RESET << endl;
+            return;
+        }
         std::unique_ptr<sql::PreparedStatement> ph(globalCon->prepareStatement("SELECT CURTIME() AS HORA"));
         std::unique_ptr<sql::ResultSet> rh(ph->executeQuery());
         string hora = "12:00:00";
@@ -416,7 +410,31 @@ static bool fechaValidaEmpleados(const string &s) {
     return true;
 }
 
-static void verAsistenciaUI() {    cout << "\n--- VER ASISTENCIA ---" << endl;
+static void mostrarReporteAsistencia(int idEmp, const string& ini, const string& fin) {
+    std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL(?, ?, ?)"));
+    pstmt->setInt(1, idEmp);
+    pstmt->setString(2, ini);
+    pstmt->setString(3, fin);
+    std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+    printf("\n%-12s | %-8s | %-8s | %-6s | %-10s\n", "FECHA", "ENTRADA", "SALIDA", "HORAS", "ESTADO");
+    bool hay = false;
+    while (res->next()) {
+        hay = true;
+        string ent("--:--:--"), sal("--:--:--"), est("?");
+        try { ent = res->getString("HORA_ENTRADA").c_str(); } catch (...) {}
+        try { sal = res->getString("HORA_SALIDA").c_str(); } catch (...) {}
+        double hs = 0.0;
+        try { hs = res->getDouble("HORAS_TRABAJADAS"); } catch (...) {}
+        try { est = res->getString("ESTADO").c_str(); } catch (...) {}
+        printf("%-12.12s | %-8.8s | %-8.8s | %-6.2f | %-10.10s\n",
+               res->getString("FECHA").c_str(), ent.c_str(), sal.c_str(), hs, est.c_str());
+    }
+    if (!hay) cout << "[!] Sin registros." << endl;
+    drenarResultados(pstmt.get());
+}
+
+static void verAsistenciaUI() {
+    cout << "\n--- VER ASISTENCIA ---" << endl;
     try {
         int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
         string ini = leerDatoSeguro("Desde (AAAA-MM-DD): ");
@@ -425,26 +443,7 @@ static void verAsistenciaUI() {    cout << "\n--- VER ASISTENCIA ---" << endl;
             cout << ROJO << "Rango invalido. Use AAAA-MM-DD." << RESET << endl;
             return;
         }
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL 11_SP_REPORTE_ASISTENCIA_INDIVIDUAL(?, ?, ?)"));
-        pstmt->setInt(1, idEmp);
-        pstmt->setString(2, ini);
-        pstmt->setString(3, fin);
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-12s | %-8s | %-8s | %-6s | %-10s\n", "FECHA", "ENTRADA", "SALIDA", "HORAS", "ESTADO");
-        bool hay = false;
-        while (res->next()) {
-            hay = true;
-            string ent("--:--:--"), sal("--:--:--"), est("?");
-            try { ent = res->getString("HORA_ENTRADA").c_str(); } catch (...) {}
-            try { sal = res->getString("HORA_SALIDA").c_str(); } catch (...) {}
-            double hs = 0.0;
-            try { hs = res->getDouble("HORAS_TRABAJADAS"); } catch (...) {}
-            try { est = res->getString("ESTADO").c_str(); } catch (...) {}
-            printf("%-12.12s | %-8.8s | %-8.8s | %-6.2f | %-10.10s\n",
-                   res->getString("FECHA").c_str(), ent.c_str(), sal.c_str(), hs, est.c_str());
-        }
-        if (!hay) cout << "[!] Sin registros." << endl;
-        drenarResultados(pstmt.get());
+        mostrarReporteAsistencia(idEmp, ini, fin);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
@@ -452,9 +451,45 @@ static void verAsistenciaUI() {    cout << "\n--- VER ASISTENCIA ---" << endl;
     }
 }
 
+// Mi asistencia: solo la propia, con el empleado de la sesion.
+static void miAsistenciaUI() {
+    cout << "\n--- MI ASISTENCIA ---" << endl;
+    try {
+        int idEmp = sesionActual.idEmpleado;
+        if (idEmp <= 0) {
+            cout << ROJO << "Tu usuario no tiene un empleado asociado." << RESET << endl;
+            return;
+        }
+        string iniDef, finDef;
+        std::unique_ptr<sql::PreparedStatement> pd(globalCon->prepareStatement(
+            "SELECT DATE_FORMAT(CURDATE(), '%Y-%m-01') AS INI, CURDATE() AS FIN"));
+        std::unique_ptr<sql::ResultSet> rd(pd->executeQuery());
+        if (rd->next()) {
+            iniDef = rd->getString("INI");
+            finDef = rd->getString("FIN");
+        }
+        drenarResultados(pd.get());
+
+        string ini = leerDatoSeguro("Desde (AAAA-MM-DD, Enter = " + iniDef + "): ");
+        string fin = leerDatoSeguro("Hasta (AAAA-MM-DD, Enter = " + finDef + "): ");
+        if (ini.empty()) ini = iniDef;
+        if (fin.empty()) fin = finDef;
+        if (!fechaValidaEmpleados(ini) || !fechaValidaEmpleados(fin) || ini > fin) {
+            cout << ROJO << "Rango invalido. Use AAAA-MM-DD." << RESET << endl;
+            return;
+        }
+        mostrarReporteAsistencia(idEmp, ini, fin);
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo ver tu asistencia." << RESET << endl;
+    }
+}
+
 // (17/10/2026) Asistencia v2 - justificar: cambia el estado de UN dia ya
 // marcado (AUSENTE/TARDE/PERMISO) con motivo. Bloquea fechas > 7 dias via
-// 11_SP_BLOQUEAR_EDICION_ANTIGUA. Solo admin.
+// 11_SP_BLOQUEAR_EDICION_ANTIGUA. Lo habilitan JUSTIFICAR_ASISTENCIA (ADMIN,
+// GERENTE, SUBGERENTE y RRHH).
 static void justificarAsistenciaUI() {
     cout << "\n--- JUSTIFICAR ASISTENCIA ---" << endl;
     try {
@@ -643,11 +678,6 @@ void ejecutarSubmenuEmpleados() {
             case AccionEmpleado::Reactivar:         reactivarEmpleado(); break;
             case AccionEmpleado::Buscar:            buscarEmpleado(); break;
             case AccionEmpleado::Listar:            listarEmpleados(); break;
-            case AccionEmpleado::MarcarAsistencia:  marcarAsistenciaAuto(); break;
-            case AccionEmpleado::VerAsistencia:     verAsistenciaUI(); break;
-            case AccionEmpleado::Justificar:        justificarAsistenciaUI(); break;
-            case AccionEmpleado::AsistenciaHoy:     asistenciaHoyUI(); break;
-            case AccionEmpleado::Historial:         historialAsistenciaUI(); break;
             case AccionEmpleado::GenerarContrato:   generarContratoUI(); break;
             case AccionEmpleado::SubirContrato:     subirContratoUI(); break;
             case AccionEmpleado::VerContratos:      consultarContratosUI(); break;
@@ -655,6 +685,86 @@ void ejecutarSubmenuEmpleados() {
             case AccionEmpleado::Permisos:          gestionarPermisosUI(); break;
             case AccionEmpleado::Vacaciones:        gestionarVacacionesUI(); break;
             case AccionEmpleado::Volver:            return;
+        }
+        pausar();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Submenu de Asistencia (23/10/2026): la asistencia deja de vivir dentro de
+// Empleados. Marcar y Mi asistencia son para todos; los reportes quedan para
+// quien tenga CONSULTAR_ASISTENCIA (VENDEDOR no lo tiene).
+// ---------------------------------------------------------------------------
+enum class AccionAsistencia {
+    Marcar, MiAsistencia, Ver, Hoy, Historial, Justificar, Volver
+};
+
+struct OpcionAsistencia {
+    const char* etiqueta;
+    const char* permiso;
+    AccionAsistencia accion;
+};
+
+static const vector<OpcionAsistencia>& opcionesAsistencia() {
+    static const vector<OpcionAsistencia> opciones = {
+        {"Marcar entrada/salida",     "REGISTRAR_ASISTENCIA",  AccionAsistencia::Marcar},
+        {"Mi asistencia",             "REGISTRAR_ASISTENCIA",  AccionAsistencia::MiAsistencia},
+        {"Ver asistencia",            "CONSULTAR_ASISTENCIA",  AccionAsistencia::Ver},
+        {"Asistencia del dia",        "CONSULTAR_ASISTENCIA",  AccionAsistencia::Hoy},
+        {"Historial de asistencia",   "CONSULTAR_ASISTENCIA",  AccionAsistencia::Historial},
+        {"Justificar asistencia",     "JUSTIFICAR_ASISTENCIA", AccionAsistencia::Justificar},
+        {"Volver al Menu Principal",  "",                      AccionAsistencia::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerAsistencia(const OpcionAsistencia& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionAsistencia*> opcionesAsistenciaVisibles() {
+    vector<const OpcionAsistencia*> visibles;
+    for (const OpcionAsistencia& opcion : opcionesAsistencia()) {
+        if (puedeVerAsistencia(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+static void imprimirMenuAsistencia(const vector<const OpcionAsistencia*>& visibles) {
+    cout << "\n=== MODULO DE ASISTENCIA ===" << endl;
+    int n = 0;
+    for (const OpcionAsistencia* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
+    cout << "============================" << endl;
+}
+
+void ejecutarSubmenuAsistencia() {
+    for (;;) {
+        vector<const OpcionAsistencia*> visibles = opcionesAsistenciaVisibles();
+        imprimirMenuAsistencia(visibles);
+
+        int opcion = 0;
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        if (!leerOpcionMenu(opcion)) {
+            cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
+            return;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
+        }
+
+        const OpcionAsistencia& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionAsistencia::Marcar:       marcarAsistenciaAuto(); break;
+            case AccionAsistencia::MiAsistencia: miAsistenciaUI(); break;
+            case AccionAsistencia::Ver:          verAsistenciaUI(); break;
+            case AccionAsistencia::Hoy:          asistenciaHoyUI(); break;
+            case AccionAsistencia::Historial:    historialAsistenciaUI(); break;
+            case AccionAsistencia::Justificar:   justificarAsistenciaUI(); break;
+            case AccionAsistencia::Volver:       return;
         }
         pausar();
     }
