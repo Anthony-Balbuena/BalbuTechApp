@@ -57,7 +57,7 @@ Rama: `feat/permisos-finos-proveedores`. Estrategia de entrega: `ask-on-risk`
 - [x] **T6 — Verificación**: build, `check-app-sps`, menús, TEST; luego viva
   con backup. S6. Route: inline.
 
-Commit del work unit: `6c2dad5` (rama `feat/permisos-finos-proveedores`).
+Commit del work unit: `48350c4` (rama `feat/permisos-finos-proveedores`; el amend movió el hash original `6c2dad5`).
 
 ## Log
 
@@ -81,4 +81,4 @@ Commit del work unit: `6c2dad5` (rama `feat/permisos-finos-proveedores`).
   VENDEDOR 10, ALMACEN 12, CONTABILIDAD 4); los 4 roles con los 4 permisos y
   `GESTIONAR_PROVEEDORES` eliminado. Proveedores, empleados y contratos
   intactos.
-- **L6** — Commit: `6c2dad5` en `feat/permisos-finos-proveedores`.
+- **L6** — Commit: `48350c4` en `feat/permisos-finos-proveedores` (el amend movió el hash original `6c2dad5`).
