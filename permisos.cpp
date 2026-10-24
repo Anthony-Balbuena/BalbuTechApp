@@ -10,6 +10,7 @@
 #include "permisos.h"
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 #include "sesion.h"
 
@@ -130,6 +131,52 @@ static void crearSolicitudPermiso(int idEmpleado) {
 
 // Pantalla del empleado: historial + alta, en loop para refrescar la lista
 // despues de cada solicitud. No edita ni borra.
+namespace {
+
+enum class AccionMisPermisos {
+    NuevaSolicitud, Volver
+};
+
+struct OpcionMisPermisos {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionMisPermisos accion;
+};
+
+// (24/10/2026) Mismo patron que el resto de los submenus: lista visible
+// numerada y Volver como opcion. El item del menu principal ya pide
+// SOLICITAR_PERMISO, asi que hoy las dos opciones se ven siempre.
+static const vector<OpcionMisPermisos>& opcionesMisPermisos() {
+    static const vector<OpcionMisPermisos> opciones = {
+        {"Nueva solicitud",          "SOLICITAR_PERMISO", AccionMisPermisos::NuevaSolicitud},
+        {"Volver al Menu Principal", "",                 AccionMisPermisos::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcionMisPermisos(const OpcionMisPermisos& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionMisPermisos*> opcionesMisPermisosVisibles() {
+    vector<const OpcionMisPermisos*> visibles;
+    for (const OpcionMisPermisos& opcion : opcionesMisPermisos()) {
+        if (puedeVerOpcionMisPermisos(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuMisPermisos(const vector<const OpcionMisPermisos*>& visibles) {
+    int n = 0;
+    for (const OpcionMisPermisos* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
+}
+
+}  // namespace
+
 void misPermisosUI() {
     if (!sesionActiva() || globalCon == nullptr) {
         cout << ROJO << "No hay sesión activa." << RESET << endl;
@@ -152,20 +199,26 @@ void misPermisosUI() {
     }
 
     int opcion = 0;
-    do {
+    while (true) {
+        vector<const OpcionMisPermisos*> visibles = opcionesMisPermisosVisibles();
         cout << MAGENTA << "\n=== MIS PERMISOS ===" << RESET << endl;
         mostrarHistorialPropio(idEmpleado);
-        cout << "\n1. Nueva solicitud" << endl;
-        cout << "0. Volver al Menu Principal" << endl;
+        cout << endl;
+        imprimirMenuMisPermisos(visibles);
 
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
+        }
 
-        switch (opcion) {
-            case 1:
+        const OpcionMisPermisos& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionMisPermisos::NuevaSolicitud:
                 try {
                     crearSolicitudPermiso(idEmpleado);
                 } catch (const CancelarOperacionException &e) {
@@ -174,14 +227,11 @@ void misPermisosUI() {
                     cout << ROJO << "No se pudo crear la solicitud: " << e.what() << RESET << endl;
                 }
                 break;
-            case 0:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+            case AccionMisPermisos::Volver:
+                return;
         }
-        if (opcion != 0) pausar();
-    } while (opcion != 0);
+        pausar();
+    }
 }
 
 struct PermisoPendiente {

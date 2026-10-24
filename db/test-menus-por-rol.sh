@@ -1752,6 +1752,51 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Mis permisos (24/10/2026): migrado al patron de lista visible. El 0 ya no
+# vuelve en silencio: avisa y reimprime el historial y el menu.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_mis_permisos="$TMP/out-mis-permisos-admin.txt"
+# Entrada: Enter del "Presione Enter", 5 = Mis permisos, 0 = invalida, 2 = Volver.
+printf '\n5\n0\n2\n' | BALBU_USER="$BALBU_USER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_mis_permisos" 2>&1
+rc_mis_permisos=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_mis_permisos"; then
+    echo "FALLO ADMIN/Mis permisos: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_mis_permisos" -ne 0 ]; then
+    echo "FALLO ADMIN/Mis permisos: la app salio con $rc_mis_permisos"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_mis_permisos=$(awk '/=== MIS PERMISOS ===/{f=1} f{print} f && /Seleccione una opcion:/{exit}' "$salida_mis_permisos")
+    n_sub_mis_permisos=$(printf '%s\n' "$submenu_mis_permisos" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_mis_permisos" -ne 2 ]; then
+        echo "FALLO ADMIN/Mis permisos: $n_sub_mis_permisos opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Nueva solicitud" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_mis_permisos" | grep -Fq "$label"; then
+            echo "FALLO ADMIN/Mis permisos: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if ! grep -q "Opcion no valida" "$salida_mis_permisos"; then
+        echo "FALLO ADMIN/Mis permisos: el 0 no aviso"
+        fail=1; fallos=$((fallos+1))
+    fi
+    n_menus_mis_permisos=$(grep -c "=== MIS PERMISOS ===" "$salida_mis_permisos" || true)
+    if [ "$n_menus_mis_permisos" -ne 2 ]; then
+        echo "FALLO ADMIN/Mis permisos: el menu se imprimio $n_menus_mis_permisos veces, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ADMIN/Mis permisos (2 opciones, el 0 reimprime)"
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"
 else
