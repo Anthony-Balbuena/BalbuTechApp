@@ -1888,6 +1888,52 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Accesos (24/10/2026): migrado al patron de lista visible. El 0 avisa y
+# reimprime en vez de volver.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_accesos="$TMP/out-accesos-admin.txt"
+# Entrada: Enter del "Presione Enter", 17 = Accesos, 0 = invalida, 3 = Volver.
+printf '\n17\n0\n3\n' | BALBU_USER="$BALBU_USER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_accesos" 2>&1
+rc_accesos=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_accesos"; then
+    echo "FALLO ADMIN/Accesos: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_accesos" -ne 0 ]; then
+    echo "FALLO ADMIN/Accesos: la app salio con $rc_accesos"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_accesos=$(awk '/=== MODULO DE ACCESOS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_accesos")
+    n_sub_accesos=$(printf '%s\n' "$submenu_accesos" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_accesos" -ne 3 ]; then
+        echo "FALLO ADMIN/Accesos: $n_sub_accesos opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Ver ultimos accesos" "Limpiar accesos antiguos" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_accesos" | grep -Fq "$label"; then
+            echo "FALLO ADMIN/Accesos: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if ! grep -q "Opcion no valida" "$salida_accesos"; then
+        echo "FALLO ADMIN/Accesos: el 0 no aviso"
+        fail=1; fallos=$((fallos+1))
+    fi
+    n_menus_accesos=$(grep -c "=== MODULO DE ACCESOS ===" "$salida_accesos" || true)
+    if [ "$n_menus_accesos" -ne 2 ]; then
+        echo "FALLO ADMIN/Accesos: el menu se imprimio $n_menus_accesos veces, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ADMIN/Accesos (3 opciones, el 0 reimprime)"
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"
 else

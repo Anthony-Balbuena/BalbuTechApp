@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <vector>
 #include <cstdio>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
@@ -9,6 +10,7 @@
 #include "accesos.h"
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
@@ -86,38 +88,77 @@ static void limpiarAccesos() {
     }
 }
 
-static void mostrarMenuAccesos() {
+namespace {
+
+enum class AccionAccesos {
+    Ver, Limpiar, Volver
+};
+
+struct OpcionAccesos {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionAccesos accion;
+};
+
+// (24/10/2026) Mismo patron que el resto de los submenus: lista visible
+// numerada y Volver como opcion. El item del menu principal ya pide
+// GESTIONAR_ROLES, asi que hoy las tres opciones se ven siempre.
+static const vector<OpcionAccesos>& opcionesAccesos() {
+    static const vector<OpcionAccesos> opciones = {
+        {"Ver ultimos accesos",      "GESTIONAR_ROLES", AccionAccesos::Ver},
+        {"Limpiar accesos antiguos", "GESTIONAR_ROLES", AccionAccesos::Limpiar},
+        {"Volver al Menu Principal", "",                AccionAccesos::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcionAccesos(const OpcionAccesos& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionAccesos*> opcionesAccesosVisibles() {
+    vector<const OpcionAccesos*> visibles;
+    for (const OpcionAccesos& opcion : opcionesAccesos()) {
+        if (puedeVerOpcionAccesos(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuAccesos(const vector<const OpcionAccesos*>& visibles) {
     cout << "\n=== MODULO DE ACCESOS ===" << endl;
-    cout << "1. Ver ultimos accesos" << endl;
-    cout << "2. Limpiar accesos antiguos" << endl;
-    cout << "0. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionAccesos* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=========================" << endl;
 }
+
+}  // namespace
 
 void ejecutarSubmenuAccesos() {
     int opcion = 0;
 
-    do {
-        mostrarMenuAccesos();
+    while (true) {
+        vector<const OpcionAccesos*> visibles = opcionesAccesosVisibles();
+        imprimirMenuAccesos(visibles);
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-
-        switch (opcion) {
-            case 1:
-                listarAccesos();
-                break;
-            case 2:
-                limpiarAccesos();
-                break;
-            case 0:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 0) pausar();
-    } while (opcion != 0);
+
+        const OpcionAccesos& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionAccesos::Ver:     listarAccesos(); break;
+            case AccionAccesos::Limpiar: limpiarAccesos(); break;
+            case AccionAccesos::Volver:  return;
+        }
+        pausar();
+    }
 }
