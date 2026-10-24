@@ -279,17 +279,94 @@ void ejecutarMenuSegunRol() {
 }
 
 // Muestra las opciones del módulo de roles para administración del sistema.
-void mostrarMenuRoles() {
+// Acciones que se definen mas abajo: el menu se arma antes que ellas.
+static void cambiarPermisoDeRol(bool asignar);
+static void verPermisosDeRol();
+
+namespace {
+
+enum class AccionRol {
+    Agregar, Actualizar, Buscar, Listar, AsignarPermiso, QuitarPermiso, VerPermisos, Volver
+};
+
+struct OpcionRol {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionRol accion;
+};
+
+// (24/10/2026) Mismo patron que el resto de los submenus: lista visible
+// numerada y Volver como opcion. Hoy todas las acciones piden GESTIONAR_ROLES,
+// que es lo que ya exige el item del menu principal; la estructura queda lista
+// para separar consulta de gestion si hace falta.
+static const vector<OpcionRol>& opcionesRoles() {
+    static const vector<OpcionRol> opciones = {
+        {"Agregar Rol",              "GESTIONAR_ROLES", AccionRol::Agregar},
+        {"Actualizar Rol",           "GESTIONAR_ROLES", AccionRol::Actualizar},
+        {"Buscar Rol",               "GESTIONAR_ROLES", AccionRol::Buscar},
+        {"Listar Roles",             "GESTIONAR_ROLES", AccionRol::Listar},
+        {"Asignar permiso a rol",    "GESTIONAR_ROLES", AccionRol::AsignarPermiso},
+        {"Quitar permiso a rol",     "GESTIONAR_ROLES", AccionRol::QuitarPermiso},
+        {"Ver permisos de un rol",   "GESTIONAR_ROLES", AccionRol::VerPermisos},
+        {"Volver al Menu Principal", "",                AccionRol::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcionRol(const OpcionRol& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionRol*> opcionesRolesVisibles() {
+    vector<const OpcionRol*> visibles;
+    for (const OpcionRol& opcion : opcionesRoles()) {
+        if (puedeVerOpcionRol(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuRoles(const vector<const OpcionRol*>& visibles) {
     cout << "\n=== MODULO DE ROLES ===" << endl;
-    cout << "1. Agregar Rol" << endl;
-    cout << "2. Actualizar Rol" << endl;
-    cout << "3. Buscar Rol" << endl;
-    cout << "4. Listar Roles" << endl;
-    cout << "5. Asignar permiso a rol" << endl;
-    cout << "6. Quitar permiso a rol" << endl;
-    cout << "7. Ver permisos de un rol" << endl;
-    cout << "8. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionRol* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "=======================" << endl;
+}
+
+}  // namespace
+
+void ejecutarSubmenuRoles() {
+    int opcion = 0;
+
+    while (true) {
+        vector<const OpcionRol*> visibles = opcionesRolesVisibles();
+        imprimirMenuRoles(visibles);
+        cout << AZUL << "Seleccione una opcion: " << RESET;
+        if (!leerOpcionMenu(opcion)) {
+            cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
+            break;
+        }
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
+        }
+
+        const OpcionRol& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionRol::Agregar:        registrarRol(); break;
+            case AccionRol::Actualizar:     actualizarRol(); break;
+            case AccionRol::Buscar:         buscarRol(); break;
+            case AccionRol::Listar:         listarRoles(); break;
+            case AccionRol::AsignarPermiso: cambiarPermisoDeRol(true); break;
+            case AccionRol::QuitarPermiso:  cambiarPermisoDeRol(false); break;
+            case AccionRol::VerPermisos:    verPermisosDeRol(); break;
+            case AccionRol::Volver:         return;
+        }
+        pausar();
+    }
 }
 
 // Registra un nuevo rol en la base de datos con validación básica de entrada.
@@ -517,46 +594,4 @@ static void verPermisosDeRol() {
 }
 
 // Submenú de roles: lee la opción y llama a la acción.
-void ejecutarSubmenuRoles() {
-    int opcion = 0;
-
-    do {
-        mostrarMenuRoles();
-        cout << AZUL << "Seleccione una opcion: " << RESET;
-        if (!leerOpcionMenu(opcion)) {
-            cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
-            break;
-        }
-
-        switch (opcion) {
-            case 1:
-                registrarRol();
-                break;
-            case 2:
-                actualizarRol();
-                break;
-            case 3:
-                buscarRol();
-                break;
-            case 4:
-                listarRoles();
-                break;
-            case 5:
-                cambiarPermisoDeRol(true);
-                break;
-            case 6:
-                cambiarPermisoDeRol(false);
-                break;
-            case 7:
-                verPermisosDeRol();
-                break;
-            case 8:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
-        }
-        if (opcion != 8) pausar();
-    } while (opcion != 8);
-}
 

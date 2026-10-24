@@ -1705,6 +1705,53 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Submenu Roles (24/10/2026): migrado al patron de lista visible. ADMIN ve las
+# 8 opciones y el 0 ya no vuelve en silencio: avisa y reimprime.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_roles="$TMP/out-roles-admin.txt"
+# Entrada: Enter del "Presione Enter", 2 = Roles, 0 = invalida, 8 = Volver.
+printf '\n2\n0\n8\n' | BALBU_USER="$BALBU_USER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_roles" 2>&1
+rc_roles=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_roles"; then
+    echo "FALLO ADMIN/Roles: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_roles" -ne 0 ]; then
+    echo "FALLO ADMIN/Roles: la app salio con $rc_roles"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_roles=$(awk '/=== MODULO DE ROLES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_roles")
+    n_sub_roles=$(printf '%s\n' "$submenu_roles" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_roles" -ne 8 ]; then
+        echo "FALLO ADMIN/Roles: $n_sub_roles opciones en el submenu, se esperaban 8"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Rol" "Actualizar Rol" "Buscar Rol" "Listar Roles" \
+                 "Asignar permiso a rol" "Quitar permiso a rol" \
+                 "Ver permisos de un rol" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_roles" | grep -Fq "$label"; then
+            echo "FALLO ADMIN/Roles: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if ! grep -q "Opcion no valida" "$salida_roles"; then
+        echo "FALLO ADMIN/Roles: el 0 no aviso"
+        fail=1; fallos=$((fallos+1))
+    fi
+    n_menus_roles=$(grep -c "=== MODULO DE ROLES ===" "$salida_roles" || true)
+    if [ "$n_menus_roles" -ne 2 ]; then
+        echo "FALLO ADMIN/Roles: el menu se imprimio $n_menus_roles veces, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ADMIN/Roles (8 opciones, el 0 reimprime)"
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"
 else
