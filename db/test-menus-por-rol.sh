@@ -1797,6 +1797,51 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Mis vacaciones (24/10/2026): mismo patron que Mis permisos. El 0 avisa y
+# reimprime en vez de volver.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_mis_vacaciones="$TMP/out-mis-vacaciones-admin.txt"
+# Entrada: Enter del "Presione Enter", 6 = Mis vacaciones, 0 = invalida, 2 = Volver.
+printf '\n6\n0\n2\n' | BALBU_USER="$BALBU_USER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_mis_vacaciones" 2>&1
+rc_mis_vacaciones=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_mis_vacaciones"; then
+    echo "FALLO ADMIN/Mis vacaciones: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_mis_vacaciones" -ne 0 ]; then
+    echo "FALLO ADMIN/Mis vacaciones: la app salio con $rc_mis_vacaciones"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_mis_vacaciones=$(awk '/=== MIS VACACIONES ===/{f=1} f{print} f && /Seleccione una opcion:/{exit}' "$salida_mis_vacaciones")
+    n_sub_mis_vacaciones=$(printf '%s\n' "$submenu_mis_vacaciones" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_mis_vacaciones" -ne 2 ]; then
+        echo "FALLO ADMIN/Mis vacaciones: $n_sub_mis_vacaciones opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Nueva solicitud" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_mis_vacaciones" | grep -Fq "$label"; then
+            echo "FALLO ADMIN/Mis vacaciones: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if ! grep -q "Opcion no valida" "$salida_mis_vacaciones"; then
+        echo "FALLO ADMIN/Mis vacaciones: el 0 no aviso"
+        fail=1; fallos=$((fallos+1))
+    fi
+    n_menus_mis_vacaciones=$(grep -c "=== MIS VACACIONES ===" "$salida_mis_vacaciones" || true)
+    if [ "$n_menus_mis_vacaciones" -ne 2 ]; then
+        echo "FALLO ADMIN/Mis vacaciones: el menu se imprimio $n_menus_mis_vacaciones veces, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ADMIN/Mis vacaciones (2 opciones, el 0 reimprime)"
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"
 else
