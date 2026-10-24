@@ -1842,6 +1842,52 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Inventario (24/10/2026): migrado al patron de lista visible. El 0 avisa y
+# reimprime en vez de volver.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_inventario="$TMP/out-inventario-admin.txt"
+# Entrada: Enter del "Presione Enter", 15 = Inventario, 0 = invalida, 4 = Volver.
+printf '\n15\n0\n4\n' | BALBU_USER="$BALBU_USER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_inventario" 2>&1
+rc_inventario=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_inventario"; then
+    echo "FALLO ADMIN/Inventario: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_inventario" -ne 0 ]; then
+    echo "FALLO ADMIN/Inventario: la app salio con $rc_inventario"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_inventario=$(awk '/=== MODULO DE INVENTARIO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_inventario")
+    n_sub_inventario=$(printf '%s\n' "$submenu_inventario" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_inventario" -ne 4 ]; then
+        echo "FALLO ADMIN/Inventario: $n_sub_inventario opciones en el submenu, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Ajuste de stock" "Ajustar p.compra" "Movimientos" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_inventario" | grep -Fq "$label"; then
+            echo "FALLO ADMIN/Inventario: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    if ! grep -q "Opcion no valida" "$salida_inventario"; then
+        echo "FALLO ADMIN/Inventario: el 0 no aviso"
+        fail=1; fallos=$((fallos+1))
+    fi
+    n_menus_inventario=$(grep -c "=== MODULO DE INVENTARIO ===" "$salida_inventario" || true)
+    if [ "$n_menus_inventario" -ne 2 ]; then
+        echo "FALLO ADMIN/Inventario: el menu se imprimio $n_menus_inventario veces, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ADMIN/Inventario (4 opciones, el 0 reimprime)"
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "TODOS LOS TESTS DE MENUS POR ROL OK"
 else

@@ -3,23 +3,16 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <vector>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "inventario.h"
 
 using namespace std;
-
-void mostrarMenuInventario() {
-    cout << "\n=== MODULO DE INVENTARIO ===" << endl;
-    cout << "1. Ajuste de stock" << endl;
-    cout << "2. Ajustar p.compra" << endl;
-    cout << "3. Movimientos" << endl;
-    cout << "4. Volver al Menu Principal" << endl;
-    cout << "============================" << endl;
-}
 
 static void registrarAjuste() {
     cout << "\n--- AJUSTE DE STOCK ---" << endl;
@@ -195,31 +188,79 @@ static void kardexUI() {
     }
 }
 
+namespace {
+
+enum class AccionInventario {
+    AjusteStock, AjustarCosto, Movimientos, Volver
+};
+
+struct OpcionInventario {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionInventario accion;
+};
+
+// (24/10/2026) Mismo patron que el resto de los submenus: lista visible
+// numerada y Volver como opcion. El item del menu principal ya pide
+// GESTIONAR_INVENTARIO, asi que hoy las tres acciones se ven siempre.
+static const vector<OpcionInventario>& opcionesInventario() {
+    static const vector<OpcionInventario> opciones = {
+        {"Ajuste de stock",          "GESTIONAR_INVENTARIO", AccionInventario::AjusteStock},
+        {"Ajustar p.compra",         "GESTIONAR_INVENTARIO", AccionInventario::AjustarCosto},
+        {"Movimientos",              "GESTIONAR_INVENTARIO", AccionInventario::Movimientos},
+        {"Volver al Menu Principal", "",                     AccionInventario::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcionInventario(const OpcionInventario& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionInventario*> opcionesInventarioVisibles() {
+    vector<const OpcionInventario*> visibles;
+    for (const OpcionInventario& opcion : opcionesInventario()) {
+        if (puedeVerOpcionInventario(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuInventario(const vector<const OpcionInventario*>& visibles) {
+    cout << "\n=== MODULO DE INVENTARIO ===" << endl;
+    int n = 0;
+    for (const OpcionInventario* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
+    cout << "============================" << endl;
+}
+
+}  // namespace
+
 void ejecutarSubmenuInventario() {
     int opcion = 0;
-    do {
-        mostrarMenuInventario();
+
+    while (true) {
+        vector<const OpcionInventario*> visibles = opcionesInventarioVisibles();
+        imprimirMenuInventario(visibles);
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-        switch (opcion) {
-            case 1:
-                registrarAjuste();
-                break;
-            case 2:
-                actualizarCostoUI();
-                break;
-            case 3:
-                kardexUI();
-                break;
-            case 4:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 4) pausar();
-    } while (opcion != 4);
+
+        const OpcionInventario& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionInventario::AjusteStock:   registrarAjuste(); break;
+            case AccionInventario::AjustarCosto:  actualizarCostoUI(); break;
+            case AccionInventario::Movimientos:   kardexUI(); break;
+            case AccionInventario::Volver:        return;
+        }
+        pausar();
+    }
 }
