@@ -103,7 +103,9 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (23/10/2026) 49 permisos: el modulo Usuarios usa 5 permisos finos
+-- (24/10/2026) 52 permisos: Caja dejo de colgar de GESTIONAR_VENTAS y usa
+-- CONSULTAR_CAJA, ABRIR_CAJA y CERRAR_CAJA (modulo 53). El modulo Usuarios usa
+-- 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
 -- (EMPLEADOS_VER, CREAR, EDITAR, BAJA, GESTIONAR_CONTRATOS,
 -- GESTIONAR_PERMISOS_EMPLEADO y GESTIONAR_VACACIONES_EMPLEADO), el modulo
@@ -157,6 +159,9 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('METODOS_PAGO_ESTADO', 'Activar o desactivar metodos de pago'),
 ('GESTIONAR_INVENTARIO', 'Administrar inventario'),
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
+('CONSULTAR_CAJA', 'Consultar el estado del turno de caja'),
+('ABRIR_CAJA', 'Abrir el turno de caja'),
+('CERRAR_CAJA', 'Cerrar el turno de caja y registrar el cuadre'),
 ('CONSULTAR_HISTORIAL_VENTA', 'Consultar el historial de una venta'),
 ('COMPRAS_VER', 'Consultar compras'),
 ('COMPRAS_REGISTRAR', 'Registrar compras'),
@@ -258,6 +263,9 @@ SELECT 'VENDEDOR', ID_PERMISO
 FROM PERMISOS
 WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_VENTAS',
+    'CONSULTAR_CAJA',
+    'ABRIR_CAJA',
+    'CERRAR_CAJA',
     'CLIENTES_VER',
     'CLIENTES_CREAR',
     'CLIENTES_EDITAR',

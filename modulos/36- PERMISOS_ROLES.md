@@ -22,7 +22,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (49, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (52, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
@@ -35,7 +35,8 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 `GESTIONAR_PRODUCTOS`,
 `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`,
 `METODOS_PAGO_ESTADO`,
-`GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`, `CONSULTAR_HISTORIAL_VENTA`,
+`GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`,
+`CONSULTAR_CAJA`, `ABRIR_CAJA`, `CERRAR_CAJA`, `CONSULTAR_HISTORIAL_VENTA`,
 `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`,
 `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`,
 `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `CONSULTAR_PRODUCTOS`,
@@ -138,15 +139,15 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 49** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (43) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (37) |
+| `ADMIN` | **los 52** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (46) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (40) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
-| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (13) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (16) |
 | `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `GESTIONAR_INVENTARIO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (23) |
 | `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
 
-> Total: **181 pares rol-permiso** (49 + 43 + 37 + 12 + 13 + 23 + 4).
+> Total: **193 pares rol-permiso** (52 + 46 + 40 + 12 + 16 + 23 + 4).
 
 ### Mapa del submenú de Clientes
 
@@ -367,8 +368,30 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 > **Número fuera de rango no ejecuta nada**: `0`, un negativo o uno mayor que la
 > última opción visible muestran `Opcion no valida` y reimprimen el submenú. El
 > `0` ya no vuelve atrás en silencio (antes solo pasaba en los submenús; el menú
-> principal nunca lo aceptó). Las seis pantallas con el patrón —Asistencia,
-> Usuarios, Empleados, Clientes, Productos y Ventas— se comportan igual.
+> principal nunca lo aceptó). Todos los submenús con el patrón —Asistencia,
+> Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Productos,
+> Métodos de pago, Ventas, Compras y Caja— se comportan igual.
+
+### Mapa del submenú de Caja
+
+El submenú conserva el orden histórico y **numera solo lo visible**. Cada opción
+pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Abrir caja | `ABRIR_CAJA` |
+| 2 | Estado de la caja | `CONSULTAR_CAJA` |
+| 3 | Cerrar caja (cuadre) | `CERRAR_CAJA` |
+| 4 | Volver al Menu Principal | *(siempre)* |
+
+`ADMIN`, `GERENTE`, `SUBGERENTE` y `VENDEDOR` tienen los tres permisos y ven las
+4 opciones. El vendedor abre su turno al empezar y lo cierra al terminar. El
+cierre sigue siendo directo, sin confirmación de un segundo actor: el flujo con
+firma del cuadre quedó fuera de esta fase.
+
+> **Caja ya no cuelga de `GESTIONAR_VENTAS`.** Un rol con solo ese permiso deja
+> de ver el ítem. El módulo 53 migra los roles existentes; un rol creado después
+> necesita `CONSULTAR_CAJA`, `ABRIR_CAJA` o `CERRAR_CAJA`.
 
 **Migraciones incluidas** (idempotentes; las 3 primeras son `C-3` del
 20/10/2026, las 3 últimas del 22/10/2026):

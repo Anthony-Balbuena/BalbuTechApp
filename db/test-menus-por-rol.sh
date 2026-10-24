@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -1154,8 +1154,9 @@ EOF
 
 fallos_previos=$fallos
 salida_ven_gest="$TMP/out-ventas-gest.txt"
-# Entrada: Enter del "Presione Enter", 1 = Ventas (su menu queda Ventas, Caja
-# (turnos), Ver permisos y Cerrar sesion), 9 = Volver en un submenu de 9.
+# Entrada: Enter del "Presione Enter", 1 = Ventas (su menu queda Ventas,
+# Ver permisos y Cerrar sesion: Caja ya no cuelga de GESTIONAR_VENTAS),
+# 9 = Volver en un submenu de 9.
 printf '\n1\n9\n' | BALBU_USER="$USR_VEN" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_ven_gest" 2>&1
 rc_ven_gest=$?
@@ -1188,6 +1189,18 @@ else
             fail=1; fallos=$((fallos+1))
         fi
     done
+
+    # Caja ya no cuelga de GESTIONAR_VENTAS: este rol no debe ver el item.
+    principal_ven_gest=$(sed -n '1,/=== MODULO DE VENTAS ===/p' "$salida_ven_gest")
+    n_principal_ven_gest=$(printf '%s\n' "$principal_ven_gest" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_ven_gest" -ne 3 ]; then
+        echo "FALLO $ROL_VEN: $n_principal_ven_gest opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    if printf '%s\n' "$principal_ven_gest" | grep -Fq "Caja (turnos)"; then
+        echo "FALLO $ROL_VEN: ve Caja sin permisos de caja"
+        fail=1; fallos=$((fallos+1))
+    fi
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_VEN (9 opciones, sin reportes)"
@@ -1567,6 +1580,128 @@ else
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK ALMACEN/Compras (8 opciones)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Caja (24/10/2026): abrir, consultar y cerrar el turno tienen permisos
+# separados. Un rol con solo CONSULTAR_CAJA ve el estado y nada mas.
+# ---------------------------------------------------------------------------
+ROL_CAJA_VER="PRUEBA_CAJA_VER"
+USR_CAJA_VER="prueba_caja_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_CAJA_VER';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCJ001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_CAJA_VER';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_CAJA_VER';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_CAJA_VER')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_CAJA_VER', ID_PERMISO FROM PERMISOS
+ WHERE NOMBRE_PERMISO='CONSULTAR_CAJA';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA CAJA VER','TESTCJ001','PRUEBA',1000,'T-CJ-001','cj-001@test.local','2026-10-24');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_CAJA_VER', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCJ001' AND R.NOMBRE_ROL='$ROL_CAJA_VER';
+EOF
+
+fallos_previos=$fallos
+salida_caja_ver="$TMP/out-caja-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Caja (unico item del menu principal
+# ademas de Ver permisos y Cerrar sesion), 2 = Volver en un submenu de 2.
+printf '\n1\n2\n' | BALBU_USER="$USR_CAJA_VER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_caja_ver" 2>&1
+rc_caja_ver=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_caja_ver"; then
+    echo "FALLO $ROL_CAJA_VER: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_caja_ver" -ne 0 ]; then
+    echo "FALLO $ROL_CAJA_VER: la app salio con $rc_caja_ver"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_caja_ver=$(awk '/=== MODULO DE CAJA ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_caja_ver")
+    n_sub_caja_ver=$(printf '%s\n' "$submenu_caja_ver" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_caja_ver" -ne 2 ]; then
+        echo "FALLO $ROL_CAJA_VER: $n_sub_caja_ver opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Estado de la caja" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_caja_ver" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAJA_VER: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Abrir caja" "Cerrar caja (cuadre)"; do
+        if printf '%s\n' "$submenu_caja_ver" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAJA_VER: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_CAJA_VER (2 opciones, solo consulta)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Los tres permisos de Caja juntos: el submenu historico completo. Sin este
+# caso, un typo en ABRIR_CAJA o CERRAR_CAJA esconde la opcion para todos.
+# ---------------------------------------------------------------------------
+ROL_CAJA_GEST="PRUEBA_CAJA_GEST"
+USR_CAJA_GEST="prueba_caja_gest"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_CAJA_GEST';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTCJ002';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_CAJA_GEST';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_CAJA_GEST';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_CAJA_GEST')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_CAJA_GEST', ID_PERMISO FROM PERMISOS
+ WHERE NOMBRE_PERMISO IN ('CONSULTAR_CAJA', 'ABRIR_CAJA', 'CERRAR_CAJA');
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA CAJA GEST','TESTCJ002','PRUEBA',1000,'T-CJ-002','cj-002@test.local','2026-10-24');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_CAJA_GEST', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTCJ002' AND R.NOMBRE_ROL='$ROL_CAJA_GEST';
+EOF
+
+fallos_previos=$fallos
+salida_caja_gest="$TMP/out-caja-gest.txt"
+# Entrada: Enter del "Presione Enter", 1 = Caja, 4 = Volver en un submenu de 4.
+printf '\n1\n4\n' | BALBU_USER="$USR_CAJA_GEST" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_caja_gest" 2>&1
+rc_caja_gest=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_caja_gest"; then
+    echo "FALLO $ROL_CAJA_GEST: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_caja_gest" -ne 0 ]; then
+    echo "FALLO $ROL_CAJA_GEST: la app salio con $rc_caja_gest"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_caja_gest=$(awk '/=== MODULO DE CAJA ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_caja_gest")
+    n_sub_caja_gest=$(printf '%s\n' "$submenu_caja_gest" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_caja_gest" -ne 4 ]; then
+        echo "FALLO $ROL_CAJA_GEST: $n_sub_caja_gest opciones en el submenu, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Abrir caja" "Estado de la caja" "Cerrar caja (cuadre)" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_caja_gest" | grep -Fq "$label"; then
+            echo "FALLO $ROL_CAJA_GEST: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_CAJA_GEST (4 opciones, submenu completo)"
     fi
 fi
 

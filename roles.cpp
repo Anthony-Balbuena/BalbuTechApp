@@ -186,7 +186,8 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Compras",          {"COMPRAS_VER", "COMPRAS_REGISTRAR", "COMPRAS_PAGAR",
                               "COMPRAS_CANCELAR", "COMPRAS_DEVOLVER", "COMPRAS_REPORTES"}, AccionMenu::Compras},
         {"Inventario",       {"GESTIONAR_INVENTARIO"},                     AccionMenu::Inventario},
-        {"Caja (turnos)",    {"GESTIONAR_VENTAS"},                         AccionMenu::Caja},
+        {"Caja (turnos)",    {"CONSULTAR_CAJA", "ABRIR_CAJA",
+                              "CERRAR_CAJA"},                              AccionMenu::Caja},
         {"Accesos",          {"GESTIONAR_ROLES"},                          AccionMenu::LogAccesos},
         {"Ver permisos",     {},                                           AccionMenu::VerPermisos},
         {"Cerrar sesión",    {},                                           AccionMenu::CerrarSesion}

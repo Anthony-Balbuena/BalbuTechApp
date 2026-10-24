@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <vector>
 #include <memory>
 #include <stdexcept>
 #include <iomanip>
@@ -12,6 +13,7 @@
 #include "caja.h"
 #include "database.h"
 #include "seguridad.h"
+#include "roles.h"
 #include "colores.h"
 
 using namespace std;
@@ -168,42 +170,78 @@ static void cerrarCajaUI() {
     }
 }
 
-void mostrarMenuCaja() {
+namespace {
+
+enum class AccionCaja {
+    Abrir, Estado, Cerrar, Volver
+};
+
+struct OpcionCaja {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionCaja accion;
+};
+
+// (24/10/2026) Menu por permisos: abrir, consultar y cerrar el turno piden cada
+// uno el suyo. Antes la lista era fija y colgaba entera de GESTIONAR_VENTAS.
+static const vector<OpcionCaja>& opcionesCaja() {
+    static const vector<OpcionCaja> opciones = {
+        {"Abrir caja",               "ABRIR_CAJA",     AccionCaja::Abrir},
+        {"Estado de la caja",        "CONSULTAR_CAJA", AccionCaja::Estado},
+        {"Cerrar caja (cuadre)",     "CERRAR_CAJA",    AccionCaja::Cerrar},
+        {"Volver al Menu Principal", "",               AccionCaja::Volver}
+    };
+    return opciones;
+}
+
+static bool puedeVerOpcion(const OpcionCaja& opcion) {
+    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
+    return tienePermiso(opcion.permiso);
+}
+
+static vector<const OpcionCaja*> opcionesVisibles() {
+    vector<const OpcionCaja*> visibles;
+    for (const OpcionCaja& opcion : opcionesCaja()) {
+        if (puedeVerOpcion(opcion)) visibles.push_back(&opcion);
+    }
+    return visibles;
+}
+
+// Numera sobre lo visible: si un rol no tiene una accion, no queda hueco.
+static void imprimirMenuCaja(const vector<const OpcionCaja*>& visibles) {
     cout << "\n=== MODULO DE CAJA ===" << endl;
-    cout << "1. Abrir caja" << endl;
-    cout << "2. Estado de la caja" << endl;
-    cout << "3. Cerrar caja (cuadre)" << endl;
-    cout << "4. Volver al Menu Principal" << endl;
+    int n = 0;
+    for (const OpcionCaja* opcion : visibles) {
+        cout << ++n << ". " << opcion->etiqueta << endl;
+    }
     cout << "======================" << endl;
 }
+
+}  // namespace
 
 void ejecutarSubmenuCaja() {
     int opcion = 0;
 
-    do {
-        mostrarMenuCaja();
+    while (true) {
+        vector<const OpcionCaja*> visibles = opcionesVisibles();
+        imprimirMenuCaja(visibles);
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-
-        switch (opcion) {
-            case 1:
-                abrirCajaUI();
-                break;
-            case 2:
-                estadoCajaUI();
-                break;
-            case 3:
-                cerrarCajaUI();
-                break;
-            case 4:
-                break;
-            default:
-                cout << ROJO << "Opcion no valida." << RESET << endl;
-                break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 4) pausar();
-    } while (opcion != 4);
+
+        const OpcionCaja& elegido = *visibles[opcion - 1];
+        switch (elegido.accion) {
+            case AccionCaja::Abrir:  abrirCajaUI(); break;
+            case AccionCaja::Estado: estadoCajaUI(); break;
+            case AccionCaja::Cerrar: cerrarCajaUI(); break;
+            case AccionCaja::Volver: return;
+        }
+        pausar();
+    }
 }
