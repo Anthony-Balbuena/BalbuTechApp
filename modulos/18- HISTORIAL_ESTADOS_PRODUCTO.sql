@@ -89,6 +89,8 @@ con el producto, el empleado, el estado nuevo, el anterior y el motivo.
 CREATE TRIGGER TR_LOG_CAMBIO_ESTADO_PRODUCTO
 AFTER UPDATE ON PRODUCTOS
 FOR EACH ROW
+-- (25/10/2026) Orden fijo: despues de la auditoria de precio del modulo 9.
+FOLLOWS TR_AUDITORIA_PRODUCTOS_UPDATE
 BEGIN
     -- Solo registramos si hubo un cambio real en el estado
     IF OLD.ESTADO <> NEW.ESTADO THEN
