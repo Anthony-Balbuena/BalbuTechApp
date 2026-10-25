@@ -96,6 +96,20 @@ bool intentarLogin(const string& usuario, const string& password) {
 
                 registrarAcceso(idUsuario, usuario, "EXITOSO");
                 guardarSesion(idUsuario, idEmpleado, usuario, idRol, rol, estadoCuenta);
+
+                // (25/10/2026) Deja el id en la conexion para que el trigger
+                // TRG_AUDITORIA_USUARIOS sepa quien hizo cada cambio.
+                try {
+                    std::unique_ptr<sql::PreparedStatement> pSet(globalCon->prepareStatement(
+                        "SET @ID_USUARIO_ACTUAL = ?"
+                    ));
+                    pSet->setInt(1, idUsuario);
+                    pSet->execute();
+                    drenarResultados(pSet.get());
+                } catch (...) {
+                    // no fatal: el login sigue aunque no se pueda setear
+                }
+
                 return true;
             }
 

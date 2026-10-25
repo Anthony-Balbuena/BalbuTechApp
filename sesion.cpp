@@ -1,5 +1,7 @@
 #include "sesion.h"
+#include "database.h"
 #include <iostream>
+#include <memory>
 
 using namespace std;
 
@@ -28,6 +30,18 @@ void guardarSesion(int idUsuario, int idEmpleado, const string& username, int id
 }
 
 void cerrarSesion() {
+    // (25/10/2026) Limpia el admin de la conexion: despues del logout no
+    // queda ningun usuario como autor de un cambio.
+    if (globalCon != nullptr) {
+        try {
+            std::unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
+                "SET @ID_USUARIO_ACTUAL = NULL"
+            ));
+            p->execute();
+            drenarResultados(p.get());
+        } catch (...) {
+        }
+    }
     inicializarSesion();
 }
 

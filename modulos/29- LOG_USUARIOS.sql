@@ -42,24 +42,36 @@ DELIMITER //
 DROP TRIGGER IF EXISTS TRG_AUDITORIA_USUARIOS ;
 /*
 TRG_AUDITORIA_USUARIOS
-Cada vez que se modifica un usuario, revisa si cambio el rol o el estado.
-Si cambio alguno de los dos, guarda el valor anterior y el nuevo en
-LOG_USUARIOS para dejar constancia.
+Cada vez que se modifica un usuario, revisa si cambio el rol, el estado o
+el nombre. Si cambio alguno, guarda el valor anterior, el nuevo y quien lo
+hizo en LOG_USUARIOS. El admin sale de @ID_USUARIO_ACTUAL, que la app deja
+en la conexion al iniciar sesion; si no esta, queda NULL.
 */
 CREATE TRIGGER TRG_AUDITORIA_USUARIOS
 AFTER UPDATE ON USUARIOS
 FOR EACH ROW
 BEGIN
+    DECLARE v_admin INT DEFAULT NULL;
+
+    -- (25/10/2026) Si el id no existe, NULL: el log no tumba el cambio.
+    SET v_admin = (SELECT ID_USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL);
+
     -- Auditoría de Cambio de Rol
-    IF OLD.ID_ROL <> NEW.ID_ROL THEN
-        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO)
-        VALUES (OLD.ID_USUARIO, 'CAMBIO_ROL', CAST(OLD.ID_ROL AS CHAR), CAST(NEW.ID_ROL AS CHAR));
+    IF NOT (OLD.ID_ROL <=> NEW.ID_ROL) THEN
+        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO, ID_USUARIO_ADMIN)
+        VALUES (OLD.ID_USUARIO, 'CAMBIO_ROL', CAST(OLD.ID_ROL AS CHAR), CAST(NEW.ID_ROL AS CHAR), v_admin);
     END IF;
 
     -- Auditoría de Cambio de Estado
-    IF OLD.ESTADO <> NEW.ESTADO THEN
-        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO)
-        VALUES (OLD.ID_USUARIO, 'CAMBIO_ESTADO', OLD.ESTADO, NEW.ESTADO);
+    IF NOT (OLD.ESTADO <=> NEW.ESTADO) THEN
+        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO, ID_USUARIO_ADMIN)
+        VALUES (OLD.ID_USUARIO, 'CAMBIO_ESTADO', OLD.ESTADO, NEW.ESTADO, v_admin);
+    END IF;
+
+    -- Auditoría de Cambio de Nombre de Usuario
+    IF NOT (OLD.USUARIO <=> NEW.USUARIO) THEN
+        INSERT INTO LOG_USUARIOS (ID_USUARIO, ACCION, VALOR_ANTERIOR, VALOR_NUEVO, ID_USUARIO_ADMIN)
+        VALUES (OLD.ID_USUARIO, 'CAMBIO_USUARIO', OLD.USUARIO, NEW.USUARIO, v_admin);
     END IF;
 END//
 DELIMITER ;
@@ -73,19 +85,22 @@ DELIMITER ;
 ----------------------------------------------------------------------------------------------------------------------------- 
 /*
 VIEW_HISTORIAL_CAMBIOS_USUARIOS
-Muestra los cambios de usuarios con el nombre de quien los sufrio.
-Ordena los cambios del mas reciente al mas viejo.
+Muestra los cambios de usuarios con el nombre del afectado y el del admin
+que los hizo. LEFT JOIN: si una cuenta se borra, el registro no desaparece.
 */
 CREATE OR REPLACE VIEW VIEW_HISTORIAL_CAMBIOS_USUARIOS AS
 SELECT 
     L.ID_LOG,
-    U.USUARIO AS USUARIO_AFECTADO, -- Aquí estaba el error
+    U.USUARIO AS USUARIO_AFECTADO,
     L.ACCION,
     L.VALOR_ANTERIOR,
     L.VALOR_NUEVO,
-    L.FECHA_CAMBIO
+    L.FECHA_CAMBIO,
+    L.ID_USUARIO_ADMIN,
+    A.USUARIO AS USUARIO_ADMIN
 FROM LOG_USUARIOS L
-INNER JOIN USUARIOS U ON L.ID_USUARIO = U.ID_USUARIO
+LEFT JOIN USUARIOS U ON L.ID_USUARIO = U.ID_USUARIO
+LEFT JOIN USUARIOS A ON L.ID_USUARIO_ADMIN = A.ID_USUARIO
 ORDER BY L.FECHA_CAMBIO DESC;
 
 
