@@ -105,10 +105,10 @@ comprobar "usuarios movidos a VENDEDOR" \
 comprobar "los 7 roles del set final" \
     "$(Q "SELECT COUNT(*) FROM ROLES WHERE NOMBRE_ROL IN
           ('ADMIN','GERENTE','SUBGERENTE','RRHH','VENDEDOR','ALMACEN','CONTABILIDAD')")" "7"
-# VENDEDOR paso de 10 a 16: +CONSULTAR_HISTORIAL_VENTA, +3 de metodos de pago
-# y +3 de caja.
+# (26/10/2026) VENDEDOR queda en 12: perdio CLIENTES_VER y los tres permisos de
+# gestion de metodos de pago; conserva METODOS_PAGO_VER.
 comprobar "permisos de VENDEDOR intactos" \
-    "$(Q "SELECT COUNT(*) FROM ROL_PERMISO WHERE ROL_NOMBRE='VENDEDOR'")" "16"
+    "$(Q "SELECT COUNT(*) FROM ROL_PERMISO WHERE ROL_NOMBRE='VENDEDOR'")" "12"
 
 # ---------------------------------------------------------------------------
 # 3. Segunda pasada: idempotente, sin errores y sin cambiar nada.

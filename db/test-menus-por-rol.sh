@@ -854,15 +854,63 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# VENDEDOR con CLIENTES_CREAR, EDITAR y ESTADO pero sin CLIENTES_VER
+# (26/10/2026): ve el item Clientes y, adentro, las tres acciones de gestion y
+# Volver. No ve Buscar ni Listar: el listado de clientes no se filtra.
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_cli_ven="$TMP/out-clientes-vendedor.txt"
+# Entrada: Enter del "Presione Enter", 4 = Clientes (su menu queda
+# Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos de
+# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 4 = Volver.
+printf '\n4\n4\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_cli_ven" 2>&1
+rc_cli_ven=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_cli_ven"; then
+    echo "FALLO VENDEDOR/Clientes: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_cli_ven" -ne 0 ]; then
+    echo "FALLO VENDEDOR/Clientes: la app salio con $rc_cli_ven"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_cli_ven=$(awk '/=== MODULO DE CLIENTES ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_cli_ven")
+    n_sub_cli_ven=$(printf '%s\n' "$submenu_cli_ven" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_cli_ven" -ne 4 ]; then
+        echo "FALLO VENDEDOR/Clientes: $n_sub_cli_ven opciones, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Agregar Cliente" "Actualizar Cliente" "Cambiar Estado" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_cli_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Clientes: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Buscar Cliente" "Listar Clientes"; do
+        if printf '%s\n' "$submenu_cli_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Clientes: muestra '$label' sin CLIENTES_VER"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK VENDEDOR/Clientes (4 opciones, sin buscar ni listar)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # VENDEDOR con los 4 permisos de Metodos de pago (23/10/2026): ve el submenu
 # historico completo de 6 opciones.
+# (26/10/2026) VENDEDOR quedo solo con METODOS_PAGO_VER: ve 3 opciones y no
+# puede mantener los metodos de pago.
 # ---------------------------------------------------------------------------
 fallos_previos=$fallos
 salida_met_ven="$TMP/out-metodos-pago-vendedor.txt"
 # Entrada: Enter del "Presione Enter", 6 = Metodos de pago (su menu queda
 # Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos de
-# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 6 = Volver.
-printf '\n6\n6\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 3 = Volver.
+printf '\n6\n3\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_met_ven" 2>&1
 rc_met_ven=$?
 
@@ -875,20 +923,25 @@ elif [ "$rc_met_ven" -ne 0 ]; then
 else
     submenu_met_ven=$(awk '/=== MODULO DE METODOS DE PAGO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_met_ven")
     n_sub_met_ven=$(printf '%s\n' "$submenu_met_ven" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_sub_met_ven" -ne 6 ]; then
-        echo "FALLO VENDEDOR/Metodos de pago: $n_sub_met_ven opciones, se esperaban 6"
+    if [ "$n_sub_met_ven" -ne 3 ]; then
+        echo "FALLO VENDEDOR/Metodos de pago: $n_sub_met_ven opciones, se esperaban 3"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Agregar Metodo" "Actualizar Datos" "Activar/Desactivar Metodo" \
-                 "Buscar Metodo" "Listar Metodos" "Volver al Menu Principal"; do
+    for label in "Buscar Metodo" "Listar Metodos" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_met_ven" | grep -Fq "$label"; then
             echo "FALLO VENDEDOR/Metodos de pago: falta la opcion '$label'"
             fail=1; fallos=$((fallos+1))
         fi
     done
+    for label in "Agregar Metodo" "Actualizar Datos" "Activar/Desactivar Metodo"; do
+        if printf '%s\n' "$submenu_met_ven" | grep -Fq "$label"; then
+            echo "FALLO VENDEDOR/Metodos de pago: muestra '$label' sin permiso de gestion"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK VENDEDOR/Metodos de pago (6 opciones)"
+        echo "OK VENDEDOR/Metodos de pago (3 opciones, solo consulta)"
     fi
 fi
 

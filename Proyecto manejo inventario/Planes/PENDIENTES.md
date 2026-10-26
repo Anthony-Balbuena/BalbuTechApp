@@ -10,7 +10,7 @@
 
 ### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
 
-Estado: **TEST y la viva migradas** (26/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/16/25/4 = 201 pares**; `test-menus-por-rol.sh` 0 fallos en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/106-antes-permisos-inventario-26-10-2026.sql`. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`.
+Estado: **TEST y la viva migradas** (26/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/12/25/4 = 197 pares**; `test-menus-por-rol.sh` 0 fallos en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/106-antes-permisos-inventario-26-10-2026.sql`. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`. VENDEDOR quedó en 12 permisos: no busca ni lista clientes (`CLIENTES_VER`) y de Métodos de pago solo conserva `METODOS_PAGO_VER`.
 
 - [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 26/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
 - [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 26/10 con backup `backups/106-antes-permisos-inventario-26-10-2026.sql`.
@@ -53,7 +53,7 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos ap
 |---|---|---|
 | `bash build.sh` | compila | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 93/0 |
-| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Compras, Caja e Inventario | 42/42 |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Compras, Caja e Inventario | 43/43 |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -67,8 +67,8 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos ap
 - [ ] SUBGERENTE ve **16**, con Empleados (solo 3: buscar, listar, volver) y Asistencia (7, con Justificar).
 - [ ] RRHH ve **6**; VENDEDOR **10**; ALMACEN **11**; CONTABILIDAD **5**.
 - [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`).
-- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle `CLIENTES_VER` desde ADMIN y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
-- [ ] Al reingresar después de quitar el permiso, la opción sigue ausente.
+- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos que le quedan de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
+- [ ] Al reingresar después de quitar los permisos, la opción sigue ausente.
 
 #### 2.2 Usuarios (solo ADMIN)
 
@@ -88,9 +88,9 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos ap
 
 #### 2.4 Clientes
 
-- [ ] VENDEDOR: ver, crear, editar y cambiar estado. Las cuatro acciones funcionan.
+- [ ] VENDEDOR: solo crear, editar y cambiar estado (4 opciones contando Volver); **no** aparecen Buscar ni Listar.
 - [ ] CONTABILIDAD: solo `CLIENTES_VER`; ve la consulta y nada más.
-- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú y **no** queda un hueco en la numeración.
+- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú, **no** queda un hueco y pasa a 3 opciones.
 
 #### 2.5 Proveedores
 

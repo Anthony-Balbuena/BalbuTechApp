@@ -33,6 +33,9 @@ Totales después de la migración: **54 permisos** y **201 pares rol-permiso**
 (ADMIN 54, GERENTE 48, SUBGERENTE 42, RRHH 12, VENDEDOR 16, ALMACEN 25,
 CONTABILIDAD 4).
 
+> (26/10/2026) VENDEDOR bajó a 12 permisos y el total a 197 por el ajuste de
+> Clientes y Métodos de pago. La matriz vigente está en `36- PERMISOS_ROLES.md`.
+
 El catálogo pasa de 52 a 54: se va un permiso y entran tres. Cada uno de los
 cuatro roles que tenía el paraguas gana dos pares (los tres finos menos el
 viejo), así que el total pasa de 193 a 201.

@@ -23,14 +23,19 @@ pide el suyo. `Volver` es siempre visible.
 | `ADMIN` | los 4 |
 | `GERENTE` | los 4 |
 | `SUBGERENTE` | los 4 |
-| `VENDEDOR` | los 4 |
+| `VENDEDOR` | solo `METODOS_PAGO_VER` |
 | `RRHH` | ninguno |
 | `ALMACEN` | ninguno |
 | `CONTABILIDAD` | ninguno |
 
-Totales después de la migración: **44 permisos** y **161 pares rol-permiso**
-(ADMIN 44, GERENTE 38, SUBGERENTE 32, RRHH 12, VENDEDOR 13, ALMACEN 18,
-CONTABILIDAD 4).
+Totales en su primera aplicación (23/10/2026): **44 permisos** y **161 pares
+rol-permiso** (ADMIN 44, GERENTE 38, SUBGERENTE 32, RRHH 12, VENDEDOR 13,
+ALMACEN 18, CONTABILIDAD 4).
+
+> (26/10/2026) VENDEDOR ya no recibe los cuatro: conserva solo
+> `METODOS_PAGO_VER` y el `DELETE` de abajo le quita los tres de gestión. La
+> matriz vigente completa está en `36- PERMISOS_ROLES.md` (54 permisos y 197
+> pares).
 
 El catálogo pasa de 41 a 44: se va un permiso y entran cuatro. Cada uno de los
 cuatro roles que tenía el paraguas gana tres pares (los cuatro finos menos el
@@ -56,8 +61,10 @@ Es idempotente: se puede correr dos veces sin duplicar pares.
 
 ## Qué preserva
 
-- `ADMIN`, `GERENTE`, `SUBGERENTE` y `VENDEDOR` reciben los cuatro permisos
-  finos aunque el paraguas ya no exista (base nueva o reimportación del 36).
+- `ADMIN`, `GERENTE` y `SUBGERENTE` reciben los cuatro permisos finos aunque el
+  paraguas ya no exista (base nueva o reimportación del 36).
+- (26/10/2026) `VENDEDOR` recibe solo `METODOS_PAGO_VER`: consulta los métodos
+  existentes y no los mantiene.
 - `RRHH`, `ALMACEN` y `CONTABILIDAD` siguen sin acceso al módulo.
 - No toca datos de métodos de pago, ventas, pagos ni cierres de caja.
 

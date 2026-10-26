@@ -259,11 +259,14 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- VENDEDOR: atiende el mostrador. Toma los permisos de EMPLEADO y los de
 -- CAJERO (que se elimina): ventas, caja, clientes, metodos de pago y consultas.
--- (22/10/2026) Clientes pasa a los 4 permisos finos: el vendedor puede ver,
--- crear, editar y cambiar el estado.
+-- (22/10/2026) Clientes pasa a los 4 permisos finos.
 -- (23/10/2026) Ya no tiene CONSULTAR_REPORTES: no ve reportes ni ganancias.
 -- El historial de venta lo abre CONSULTAR_HISTORIAL_VENTA. Garantias sigue
 -- dentro de GESTIONAR_VENTAS.
+-- (26/10/2026) Sin CLIENTES_VER: puede crear, editar y cambiar el estado de un
+-- cliente por ID, pero no buscarlo ni listarlo. De metodos de pago solo
+-- conserva METODOS_PAGO_VER: consulta los existentes, no los mantiene. La
+-- matriz de VENDEDOR queda en 12 permisos.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'VENDEDOR', ID_PERMISO
 FROM PERMISOS
@@ -272,20 +275,29 @@ WHERE NOMBRE_PERMISO IN (
     'CONSULTAR_CAJA',
     'ABRIR_CAJA',
     'CERRAR_CAJA',
-    'CLIENTES_VER',
     'CLIENTES_CREAR',
     'CLIENTES_EDITAR',
     'CLIENTES_ESTADO',
     'METODOS_PAGO_VER',
-    'METODOS_PAGO_CREAR',
-    'METODOS_PAGO_EDITAR',
-    'METODOS_PAGO_ESTADO',
     'CONSULTAR_HISTORIAL_VENTA',
     'CONSULTAR_PRODUCTOS',
     'REGISTRAR_ASISTENCIA',
     'SOLICITAR_PERMISO'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
+
+-- (26/10/2026) La semilla ya no incluye estos cuatro. El DELETE los limpia en
+-- instalaciones donde una corrida anterior del modulo los habia asignado.
+DELETE RP
+FROM ROL_PERMISO RP
+INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO
+WHERE RP.ROL_NOMBRE = 'VENDEDOR'
+  AND P.NOMBRE_PERMISO IN (
+      'CLIENTES_VER',
+      'METODOS_PAGO_CREAR',
+      'METODOS_PAGO_EDITAR',
+      'METODOS_PAGO_ESTADO'
+  );
 
 -- ALMACEN: stock, compras y proveedores. Sin ventas, usuarios ni roles.
 -- (22/10/2026) Suma SOLICITAR_PERMISO para que pueda pedir permisos/ausencias.

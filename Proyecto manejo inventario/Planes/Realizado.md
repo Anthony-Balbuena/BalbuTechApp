@@ -782,3 +782,34 @@ rol antes que el permiso, y se habia escrito el ID que la propia lista mostraba.
 
 **Pendiente**
 - Commit (lo hace el usuario).
+
+## 26/10 - VENDEDOR sin listado de clientes ni gestion de metodos de pago
+
+Al validar la Tanda B se definio que VENDEDOR no consulta el listado de
+clientes y que de Metodos de pago solo mira. La matriz baja de 16 a 12
+permisos y el total de 201 a 197 pares.
+
+- Fuera de VENDEDOR: `CLIENTES_VER`, `METODOS_PAGO_CREAR`,
+  `METODOS_PAGO_EDITAR` y `METODOS_PAGO_ESTADO`.
+- Queda con `CLIENTES_CREAR`, `CLIENTES_EDITAR` y `CLIENTES_ESTADO`: puede
+  dar de alta y mantener un cliente por ID, pero no buscarlo ni listarlo.
+- De Metodos de pago conserva solo `METODOS_PAGO_VER`.
+- `modulos/36- PERMISOS_ROLES.sql`: la semilla de VENDEDOR ya no incluye esos
+  cuatro y suma un `DELETE` acotado para limpiarlos si una corrida anterior
+  los habia insertado.
+- `modulos/51- PERMISOS_METODOS_PAGO.sql`: ADMIN, GERENTE y SUBGERENTE siguen
+  recibiendo los cuatro finos; VENDEDOR solo `VER`, con `DELETE` de los tres
+  de gestion. Asi, re-aplicar el 51 no le devuelve permisos.
+- TEST paso de 201 a 197 pares; la viva ya estaba en 197 por los cambios
+  hechos desde la UI. Ambas quedaron con VENDEDOR en 12 y 0 huerfanos.
+- `db/test-menus-por-rol.sh`: VENDEDOR/Clientes ahora espera 4 opciones y
+  verifica que no aparezcan Buscar ni Listar; VENDEDOR/Metodos de pago espera
+  3 y verifica que no aparezcan las tres de gestion. Total 43/43.
+- `db/test-migracion-roles.sh`: VENDEDOR 12 y matriz 197 en la segunda pasada
+  idempotente. 15/15.
+- `check-app-sps.sh` 93/0 en TEST.
+
+**Pendiente**
+- Commit (lo hace el usuario).
+- Si se quiere un backup del estado 197 de la viva, tomarlo antes de la
+  proxima migracion; el `106` es anterior a este ajuste.

@@ -34,6 +34,10 @@ Totales después de la migración: **52 permisos** y **193 pares rol-permiso**
 (ADMIN 52, GERENTE 46, SUBGERENTE 40, RRHH 12, VENDEDOR 16, ALMACEN 23,
 CONTABILIDAD 4).
 
+> (26/10/2026) VENDEDOR bajó a 12 permisos y el total a 197 por el ajuste de
+> Clientes y Métodos de pago. Los totales de arriba son los de esta migración;
+> la matriz vigente está en `36- PERMISOS_ROLES.md`.
+
 El catálogo pasa de 49 a 52: entran tres permisos y cada uno de los cuatro
 roles que ya veía Caja gana tres pares, así que el total pasa de 181 a 193.
 

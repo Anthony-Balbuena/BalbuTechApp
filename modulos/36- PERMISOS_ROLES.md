@@ -148,11 +148,11 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 26/1
 | `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (48) |
 | `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (42) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
-| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (16) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (12) |
 | `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `INVENTARIO_VER`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (25) |
 | `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
 
-> Total: **201 pares rol-permiso** (54 + 48 + 42 + 12 + 16 + 25 + 4).
+> Total: **197 pares rol-permiso** (54 + 48 + 42 + 12 + 12 + 25 + 4).
 
 ### Mapa del submenú de Clientes
 
@@ -167,6 +167,10 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 | 4 | Buscar Cliente | `CLIENTES_VER` |
 | 5 | Listar Clientes | `CLIENTES_VER` |
 | 6 | Volver al Menu Principal | *(siempre)* |
+
+> Desde el 26/10/2026 `VENDEDOR` no tiene `CLIENTES_VER`: ve 4 opciones
+> (Agregar, Actualizar, Cambiar Estado y Volver) y puede mantener un cliente
+> conocido por ID, pero no buscarlo ni listarlo.
 
 ### Mapa del submenú de Proveedores
 
@@ -238,8 +242,9 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 >
 > **Métodos de pago deja de usar el paraguas `GESTIONAR_METODOS_PAGO`.** Un rol
 > con solo `METODOS_PAGO_VER` ve 3 opciones (Buscar, Listar, Volver);
-> `VENDEDOR`, con los cuatro, ve las 6. La migración de una base existente es el
-> módulo 51.
+> `ADMIN`, `GERENTE` y `SUBGERENTE`, con los cuatro, ven las 6. Desde el
+> 26/10/2026 `VENDEDOR` solo consulta y ve las 3. La migración de una base
+> existente es el módulo 51.
 
 ### Mapa del submenú de Compras
 

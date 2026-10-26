@@ -23,18 +23,31 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('METODOS_PAGO_ESTADO', 'Activar o desactivar metodos de pago')
 ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 
--- Matriz objetivo: los cuatro roles que hoy tienen el paraguas reciben los
--- cuatro permisos finos. El SELECT no lee ROL_PERMISO, asi que el
+-- Matriz objetivo: ADMIN, GERENTE y SUBGERENTE reciben los cuatro permisos
+-- finos. (26/10/2026) VENDEDOR solo METODOS_PAGO_VER: consulta los metodos
+-- existentes, no los mantiene. El SELECT no lee ROL_PERMISO, asi que el
 -- ON DUPLICATE KEY UPDATE no es ambiguo.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT R.NOMBRE_ROL, P.ID_PERMISO
 FROM ROLES R
-JOIN PERMISOS P ON P.NOMBRE_PERMISO IN (
-    'METODOS_PAGO_VER', 'METODOS_PAGO_CREAR',
-    'METODOS_PAGO_EDITAR', 'METODOS_PAGO_ESTADO'
+JOIN PERMISOS P ON (
+    (R.NOMBRE_ROL IN ('ADMIN', 'GERENTE', 'SUBGERENTE')
+        AND P.NOMBRE_PERMISO IN (
+            'METODOS_PAGO_VER', 'METODOS_PAGO_CREAR',
+            'METODOS_PAGO_EDITAR', 'METODOS_PAGO_ESTADO'))
+    OR (R.NOMBRE_ROL = 'VENDEDOR' AND P.NOMBRE_PERMISO = 'METODOS_PAGO_VER')
 )
-WHERE R.NOMBRE_ROL IN ('ADMIN', 'GERENTE', 'SUBGERENTE', 'VENDEDOR')
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
+
+-- (26/10/2026) VENDEDOR ya no mantiene metodos de pago: si una corrida
+-- anterior le asigno los tres de gestion, se los quita.
+DELETE RP
+FROM ROL_PERMISO RP
+INNER JOIN PERMISOS P ON P.ID_PERMISO = RP.ID_PERMISO
+WHERE RP.ROL_NOMBRE = 'VENDEDOR'
+  AND P.NOMBRE_PERMISO IN (
+      'METODOS_PAGO_CREAR', 'METODOS_PAGO_EDITAR', 'METODOS_PAGO_ESTADO'
+  );
 
 -- Borra el paraguas viejo en cualquier rol (incluidos los personalizados).
 DELETE RP
