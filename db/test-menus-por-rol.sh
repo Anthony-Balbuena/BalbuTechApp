@@ -37,10 +37,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest', 'prueba_inv_ver');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002', 'TESTIN001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -1885,6 +1885,124 @@ else
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK ADMIN/Inventario (4 opciones, el 0 reimprime)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Inventario con permisos finos (26/10/2026): un rol con SOLO
+# INVENTARIO_VER ve Inventario en el menu principal y, adentro, solo
+# Movimientos mas Volver. No debe ver el ajuste de stock ni el de costo.
+# ---------------------------------------------------------------------------
+ROL_INV_VER="PRUEBA_INV_VER"
+USR_INV_VER="prueba_inv_ver"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_INV_VER';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTIN001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_INV_VER';
+DELETE FROM ROLES WHERE NOMBRE_ROL='$ROL_INV_VER';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_INV_VER')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_INV_VER', ID_PERMISO FROM PERMISOS
+ WHERE NOMBRE_PERMISO='INVENTARIO_VER';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA INV VER','TESTIN001','PRUEBA',1000,'T-IN-001','in-001@test.local','2026-10-26');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_INV_VER', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTIN001' AND R.NOMBRE_ROL='$ROL_INV_VER';
+EOF
+
+fallos_previos=$fallos
+salida_inv_ver="$TMP/out-inventario-ver.txt"
+# Entrada: Enter del "Presione Enter", 1 = Inventario (unico item del menu
+# principal ademas de Ver permisos y Cerrar sesion), 2 = Volver en un submenu
+# de 2 opciones.
+printf '\n1\n2\n' | BALBU_USER="$USR_INV_VER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_inv_ver" 2>&1
+rc_inv_ver=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_inv_ver"; then
+    echo "FALLO $ROL_INV_VER: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_inv_ver" -ne 0 ]; then
+    echo "FALLO $ROL_INV_VER: la app salio con $rc_inv_ver"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_inv_ver=$(sed -n '1,/=== MODULO DE INVENTARIO ===/p' "$salida_inv_ver")
+    n_principal_inv_ver=$(printf '%s\n' "$principal_inv_ver" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_inv_ver" -ne 3 ]; then
+        echo "FALLO $ROL_INV_VER: $n_principal_inv_ver opciones en el menu principal, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Inventario" "Ver permisos" "Cerrar sesión"; do
+        if ! printf '%s\n' "$principal_inv_ver" | grep -Fq "$label"; then
+            echo "FALLO $ROL_INV_VER: el menu principal no muestra '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    submenu_inv_ver=$(awk '/=== MODULO DE INVENTARIO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_inv_ver")
+    n_sub_inv_ver=$(printf '%s\n' "$submenu_inv_ver" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_inv_ver" -ne 2 ]; then
+        echo "FALLO $ROL_INV_VER: $n_sub_inv_ver opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Movimientos" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_inv_ver" | grep -Fq "$label"; then
+            echo "FALLO $ROL_INV_VER: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Ajuste de stock" "Ajustar p.compra"; do
+        if printf '%s\n' "$submenu_inv_ver" | grep -Fq "$label"; then
+            echo "FALLO $ROL_INV_VER: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_INV_VER (3 opciones en el menu principal y 2 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# ALMACEN con los 3 permisos de Inventario (26/10/2026): ve el submenu
+# completo de 4 opciones (las 3 acciones mas Volver).
+# ---------------------------------------------------------------------------
+fallos_previos=$fallos
+salida_inv_alm="$TMP/out-inventario-almacen.txt"
+# Entrada: Enter del "Presione Enter", 9 = Inventario (su menu queda Asistencia,
+# Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
+# Compras, Inventario, Ver permisos y Cerrar sesion), 4 = Volver.
+printf '\n9\n4\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_inv_alm" 2>&1
+rc_inv_alm=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_inv_alm"; then
+    echo "FALLO ALMACEN/Inventario: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_inv_alm" -ne 0 ]; then
+    echo "FALLO ALMACEN/Inventario: la app salio con $rc_inv_alm"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_inv_alm=$(awk '/=== MODULO DE INVENTARIO ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_inv_alm")
+    n_sub_inv_alm=$(printf '%s\n' "$submenu_inv_alm" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_inv_alm" -ne 4 ]; then
+        echo "FALLO ALMACEN/Inventario: $n_sub_inv_alm opciones en el submenu, se esperaban 4"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Ajuste de stock" "Ajustar p.compra" "Movimientos" \
+                 "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_inv_alm" | grep -Fq "$label"; then
+            echo "FALLO ALMACEN/Inventario: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK ALMACEN/Inventario (4 opciones)"
     fi
 fi
 

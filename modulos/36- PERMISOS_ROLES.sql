@@ -103,7 +103,10 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 
 -- ================================================================
 -- PERMISOS BASE DEL SISTEMA
--- (24/10/2026) 52 permisos: Caja dejo de colgar de GESTIONAR_VENTAS y usa
+-- (26/10/2026) 54 permisos: Inventario dejo de usar el paraguas
+-- GESTIONAR_INVENTARIO y ahora tiene 3 permisos finos (INVENTARIO_VER,
+-- INVENTARIO_AJUSTAR e INVENTARIO_COSTO, modulo 58), con lo que cierra la
+-- Tanda B. (24/10/2026) Caja dejo de colgar de GESTIONAR_VENTAS y usa
 -- CONSULTAR_CAJA, ABRIR_CAJA y CERRAR_CAJA (modulo 53). El modulo Usuarios usa
 -- 5 permisos finos
 -- (USUARIOS_VER, CREAR, EDITAR, ESTADO y CLAVE), el modulo Empleados usa 7
@@ -117,7 +120,8 @@ DELETE FROM PERMISOS WHERE NOMBRE_PERMISO = 'GESTIONAR_PROVEEDORES';
 -- (COMPRAS_VER, REGISTRAR, PAGAR, CANCELAR, DEVOLVER y REPORTES) en lugar de
 -- los viejos GESTIONAR_USUARIOS, GESTIONAR_EMPLEADOS, GESTIONAR_CLIENTES,
 -- CONSULTAR_CLIENTES, GESTIONAR_PROVEEDORES, GESTIONAR_CATEGORIAS,
--- GESTIONAR_MARCAS, GESTIONAR_METODOS_PAGO y GESTIONAR_COMPRAS. La asistencia
+-- GESTIONAR_MARCAS, GESTIONAR_METODOS_PAGO, GESTIONAR_COMPRAS y
+-- GESTIONAR_INVENTARIO. La asistencia
 -- tiene sus propios permisos (REGISTRAR_ASISTENCIA, CONSULTAR_ASISTENCIA y
 -- JUSTIFICAR_ASISTENCIA) desde el 23/10/2026 (modulo 45).
 -- El historial de venta usa CONSULTAR_HISTORIAL_VENTA, separado de
@@ -157,7 +161,9 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('METODOS_PAGO_CREAR', 'Registrar metodos de pago'),
 ('METODOS_PAGO_EDITAR', 'Actualizar datos de metodos de pago'),
 ('METODOS_PAGO_ESTADO', 'Activar o desactivar metodos de pago'),
-('GESTIONAR_INVENTARIO', 'Administrar inventario'),
+('INVENTARIO_VER', 'Consultar movimientos de inventario'),
+('INVENTARIO_AJUSTAR', 'Registrar ajustes de stock'),
+('INVENTARIO_COSTO', 'Actualizar el costo de compra de productos'),
 ('GESTIONAR_VENTAS', 'Gestionar ventas del sistema'),
 ('CONSULTAR_CAJA', 'Consultar el estado del turno de caja'),
 ('ABRIR_CAJA', 'Abrir el turno de caja'),
@@ -185,7 +191,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 49 permisos del sistema).
+-- ADMIN: acceso total (los 54 permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -283,6 +289,7 @@ ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
 
 -- ALMACEN: stock, compras y proveedores. Sin ventas, usuarios ni roles.
 -- (22/10/2026) Suma SOLICITAR_PERMISO para que pueda pedir permisos/ausencias.
+-- (26/10/2026) Conserva los 3 permisos finos de Inventario.
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ALMACEN', ID_PERMISO
 FROM PERMISOS
@@ -296,7 +303,9 @@ WHERE NOMBRE_PERMISO IN (
     'MARCAS_CREAR',
     'MARCAS_EDITAR',
     'MARCAS_ESTADO',
-    'GESTIONAR_INVENTARIO',
+    'INVENTARIO_VER',
+    'INVENTARIO_AJUSTAR',
+    'INVENTARIO_COSTO',
     'COMPRAS_VER',
     'COMPRAS_REGISTRAR',
     'COMPRAS_PAGAR',

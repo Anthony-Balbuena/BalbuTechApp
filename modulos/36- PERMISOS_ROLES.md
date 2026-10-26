@@ -10,7 +10,7 @@ código.
 `empleados.cpp` y el resto de los módulos de UI (cada uno pregunta por su
 permiso).
 
-Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/10/2026.
+Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 26/10/2026.
 
 ## Tablas
 
@@ -22,7 +22,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (52, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (54, idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
@@ -35,7 +35,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 `GESTIONAR_PRODUCTOS`,
 `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`,
 `METODOS_PAGO_ESTADO`,
-`GESTIONAR_INVENTARIO`, `GESTIONAR_VENTAS`,
+`INVENTARIO_VER`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `GESTIONAR_VENTAS`,
 `CONSULTAR_CAJA`, `ABRIR_CAJA`, `CERRAR_CAJA`, `CONSULTAR_HISTORIAL_VENTA`,
 `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`,
 `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`,
@@ -84,6 +84,11 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > Compras: el producto exige `GESTIONAR_PRODUCTOS` y el suplidor
 > `PROVEEDORES_CREAR`.
 >
+> **El módulo Inventario usa 3 permisos finos** (`INVENTARIO_VER`,
+> `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO`). El viejo `GESTIONAR_INVENTARIO`
+> **ya no existe**: lo borra el módulo 58 (idempotente) y el `ON DELETE CASCADE`
+> limpia sus pares en `ROL_PERMISO`.
+>
 > **El módulo Proveedores usa 4 permisos finos** (`PROVEEDORES_VER`,
 > `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR` y `PROVEEDORES_ESTADO`). El viejo
 > `GESTIONAR_PROVEEDORES` **ya no existe**: el import lo borra del catálogo y el
@@ -109,12 +114,12 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 49 se consultan en el código**: los de Empleados y Asistencia en
+> **Los 54 se consultan en el código**: los de Empleados y Asistencia en
 > `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Proveedores en
 > `proveedores.cpp`, los de Categorías en `categorias.cpp`, los de Marcas en
 > `marcas.cpp`, los de Métodos de pago en `metodos_pago.cpp`, los de Compras en
-> `compras.cpp`, los de Productos en `productos.cpp` y los de Ventas en
-> `ventas.cpp`; el menú principal, en `roles.cpp`. `REGISTRAR_ASISTENCIA` abre
+> `compras.cpp`, los de Inventario en `inventario.cpp`, los de Productos en
+> `productos.cpp` y los de Ventas en `ventas.cpp`; el menú principal, en `roles.cpp`. `REGISTRAR_ASISTENCIA` abre
 > el ítem propio `Asistencia` (primero del menú), no `Empleados`.
 > `SOLICITAR_PERMISO` lo usa el menú principal (`Mis permisos` y
 > `Mis vacaciones`).
@@ -139,15 +144,15 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 23/1
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 52** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (46) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (40) |
+| `ADMIN` | **los 54** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (48) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (42) |
 | `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
 | `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (16) |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `GESTIONAR_INVENTARIO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (23) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `INVENTARIO_VER`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (25) |
 | `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
 
-> Total: **193 pares rol-permiso** (52 + 46 + 40 + 12 + 16 + 23 + 4).
+> Total: **201 pares rol-permiso** (54 + 48 + 42 + 12 + 16 + 25 + 4).
 
 ### Mapa del submenú de Clientes
 
@@ -267,7 +272,24 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 >
 > **Registrar una compra mueve stock por diseño**: `22_SP_AGREGAR_DETALLE_COMPRA`
 > suma inventario y `SP_CANCELAR_COMPRA` lo repone. `COMPRAS_REGISTRAR` no
-> duplica `GESTIONAR_INVENTARIO`; el efecto es parte del flujo de compra.
+> duplica `INVENTARIO_AJUSTAR`; el efecto es parte del flujo de compra.
+
+### Mapa del submenú de Inventario
+
+El submenú tiene las 3 acciones más `Volver`, y **numera solo lo visible**.
+Cada opción pide un permiso; `Volver` es siempre visible.
+
+| # | Opción | Permiso |
+|---|---|---|
+| 1 | Ajuste de stock | `INVENTARIO_AJUSTAR` |
+| 2 | Ajustar p.compra | `INVENTARIO_COSTO` |
+| 3 | Movimientos | `INVENTARIO_VER` |
+| 4 | Volver al Menu Principal | *(siempre)* |
+
+> **Inventario deja de usar el paraguas `GESTIONAR_INVENTARIO`** y es el último
+> módulo de la Tanda B en migrar. Un rol con solo `INVENTARIO_VER` ve 2 opciones
+> (Movimientos y Volver); `ALMACEN`, con los tres, ve las 4. La migración de una
+> base existente es el módulo 58.
 
 ### Mapa del submenú de Empleados
 
@@ -426,7 +448,7 @@ firma del cuadre quedó fuera de esta fase.
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 49 sembrados.
+> 54 sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 
@@ -466,8 +488,8 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
 - **La base manda**: los permisos se leen de `ROL_PERMISO`, no del nombre del rol
   en el código.
 - **`ADMIN` tiene todo**; `GERENTE` todo lo operativo salvo roles y los 5
-  permisos de Usuarios (43); `SUBGERENTE` además no toca empleados ni contratos
-  (37); `RRHH` conserva personal, contratos y reportes (12).
+  permisos de Usuarios (48); `SUBGERENTE` además no toca empleados ni contratos
+  (42); `RRHH` conserva personal, contratos y reportes (12).
 - **El módulo Usuarios usa 5 permisos finos** (`USUARIOS_VER`, `CREAR`,
   `EDITAR`, `ESTADO`, `CLAVE`); el submenú muestra solo las acciones habilitadas.
 - **El módulo Empleados usa 7 permisos finos**; el submenú muestra solo las
@@ -492,6 +514,10 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
   acciones habilitadas y renumera sobre lo visible. `COMPRAS_REPORTES` cubre las
   dos opciones de reporte. Cualquiera de los seis abre el ítem del menú
   principal.
+- **El módulo de Inventario usa 3 permisos finos** (`INVENTARIO_VER`,
+  `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`); el submenú muestra solo las
+  acciones habilitadas y renumera sobre lo visible. Cualquiera de los tres abre
+  el ítem del menú principal; con solo `INVENTARIO_VER` queda `Movimientos`.
 - **Productos y Ventas también filtran por permiso**: `GESTIONAR_PRODUCTOS`
   habilita alta/cambio de estado y `CONSULTAR_PRODUCTOS`
   las consultas; en Ventas, `GESTIONAR_VENTAS` habilita operar,

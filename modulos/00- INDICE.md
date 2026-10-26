@@ -1,13 +1,13 @@
 # Índice general — módulos de la base de datos
 
-Los **58 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
+Los **59 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
 app lo usa. Cada módulo tiene su documento al lado del `.sql`, con el mismo
 nombre.
 
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 25/10/2026 · 58 `.sql` + 58 `.md` · 367 objetos documentados.
+Última revisión: 26/10/2026 · 59 `.sql` + 59 `.md` · 367 objetos documentados.
 
 ## Resumen
 
@@ -120,6 +120,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [ORDEN_TRIGGERS_RESTANTES](<55- ORDEN_TRIGGERS_RESTANTES.md>) | — | Fija el orden de los triggers de ventas, empleados y productos. | — |
 | [AUDITORIA_USUARIOS](<56- AUDITORIA_USUARIOS.md>) | — | Registra quién cambia usuarios y agrega `CAMBIO_USUARIO`. | — |
 | [AUDITORIA_SISTEMA_FIX](<57- AUDITORIA_SISTEMA_FIX.md>) | 3SP · 3TR | Recrea los `SP` y triggers del 6: rango indexable, usuario real y `DELETE` de proveedores. | — |
+| [PERMISOS_INVENTARIO](<58- PERMISOS_INVENTARIO.md>) | — | Reemplaza `GESTIONAR_INVENTARIO` por 3 permisos finos. | — |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 3TR | Bitácora genérica por tabla y registro. | — |
 | [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |
@@ -217,7 +218,7 @@ Parciales, que conviene mirar antes de tocarlos:
 
 ## Estado de la documentación
 
-- **58 de 58** módulos documentados, un `.md` por `.sql`.
+- **59 de 59** módulos documentados, un `.md` por `.sql`.
 - **367 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
 - Los `.sql` **no se tocaron** para documentar.
 - Los hallazgos están anotados en cada documento y en

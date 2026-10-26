@@ -674,3 +674,111 @@ paraguas: `GESTIONAR_COMPRAS` abria el item y las 8 opciones a la vez.
 - Commit y push (los hace el usuario).
 - Aplicar el `52` a la viva con backup previo (binario nuevo primero).
 - Seguir con Inventario y Caja.
+
+## 26/10 - Verificacion tras el pull y modulo 53 de Caja en TEST
+
+Se hizo `git pull` (10 commits, de `7024c79` a `c1d6845`, hechos en otra
+maquina) y se verifico el estado real de codigo y bases antes de seguir.
+
+- Build con el binario nuevo: OK.
+- `check-app-sps.sh` 93/0 en TEST y en la viva.
+- Triggers y auditoria de los modulos `54` a `57` presentes en ambas bases:
+  `TR_HISTORIAL_COMPRA`, `TR_VALIDAR_STOCK_DETALLE_VENTA`,
+  `TR_AUDITORIA_PERFIL_EMPLEADO`, `TR_LOG_CAMBIO_ESTADO_PRODUCTO`,
+  `TRG_AUDITORIA_USUARIOS` y `TR_AUDIT_PROVEEDORES_INSERT/UPDATE`.
+  `TR_AUDIT_PROVEEDORES_DELETE` no existe porque proveedores no se borra.
+  `LOG_USUARIOS` con 7 columnas en ambas.
+- Hallazgo: TEST estaba en 49/181 y la viva en 44/161. El binario nuevo pide
+  permisos que ninguna de las dos bases tenia, asi que `Caja (turnos)` no
+  aparecia para ADMIN, GERENTE, SUBGERENTE ni VENDEDOR.
+- Se aplico el modulo `53` en TEST. Quedo en **52 permisos / 193 pares**
+  (ADMIN 52, GERENTE 46, SUBGERENTE 40, RRHH 12, VENDEDOR 16, ALMACEN 23,
+  CONTABILIDAD 4). VENDEDOR conserva los tres permisos de Caja.
+- `test-menus-por-rol.sh` en TEST: **0 fallos**. Antes del `53` habia 21.
+- Los 21 fallos venian de una sola causa: al faltar `Caja (turnos)` el indice
+  del menu principal se corria y `ADMIN/Accesos` navegaba al item
+  equivocado. `Accesos` sigue gateado con `GESTIONAR_ROLES`; no era un bug
+  de ese modulo.
+- Ojo con los nombres: los permisos de Caja son `CONSULTAR_CAJA`,
+  `ABRIR_CAJA` y `CERRAR_CAJA`, no `CAJA_*`. Un `LIKE 'CAJA%'` da 0 y es
+  enganoso.
+- Inventario ya migro al patron de lista visible (`5e4f4c3`) pero sus tres
+  acciones siguen colgando todas de `GESTIONAR_INVENTARIO`: es el ultimo
+  modulo con permiso paraguas.
+
+**Viva (26/10)**
+- Backup `backups/105-antes-permisos-compras-caja-26-10-2026.sql`
+  (559 KB, dump completo con rutinas y triggers); `52` y `53` aplicados en ese
+  orden. Quedó en **52 permisos / 193 pares**, con la matriz
+  52/46/40/12/16/23/4, idéntica a TEST. `check-app-sps` contra la viva: 93/0.
+- Paraguas retirados: `GESTIONAR_COMPRAS`, `GESTIONAR_METODOS_PAGO`,
+  `GESTIONAR_MARCAS` y `GESTIONAR_CATEGORIAS` ya no existen. Siguen vivos
+  `GESTIONAR_VENTAS` (lo usan `roles.cpp` y `ventas.cpp`) y
+  `GESTIONAR_INVENTARIO`, que es el último pendiente.
+- No se corrió `test-menus-por-rol.sh` contra la viva: crea roles y usuarios
+  sintéticos (`PRUEBA_*`) y no conviene generarlos en producción. Allí la
+  verificación fue por matriz SQL.
+
+**Pendiente**
+- Inventario quedó migrado a permisos finos en TEST (ver la entrada siguiente,
+  módulo `58`); falta aplicarlo en la viva.
+
+## 26/10 - Permisos finos de Inventario (Tanda B, ultimo modulo)
+
+Cierra la Tanda B: Inventario era el ultimo modulo que abria sus tres acciones
+con un solo permiso paraguas.
+
+- Permisos nuevos: `INVENTARIO_VER` (Movimientos), `INVENTARIO_AJUSTAR` (Ajuste
+  de stock) e `INVENTARIO_COSTO` (Ajustar p.compra). Reemplazan a
+  `GESTIONAR_INVENTARIO`, que ya no existe en el catalogo ni en la matriz. No
+  queda ningun modulo con permiso paraguas.
+- `inventario.cpp`: cada opcion del submenu pide su permiso y la numeracion se
+  reacomoda sobre lo visible. Solo cambio la tabla de opciones y el comentario:
+  el patron de lista visible ya estaba desde `5e4f4c3`.
+- `roles.cpp`: el item Inventario se abre con cualquiera de los tres permisos.
+- Modulo `36` actualizado (54 permisos, `ALMACEN` con los tres finos) y modulo
+  `58` nuevo, idempotente, para las bases existentes.
+- Matriz en TEST: **54 permisos / 201 pares** (ADMIN 54, GERENTE 48,
+  SUBGERENTE 42, RRHH 12, VENDEDOR 16, ALMACEN 25, CONTABILIDAD 4).
+  `GESTIONAR_INVENTARIO` no aparece en `PERMISOS` ni en `ROL_PERMISO`.
+- `build.sh`: OK.
+- `test-menus-por-rol.sh` en TEST: **42 checks, 0 fallos**. Casos nuevos:
+  `PRUEBA_INV_VER` (solo `INVENTARIO_VER`: 3 opciones en el menu principal y 2
+  en el submenu, sin Ajuste de stock ni Ajustar p.compra) y
+  `ALMACEN/Inventario` (4 opciones). Los conteos de los 7 roles reales no
+  cambiaron: 19/16/16/6/10/11/5.
+- `check-app-sps.sh` en TEST: 93/0.
+- **Viva**: backup `backups/106-antes-permisos-inventario-26-10-2026.sql`
+  (560 KB, dump completo con rutinas y triggers); `58` aplicado. Quedó en
+  **54 permisos / 201 pares**, con la misma matriz que TEST.
+  `check-app-sps` contra la viva: 93/0. `GESTIONAR_INVENTARIO` ya no existe.
+- Como en Compras y Caja, no se corrió `test-menus-por-rol.sh` contra la viva:
+  crea roles y usuarios sintéticos (`PRUEBA_*`). Allí la verificación fue por
+  matriz SQL.
+
+**Tanda B cerrada**: no queda ningún módulo con permiso paraguas.
+
+## 26/10 - Roles: el prompt de permisos acepta nombre o ID
+
+Al validar la Tanda B, quitar `CLIENTES_VER` fallaba con "ERROR: EL ROL NO
+EXISTE EN EL SISTEMA." El mensaje era correcto pero enganoso: el SP valida el
+rol antes que el permiso, y se habia escrito el ID que la propia lista mostraba.
+
+- `mostrarRolesDisponibles()` imprime `ID_ROL. NOMBRE_ROL`, pero el prompt
+  pedia "nombre exacto". La lista destacaba el dato que no aceptaba.
+- Se agrego `resolverNombreRol()` en `roles.cpp`: si la entrada es numerica
+  busca por `ID_ROL`, si no por `NOMBRE_ROL`, y devuelve el nombre canonico
+  que espera el SP. Aplica a "Asignar permiso a rol", "Quitar permiso a rol"
+  y "Ver permisos de un rol".
+- El prompt pasa a "Rol (nombre o ID)". Si no existe, la UI avisa "Rol no
+  encontrado" en vez de dejar que el SP corte con un mensaje que habla del
+  rol cuando el usuario cree que el problema es el permiso.
+- Los IDs no siguen el orden alfabetico: 1 ADMIN, 2 RRHH, 3 VENDEDOR,
+  4 GERENTE, 5 SUBGERENTE, 6 ALMACEN, 7 CONTABILIDAD.
+- Probado por la UI: asignar y quitar con ID 2 resolvieron a RRHH, y ver
+  permisos con ID 2 listo sus 12. La matriz de TEST se restauro a 201 pares
+  despues de la prueba de asignacion.
+- `build.sh` OK, `test-menus-por-rol.sh` 42/42.
+
+**Pendiente**
+- Commit (lo hace el usuario).

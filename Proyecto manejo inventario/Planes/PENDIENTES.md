@@ -2,24 +2,25 @@
 
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
 > Lo hecho vive en `Realizado.md`; los detalles largos, en `Auditoria/` y `Flujos/`.
-> Actualizado: 23/10/2026.
+> Actualizado: 26/10/2026.
 
 ---
 
 ## 🔴 P0 — Ahora (bloquea lo que estás haciendo)
 
-### 1. Permisos finos: Tanda B, faltan 2 módulos
+### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
 
-Estado: **TEST está migrada** (23/10/2026: 7 roles, **49 permisos**, matriz **49/43/37/12/13/23/4 = 181 pares**). La viva sigue en **44 permisos / 161 pares** hasta aplicar el módulo `52` con backup previo. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago y Compras ya están cerrados; el detalle con evidencia vive en `Realizado.md` (23/10). VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`.
+Estado: **TEST y la viva migradas** (26/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/16/25/4 = 201 pares**; `test-menus-por-rol.sh` 0 fallos en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/106-antes-permisos-inventario-26-10-2026.sql`. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`.
 
-- [ ] Seguir en este orden: **Inventario → Caja** (grandes al final).
+- [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 26/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
+- [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 26/10 con backup `backups/106-antes-permisos-inventario-26-10-2026.sql`.
 
-**Estimación de esfuerzo (23/10):** quedan 2 módulos:
+**Estimación de esfuerzo (26/10):** ya no quedan módulos con paraguas; la Tanda B está cerrada.
 
-- Simples: ninguno; Métodos de pago cerró la tanda de módulos simples.
-- Grandes (varias sesiones cada uno, tocan flujos): **Inventario y Caja**.
+- **Inventario** cerrado: `INVENTARIO_VER` abre Movimientos, `INVENTARIO_AJUSTAR` el ajuste de stock e `INVENTARIO_COSTO` el precio de compra. Cualquiera de los tres abre el ítem del menú.
+- **Caja** ya quedó cerrada en esta tanda: permisos propios (`CONSULTAR_CAJA`, `ABRIR_CAJA`, `CERRAR_CAJA`), módulo `53` aplicado en TEST y VENDEDOR conserva los tres.
 - **Ventas** ya está cerrado. Solo tiene pendiente el submenú de Garantías, que despacha por número porque es una lista fija sin filtro. No es un bug; se migra si se le agregan permisos propios (ver P1, Garantías).
-- Orden de magnitud: **semanas de trabajo intermitente, no horas**. Sin fecha exacta hasta cerrar Inventario y medir el ritmo real.
+- Lo que sigue son los P1/P2 (garantías, RRHH, deuda técnica), no permisos finos.
 
 **Patrón** (referencia: `clientes.cpp`, el más chico y limpio):
 
@@ -44,7 +45,7 @@ Estado: **TEST está migrada** (23/10/2026: 7 roles, **49 permisos**, matriz **4
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 49 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`). La viva sigue en 44 hasta aplicar el `52` con backup previo.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`). La viva sigue en 52 hasta aplicar el `58` con backup previo.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
@@ -52,7 +53,7 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 49 permisos ap
 |---|---|---|
 | `bash build.sh` | compila | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 93/0 |
-| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas y Compras | 33/33 |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Compras, Caja e Inventario | 42/42 |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |

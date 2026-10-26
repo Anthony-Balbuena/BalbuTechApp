@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <limits>
 #include <vector>
+#include <cctype>
 #include <mysql_connection.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
@@ -185,7 +186,8 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Ventas",           {"GESTIONAR_VENTAS"},                         AccionMenu::Ventas},
         {"Compras",          {"COMPRAS_VER", "COMPRAS_REGISTRAR", "COMPRAS_PAGAR",
                               "COMPRAS_CANCELAR", "COMPRAS_DEVOLVER", "COMPRAS_REPORTES"}, AccionMenu::Compras},
-        {"Inventario",       {"GESTIONAR_INVENTARIO"},                     AccionMenu::Inventario},
+        {"Inventario",       {"INVENTARIO_VER", "INVENTARIO_AJUSTAR",
+                              "INVENTARIO_COSTO"},                         AccionMenu::Inventario},
         {"Caja (turnos)",    {"CONSULTAR_CAJA", "ABRIR_CAJA",
                               "CERRAR_CAJA"},                              AccionMenu::Caja},
         {"Accesos",          {"GESTIONAR_ROLES"},                          AccionMenu::LogAccesos},
@@ -520,13 +522,46 @@ static void mostrarPermisosDisponibles() {
     }
 }
 
-// Pide rol y permiso por nombre exacto y llama al SP de asignar o quitar.
+// Acepta el nombre del rol o su ID: la lista muestra ambos y obligar al
+// nombre exacto era una trampa. Devuelve el NOMBRE_ROL canonico, o vacio si
+// la entrada no corresponde a ningun rol.
+static string resolverNombreRol(const string& entrada) {
+    string valor = recortar(entrada);
+    if (valor.empty()) return "";
+
+    bool esId = true;
+    for (char c : valor) {
+        if (!isdigit((unsigned char)c)) { esId = false; break; }
+    }
+
+    try {
+        std::unique_ptr<sql::PreparedStatement> ps;
+        if (esId) {
+            ps.reset(globalCon->prepareStatement(
+                "SELECT NOMBRE_ROL FROM ROLES WHERE ID_ROL = ?"));
+            ps->setInt(1, stoi(valor));
+        } else {
+            ps.reset(globalCon->prepareStatement(
+                "SELECT NOMBRE_ROL FROM ROLES WHERE NOMBRE_ROL = ?"));
+            ps->setString(1, valor);
+        }
+        std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
+        string nombre;
+        if (res->next()) nombre = res->getString("NOMBRE_ROL");
+        drenarResultados(ps.get());
+        return nombre;
+    } catch (const exception&) {
+        return "";
+    }
+}
+
+// Pide rol (nombre o ID) y permiso por nombre exacto, y llama al SP.
 static void cambiarPermisoDeRol(bool asignar) {
     try {
         mostrarRolesDisponibles();
-        string rol = recortar(leerDatoSeguro("Rol (nombre exacto): "));
+        string rol = resolverNombreRol(leerDatoSeguro("Rol (nombre o ID): "));
         if (rol.empty()) {
-            cout << "Cancelado." << endl;
+            cout << ROJO << "Rol no encontrado. Usa el nombre o el ID de la lista." << RESET << endl;
             return;
         }
 
@@ -556,9 +591,9 @@ static void cambiarPermisoDeRol(bool asignar) {
 static void verPermisosDeRol() {
     try {
         mostrarRolesDisponibles();
-        string rol = recortar(leerDatoSeguro("Rol (nombre exacto): "));
+        string rol = resolverNombreRol(leerDatoSeguro("Rol (nombre o ID): "));
         if (rol.empty()) {
-            cout << "Cancelado." << endl;
+            cout << ROJO << "Rol no encontrado. Usa el nombre o el ID de la lista." << RESET << endl;
             return;
         }
 

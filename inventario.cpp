@@ -201,14 +201,15 @@ struct OpcionInventario {
 };
 
 // (24/10/2026) Mismo patron que el resto de los submenus: lista visible
-// numerada y Volver como opcion. El item del menu principal ya pide
-// GESTIONAR_INVENTARIO, asi que hoy las tres acciones se ven siempre.
+// numerada y Volver como opcion. (26/10/2026) Cada accion tiene su propio
+// permiso INVENTARIO_*, asi que un rol puede ver solo algunas y la
+// numeracion se reacomoda sobre lo visible.
 static const vector<OpcionInventario>& opcionesInventario() {
     static const vector<OpcionInventario> opciones = {
-        {"Ajuste de stock",          "GESTIONAR_INVENTARIO", AccionInventario::AjusteStock},
-        {"Ajustar p.compra",         "GESTIONAR_INVENTARIO", AccionInventario::AjustarCosto},
-        {"Movimientos",              "GESTIONAR_INVENTARIO", AccionInventario::Movimientos},
-        {"Volver al Menu Principal", "",                     AccionInventario::Volver}
+        {"Ajuste de stock",          "INVENTARIO_AJUSTAR", AccionInventario::AjusteStock},
+        {"Ajustar p.compra",         "INVENTARIO_COSTO",   AccionInventario::AjustarCosto},
+        {"Movimientos",              "INVENTARIO_VER",     AccionInventario::Movimientos},
+        {"Volver al Menu Principal", "",                   AccionInventario::Volver}
     };
     return opciones;
 }
