@@ -879,3 +879,25 @@ que daban la viva por migrada quedan superadas por esta.
   `INACTIVO/INACTIVA/CANCELADA/AGOTADO/CRÍTICO`.
 - `productos.cpp` migro al helper compartido sin cambiar su salida.
 - `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST.
+
+### 27/10 (tercera parte) — Celdas alineadas en catalogos y RRHH
+
+- `tabla.h`: `tablaColorEstado` reconoce `PRESENTE`, `TARDE`, `PERMISO`,
+  `AUSENTE`, `APROBADA` y `RECHAZADA`.
+- `clientes.cpp` y `proveedores.cpp`: un helper por archivo para Buscar y
+  Listar; `ESTADO` coloreado y separador tras cada fila.
+- `empleados.cpp`: helper para Buscar/Listar y la asistencia del dia con
+  celdas alineadas; el estado conserva sus colores (verde presente, amarillo
+  tarde, cian permiso, rojo ausente).
+- `metodos_pago.cpp`: helper con flag para el listado con `ESTADO` y el
+  buscar sin estado.
+- `roles.cpp`: listado de roles y permisos de un rol alineados; la
+  descripcion se recorta por code points, no por bytes.
+- `accesos.cpp`: log alineado; solo la celda `RESULTADO` lleva color
+  (verde exitoso, amarillo inactivo, rojo el resto).
+- `vacaciones.cpp`: historial propio y solicitudes pendientes alineados;
+  solo la celda `ESTADO` lleva color.
+- `categorias.cpp::listarCategorias` esta dentro de `#if 0` (codigo muerto),
+  no se toco.
+- `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST. Verificado en TEST
+  con clientes, empleados, metodos, roles y accesos.

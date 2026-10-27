@@ -13,6 +13,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "colores.h"
+#include "tabla.h"
 #include "sesion.h"
 #include "categorias.h"
 #include "marcas.h"
@@ -423,6 +424,23 @@ void actualizarRol() {
     }
 }
 
+static int imprimirTablaRoles(sql::ResultSet *res) {
+    const size_t W_ID = 5, W_NOM = 30;
+    const size_t ANCHO = W_ID + W_NOM + 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE DEL ROL", W_NOM) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        cout << tablaCelda(to_string(res->getInt("ID_ROL")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE_ROL"), W_NOM) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    }
+    return n;
+}
+
 // Busca roles por coincidencia de nombre y muestra los resultados encontrados.
 void buscarRol() {
     cout << "\n--- BUSCAR ROLES ---" << endl;
@@ -433,19 +451,7 @@ void buscarRol() {
         pstmt->setString(1, busqueda);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        string separator = string(38, '-');
-        cout << "\n" << separator << endl;
-        printf("%-5s | %-30s\n", "ID", "NOMBRE DEL ROL");
-        cout << separator << endl;
-
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            printf("%-5d | %-30.30s\n",
-                   res->getInt("ID_ROL"),
-                   res->getString("NOMBRE_ROL").c_str());
-            cout << separator << endl;
-        }
+        bool encontrado = imprimirTablaRoles(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No se hallaron roles con el filtro: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
@@ -466,18 +472,7 @@ void listarRoles() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        string separator = string(38, '-');
-        cout << "\n" << separator << endl;
-        printf("%-5s | %-30s\n", "ID", "NOMBRE DEL ROL");
-        cout << separator << endl;
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            printf("%-5d | %-30.30s\n",
-                   res->getInt("ID_ROL"),
-                   res->getString("NOMBRE_ROL").c_str());
-            cout << separator << endl;
-        }
+        bool encontrado = imprimirTablaRoles(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No hay roles registrados." << endl;
@@ -602,23 +597,25 @@ static void verPermisosDeRol() {
         ps->setString(1, rol);
         std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
 
-        string separator = string(78, '-');
-        cout << "\n" << separator << endl;
-        printf("%-5s | %-30s | %s\n", "ID", "PERMISO", "DESCRIPCION");
-        cout << separator << endl;
-
+        const size_t W_ID = 5, W_PERM = 30, W_DESC = 50;
+        const size_t ANCHO = W_ID + W_PERM + W_DESC + 2 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("PERMISO", W_PERM) << " | "
+             << tablaCelda("DESCRIPCION", W_DESC) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
-            printf("%-5d | %-30.30s | %.50s\n",
-                   res->getInt("ID_PERMISO"),
-                   res->getString("NOMBRE_PERMISO").c_str(),
-                   res->isNull("DESCRIPCION") ? "" : res->getString("DESCRIPCION").c_str());
+            string desc = res->isNull("DESCRIPCION") ? string() : (string)res->getString("DESCRIPCION");
+            cout << tablaCelda(to_string(res->getInt("ID_PERMISO")), W_ID) << " | "
+                 << tablaCelda(res->getString("NOMBRE_PERMISO"), W_PERM) << " | "
+                 << tablaCelda(desc, W_DESC) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) {
             cout << "[!] Ese rol no tiene permisos asignados." << endl;
         }
-        cout << separator << endl;
 
         drenarResultados(ps.get());
     } catch (const CancelarOperacionException &e) {

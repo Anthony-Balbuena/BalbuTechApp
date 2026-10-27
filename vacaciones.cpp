@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 #include "sesion.h"
 
 using namespace std;
@@ -63,31 +64,30 @@ static void mostrarHistorialPropio(int idEmpleado) {
         ps->setInt(1, idEmpleado);
         std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
 
-        string separator = string(66, '-');
-        cout << separator << endl;
-        printf("%-10s | %-10s | %-10s | %s\n",
-               "INICIO", "FIN", "ESTADO", "REGISTRO");
-        cout << separator << endl;
-
+        const size_t W_INI = 10, W_FIN = 10, W_EST = 10, W_REG = 19;
+        const size_t ANCHO = W_INI + W_FIN + W_EST + W_REG + 3 * 3;
+        cout << "\n"
+             << tablaCelda("INICIO", W_INI) << " | "
+             << tablaCelda("FIN", W_FIN) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("REGISTRO", W_REG) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
             string estado = res->getString("ESTADO");
             const string& color = (estado == "APROBADO") ? VERDE
                                 : (estado == "PENDIENTE") ? AMARILLO : ROJO;
-            cout << color;
-            printf("%-10.10s | %-10.10s | %-10.10s | %.19s\n",
-                   res->getString("FECHA_INICIO").c_str(),
-                   res->getString("FECHA_FIN").c_str(),
-                   estado.c_str(),
-                   res->getString("FECHA_REGISTRO").c_str());
-            cout << RESET;
+            cout << tablaCelda(res->getString("FECHA_INICIO"), W_INI) << " | "
+                 << tablaCelda(res->getString("FECHA_FIN"), W_FIN) << " | "
+                 << color << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(res->getString("FECHA_REGISTRO"), W_REG) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
 
         if (!hay) {
             cout << "[!] Todavia no tienes solicitudes de vacaciones." << endl;
         }
-        cout << separator << endl;
 
         res.reset();
         drenarResultados(ps.get());
@@ -278,17 +278,23 @@ void gestionarVacacionesUI() {
             return;
         }
 
-        string separator = string(82, '-');
-        cout << separator << endl;
-        printf("%-5s | %-22s | %-10s | %-10s | %s\n",
-               "ID", "EMPLEADO", "INICIO", "FIN", "REGISTRO");
-        cout << separator << endl;
+        const size_t W_ID = 5, W_NOM = 22, W_INI = 10, W_FIN = 10, W_REG = 19;
+        const size_t ANCHO = W_ID + W_NOM + W_INI + W_FIN + W_REG + 4 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("EMPLEADO", W_NOM) << " | "
+             << tablaCelda("INICIO", W_INI) << " | "
+             << tablaCelda("FIN", W_FIN) << " | "
+             << tablaCelda("REGISTRO", W_REG) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         for (const VacacionPendiente& v : pendientes) {
-            printf("%-5d | %-22.22s | %-10.10s | %-10.10s | %.19s\n",
-                   v.id, v.nombre.c_str(), v.fechaInicio.c_str(),
-                   v.fechaFin.c_str(), v.fechaRegistro.c_str());
+            cout << tablaCelda(to_string(v.id), W_ID) << " | "
+                 << tablaCelda(v.nombre, W_NOM) << " | "
+                 << tablaCelda(v.fechaInicio, W_INI) << " | "
+                 << tablaCelda(v.fechaFin, W_FIN) << " | "
+                 << tablaCelda(v.fechaRegistro, W_REG) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
-        cout << separator << endl;
 
         int idVacacion = 0;
         try {

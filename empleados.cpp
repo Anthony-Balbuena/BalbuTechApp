@@ -3,6 +3,7 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <cstdio>
 #include <vector>
 #include <utility>
 #include <mysql_connection.h>
@@ -17,6 +18,7 @@
 #include "permisos.h"
 #include "vacaciones.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -288,6 +290,30 @@ void reactivarEmpleado() {
     }
 }
 
+static int imprimirTablaEmpleados(sql::ResultSet *res) {
+    const size_t W_ID = 4, W_NOM = 22, W_CED = 12, W_CAR = 28, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + W_CED + W_CAR + W_EST + 4 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << " | "
+         << tablaCelda("CEDULA", W_CED) << " | "
+         << tablaCelda("CARGO", W_CAR) << " | "
+         << tablaCelda("ESTADO", W_EST) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        string estado = res->getString("ESTADO");
+        cout << tablaCelda(to_string(res->getInt("ID_EMPLEADO")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+             << tablaCelda(res->getString("CEDULA"), W_CED) << " | "
+             << tablaCelda(res->getString("CARGO"), W_CAR) << " | "
+             << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    }
+    return n;
+}
+
 void buscarEmpleado() {
     cout << "\n--- BUSCAR EMPLEADO ---" << endl;
     try {
@@ -300,20 +326,7 @@ void buscarEmpleado() {
         pstmt->setString(4, "%" + filtro + "%");
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        bool encontrado = false;
-
-        printf("\n%-4s | %-22s | %-12s | %-28s | %-8s\n", "ID", "NOMBRE", "CEDULA", "CARGO", "ESTADO");
-        printf("%s\n", string(86, '-').c_str());
-        while (res->next()) {
-            encontrado = true;
-            printf("%-4d | %-22.22s | %-12.12s | %-28.28s | %-8s\n",
-                   res->getInt("ID_EMPLEADO"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("CEDULA").c_str(),
-                   res->getString("CARGO").c_str(),
-                   res->getString("ESTADO").c_str());
-            printf("%s\n", string(86, '-').c_str());
-        }
+        bool encontrado = imprimirTablaEmpleados(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No se encontraron empleados con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
@@ -333,19 +346,7 @@ void listarEmpleados() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_EMPLEADO, NOMBRE, CEDULA, CARGO, ESTADO FROM EMPLEADOS ORDER BY ID_EMPLEADO"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-4s | %-22s | %-12s | %-28s | %-8s\n", "ID", "NOMBRE", "CEDULA", "CARGO", "ESTADO");
-        printf("%s\n", string(86, '-').c_str());
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            printf("%-4d | %-22.22s | %-12.12s | %-28.28s | %-8s\n",
-                   res->getInt("ID_EMPLEADO"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("CEDULA").c_str(),
-                   res->getString("CARGO").c_str(),
-                   res->getString("ESTADO").c_str());
-            printf("%s\n", string(86, '-').c_str());
-        }
+        bool encontrado = imprimirTablaEmpleados(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No hay empleados registrados." << endl;
@@ -559,8 +560,17 @@ static void asistenciaHoyUI() {
         if (fecha.empty()) pstmt->setNull(1, sql::DataType::DATE);
         else pstmt->setString(1, fecha);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-5s | %-22s | %-12s | %-10s | %-10s | %-6s\n",
-               "ID", "NOMBRE", "CARGO", "ESTADO", "ENTRADA", "HORAS");
+        const size_t W_ID = 5, W_NOM = 22, W_CAR = 12, W_EST = 10,
+                     W_ENT = 10, W_HRS = 6;
+        const size_t ANCHO = W_ID + W_NOM + W_CAR + W_EST + W_ENT + W_HRS + 5 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("NOMBRE", W_NOM) << " | "
+             << tablaCelda("CARGO", W_CAR) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("ENTRADA", W_ENT) << " | "
+             << tablaCelda("HORAS", W_HRS) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         int nPres = 0, nTarde = 0, nAus = 0, nPerm = 0;
         bool hay = false;
         while (res->next()) {
@@ -572,15 +582,15 @@ static void asistenciaHoyUI() {
             else if (est == "TARDE") nTarde++;
             else if (est == "PERMISO") nPerm++;
             else nAus++;
-            printf("%-5d | %-22.22s | %-12.12s | ", res->getInt("ID_EMPLEADO"),
-                   res->getString("NOMBRE").c_str(), res->getString("CARGO").c_str());
-            const string &c = (est == "PRESENTE") ? VERDE
-                            : (est == "TARDE") ? AMARILLO
-                            : (est == "PERMISO") ? CIAN : ROJO;
-            string estCelda = est;
-            estCelda.resize(10, ' ');  // ancho fijo 10: mantiene alineadas las columnas siguientes
-            cout << c << estCelda << RESET;
-            printf(" | %-10.10s | %-6.2f\n", ent.c_str(), hs);
+            char bufHs[16];
+            snprintf(bufHs, sizeof(bufHs), "%.2f", hs);
+            cout << tablaCelda(to_string(res->getInt("ID_EMPLEADO")), W_ID) << " | "
+                 << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+                 << tablaCelda(res->getString("CARGO"), W_CAR) << " | "
+                 << tablaColorEstado(est) << tablaCelda(est, W_EST) << RESET << " | "
+                 << tablaCelda(ent, W_ENT) << " | "
+                 << tablaCelda(bufHs, W_HRS) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) cout << "[!] Sin empleados activos." << endl;
         else {

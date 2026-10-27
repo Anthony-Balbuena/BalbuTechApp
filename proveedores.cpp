@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -153,6 +154,30 @@ void cambiarEstadoProveedor() {
     }
 }
 
+static int imprimirTablaProveedores(sql::ResultSet *res) {
+    const size_t W_ID = 4, W_NOM = 22, W_TEL = 12, W_MAIL = 30, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + W_TEL + W_MAIL + W_EST + 4 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << " | "
+         << tablaCelda("TELEFONO", W_TEL) << " | "
+         << tablaCelda("EMAIL", W_MAIL) << " | "
+         << tablaCelda("ESTADO", W_EST) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        string estado = res->getString("ESTADO");
+        cout << tablaCelda(to_string(res->getInt("ID_PROVEEDOR")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+             << tablaCelda(res->getString("TELEFONO"), W_TEL) << " | "
+             << tablaCelda(res->getString("EMAIL"), W_MAIL) << " | "
+             << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    }
+    return n;
+}
+
 void buscarProveedor() {
     cout << "\n--- BUSCAR PROVEEDOR ---" << endl;
     try {
@@ -163,20 +188,7 @@ void buscarProveedor() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
-        printf("%s\n", string(88, '-').c_str());
-        bool encontrado = false;
-
-        while (res->next()) {
-            encontrado = true;
-            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
-                   res->getInt("ID_PROVEEDOR"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("TELEFONO").c_str(),
-                   res->getString("EMAIL").c_str(),
-                   res->getString("ESTADO").c_str());
-            printf("%s\n", string(88, '-').c_str());
-        }
+        bool encontrado = imprimirTablaProveedores(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No se encontraron resultados con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
@@ -196,20 +208,7 @@ void listarProveedores() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-4s | %-22s | %-12s | %-30s | %-8s\n", "ID", "NOMBRE", "TELEFONO", "EMAIL", "ESTADO");
-        printf("%s\n", string(88, '-').c_str());
-        bool encontrado = false;
-
-        while (res->next()) {
-            encontrado = true;
-            printf("%-4d | %-22.22s | %-12.12s | %-30.30s | %-8s\n",
-                   res->getInt("ID_PROVEEDOR"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("TELEFONO").c_str(),
-                   res->getString("EMAIL").c_str(),
-                   res->getString("ESTADO").c_str());
-            printf("%s\n", string(88, '-').c_str());
-        }
+        bool encontrado = imprimirTablaProveedores(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No hay proveedores registrados." << endl;

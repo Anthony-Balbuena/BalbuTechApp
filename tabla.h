@@ -62,20 +62,23 @@ inline std::string tablaLinea(size_t width) {
 inline const std::string &tablaColorEstado(const std::string &estado) {
     if (estado == "ACTIVO" || estado == "ACTIVA" || estado == "OK" ||
         estado == "REALIZADA" || estado == "RECIBIDA" ||
-        estado == "APROBADO" || estado == "PAGADA") {
+        estado == "APROBADO" || estado == "APROBADA" ||
+        estado == "PRESENTE" || estado == "PAGADA") {
         return VERDE;
     }
     if (estado == "INACTIVO" || estado == "INACTIVA" ||
         estado == "CANCELADA" || estado == "CANCELADO" ||
         estado == "AGOTADO" || estado == "CRÍTICO" ||
-        estado == "RECHAZADO" || estado == "ANULADA") {
+        estado == "RECHAZADO" || estado == "RECHAZADA" ||
+        estado == "AUSENTE" || estado == "ANULADA") {
         return ROJO;
     }
     if (estado == "EN_PROCESO" || estado == "PENDIENTE" ||
-        estado == "STOCK BAJO" || estado == "ABIERTA" ||
-        estado == "PARCIAL") {
+        estado == "TARDE" || estado == "STOCK BAJO" ||
+        estado == "ABIERTA" || estado == "PARCIAL") {
         return AMARILLO;
     }
+    if (estado == "PERMISO") return CIAN;
     return RESET;
 }
 

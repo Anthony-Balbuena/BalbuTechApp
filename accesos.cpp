@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -27,29 +28,28 @@ static void listarAccesos() {
             "CALL SP_REPORTAR_ACCESOS()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        string separator = string(54, '-');
-        cout << "\n" << separator << endl;
-        printf("%-19s | %-20s | %s\n", "FECHA", "USUARIO", "RESULTADO");
-        cout << separator << endl;
-
+        const size_t W_FECHA = 19, W_USER = 20, W_RES = 10;
+        const size_t ANCHO = W_FECHA + W_USER + W_RES + 2 * 3;
+        cout << "\n"
+             << tablaCelda("FECHA", W_FECHA) << " | "
+             << tablaCelda("USUARIO", W_USER) << " | "
+             << tablaCelda("RESULTADO", W_RES) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
             string estado = res->getString("ESTADO_INTENTO");
             const string& color = (estado == "EXITOSO") ? VERDE
                                 : (estado == "INACTIVO") ? AMARILLO : ROJO;
-            cout << color;
-            printf("%-19.19s | %-20.20s | %s\n",
-                   res->getString("FECHA_ACCESO").c_str(),
-                   res->getString("USUARIO_INTENTADO").c_str(),
-                   estado.c_str());
-            cout << RESET;
+            cout << tablaCelda(res->getString("FECHA_ACCESO"), W_FECHA) << " | "
+                 << tablaCelda(res->getString("USUARIO_INTENTADO"), W_USER) << " | "
+                 << color << tablaCelda(estado, W_RES) << RESET << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
 
         if (!hay) {
             cout << "[!] No hay accesos registrados." << endl;
         }
-        cout << separator << endl;
 
         drenarResultados(pstmt.get());
     } catch (const exception &e) {

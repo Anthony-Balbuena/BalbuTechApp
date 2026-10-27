@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -142,6 +143,28 @@ void cambiarEstadoMetodoPago() {
     }
 }
 
+static int imprimirTablaMetodos(sql::ResultSet *res, bool conEstado) {
+    const size_t W_ID = 8, W_NOM = 35, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + (conEstado ? W_EST + 3 : 0) + 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda(conEstado ? "NOMBRE" : "METODO DE PAGO", W_NOM);
+    if (conEstado) cout << " | " << tablaCelda("ESTADO", W_EST);
+    cout << "\n" << tablaLinea(ANCHO) << "\n";
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        cout << tablaCelda(to_string(res->getInt("ID_METODO_PAGO")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM);
+        if (conEstado) {
+            string estado = res->getString("ESTADO");
+            cout << " | " << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET;
+        }
+        cout << "\n" << tablaLinea(ANCHO) << "\n";
+    }
+    return n;
+}
+
 void buscarMetodoPago() {
     cout << "\n--- BUSCAR METODOS DE PAGO ---" << endl;
     try {
@@ -151,18 +174,7 @@ void buscarMetodoPago() {
         pstmt->setString(1, busqueda);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        cout << "\n" << string(46, '-') << endl;
-        printf("%-8s | %-35s\n", "ID", "METODO DE PAGO");
-        cout << string(46, '-') << endl;
-
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            printf("%-8d | %-35.35s\n",
-                   res->getInt("ID_METODO_PAGO"),
-                   res->getString("NOMBRE").c_str());
-            cout << string(46, '-') << endl;
-        }
+        bool encontrado = imprimirTablaMetodos(res.get(), false) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No se hallaron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
@@ -182,18 +194,7 @@ void listarMetodosPago() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_METODO_PAGO, NOMBRE, ESTADO FROM METODOS_PAGO ORDER BY ID_METODO_PAGO"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        cout << "\n" << string(57, '-') << endl;
-        printf("%-8s | %-35s | %-8s\n", "ID", "NOMBRE", "ESTADO");
-        cout << string(57, '-') << endl;
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            printf("%-8d | %-35.35s | %-8s\n",
-                   res->getInt("ID_METODO_PAGO"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("ESTADO").c_str());
-            cout << string(57, '-') << endl;
-        }
+        bool encontrado = imprimirTablaMetodos(res.get(), true) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No hay metodos de pago registrados." << endl;
