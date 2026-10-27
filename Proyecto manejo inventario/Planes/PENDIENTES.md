@@ -2,7 +2,7 @@
 
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
 > Lo hecho vive en `Realizado.md`; los detalles largos, en `Auditoria/` y `Flujos/`.
-> Actualizado: 26/10/2026.
+> Actualizado: 27/10/2026.
 
 ---
 
@@ -10,10 +10,10 @@
 
 ### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
 
-Estado: **TEST y la viva migradas** (26/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/12/25/4 = 197 pares**; `test-menus-por-rol.sh` 0 fallos en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/106-antes-permisos-inventario-26-10-2026.sql`. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`. VENDEDOR quedó en 12 permisos: no busca ni lista clientes (`CLIENTES_VER`) y de Métodos de pago solo conserva `METODOS_PAGO_VER`.
+Estado: **TEST y la viva migradas** (27/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/12/25/4 = 197 pares**; `test-menus-por-rol.sh` 43/43 en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`. VENDEDOR quedó en 12 permisos: no busca ni lista clientes (`CLIENTES_VER`) y de Métodos de pago solo conserva `METODOS_PAGO_VER`.
 
-- [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 26/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
-- [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 26/10 con backup `backups/106-antes-permisos-inventario-26-10-2026.sql`.
+- [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 27/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
+- [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 27/10 con backup `backups/107-antes-permisos-inventario-20261027_123943.sql`.
 
 **Estimación de esfuerzo (26/10):** ya no quedan módulos con paraguas; la Tanda B está cerrada.
 
@@ -45,7 +45,7 @@ Estado: **TEST y la viva migradas** (26/10/2026: 7 roles, **54 permisos**, matri
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`). La viva sigue en 52 hasta aplicar el `58` con backup previo.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`). La viva quedó alineada el 27/10 con la misma matriz (54 permisos / 197 pares).
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 

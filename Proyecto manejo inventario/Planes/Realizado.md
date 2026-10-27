@@ -813,3 +813,34 @@ permisos y el total de 201 a 197 pares.
 - Commit (lo hace el usuario).
 - Si se quiere un backup del estado 197 de la viva, tomarlo antes de la
   proxima migracion; el `106` es anterior a este ajuste.
+
+## 27/10 - Tanda B aplicada de verdad en TEST y en la viva
+
+Correccion: el estado real al empezar el dia era **52 permisos / 193 pares** y
+VENDEDOR con 16, no 54/197. El `58` no estaba aplicado en ninguna de las dos
+bases y el ajuste de VENDEDOR del `65c2c1b` tampoco. Las entradas del 26/10
+que daban la viva por migrada quedan superadas por esta.
+
+- TEST: se aplico `58` (54 permisos / 201 pares, VENDEDOR 16) y despues `36`
+  (idempotente), que limpia los cuatro permisos de VENDEDOR. Quedo en
+  **54 permisos / 197 pares**: 54/48/42/12/25/12/4.
+- Viva: backup completo `backups/107-antes-permisos-inventario-20261027_123943.sql`
+  (604 KB, con rutinas y triggers). Se aplicaron `36` y `58`. Quedo igual que
+  TEST: **54 permisos / 197 pares**, VENDEDOR 12, sin `GESTIONAR_INVENTARIO`,
+  con `INVENTARIO_VER/AJUSTAR/COSTO`, 0 pares huerfanos.
+- Integridad de la viva: 3 usuarios, 9 empleados, 49 productos, 13 ventas,
+  7 roles. `check-app-sps` 93/0 en ambas bases.
+- Pruebas automaticas en TEST: `build.sh` OK; `check-app-sps` 93/0;
+  `test-menus-por-rol.sh` 43/43; `test-migracion-roles.sh` 15/15;
+  `test-asistencia-propia.sh` OK; `test-contrato-borrador.sh` 15/15;
+  `test-contratos-subir.sh` OK; `test-auditoria-sistema.sh` 8/8;
+  `test-auditoria-usuarios.sh` 5/5; `test-login-eof.sh` OK;
+  `test-menus-eof.sh` OK.
+- **Importante**: la app que esta corriendo usa el binario viejo y sigue
+  pidiendo `GESTIONAR_INVENTARIO`; hasta relanzar `output/app`, el item
+  Inventario no aparece. El binario nuevo ya esta compilado.
+
+**Pendiente**
+- Relanzar la app con `output/app`.
+- Commit de esta correccion (lo hace el usuario).
+- Quedan las pruebas manuales por rol de `PENDIENTES.md`.
