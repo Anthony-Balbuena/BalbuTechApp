@@ -872,6 +872,8 @@ que daban la viva por migrada quedan superadas por esta.
 - `mostrarFactura()`: el encabezado de la venta colorea el estado y el
   detalle de lineas pasa a celdas alineadas con separadores y fila de total.
 - `cancelarCompraUI()`: tabla de compras alineada y con estado coloreado.
+- `verPreciosCompraUI()`: reporte de precios por suplidor con celdas
+  alineadas y separadores; el simbolo `™` ya no corre la columna.
 - Colores por estado: verde `ACTIVO/ACTIVA/REALIZADA/RECIBIDA`; amarillo
   `EN_PROCESO/PENDIENTE/ABIERTA/STOCK BAJO`; rojo
   `INACTIVO/INACTIVA/CANCELADA/AGOTADO/CRÍTICO`.

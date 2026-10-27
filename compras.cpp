@@ -1123,18 +1123,33 @@ static void verPreciosCompraUI() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_REPORTE_PRECIOS_COMPRA()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-25s | %-10s | %-10s | %-25s | %-10s | %-25s | %-10s\n", "PRODUCTO", "SUPLIDORES", "MAS BARATO", "BARATO EN", "MAS CARO", "CARO EN", "ULTIMA");
+        const size_t W_PROD = 25, W_SUP = 10, W_BAR = 10, W_DONDE_BAR = 25,
+                     W_CARO = 10, W_DONDE_CAR = 25, W_ULT = 10;
+        const size_t ANCHO = W_PROD + W_SUP + W_BAR + W_DONDE_BAR + W_CARO +
+                             W_DONDE_CAR + W_ULT + 6 * 3;
+        cout << "\n"
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("SUPLIDORES", W_SUP) << " | "
+             << tablaCelda("MAS BARATO", W_BAR) << " | "
+             << tablaCelda("BARATO EN", W_DONDE_BAR) << " | "
+             << tablaCelda("MAS CARO", W_CARO) << " | "
+             << tablaCelda("CARO EN", W_DONDE_CAR) << " | "
+             << tablaCelda("ULTIMA", W_ULT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
-            printf("%-25.25s | %-10d | %-10.2f | %-25.25s | %-10.2f | %-25.25s | %-10.10s\n",
-                   res->getString("PRODUCTO").c_str(),
-                   res->getInt("SUPLIDORES"),
-                   (double)res->getDouble("MAS_BARATO"),
-                   res->getString("DONDE_BARATO").c_str(),
-                   (double)res->getDouble("MAS_CARO"),
-                   res->getString("DONDE_CARO").c_str(),
-                   res->getString("ULTIMA_COMPRA").c_str());
+            char masBarato[24], masCaro[24];
+            snprintf(masBarato, sizeof(masBarato), "%.2f", (double)res->getDouble("MAS_BARATO"));
+            snprintf(masCaro, sizeof(masCaro), "%.2f", (double)res->getDouble("MAS_CARO"));
+            cout << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                 << tablaCelda(to_string(res->getInt("SUPLIDORES")), W_SUP) << " | "
+                 << tablaCelda(masBarato, W_BAR) << " | "
+                 << tablaCelda(res->getString("DONDE_BARATO"), W_DONDE_BAR) << " | "
+                 << tablaCelda(masCaro, W_CARO) << " | "
+                 << tablaCelda(res->getString("DONDE_CARO"), W_DONDE_CAR) << " | "
+                 << tablaCelda(res->getString("ULTIMA_COMPRA"), W_ULT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) cout << "[!] Sin datos: ninguna compra RECIBIDA aun." << endl;
         drenarResultados(pstmt.get());
