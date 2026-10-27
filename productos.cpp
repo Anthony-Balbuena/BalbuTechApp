@@ -367,6 +367,56 @@ void buscarProducto() {
     }
 }
 
+// (27/10/2026) Tablas del inventario con celdas alineadas. printf cuenta
+// bytes, no columnas: "CRÍTICO" ocupa 8 bytes pero 7 columnas y desalinea.
+// Estas helpers recortan y rellenan por code point UTF-8 para que los acentos
+// se conserven y la tabla quede derecha.
+static size_t anchoVisible(const string &s) {
+    size_t n = 0;
+    for (size_t i = 0; i < s.size(); ) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < 0x80) i += 1;
+        else if ((c & 0xE0) == 0xC0) i += 2;
+        else if ((c & 0xF0) == 0xE0) i += 3;
+        else if ((c & 0xF8) == 0xF0) i += 4;
+        else i += 1;
+        ++n;
+    }
+    return n;
+}
+
+static string recortarVisible(const string &s, size_t maxCols) {
+    string out;
+    size_t cols = 0;
+    for (size_t i = 0; i < s.size() && cols < maxCols; ) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        size_t len = 1;
+        if (c >= 0x80) {
+            if ((c & 0xE0) == 0xC0) len = 2;
+            else if ((c & 0xF0) == 0xE0) len = 3;
+            else if ((c & 0xF8) == 0xF0) len = 4;
+            if (i + len > s.size()) break;
+        }
+        out.append(s, i, len);
+        i += len;
+        ++cols;
+    }
+    return out;
+}
+
+static string celda(const string &s, size_t width) {
+    string out = recortarVisible(s, width);
+    size_t n = anchoVisible(out);
+    if (n < width) out.append(width - n, ' ');
+    return out;
+}
+
+static const string &colorEstatus(const string &estatus) {
+    if (estatus == "AGOTADO" || estatus == "CRÍTICO") return ROJO;
+    if (estatus == "STOCK BAJO") return AMARILLO;
+    return VERDE;
+}
+
 void consultarInventario() {
     cout << "\n============================================\n";
     cout << "        CONSULTA DE INVENTARIO BALBU_TECH     \n";
@@ -381,20 +431,42 @@ void consultarInventario() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
+        const size_t W_ID = 6, W_COD = 10, W_PROD = 25, W_CAT = 20, W_MARCA = 12,
+                     W_STOCK = 6, W_MIN = 7, W_PRECIO = 9, W_EST = 10;
+        const size_t ANCHO = W_ID + W_COD + W_PROD + W_CAT + W_MARCA + W_STOCK +
+                             W_MIN + W_PRECIO + W_EST + 8 * 3;
+        const string linea(ANCHO, '-');
+
         int cont = 0;
-        cout << "\nID | CODIGO | PRODUCTO | CATEGORIA | MARCA | STOCK | MINIMO | PRECIO | ESTATUS" << endl;
+        cout << "\n"
+             << celda("ID", W_ID) << " | "
+             << celda("CODIGO", W_COD) << " | "
+             << celda("PRODUCTO", W_PROD) << " | "
+             << celda("CATEGORIA", W_CAT) << " | "
+             << celda("MARCA", W_MARCA) << " | "
+             << celda("STOCK", W_STOCK) << " | "
+             << celda("MINIMO", W_MIN) << " | "
+             << celda("PRECIO", W_PRECIO) << " | "
+             << celda("ESTATUS", W_EST) << "\n"
+             << linea << "\n";
 
         while (res->next()) {
             cont++;
-            cout << res->getInt("ID_PRODUCTO") << " | "
-                 << res->getString("CODIGO") << " | "
-                 << res->getString("NOMBRE") << " | "
-                 << res->getString("CATEGORIA") << " | "
-                 << res->getString("MARCA") << " | "
-                 << res->getInt("STOCK_ACTUAL") << " | "
-                 << res->getInt("STOCK_MINIMO") << " | $"
-                 << res->getDouble("PRECIO") << " | "
-                 << res->getString("ESTATUS_STOCK") << endl;
+            char precio[24];
+            snprintf(precio, sizeof(precio), "$%.0f", (double)res->getDouble("PRECIO"));
+            string estatus;
+            try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) { estatus = "OK"; }
+            const string &color = colorEstatus(estatus);
+            cout << celda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
+                 << celda(res->getString("CODIGO"), W_COD) << " | "
+                 << celda(res->getString("NOMBRE"), W_PROD) << " | "
+                 << celda(res->getString("CATEGORIA"), W_CAT) << " | "
+                 << celda(res->getString("MARCA"), W_MARCA) << " | "
+                 << celda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
+                 << celda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
+                 << celda(precio, W_PRECIO) << " | "
+                 << color << celda(estatus, W_EST) << RESET << "\n"
+                 << linea << "\n";
         }
 
         if (cont == 0) {
@@ -424,15 +496,24 @@ void reporteStockCritico() {
         bool encontrado = false;
         int contador = 0;
 
-        cout << "PRODUCTO | STOCK ACT. | STOCK MIN. | FALTANTE" << endl;
+        const size_t W_PROD = 30, W_STOCK = 10, W_MIN = 10, W_FALTA = 9;
+        const size_t ANCHO = W_PROD + W_STOCK + W_MIN + W_FALTA + 3 * 3;
+        const string linea(ANCHO, '-');
+
+        cout << celda("PRODUCTO", W_PROD) << " | "
+             << celda("STOCK ACT.", W_STOCK) << " | "
+             << celda("STOCK MIN.", W_MIN) << " | "
+             << celda("FALTANTE", W_FALTA) << "\n"
+             << linea << "\n";
 
         while (res->next()) {
             encontrado = true;
             contador++;
-            cout << res->getString("NOMBRE") << " | "
-                 << res->getInt("STOCK_ACTUAL") << " | "
-                 << res->getInt("STOCK_MINIMO") << " | "
-                 << res->getInt("CANTIDAD_FALTANTE") << endl;
+            cout << celda(res->getString("NOMBRE"), W_PROD) << " | "
+                 << celda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
+                 << celda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
+                 << celda(to_string(res->getInt("CANTIDAD_FALTANTE")), W_FALTA) << "\n"
+                 << linea << "\n";
         }
 
         if (!encontrado) {

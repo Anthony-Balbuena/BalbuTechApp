@@ -844,3 +844,15 @@ que daban la viva por migrada quedan superadas por esta.
 - Relanzar la app con `output/app`.
 - Commit de esta correccion (lo hace el usuario).
 - Quedan las pruebas manuales por rol de `PENDIENTES.md`.
+
+## 27/10 - Tablas de inventario alineadas y estatus con color
+
+- `consultarInventario()`: el listado pasa a una tabla de celdas alineadas,
+  con separador despues del encabezado y de cada fila, como la de
+  Movimientos. El recorte y el relleno cuentan caracteres UTF-8, no bytes,
+  para que `CRÍTICO` no corra las columnas.
+- Columna `ESTATUS`: rojo para `AGOTADO` y `CRÍTICO`, amarillo para
+  `STOCK BAJO`, verde para `OK`.
+- `reporteStockCritico()`: mismas columnas alineadas y separadores; el
+  encabezado ya no queda pegado a los datos.
+- `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST.
