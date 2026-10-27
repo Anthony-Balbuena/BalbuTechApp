@@ -2,15 +2,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Ejecutar BalbuTechApp",
+            "name": "Ejecutar BalbuTechApp (Linux)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/output/app",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
-            "envFile": "${env:HOME}/.balbuenv",
+            "environment": [
+                {"name": "DB_HOST", "value": "127.0.0.1"},
+                {"name": "DB_PORT", "value": "3306"},
+                {"name": "BALBU_USER", "value": ""},
+                {"name": "BALBU_PASS", "value": ""}
+            ],
+            "envFile": "${workspaceFolder}/.env",
             "externalConsole": false,
             "MIMode": "gdb",
             "preLaunchTask": "Nativo: compilar con build.sh (Linux)"
