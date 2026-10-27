@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -144,6 +145,26 @@ void cambiarEstadoMarca() {
     }
 }
 
+static int imprimirTablaMarcas(sql::ResultSet *res) {
+    const size_t W_ID = 5, W_NOM = 30, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + W_EST + 2 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << " | "
+         << tablaCelda("ESTADO", W_EST) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        string estado = res->getString("ESTADO");
+        cout << tablaCelda(to_string(res->getInt("ID_MARCA")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+             << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    }
+    return n;
+}
+
 void buscarMarca() {
     cout << "\n--- BUSCAR MARCA ---" << endl;
     try {
@@ -154,17 +175,7 @@ void buscarMarca() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
-        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
-        bool encontrado = false;
-
-        while (res->next()) {
-            encontrado = true;
-            printf("%-5d | %-30.30s | %-8s\n",
-                   res->getInt("ID_MARCA"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("ESTADO").c_str());
-        }
+        bool encontrado = imprimirTablaMarcas(res.get()) > 0;
 
         if (!encontrado) {
             cout << "\n[!] No se encontraron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
@@ -184,14 +195,7 @@ void listarMarcas() {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_MARCAS()"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
-        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
-        while (res->next()) {
-            printf("%-5d | %-30.30s | %-8s\n",
-                   res->getInt("ID_MARCA"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("ESTADO").c_str());
-        }
+        imprimirTablaMarcas(res.get());
 
         drenarResultados(pstmt.get());
     } catch (const exception &e) {

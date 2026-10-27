@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -181,16 +182,22 @@ void buscarCategoria() {
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        printf("\n%-5s | %-30s | %-8s\n", "ID", "NOMBRE", "ESTADO");
-        printf("%-5s-+-%-30s-+-%-8s\n", "-----", "------------------------------", "--------");
+        const size_t W_ID = 5, W_NOM = 30, W_EST = 9;
+        const size_t ANCHO = W_ID + W_NOM + W_EST + 2 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("NOMBRE", W_NOM) << " | "
+             << tablaCelda("ESTADO", W_EST) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool encontrado = false;
 
         while (res->next()) {
             encontrado = true;
-            printf("%-5d | %-30.30s | %-8s\n",
-                   res->getInt("ID_CATEGORIA"),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("ESTADO").c_str());
+            string estado = res->getString("ESTADO");
+            cout << tablaCelda(to_string(res->getInt("ID_CATEGORIA")), W_ID) << " | "
+                 << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
 
         if (!encontrado) {

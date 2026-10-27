@@ -10,9 +10,42 @@
 #include "database.h"
 #include "seguridad.h"
 #include "roles.h"
+#include "tabla.h"
 #include "inventario.h"
 
 using namespace std;
+
+static bool imprimirTablaProductos(sql::ResultSet *rl) {
+    const size_t W_ID = 5, W_NOM = 25, W_EST = 9, W_COSTO = 10, W_STOCK = 6;
+    const size_t ANCHO = W_ID + W_NOM + W_EST + W_COSTO + W_STOCK + 4 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << " | "
+         << tablaCelda("ESTADO", W_EST) << " | "
+         << tablaCelda("P.COMPRA", W_COSTO) << " | "
+         << tablaCelda("STOCK", W_STOCK) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+    bool hay = false;
+    while (rl->next()) {
+        hay = true;
+        int stock = 0;
+        try { stock = rl->getInt("STOCK"); } catch (...) { stock = 0; }
+        double costo = 0.0;
+        bool sinCosto = false;
+        try { costo = rl->getDouble("P_COMPRA"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
+        char bufCosto[16];
+        if (sinCosto) snprintf(bufCosto, sizeof(bufCosto), "%s", "---");
+        else snprintf(bufCosto, sizeof(bufCosto), "%.2f", costo);
+        string estado = rl->getString("ESTADO");
+        cout << tablaCelda(to_string(rl->getInt("ID_PRODUCTO")), W_ID) << " | "
+             << tablaCelda(rl->getString("NOMBRE"), W_NOM) << " | "
+             << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+             << tablaCelda(bufCosto, W_COSTO) << " | "
+             << tablaCelda(to_string(stock), W_STOCK) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    }
+    return hay;
+}
 
 static void registrarAjuste() {
     cout << "\n--- AJUSTE DE STOCK ---" << endl;
@@ -23,25 +56,7 @@ static void registrarAjuste() {
                 "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
             pl->setString(1, filtro);
             std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-            printf("\n%-5s | %-25s | %-8s | %-10s | %-6s\n", "ID", "NOMBRE", "ESTADO", "P.COMPRA", "STOCK");
-            bool hay = false;
-            while (rl->next()) {
-                hay = true;
-                int stock = 0;
-                try { stock = rl->getInt("STOCK"); } catch (...) { stock = 0; }
-                double costo = 0.0;
-                bool sinCosto = false;
-                try { costo = rl->getDouble("P_COMPRA"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
-                char bufCosto[16];
-                if (sinCosto) snprintf(bufCosto, sizeof(bufCosto), "%s", "---");
-                else snprintf(bufCosto, sizeof(bufCosto), "%.2f", costo);
-                printf("%-5d | %-25.25s | %-8s | %-10s | %-6d\n",
-                       rl->getInt("ID_PRODUCTO"),
-                       rl->getString("NOMBRE").c_str(),
-                       rl->getString("ESTADO").c_str(),
-                       bufCosto,
-                       stock);
-            }
+            bool hay = imprimirTablaProductos(rl.get());
             if (!hay) cout << "[!] Sin coincidencias." << endl;
             drenarResultados(pl.get());
         } catch (const exception &) {
@@ -90,25 +105,7 @@ static void actualizarCostoUI() {
                 "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
             pl->setString(1, filtro);
             std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-            printf("\n%-5s | %-25s | %-8s | %-10s | %-6s\n", "ID", "NOMBRE", "ESTADO", "P.COMPRA", "STOCK");
-            bool hay = false;
-            while (rl->next()) {
-                hay = true;
-                int stock = 0;
-                try { stock = rl->getInt("STOCK"); } catch (...) { stock = 0; }
-                double costo = 0.0;
-                bool sinCosto = false;
-                try { costo = rl->getDouble("P_COMPRA"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
-                char bufCosto[16];
-                if (sinCosto) snprintf(bufCosto, sizeof(bufCosto), "%s", "---");
-                else snprintf(bufCosto, sizeof(bufCosto), "%.2f", costo);
-                printf("%-5d | %-25.25s | %-8s | %-10s | %-6d\n",
-                       rl->getInt("ID_PRODUCTO"),
-                       rl->getString("NOMBRE").c_str(),
-                       rl->getString("ESTADO").c_str(),
-                       bufCosto,
-                       stock);
-            }
+            bool hay = imprimirTablaProductos(rl.get());
             if (!hay) cout << "[!] Sin coincidencias." << endl;
             drenarResultados(pl.get());
         } catch (const exception &) {

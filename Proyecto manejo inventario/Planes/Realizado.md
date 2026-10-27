@@ -856,3 +856,24 @@ que daban la viva por migrada quedan superadas por esta.
 - `reporteStockCritico()`: mismas columnas alineadas y separadores; el
   encabezado ya no queda pegado a los datos.
 - `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST.
+
+### 27/10 (segunda parte) — Celdas alineadas en catalogos, ventas y compras
+
+- `tabla.h`: helpers compartidos `tablaCelda`, `tablaLinea` y
+  `tablaColorEstado`. El recorte y el relleno siguen contando code points
+  UTF-8, no bytes, para conservar acentos y alinear.
+- `buscarCategoria()`: tabla de categorias con separador tras el encabezado
+  y tras cada fila.
+- `buscarMarca()` y `listarMarcas()`: comparten `imprimirTablaMarcas()` y
+  usan el mismo formato.
+- `registrarAjuste()` y `actualizarCostoUI()`: comparten
+  `imprimirTablaProductos()`; la tabla de productos queda alineada con
+  `P.COMPRA` y `STOCK`.
+- `mostrarFactura()`: el encabezado de la venta colorea el estado y el
+  detalle de lineas pasa a celdas alineadas con separadores y fila de total.
+- `cancelarCompraUI()`: tabla de compras alineada y con estado coloreado.
+- Colores por estado: verde `ACTIVO/ACTIVA/REALIZADA/RECIBIDA`; amarillo
+  `EN_PROCESO/PENDIENTE/ABIERTA/STOCK BAJO`; rojo
+  `INACTIVO/INACTIVA/CANCELADA/AGOTADO/CRÍTICO`.
+- `productos.cpp` migro al helper compartido sin cambiar su salida.
+- `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST.

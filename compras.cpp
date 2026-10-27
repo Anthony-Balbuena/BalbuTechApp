@@ -13,6 +13,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "roles.h"
+#include "tabla.h"
 #include "compras.h"
 
 using namespace std;
@@ -1082,13 +1083,23 @@ static void cancelarCompraUI() {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
             "CALL SP_COMPRAS_ULTIMAS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-6s | %-20s | %-10s | %-10s\n", "ID", "PROVEEDOR", "ESTADO", "TOTAL");
+        const size_t W_ID = 6, W_PROV = 20, W_EST = 10, W_TOT = 10;
+        const size_t ANCHO = W_ID + W_PROV + W_EST + W_TOT + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("PROVEEDOR", W_PROV) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("TOTAL", W_TOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         while (rl->next()) {
-            printf("%-6d | %-20.20s | %-10s | %-10.2f\n",
-                   rl->getInt("ID_COMPRA"),
-                   rl->getString("PROVEEDOR").c_str(),
-                   rl->getString("ESTADO").c_str(),
-                   (double)rl->getDouble("TOTAL_CON_IVA"));
+            char total[24];
+            snprintf(total, sizeof(total), "%.2f", (double)rl->getDouble("TOTAL_CON_IVA"));
+            string estado = rl->getString("ESTADO");
+            cout << tablaCelda(to_string(rl->getInt("ID_COMPRA")), W_ID) << " | "
+                 << tablaCelda(rl->getString("PROVEEDOR"), W_PROV) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(total, W_TOT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         drenarResultados(pl.get());
         int idCompraCanc = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);

@@ -13,6 +13,7 @@
 #include "seguridad.h"
 #include "caja.h"
 #include "roles.h"
+#include "tabla.h"
 #include "web_export.h"
 #include "ventas.h"
 
@@ -577,32 +578,60 @@ static void mostrarFactura(int idVenta) {
         double vTotal = rh->getDouble("TOTAL_CON_IVA");
         drenarResultados(ph.get());
 
-        printf("\nID: %d | Cliente: %s | Fecha: %s | Estado: %s\n",
-               vId, vCli.c_str(), vFecha.c_str(), vEstado.c_str());
+        cout << "\nID: " << vId << " | Cliente: " << vCli
+             << " | Fecha: " << vFecha << " | Estado: "
+             << tablaColorEstado(vEstado) << vEstado << RESET << "\n";
 
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
             "CALL SP_VENTA_LINEAS(?)"));
         pl->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-25s | %-4s | %-10s | %-7s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "P.UNIT", "DESC", "ITBIS", "Subtotal", "Total");
+        const size_t W_PROD = 25, W_CANT = 4, W_PUNIT = 10, W_DESC = 7,
+                     W_ITBIS = 10, W_SUB = 10, W_TOT = 10;
+        const size_t ANCHO = W_PROD + W_CANT + W_PUNIT + W_DESC + W_ITBIS +
+                             W_SUB + W_TOT + 6 * 3;
+        cout << "\n"
+             << tablaCelda("Nombre del producto", W_PROD) << " | "
+             << tablaCelda("Cant", W_CANT) << " | "
+             << tablaCelda("P.UNIT", W_PUNIT) << " | "
+             << tablaCelda("DESC", W_DESC) << " | "
+             << tablaCelda("ITBIS", W_ITBIS) << " | "
+             << tablaCelda("Subtotal", W_SUB) << " | "
+             << tablaCelda("Total", W_TOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         while (rl->next()) {
             double pct = rl->getDouble("PORCENTAJE_DESCUENTO");
             char descCol[16];
             if (pct > 0) snprintf(descCol, sizeof(descCol), "-%.4g%%", pct);
             else snprintf(descCol, sizeof(descCol), "%s", "-");
-            printf("%-25.25s | %-4d | %-10.2f | %-7s | %-10.2f | %-10.2f | %-10.2f\n",
-                   rl->getString("NOMBRE").c_str(),
-                   rl->getInt("CANTIDAD"),
-                   (double)rl->getDouble("PRECIO_UNITARIO"),
-                   descCol,
-                   (double)rl->getDouble("MONTO_ITBIS"),
-                   (double)rl->getDouble("SUBTOTAL"),
-                   (double)rl->getDouble("TOTAL_LINEA"));
+            char pUnit[24], itbis[24], sub[24], tot[24];
+            snprintf(pUnit, sizeof(pUnit), "%.2f", (double)rl->getDouble("PRECIO_UNITARIO"));
+            snprintf(itbis, sizeof(itbis), "%.2f", (double)rl->getDouble("MONTO_ITBIS"));
+            snprintf(sub, sizeof(sub), "%.2f", (double)rl->getDouble("SUBTOTAL"));
+            snprintf(tot, sizeof(tot), "%.2f", (double)rl->getDouble("TOTAL_LINEA"));
+            cout << tablaCelda(rl->getString("NOMBRE"), W_PROD) << " | "
+                 << tablaCelda(to_string(rl->getInt("CANTIDAD")), W_CANT) << " | "
+                 << tablaCelda(pUnit, W_PUNIT) << " | "
+                 << tablaCelda(descCol, W_DESC) << " | "
+                 << tablaCelda(itbis, W_ITBIS) << " | "
+                 << tablaCelda(sub, W_SUB) << " | "
+                 << tablaCelda(tot, W_TOT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         drenarResultados(pl.get());
 
-        printf("%-25s | %-4s | %-10s | %-7s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "", "",
-               vItbis, vSub, vTotal);
+        char vItbisStr[24], vSubStr[24], vTotStr[24];
+        snprintf(vItbisStr, sizeof(vItbisStr), "%.2f", vItbis);
+        snprintf(vSubStr, sizeof(vSubStr), "%.2f", vSub);
+        snprintf(vTotStr, sizeof(vTotStr), "%.2f", vTotal);
+        cout << tablaCelda("Total a pagar =", W_PROD) << " | "
+             << tablaCelda("", W_CANT) << " | "
+             << tablaCelda("", W_PUNIT) << " | "
+             << tablaCelda("", W_DESC) << " | "
+             << tablaCelda(vItbisStr, W_ITBIS) << " | "
+             << tablaCelda(vSubStr, W_SUB) << " | "
+             << tablaCelda(vTotStr, W_TOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
     }
