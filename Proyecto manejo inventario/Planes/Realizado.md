@@ -901,3 +901,49 @@ que daban la viva por migrada quedan superadas por esta.
   no se toco.
 - `build.sh` OK y `test-menus-por-rol.sh` 43/43 en TEST. Verificado en TEST
   con clientes, empleados, metodos, roles y accesos.
+
+### 29/10 — Deuda P1: verificacion y primer candado
+
+- Fase 0 de la deuda P1 verificada con datos reales en TEST y viva:
+  - Costo fantasma: 0 discrepancias. Los 6 productos que la consulta inicial
+    marco como raros no tienen ninguna compra; su `P_COMPRA` es precio de
+    catalogo cargado a mano y `FN_COSTO_COMPRA_VIGENTE` devuelve 0. No es
+    deuda y no se toco.
+  - Devolucion de compra: 0 inconsistencias; el trigger ya resta
+    `SUBTOTAL_DEVUELTO` de `COMPRAS.TOTAL`.
+  - `CEDULA`: 0 duplicados en ambas bases.
+- `modulos/59- EMPLEADOS_CEDULA_UNICA.sql` + `.md`: agrega
+  `UQ_EMPLEADOS_CEDULA` de forma idempotente.
+- `modulos/8- EMPLEADOS.sql`: la tabla ahora nace con `CEDULA ... UNIQUE`,
+  coherente con el comentario que ya decia que era unica.
+- Aplicado en TEST: el indice existe y un `INSERT` con cedula repetida falla
+  con `ERROR 1062`. Correr el modulo dos veces no cambia nada.
+- `check-app-sps.sh` 93/0 y `test-migracion-roles.sh` completo en TEST.
+- Aplicado en la viva con backup `backups/108-antes-cedula-unica-20261029_133826.sql`
+  (574 KB, dump completo). El indice queda con 4 empleados y el duplicado se
+  rechaza con `1062`; 0 filas basura.
+
+### 29/10 (segunda parte) — Venta neta con devoluciones
+
+- `modulos/60- VENTA_NETA.sql` + `.md`: crea `VW_VENTA_NETA` y reemplaza
+  las 3 vistas, 6 triggers y 3 SPs que repetian el BRUTO sin restar el
+  subtotal reembolsado.
+- El sexto lugar era `TR_VALIDAR_ACTUALIZACION_VENTA` (21): comparaba el
+  pago contra `VENTAS.TOTAL` y no contra el bruto neto, asi que una venta
+  con devolucion parcial no podia pasar a `REALIZADA`.
+- Prueba en TEST con datos dentro de una transaccion y `ROLLBACK`: venta de
+  2 x 100 (bruto 236), devolucion de 1 unidad (subtotal 100 + ITBIS 18),
+  neto 118. El pago parcial de 117 deja saldo 1; un pago de 2 se rechaza
+  con `45000`. El cierre de caja del dia muestra `MONTO_REALIZADO = 118`.
+- `check-app-sps.sh` 93/0 en TEST.
+- Aplicado en la viva con backup `backups/109-antes-venta-neta-20261029_143203.sql`
+  (574 KB, dump completo). Los 6 triggers y las 3 vistas quedan sobre
+  `VW_VENTA_NETA`. La devolucion existente (30.00) ahora se descuenta: el
+  bruto del periodo pasa de 766514.90 a 766484.90, diferencia exacta 30.00.
+- `db/seed-admin.sh` ya no trae `admin123`: exige el segundo argumento o
+  `BALBU_PASS`, con mínimo 8 caracteres. En TEST se probó el ciclo completo
+  (seed -> SHA256 -> login -> PBKDF2, clave mala rechazada) y se restauró a
+  `admin123`. La viva se rotó con una clave de 24 caracteres (backup
+  `110-antes-clave-admin-20261029_144621.sql`) y el login quedó en PBKDF2.
+- Ojo al correr el seed: toma `DB_NAME` del entorno del contenedor
+  (`BALBU_TECH`); para TEST hay que exportar `DB_NAME=BALBU_TECH_TEST`.

@@ -32,10 +32,12 @@ void guardarSesion(int idUsuario, int idEmpleado, const string& username, int id
 void cerrarSesion() {
     // (25/10/2026) Limpia el admin de la conexion: despues del logout no
     // queda ningun usuario como autor de un cambio.
+    // (29/10/2026) Limpia tambien el empleado y el motivo del historial
+    // de estado de producto (modulo 61).
     if (globalCon != nullptr) {
         try {
             std::unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
-                "SET @ID_USUARIO_ACTUAL = NULL"
+                "SET @ID_USUARIO_ACTUAL = NULL, @ID_EMPLEADO_ACTUAL = NULL, @MOTIVO_CAMBIO = NULL"
             ));
             p->execute();
             drenarResultados(p.get());

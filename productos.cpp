@@ -12,6 +12,7 @@
 #include <cppconn/resultset.h>
 
 #include "database.h"
+#include "sesion.h"
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
@@ -292,6 +293,22 @@ void cambiarEstadoProducto() {
 
     try {
         int idProducto = (int)leerNumeroConIntentos("Ingrese el ID del producto (NUMERO): ", 1, 999999999);
+
+        // (29/10/2026) Deja el actor en la conexion para que el trigger
+        // TR_LOG_CAMBIO_ESTADO_PRODUCTO (modulo 61) no caiga al empleado 1.
+        // La subconsulta devuelve NULL si el empleado de la sesion no existe.
+        std::unique_ptr<sql::PreparedStatement> pActor(globalCon->prepareStatement(
+            "SET @ID_EMPLEADO_ACTUAL = (SELECT ID_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = ?)"
+        ));
+        pActor->setInt(1, sesionActual.idEmpleado);
+        pActor->execute();
+        drenarResultados(pActor.get());
+
+        std::unique_ptr<sql::PreparedStatement> pMotivo(globalCon->prepareStatement(
+            "SET @MOTIVO_CAMBIO = 'Cambio desde Productos'"
+        ));
+        pMotivo->execute();
+        drenarResultados(pMotivo.get());
 
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_TOGGLE_ESTADO_PRODUCTOS(?)"));
         pstmt->setInt(1, idProducto);

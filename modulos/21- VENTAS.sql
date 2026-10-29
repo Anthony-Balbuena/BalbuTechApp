@@ -379,6 +379,7 @@ BEFORE UPDATE ON VENTAS
 FOR EACH ROW
 BEGIN
     DECLARE V_COBRADO DECIMAL(12, 2);
+    DECLARE V_BRUTO DECIMAL(12, 2);
 
     -- El TOTAL solo lo toca TR_ACTUALIZAR_TOTAL_VENTA
     IF NEW.TOTAL <> OLD.TOTAL AND IFNULL(@VENTAS_INTERNO, 0) <> 1 THEN
@@ -393,10 +394,13 @@ BEGIN
         END IF;
 
         IF NEW.ESTADO = 'REALIZADA' THEN
-            -- Solo se marca REALIZADA una venta cobrada al 100%
+            -- Solo se marca REALIZADA una venta cobrada al 100% de su
+            -- BRUTO neto (29/10/2026: descuenta las devoluciones).
             SELECT IFNULL(SUM(MONTO), 0) INTO V_COBRADO
               FROM PAGOS WHERE ID_VENTA = NEW.ID_VENTA;
-            IF OLD.ESTADO <> 'EN_PROCESO' OR NEW.TOTAL <= 0 OR V_COBRADO < NEW.TOTAL THEN
+            SELECT BRUTO_NETO INTO V_BRUTO
+              FROM VW_VENTA_NETA WHERE ID_VENTA = NEW.ID_VENTA;
+            IF OLD.ESTADO <> 'EN_PROCESO' OR V_BRUTO <= 0 OR V_COBRADO < V_BRUTO THEN
                 SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT = 'ERROR: SOLO SE MARCA REALIZADA UNA VENTA COBRADA AL 100%.';
             END IF;

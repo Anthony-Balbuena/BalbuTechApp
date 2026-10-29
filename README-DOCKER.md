@@ -12,14 +12,14 @@ Compilacion directa con `g++` (sin CMake). MariaDB `10.11` LTS para compatibilid
 docker compose up --build -d
 docker compose exec app bash build.sh
 docker compose exec app bash db/import.sh        # schema 0 errores: 59 tablas, 124 SPs, 65 triggers
-docker compose exec app bash db/seed-admin.sh    # crea admin/admin123 (hash legacy; la app lo migra a PBKDF2 al entrar)
+docker compose exec app bash db/seed-admin.sh admin 'TU_CLAVE'  # crea/actualiza el admin; la clave es obligatoria
 docker compose exec app bash db/seed-catalogo.sh # catálogo demo opt-in (4 categorías, 10 marcas, 4 métodos; idempotente)
 docker compose exec app bash db/check-app-sps.sh # verifica los 47 SPs que la app invoca
 docker compose exec app ./output/app
 ```
 Importar es para DB fresca (el script hace seeds con CALLs no idempotentes):
 para reimportar limpio, recrea la DB antes (ver `db/import.sh`).
-Credenciales de entrada: `admin` / `admin123`.
+Credenciales de entrada: el usuario que definas en el seed y la clave que elijas. No hay clave por defecto.
 
 ## Uso en VS Code
 1. `Dev Containers: Reopen in Container`.

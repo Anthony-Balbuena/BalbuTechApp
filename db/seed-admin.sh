@@ -1,14 +1,25 @@
 #!/bin/bash
 # Crea (o actualiza) el usuario admin para entrar a la app.
 # Uso: docker compose exec app bash db/seed-admin.sh [usuario] [clave] [rol]
-# Defecto: admin / admin123 / ROLE_ADMIN.
+# La clave es OBLIGATORIA: no hay default. Pasa el segundo argumento o BALBU_PASS.
+#   bash db/seed-admin.sh admin 'una-clave-larga'
+#   BALBU_PASS='una-clave-larga' bash db/seed-admin.sh
 # Crea un EMPLEADOS minimo + fila en USUARIOS con hash SHA256 legacy;
 # login.cpp lo acepta y lo rehashea a PBKDF2 al primer login (verificarPassword).
 set -e
 cd "$(dirname "$0")/.."
 USER="${1:-admin}"
-PASS="${2:-admin123}"
+PASS="${2:-${BALBU_PASS:-}}"
 ROL="${3:-ADMIN}"
+if [ -z "$PASS" ]; then
+  echo "ERROR: falta la clave del usuario '$USER'." >&2
+  echo "Pasa el segundo argumento o BALBU_PASS. Ya no hay clave por defecto." >&2
+  exit 1
+fi
+if [ "${#PASS}" -lt 8 ]; then
+  echo "ERROR: la clave debe tener al menos 8 caracteres." >&2
+  exit 1
+fi
 DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-BALBU_TECH}"

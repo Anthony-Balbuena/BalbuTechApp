@@ -219,9 +219,9 @@ La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, 
 
 - [ ] **Venta multi-línea atómica** (P-4 de la auditoría).
 - [ ] **P-3 validaciones**: 8 errores pintados en verde, advertencia de precio descartada y monto de la liquidación tomado del cliente.
-- [ ] **Costo fantasma al cancelar una compra** (auditoría #1: `PRODUCTO FASE I` quedó con `P_COMPRA` de dos compras canceladas y cero válidas).
-- [ ] **`EMPLEADOS.CEDULA` sin `UNIQUE`** (riesgo latente; hoy 9 empleados con 9 cédulas distintas).
-- [ ] **Rotar la clave del administrador** (C-2 de la auditoría; la de `root` ya se rotó el 19/10).
+- [x] **Costo fantasma al cancelar una compra** — cerrado el 29/10/2026: `FN_COSTO_COMPRA_VIGENTE` y `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` están en TEST y en la viva; 0 discrepancias reales en ambas.
+- [x] **`EMPLEADOS.CEDULA` sin `UNIQUE`** — módulo 59 aplicado en TEST y en la viva el 29/10/2026 (backup 108); el duplicado se rechaza con `1062` en ambas.
+- [x] **Rotar la clave del administrador** — 29/10/2026: `seed-admin.sh` ya no tiene clave por defecto (exige el argumento o `BALBU_PASS`, mínimo 8 caracteres); la viva se rotó y el login quedó verificado en PBKDF2. La de `root` ya se había rotado el 19/10.
 - [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI).
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
 - [ ] **Barrido del resto de los `while` con `leerDatoSeguro`** (el 18/10 solo se tocó `contrato.cpp`; los bucles con EOF pueden girar sin fin).
@@ -229,7 +229,7 @@ La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, 
 ### 10. Hallazgos del mapa de módulos (21/10)
 
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
-- [ ] **Devolver mercancía no baja el subtotal**: solo descuenta el ITBIS devuelto.
+- [x] **Devolver mercancía no baja el subtotal** — cerrado en TEST y viva el 29/10/2026 (backup 109) con el módulo 60: `VW_VENTA_NETA` centraliza el neto y lo usan reportes, cierre de caja y topes de pago. El sexto lugar era `TR_VALIDAR_ACTUALIZACION_VENTA` (21), que comparaba el pago contra el subtotal y no contra el bruto neto.
 - [ ] **`VENCIDA` de GARANTIAS nunca se escribe**: hoy se puede reclamar una garantía vencida.
 - [ ] **El 18 atribuye todo al empleado 1** y el 29 guarda `ID_USUARIO_ADMIN` en `NULL`: la auditoría no dice quién fue.
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
