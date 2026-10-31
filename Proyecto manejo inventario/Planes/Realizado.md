@@ -989,3 +989,49 @@ que daban la viva por migrada quedan superadas por esta.
 - `check-app-sps.sh` sobre la viva: 93/0.
 - `HISTORIAL_ESTADOS_PRODUCTO` estaba vacía, así que el `ALTER` no relajó
   ningún valor existente.
+
+### 30/10 (tercera parte) — Garantías: módulos 62 y 63 en TEST
+
+- `modulos/63- GARANTIAS_FLUJO.sql` + `.md`: `PRODUCTOS.DIAS_GARANTIA`
+  (NULL/0 = sin garantía automática), autor y fechas en `GARANTIAS` y
+  `RECLAMOS_GARANTIAS`, y el flujo completo.
+- Cuatro SP nuevos: `SP_CONSULTAR_GARANTIAS`, `SP_CONSULTAR_RECLAMOS`,
+  `SP_LINEAS_VENTA_CON_GARANTIA` y `SP_MARCAR_GARANTIAS_VENCIDAS` (el estado
+  que nadie escribía). `SP_CONSULTAR_GARANTIAS` lo invoca antes de listar, así
+  que la app no depende de un scheduler.
+- Tres SP reemplazados con firma nueva: `SP_REGISTRAR_GARANTIA` (3),
+  `27_SP_REGISTRAR_RECLAMO_GARANTIA` (3) y `27_SP_FINALIZAR_RECLAMO_TOTAL` (2,
+  ahora devuelve `MENSAJE`). Reclamar valida `CURRENT_DATE BETWEEN
+  FECHA_INICIO AND FECHA_FIN`, no solo `ESTADO`.
+- `TR_REGISTRAR_GARANTIA_VENTA`: `AFTER UPDATE ON VENTAS` con
+  `FOLLOWS TR_CAMBIO_ESTADO_VENTA`. Cuando la venta pasa a `REALIZADA` crea la
+  garantía sola con los días del producto y el empleado de la venta.
+- `modulos/62- PERMISOS_GARANTIAS.sql` + `.md`: 4 permisos propios.
+  `GARANTIAS_REGISTRAR` y `GARANTIAS_RECLAMAR` (ADMIN, GERENTE, SUBGERENTE,
+  VENDEDOR), `GARANTIAS_FINALIZAR` (sin VENDEDOR), `GARANTIAS_CONSULTAR`
+  (los 4 + CONTABILIDAD). Catálogo 54 → **58 permisos**, matriz 197 → **213
+  pares**.
+- `GESTIONAR_VENTAS` no se borra ni pierde pares: solo deja de abrir
+  Garantías. El ítem "Ventas" del menú principal se abre también con los
+  cuatro permisos de Garantías, porque si no CONTABILIDAD tendría
+  `GARANTIAS_CONSULTAR` y no podría llegar a usarlo.
+- `ventas.cpp`: `OpcionVenta.permisos` pasa a `vector<const char*>` (alcanza
+  con uno), submenú dinámico por permiso y las cuatro pantallas reescritas
+  (listan y validan contra lo listado en vez de pedir IDs a ciegas).
+  `consultarGarantiasUI` es nueva. El actor va como `NULL` si la sesión no
+  tiene empleado.
+- `tabla.h`: `VENCIDA` → ROJO y `CERRADO` → VERDE.
+- Aplicados en `BALBU_TECH_TEST` dos veces cada uno, sin error.
+- `db/test-garantias.sh` (nuevo) → **11 OK, 0 FAIL**, 3/3 errores esperados
+  vistos. Corre en transacción con `ROLLBACK`; quedan 0 residuos `ZZ GAR`.
+- `test-menus-por-rol.sh`: Garantías ADMIN/GERENTE/SUBGERENTE 5 opciones,
+  VENDEDOR 4 (sin "Finalizar reclamo"), CONTABILIDAD 2. `PRUEBA_VEN_GEST`
+  baja a 8 opciones en Ventas (ya no ve Garantías). Todo OK.
+- `test-migracion-roles.sh`: VENDEDOR 12 → 15 permisos. `check-app-sps.sh`
+  en TEST: **99/0** (suma los 6 SP que usa la app).
+- Suite completa en TEST: auditorías, login/menús EOF, migración de roles,
+  asistencia, contratos, garantías y menús por rol → todo OK.
+- **Falta la viva**: requiere orden explícita y backup previo. Orden de
+  despliegue: backup → `63` → binario → `62`. El binario viejo llama a las
+  firmas viejas, así que el `63` va antes; y el `62` va después del binario o
+  Garantías desaparece del menú hasta desplegar.

@@ -6,6 +6,11 @@ quedó. Es la **puerta de entrada** al uso de una garantía (módulo 25).
 **Depende de:** `GARANTIAS` (25) y `AUDITORIA_SISTEMA` (3).
 **Es usado por:** `ventas.cpp` (alta y cierre del reclamo).
 
+> **Superado en parte por el módulo 63** (`GARANTIAS_FLUJO`): agrega
+> `ID_EMPLEADO`, `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE`, reemplaza los dos SP de
+> reclamo por firmas nuevas con el empleado, valida las fechas de la garantía y
+> suma las consultas. Este documento describe el `.sql` del 27 tal como está.
+
 Fuente: `modulos/27- RECLAMOS_GARANTIAS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
 
 ## Tablas

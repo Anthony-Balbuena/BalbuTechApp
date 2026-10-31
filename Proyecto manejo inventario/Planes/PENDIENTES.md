@@ -10,7 +10,7 @@
 
 ### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
 
-Estado: **TEST y la viva migradas** (27/10/2026: 7 roles, **54 permisos**, matriz **54/48/42/12/12/25/4 = 197 pares**; `test-menus-por-rol.sh` 43/43 en TEST, `check-app-sps` 93/0 en ambas). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`) y Garantías sigue con `GESTIONAR_VENTAS`. VENDEDOR quedó en 12 permisos: no busca ni lista clientes (`CLIENTES_VER`) y de Métodos de pago solo conserva `METODOS_PAGO_VER`.
+Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026: 7 roles, **58 permisos**, matriz **58/52/46/12/15/25/5 = 213 pares** en TEST; `test-menus-por-rol.sh` OK en TEST, `check-app-sps` 99/0 en TEST). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`). VENDEDOR quedó en 15 permisos: no busca ni lista clientes (`CLIENTES_VER`), de Métodos de pago solo conserva `METODOS_PAGO_VER`, y en Garantías registra, reclama y consulta pero **no** finaliza.
 
 - [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 27/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
 - [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 27/10 con backup `backups/107-antes-permisos-inventario-20261027_123943.sql`.
@@ -19,7 +19,7 @@ Estado: **TEST y la viva migradas** (27/10/2026: 7 roles, **54 permisos**, matri
 
 - **Inventario** cerrado: `INVENTARIO_VER` abre Movimientos, `INVENTARIO_AJUSTAR` el ajuste de stock e `INVENTARIO_COSTO` el precio de compra. Cualquiera de los tres abre el ítem del menú.
 - **Caja** ya quedó cerrada en esta tanda: permisos propios (`CONSULTAR_CAJA`, `ABRIR_CAJA`, `CERRAR_CAJA`), módulo `53` aplicado en TEST y VENDEDOR conserva los tres.
-- **Ventas** ya está cerrado. Solo tiene pendiente el submenú de Garantías, que despacha por número porque es una lista fija sin filtro. No es un bug; se migra si se le agregan permisos propios (ver P1, Garantías).
+- **Ventas** ya está cerrado, Garantías incluida: el módulo `62` le dio cuatro permisos propios y el submenú ya no despacha por número fijo. Falta aplicarlo en la viva.
 - Lo que sigue son los P1/P2 (garantías, RRHH, deuda técnica), no permisos finos.
 
 **Patrón** (referencia: `clientes.cpp`, el más chico y limpio):
@@ -45,15 +45,16 @@ Estado: **TEST y la viva migradas** (27/10/2026: 7 roles, **54 permisos**, matri
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`). La viva quedó alineada el 27/10 con la misma matriz (54 permisos / 197 pares).
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`). La viva quedó en 54 permisos / 197 pares el 27/10; le faltan el `62` y el `63`.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 93/0 |
-| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Compras, Caja e Inventario | 43/43 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 99/0 |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
+| `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
 | `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -117,8 +118,10 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 54 permisos ap
 #### 2.8 Ventas
 
 - [ ] VENDEDOR ve 10: las 7 de gestión, historial, garantías y volver, **sin** reportes ni exportación.
-- [ ] `PRUEBA_VEN_GEST` (sin `CONSULTAR_REPORTES`) ve 9: solo las acciones sobre la venta.
-- [ ] **Garantías** se abre con `GESTIONAR_VENTAS`; sus 4 opciones son fijas (registrar, reclamar, finalizar, volver).
+- [ ] `PRUEBA_VEN_GEST` (sin `CONSULTAR_REPORTES`) ve 8: solo las acciones sobre la venta, **sin** Garantías.
+- [ ] **Garantías** ya no cuelga de `GESTIONAR_VENTAS`: se abre con cualquiera de sus 4 permisos (módulo `62`) y el submenú filtra por permiso.
+- [ ] ADMIN/GERENTE/SUBGERENTE ven 5 opciones en Garantías; VENDEDOR 4 (sin "Finalizar reclamo"); CONTABILIDAD 2 (solo consultar).
+- [ ] Un usuario con `GARANTIAS_CONSULTAR` y sin `GESTIONAR_VENTAS` llega a Garantías por el ítem "Ventas" del menú principal.
 
 #### 2.9 Roles
 
@@ -146,7 +149,7 @@ Ambas deben dar 7 roles y 0 usuarios huérfanos.
 - [ ] **28 Accesos:** entrar/salir y ver las filas.
 - [ ] Limpiar los datos de prueba (permisos, vacaciones, log) al terminar.
 
-Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
+Cierre: build OK, `check-app-sps` 99/0, visual OK, sin datos de prueba.
 
 ### 4. Contratos: cargar los datos de la empresa
 
@@ -162,9 +165,14 @@ Cierre: build OK, `check-app-sps` 93/0, visual OK, sin datos de prueba.
 - [ ] Agregar a la plantilla: nacionalidad, edad, sexo, estado civil, **RNL** (Registro Nacional del Trabajador), lugar de prestación, provincia y municipio. Checklist y fuentes: `Flujos/Contrato de trabajo - requisitos legales RD.md`.
 - [ ] Revisión legal del texto antes de usarlo con personal real (la plantilla ya lo dice al pie).
 
-### 6. Garantías: estructurar el flujo (diseño acordado 23/10)
+### 6. Garantías: estructurar el flujo (implementado en TEST, falta la viva)
 
-Hoy **cualquiera con `GESTIONAR_VENTAS`** (ADMIN, GERENTE, SUBGERENTE, VENDEDOR) registra, reclama y finaliza. No queda autor, `VENCIDA` nunca se escribe y el flujo pide IDs a ciegas.
+Estado: **implementado en TEST el 30/10/2026** con los módulos `62`
+(`PERMISOS_GARANTIAS`) y `63` (`GARANTIAS_FLUJO`); falta aplicarlo en la viva
+con backup previo y orden explícita. El diseño de abajo se cumplió completo:
+autor y fechas, validación por fecha, `VENCIDA`, consultas y registro
+**automático** al confirmar la venta (la opción que quedaba abierta). Queda
+sin hacer el módulo `34` (`ASIGNACIONES_RECLAMOS`, asignar técnicos).
 
 **Permisos nuevos (4):**
 
@@ -177,28 +185,32 @@ Hoy **cualquiera con `GESTIONAR_VENTAS`** (ADMIN, GERENTE, SUBGERENTE, VENDEDOR)
 
 La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, pero la decisión queda en Gerencia. VENDEDOR conserva `GARANTIAS_REGISTRAR` y `GARANTIAS_RECLAMAR`.
 
-**Datos (módulo 48, idempotente):**
+**Datos (módulo 63, idempotente):**
 
 - `GARANTIAS`: `ID_EMPLEADO` (quién registró) y `FECHA_REGISTRO`.
 - `RECLAMOS_GARANTIAS`: `ID_EMPLEADO`, `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE`.
-- Opcional: `PRODUCTOS.DIAS_GARANTIA` para no pedir los días a mano.
+- `PRODUCTOS.DIAS_GARANTIA` (NULL/0 = sin garantía automática; los 49
+  productos existentes quedan en NULL).
 
 **SPs:**
 
 - `SP_REGISTRAR_GARANTIA(detalle, dias, idEmpleado)`.
 - `27_SP_REGISTRAR_RECLAMO_GARANTIA(garantia, descripcion, idEmpleado)`; validar `CURRENT_DATE BETWEEN FECHA_INICIO AND FECHA_FIN`, no solo `ESTADO`.
 - `27_SP_FINALIZAR_RECLAMO_TOTAL(reclamo, idEmpleado)`; validar que el estado sea `PENDIENTE` o `APROBADO`.
-- Nuevo SP de consulta por venta o cliente.
-- Proceso o vista que marque `VENCIDA` cuando pasa `FECHA_FIN`.
+- `SP_CONSULTAR_GARANTIAS`, `SP_CONSULTAR_RECLAMOS` y `SP_LINEAS_VENTA_CON_GARANTIA`.
+- `SP_MARCAR_GARANTIAS_VENCIDAS`, invocado por `SP_CONSULTAR_GARANTIAS`
+  antes de listar (no hay scheduler).
 
 **UI:**
 
 - Registrar: pedir **ID de venta** y listar sus detalles, en vez de pedir el ID de detalle.
 - Reclamar y finalizar: listar lo que corresponde, no pedir IDs de memoria.
 
-**Decisión abierta:** registrar a mano o **automático al confirmar la venta** con los días del producto. Lo segundo es más limpio pero toca el flujo de venta.
+**Decisión tomada:** registro **automático al confirmar la venta** con los días
+del producto (`TR_REGISTRAR_GARANTIA_VENTA`); el alta manual queda como
+respaldo para ventas viejas.
 
-**Cierre:** build, `check-app-sps`, test de menús, test nuevo de garantías y prueba manual con VENDEDOR (no debe poder finalizar).
+**Cierre hecho en TEST:** build, `check-app-sps` 99/0, test de menús, `test-garantias.sh` 11/0 y `test-migracion-roles.sh` OK. Falta la prueba manual con VENDEDOR en la viva (no debe poder finalizar) y aplicar `63` → binario → `62` con backup previo.
 
 ### 7. RRHH: módulos que faltan
 
@@ -281,7 +293,7 @@ La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, 
 # Build
 ./build.sh
 
-# SPs que usa la app (debe dar 93/0)
+# SPs que usa la app (debe dar 99/0)
 DB_HOST=127.0.0.1 bash db/check-app-sps.sh
 
 # Menús por rol (sobre TEST)

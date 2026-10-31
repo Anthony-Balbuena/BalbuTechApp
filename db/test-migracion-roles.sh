@@ -107,8 +107,10 @@ comprobar "los 7 roles del set final" \
           ('ADMIN','GERENTE','SUBGERENTE','RRHH','VENDEDOR','ALMACEN','CONTABILIDAD')")" "7"
 # (26/10/2026) VENDEDOR queda en 12: perdio CLIENTES_VER y los tres permisos de
 # gestion de metodos de pago; conserva METODOS_PAGO_VER.
+# (30/10/2026) Sube a 15: gano GARANTIAS_REGISTRAR, GARANTIAS_RECLAMAR y
+# GARANTIAS_CONSULTAR (modulo 62). No tiene GARANTIAS_FINALIZAR.
 comprobar "permisos de VENDEDOR intactos" \
-    "$(Q "SELECT COUNT(*) FROM ROL_PERMISO WHERE ROL_NOMBRE='VENDEDOR'")" "12"
+    "$(Q "SELECT COUNT(*) FROM ROL_PERMISO WHERE ROL_NOMBRE='VENDEDOR'")" "15"
 
 # ---------------------------------------------------------------------------
 # 3. Segunda pasada: idempotente, sin errores y sin cambiar nada.

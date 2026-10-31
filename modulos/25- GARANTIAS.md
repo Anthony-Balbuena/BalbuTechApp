@@ -11,6 +11,11 @@ inicial.
 > que por nombre y por tema pertenece al módulo **26**. Funciona, pero vive lejos
 > de su tabla.
 
+> **Superado en parte por el módulo 63** (`GARANTIAS_FLUJO`): agrega
+> `ID_EMPLEADO` y `FECHA_REGISTRO`, reemplaza `SP_REGISTRAR_GARANTIA` por la
+> firma de 3 parámetros y agrega los triggers y SPs del flujo nuevo. Este
+> documento describe el `.sql` del 25 tal como está.
+
 Fuente: `modulos/25- GARANTIAS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
 
 ## Tablas

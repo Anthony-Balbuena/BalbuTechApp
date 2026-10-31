@@ -138,7 +138,7 @@ revisar "SUBGERENTE" "prueba_r7_sub" 16 "Asistencia|Empleados|Mis permisos|Mis v
 revisar "RRHH" "prueba_r7_rrhh" 6 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Ver permisos|Cerrar sesión"
 revisar "VENDEDOR" "prueba_r7_ven" 10 "Asistencia|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
 revisar "ALMACEN" "prueba_r7_alm" 11 "Asistencia|Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Ver permisos|Cerrar sesión"
-revisar "CONTABILIDAD" "prueba_r7_con" 5 "Asistencia|Clientes|Productos|Ver permisos|Cerrar sesión"
+revisar "CONTABILIDAD" "prueba_r7_con" 6 "Asistencia|Clientes|Productos|Ventas|Ver permisos|Cerrar sesión"
 
 # ---------------------------------------------------------------------------
 # Submenu Usuarios con permisos finos (22/10/2026): un rol con SOLO
@@ -1185,6 +1185,7 @@ fi
 # GESTIONAR_VENTAS ve las acciones sobre ventas pero no los reportes, que piden
 # CONSULTAR_REPORTES. Hoy ningun rol real tiene uno sin el otro, por eso el caso
 # usa un rol sintetico: asi el corte queda fijado igual.
+# (30/10/2026) Garantias ya no cuelga de GESTIONAR_VENTAS: este rol tampoco la ve.
 # ---------------------------------------------------------------------------
 ROL_VEN="PRUEBA_VEN_GEST"
 USR_VEN="prueba_ven_gest"
@@ -1223,22 +1224,23 @@ elif [ "$rc_ven_gest" -ne 0 ]; then
 else
     submenu_ven_gest=$(awk '/=== MODULO DE VENTAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida_ven_gest")
     n_sub_ven_gest=$(printf '%s\n' "$submenu_ven_gest" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_sub_ven_gest" -ne 9 ]; then
-        echo "FALLO $ROL_VEN: $n_sub_ven_gest opciones en el submenu, se esperaban 9"
+    if [ "$n_sub_ven_gest" -ne 8 ]; then
+        echo "FALLO $ROL_VEN: $n_sub_ven_gest opciones en el submenu, se esperaban 8"
         fail=1; fallos=$((fallos+1))
     fi
     for label in "Venta rapida (carrito)" "Ver venta con IVA" "Cancelar venta" \
                  "Anular pago" "Devolucion de venta" "Cierre de caja" "Cobrar venta" \
-                 "Garantias" "Volver al Menu Principal"; do
+                 "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_ven_gest" | grep -Fq "$label"; then
             echo "FALLO $ROL_VEN: falta la opcion '$label'"
             fail=1; fallos=$((fallos+1))
         fi
     done
     for label in "Reporte por rango" "Ganancias" "Reporte por periodo" \
-                 "Ganancias por periodo" "Historial de venta" "Exportar datos para la web"; do
+                 "Ganancias por periodo" "Historial de venta" "Exportar datos para la web" \
+                 "Garantias"; do
         if printf '%s\n' "$submenu_ven_gest" | grep -Fq "$label"; then
-            echo "FALLO $ROL_VEN: el submenu muestra '$label' sin CONSULTAR_REPORTES"
+            echo "FALLO $ROL_VEN: el submenu muestra '$label' sin permiso"
             fail=1; fallos=$((fallos+1))
         fi
     done
@@ -1256,7 +1258,7 @@ else
     fi
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_VEN (9 opciones, sin reportes)"
+        echo "OK $ROL_VEN (8 opciones, sin reportes ni garantias)"
     fi
 fi
 
@@ -1348,6 +1350,64 @@ else
         echo "OK VENDEDOR/Ventas (10 opciones, sin reportes)"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Submenu Garantias con permisos propios (30/10/2026): el vendedor registra,
+# reclama y consulta, pero NO finaliza; contabilidad solo consulta; admin,
+# gerente y subgerente ven las cuatro acciones.
+# ---------------------------------------------------------------------------
+probar_garantias() {
+    local rol="$1" usuario="$2" entrada="$3" cant="$4" visibles="$5" ocultas="$6"
+    local salida="$TMP/out-garantias-$rol.txt" rc n fallos_previos=$fallos
+    printf "$entrada" | BALBU_USER="$usuario" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+        timeout "$LIMITE" "$APP" >"$salida" 2>&1
+    rc=$?
+
+    if ! grep -q "Acceso concedido \[DEV\]" "$salida"; then
+        echo "FALLO GARANTIAS/$rol: no entro al menu (¿usuario/clave/BD?)"
+        fail=1; fallos=$((fallos+1))
+        return
+    fi
+    if [ "$rc" -ne 0 ]; then
+        echo "FALLO GARANTIAS/$rol: la app salio con $rc"
+        fail=1; fallos=$((fallos+1))
+        return
+    fi
+
+    local submenu
+    submenu=$(awk '/=== GARANTIAS ===/{f=1} f{print} /^=+$/ && f{exit}' "$salida")
+    n=$(printf '%s\n' "$submenu" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n" -ne "$cant" ]; then
+        echo "FALLO GARANTIAS/$rol: $n opciones, se esperaban $cant"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    local IFS='|'
+    for label in $visibles; do
+        if ! printf '%s\n' "$submenu" | grep -Fq "$label"; then
+            echo "FALLO GARANTIAS/$rol: falta la opcion '$label'"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in $ocultas; do
+        if printf '%s\n' "$submenu" | grep -Fq "$label"; then
+            echo "FALLO GARANTIAS/$rol: muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK GARANTIAS/$rol ($n opciones)"
+    fi
+}
+
+# Entrada: Enter del "Presione Enter", Ventas, Garantias, Volver.
+probar_garantias "ADMIN" "$BALBU_USER" '\n13\n12\n5\n' 5 \
+    "Registrar garantia|Reclamar garantia|Finalizar reclamo|Consultar garantias|Volver" ""
+probar_garantias "VENDEDOR" "prueba_r7_ven" '\n7\n8\n4\n' 4 \
+    "Registrar garantia|Reclamar garantia|Consultar garantias|Volver" "Finalizar reclamo"
+probar_garantias "CONTABILIDAD" "prueba_r7_con" '\n4\n5\n2\n' 2 \
+    "Consultar garantias|Volver" "Registrar garantia|Reclamar garantia|Finalizar reclamo"
 
 # ---------------------------------------------------------------------------
 # Opcion 0 (22/10/2026): tiene que caer en "Opcion no valida" como cualquier

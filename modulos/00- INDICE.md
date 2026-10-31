@@ -1,25 +1,25 @@
 # Índice general — módulos de la base de datos
 
-Los **62 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
+Los **64 módulos** de `BALBU_TECH`: qué guarda cada uno, qué objetos crea y si la
 app lo usa. Cada módulo tiene su documento al lado del `.sql`, con el mismo
 nombre.
 
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 30/10/2026 · 62 `.sql` + 62 `.md` · 367 objetos documentados.
+Última revisión: 30/10/2026 · 64 `.sql` + 64 `.md` · 372 objetos documentados.
 
 ## Resumen
 
 | Tipo de objeto | Cantidad |
 |---|---|
 | Tablas | 43 |
-| Procedimientos almacenados | 159 |
-| Triggers | 77 |
+| Procedimientos almacenados | 163 |
+| Triggers | 78 |
 | Vistas | 23 |
 | Funciones | 5 |
 | Índices | 60 |
-| **Total `CREATE`** | **367** |
+| **Total `CREATE`** | **372** |
 
 ## Cómo leer un módulo
 
@@ -82,6 +82,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [GARANTIAS](<25- GARANTIAS.md>) | 1T · 2SP · 1TR | Garantías emitidas con una venta. | ✅ |
 | [DEVOLUCIONES](<26- DEVOLUCIONES.md>) | 1T · 2SP · 5TR · 2V | Devolución de mercancía del cliente. | ✅ |
 | [RECLAMOS_GARANTIAS](<27- RECLAMOS_GARANTIAS.md>) | 1T · 2SP · 3TR | Reclamos sobre una garantía. | ✅ |
+| [GARANTIAS_FLUJO](<63- GARANTIAS_FLUJO.md>) | 4SP · 1TR | Autor, fechas, validación por fecha y registro automático al confirmar la venta. | ✅ |
 | [DETALLE_REPARACIONES](<35- DETALLE_REPARACIONES.md>) | 1T · 1SP | Repuestos de una reparación. | — |
 | [GANANCIAS](<38- GANANCIAS.md>) | 1SP · 2V | Ganancia por línea y por mes. | ◐ |
 | [LECTURAS_VENTAS](<39- LECTURAS_VENTAS.md>) | 14SP | Las 14 consultas de solo lectura de ventas, compras y caja. | ✅ |
@@ -124,6 +125,8 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [EMPLEADOS_CEDULA_UNICA](<59- EMPLEADOS_CEDULA_UNICA.md>) | - | Agrega `UNIQUE` a `EMPLEADOS.CEDULA`. | - |
 | [VENTA_NETA](<60- VENTA_NETA.md>) | - | Neto de la venta tras devoluciones: vistas, cierre de caja y topes de pago. | - |
 | [AUDITORIA_ACTOR](<61- AUDITORIA_ACTOR.md>) | 4TR · 1 ALTER | Cierra el actor de clientes y productos; el historial de estado ya no cae al empleado 1. | — |
+| [PERMISOS_GARANTIAS](<62- PERMISOS_GARANTIAS.md>) | — | Saca Garantías de `GESTIONAR_VENTAS` y le da 4 permisos finos. | — |
+| [PERMISOS_GARANTIAS](<62- PERMISOS_GARANTIAS.md>) | — | Saca Garantías de `GESTIONAR_VENTAS` y le da 4 permisos finos. | — |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 3TR | Bitácora genérica por tabla y registro. | — |
 | [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |
@@ -221,8 +224,8 @@ Parciales, que conviene mirar antes de tocarlos:
 
 ## Estado de la documentación
 
-- **62 de 62** módulos documentados, un `.md` por `.sql`.
-- **367 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
+- **64 de 64** módulos documentados, un `.md` por `.sql`.
+- **372 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql`.
 - Los `.sql` **no se tocaron** para documentar.
 - Los hallazgos están anotados en cada documento y en
   `odd/tasks/documentacion-bd.md`, **sin arreglar**: son deuda técnica
