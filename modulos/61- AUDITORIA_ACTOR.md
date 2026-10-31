@@ -74,4 +74,21 @@ Aplicado en `BALBU_TECH_TEST` el 30/10/2026 con backup
 - Aplicarlo tres veces seguidas no cambia nada ni devuelve error.
 - `check-app-sps.sh` 93/0 y `test-menus-por-rol.sh` 43/43 en TEST.
 
-Pendiente: aplicar en la viva con backup previo.
+Aplicado en la viva (`BALBU_TECH`) el 30/10/2026 con backup
+`backups/112-antes-modulo-61-viva-20261030_223812.sql` (605 KB, dump
+completo con rutinas y triggers):
+
+- Estado estructural identico a TEST: `ID_EMPLEADO` en `YES`, 4 triggers en
+  orden 1/1/1/2, `@ID_USUARIO_ACTUAL` en los tres de clientes y productos,
+  `@ID_EMPLEADO_ACTUAL` en el del historial, 0 fallbacks `, 1)`.
+- Prueba funcional en una transaccion con `ROLLBACK` sobre el producto 1:
+  el historial guardo el empleado de la sesion, `AUDITORIA_SISTEMA` guardo
+  el usuario real, y sin empleado en la conexion el historial quedo en
+  `NULL`. Los tres casos dieron OK.
+- Despues del `ROLLBACK`: los 7 conteos de control (clientes, productos,
+  historial, auditoria, ventas, compras, pagos) quedaron identicos al
+  estado previo, el producto 1 volvio a `ACTIVO` / `12000.00` y no quedo
+  ninguna fila `ZZ VIVA`.
+- `check-app-sps.sh` sobre la viva: 93/0.
+- `HISTORIAL_ESTADOS_PRODUCTO` estaba vacia (0 filas), asi que el `ALTER`
+  no relajo ningun valor existente.

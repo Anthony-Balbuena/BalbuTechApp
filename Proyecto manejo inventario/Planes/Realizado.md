@@ -968,3 +968,24 @@ que daban la viva por migrada quedan superadas por esta.
 - `check-app-sps.sh` 93/0 y `test-menus-por-rol.sh` 43/43 en TEST.
 - **Falta la viva**: no se aplico todavia, requiere orden explicita y
   backup previo.
+
+### 30/10 (segunda parte) — Modulo 61 aplicado en la viva
+
+- Backup previo: `backups/112-antes-modulo-61-viva-20261030_223812.sql`
+  (605 KB, dump completo con rutinas y triggers).
+- `modulos/61- AUDITORIA_ACTOR.sql` aplicado en `BALBU_TECH`, exit 0.
+- Estado estructural identico a TEST: `HISTORIAL_ESTADOS_PRODUCTO.ID_EMPLEADO`
+  en `YES`; 4 triggers en orden 1/1/1/2; `@ID_USUARIO_ACTUAL` en los tres de
+  clientes y productos; `@ID_EMPLEADO_ACTUAL` en el del historial; 0
+  fallbacks `, 1)`.
+- Prueba funcional en la viva dentro de una transaccion con `ROLLBACK` sobre
+  el producto 1 (estado `ACTIVO`, precio `12000.00`): el historial guardó el
+  empleado de la sesión, `AUDITORIA_SISTEMA` guardó el usuario real y, sin
+  empleado en la conexión, el historial quedó en `NULL`. Tres casos OK.
+- Tras el `ROLLBACK` los 7 conteos de control quedaron idénticos al estado
+  previo (clientes 5, productos 49, historial 0, auditoria 21, ventas 13,
+  compras 31, pagos 8), el producto 1 volvió a `ACTIVO` / `12000.00` y no
+  quedó ninguna fila `ZZ VIVA`.
+- `check-app-sps.sh` sobre la viva: 93/0.
+- `HISTORIAL_ESTADOS_PRODUCTO` estaba vacía, así que el `ALTER` no relajó
+  ningún valor existente.
