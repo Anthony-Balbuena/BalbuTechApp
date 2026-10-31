@@ -947,3 +947,24 @@ que daban la viva por migrada quedan superadas por esta.
   `110-antes-clave-admin-20261029_144621.sql`) y el login quedó en PBKDF2.
 - Ojo al correr el seed: toma `DB_NAME` del entorno del contenedor
   (`BALBU_TECH`); para TEST hay que exportar `DB_NAME=BALBU_TECH_TEST`.
+
+### 30/10 — Modulo 61 aplicado en TEST (auditoria con actor)
+
+- `modulos/61- AUDITORIA_ACTOR.md`: documento que faltaba; el `.sql` ya
+  existia desde el 29/10 pero el indice lo contaba como documentado.
+- El `.sql` se aplico en `BALBU_TECH_TEST` con backup
+  `backups/111-antes-modulo-61-test-20261030_223349.sql` (589 KB, dump
+  completo con rutinas y triggers).
+- `db/test-auditoria-producto.sh` -> **5 OK, 0 FAIL**: historial con el
+  empleado de la sesion, auditoria de precio con el usuario de la sesion,
+  historial en `NULL` cuando no hay empleado, y `INSERT`/`UPDATE` de
+  clientes con el usuario real.
+- Verificado en TEST: `HISTORIAL_ESTADOS_PRODUCTO.ID_EMPLEADO` quedo
+  `IS_NULLABLE = YES`; los tres triggers de clientes y productos leen
+  `@ID_USUARIO_ACTUAL`; ningun trigger conserva el fallback `, 1)`; cero
+  residuos `ZZ AUDIT` porque el test corre en transaccion con `ROLLBACK`.
+- Idempotencia probada: tres aplicaciones seguidas del modulo, exit 0 y sin
+  cambios de estado.
+- `check-app-sps.sh` 93/0 y `test-menus-por-rol.sh` 43/43 en TEST.
+- **Falta la viva**: no se aplico todavia, requiere orden explicita y
+  backup previo.

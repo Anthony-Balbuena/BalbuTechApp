@@ -2,7 +2,7 @@
 
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
 > Lo hecho vive en `Realizado.md`; los detalles largos, en `Auditoria/` y `Flujos/`.
-> Actualizado: 27/10/2026.
+> Actualizado: 30/10/2026.
 
 ---
 
@@ -225,13 +225,14 @@ La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, 
 - [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI).
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
 - [ ] **Barrido del resto de los `while` con `leerDatoSeguro`** (el 18/10 solo se tocó `contrato.cpp`; los bucles con EOF pueden girar sin fin).
+- [ ] **Módulo 61 en la viva**: aplicar con backup previo. En TEST ya está y `test-auditoria-producto.sh` da 5/5.
 
 ### 10. Hallazgos del mapa de módulos (21/10)
 
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
 - [x] **Devolver mercancía no baja el subtotal** — cerrado en TEST y viva el 29/10/2026 (backup 109) con el módulo 60: `VW_VENTA_NETA` centraliza el neto y lo usan reportes, cierre de caja y topes de pago. El sexto lugar era `TR_VALIDAR_ACTUALIZACION_VENTA` (21), que comparaba el pago contra el subtotal y no contra el bruto neto.
 - [ ] **`VENCIDA` de GARANTIAS nunca se escribe**: hoy se puede reclamar una garantía vencida.
-- [ ] **El 18 atribuye todo al empleado 1** y el 29 guarda `ID_USUARIO_ADMIN` en `NULL`: la auditoría no dice quién fue.
+- [x] **El 18 atribuye todo al empleado 1** y el 29 guarda `ID_USUARIO_ADMIN` en `NULL`: la auditoría no dice quién fue. — cerrado el 30/10/2026: el 56 arregló el actor de usuarios y el 61 el de clientes y productos. En TEST el módulo 61 está aplicado (`test-auditoria-producto.sh` 5/5); **falta la viva**.
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
 
 ---
@@ -243,7 +244,7 @@ La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, 
 - [ ] **Consolidar los `ALTER` de 25** dentro del `CREATE TABLE`; `DROP IF EXISTS` en los `CREATE` del módulo 11.
 - [ ] **3 tests shell** pendientes y notas obsoletas del índice (`modulos/00- INDICE.md`).
 - [ ] **`db/crear-usuarios.sh` no existe**: buscar el comando de provisión de la máquina del trabajo y compararlo con `balbu_app` / `balbu_admin`.
-- [ ] **`.atl/` entró en `d623ac0`**: decidir si se versiona (si no: `git rm -r --cached .atl` + commit).
+- [x] **`.atl/` entró en `d623ac0`** — resuelto: `de93561` lo sacó del control de versiones y `72bdedd` lo agregó a `.gitignore`.
 - [ ] **Sidecar `.borrador`** guarda PII en texto plano junto al HTML (registrado y aceptado por el dueño).
 - [ ] **`contratos/firmados/`**: sin listado, renombre ni limpieza; la administra RRHH a mano.
 - [ ] **P-6**: decidir cablear o retirar lo construido y no cableado (garantías, reclamos, reparaciones, bonos manuales).
