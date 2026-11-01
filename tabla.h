@@ -56,21 +56,23 @@ inline std::string tablaLinea(size_t width) {
     return std::string(width, '-');
 }
 
-// Color por estado. Verde = activo/ok/recibida/realizada; amarillo =
+// Color por estado. Verde = activo/ok/recibida/realizada/cerrado; amarillo =
 // pendiente/en proceso/stock bajo/abierta; rojo = inactivo/cancelado/
-// agotado/critico/rechazado. Un estado desconocido queda sin color.
+// agotado/critico/rechazado/vencido. Un estado desconocido queda sin color.
 inline const std::string &tablaColorEstado(const std::string &estado) {
     if (estado == "ACTIVO" || estado == "ACTIVA" || estado == "OK" ||
         estado == "REALIZADA" || estado == "RECIBIDA" ||
         estado == "APROBADO" || estado == "APROBADA" ||
-        estado == "PRESENTE" || estado == "PAGADA") {
+        estado == "PRESENTE" || estado == "PAGADA" ||
+        estado == "CERRADO") {
         return VERDE;
     }
     if (estado == "INACTIVO" || estado == "INACTIVA" ||
         estado == "CANCELADA" || estado == "CANCELADO" ||
         estado == "AGOTADO" || estado == "CRÍTICO" ||
         estado == "RECHAZADO" || estado == "RECHAZADA" ||
-        estado == "AUSENTE" || estado == "ANULADA") {
+        estado == "AUSENTE" || estado == "ANULADA" ||
+        estado == "VENCIDA") {
         return ROJO;
     }
     if (estado == "EN_PROCESO" || estado == "PENDIENTE" ||

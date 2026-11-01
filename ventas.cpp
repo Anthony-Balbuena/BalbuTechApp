@@ -13,6 +13,7 @@
 #include "seguridad.h"
 #include "caja.h"
 #include "roles.h"
+#include "sesion.h"
 #include "tabla.h"
 #include "web_export.h"
 #include "ventas.h"
@@ -38,7 +39,7 @@ enum class AccionVenta {
 
 struct OpcionVenta {
     const char* etiqueta;
-    const char* permiso;   // vacio = siempre visible
+    vector<const char*> permisos;   // vacio = siempre visible; si no, cualquiera alcanza
     AccionVenta accion;
 };
 
@@ -49,31 +50,38 @@ struct OpcionVenta {
 // unico caso con chequeo adentro del switch).
 // (23/10/2026) El historial de venta tiene permiso propio
 // (CONSULTAR_HISTORIAL_VENTA) para que VENDEDOR lo vea sin CONSULTAR_REPORTES.
-// Garantias sigue con GESTIONAR_VENTAS: no se creo un permiso nuevo para ella.
+// (30/10/2026) Garantias dejo de colgar de GESTIONAR_VENTAS: ahora se abre con
+// cualquiera de sus cuatro permisos (modulo 62). Por eso una opcion puede pedir
+// una lista de permisos y alcanza con tener uno.
 static const vector<OpcionVenta>& opcionesVentas() {
     static const vector<OpcionVenta> opciones = {
-        {"Venta rapida (carrito)",       "GESTIONAR_VENTAS",   AccionVenta::VentaRapida},
-        {"Ver venta con IVA",            "GESTIONAR_VENTAS",   AccionVenta::VerVentaIVA},
-        {"Cancelar venta",               "GESTIONAR_VENTAS",   AccionVenta::CancelarVenta},
-        {"Anular pago",                  "GESTIONAR_VENTAS",   AccionVenta::AnularPago},
-        {"Devolucion de venta",          "GESTIONAR_VENTAS",   AccionVenta::Devolucion},
-        {"Reporte por rango",            "CONSULTAR_REPORTES", AccionVenta::ReporteRango},
-        {"Cierre de caja",               "GESTIONAR_VENTAS",   AccionVenta::CierreCaja},
-        {"Ganancias",                    "CONSULTAR_REPORTES", AccionVenta::Ganancias},
-        {"Cobrar venta",                 "GESTIONAR_VENTAS",   AccionVenta::CobrarVenta},
-        {"Reporte por periodo",          "CONSULTAR_REPORTES", AccionVenta::ReportePeriodo},
-        {"Ganancias por periodo",        "CONSULTAR_REPORTES", AccionVenta::GananciasPeriodo},
-        {"Garantias",                    "GESTIONAR_VENTAS",   AccionVenta::Garantias},
-        {"Historial de venta",           "CONSULTAR_HISTORIAL_VENTA", AccionVenta::Historial},
-        {"Exportar datos para la web",   "CONSULTAR_REPORTES", AccionVenta::ExportarWeb},
-        {"Volver al Menu Principal",     "",                   AccionVenta::Volver}
+        {"Venta rapida (carrito)",       {"GESTIONAR_VENTAS"},   AccionVenta::VentaRapida},
+        {"Ver venta con IVA",            {"GESTIONAR_VENTAS"},   AccionVenta::VerVentaIVA},
+        {"Cancelar venta",               {"GESTIONAR_VENTAS"},   AccionVenta::CancelarVenta},
+        {"Anular pago",                  {"GESTIONAR_VENTAS"},   AccionVenta::AnularPago},
+        {"Devolucion de venta",          {"GESTIONAR_VENTAS"},   AccionVenta::Devolucion},
+        {"Reporte por rango",            {"CONSULTAR_REPORTES"}, AccionVenta::ReporteRango},
+        {"Cierre de caja",               {"GESTIONAR_VENTAS"},   AccionVenta::CierreCaja},
+        {"Ganancias",                    {"CONSULTAR_REPORTES"}, AccionVenta::Ganancias},
+        {"Cobrar venta",                 {"GESTIONAR_VENTAS"},   AccionVenta::CobrarVenta},
+        {"Reporte por periodo",          {"CONSULTAR_REPORTES"}, AccionVenta::ReportePeriodo},
+        {"Ganancias por periodo",        {"CONSULTAR_REPORTES"}, AccionVenta::GananciasPeriodo},
+        {"Garantias",                    {"GARANTIAS_REGISTRAR", "GARANTIAS_RECLAMAR",
+                                          "GARANTIAS_FINALIZAR", "GARANTIAS_CONSULTAR"},
+                                                               AccionVenta::Garantias},
+        {"Historial de venta",           {"CONSULTAR_HISTORIAL_VENTA"}, AccionVenta::Historial},
+        {"Exportar datos para la web",   {"CONSULTAR_REPORTES"}, AccionVenta::ExportarWeb},
+        {"Volver al Menu Principal",     {},                    AccionVenta::Volver}
     };
     return opciones;
 }
 
 static bool puedeVerOpcion(const OpcionVenta& opcion) {
-    if (opcion.permiso == nullptr || opcion.permiso[0] == '\0') return true;
-    return tienePermiso(opcion.permiso);
+    if (opcion.permisos.empty()) return true;
+    for (const char* permiso : opcion.permisos) {
+        if (permiso != nullptr && permiso[0] != '\0' && tienePermiso(permiso)) return true;
+    }
+    return false;
 }
 
 static vector<const OpcionVenta*> opcionesVisibles() {
@@ -1237,16 +1245,119 @@ static void cobrarVentaUI() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Garantias
+// ---------------------------------------------------------------------------
+// (30/10/2026) El vendedor atiende y registra, pero NO cierra reclamos: por eso
+// cada opcion pide su permiso (modulo 62). La UI lista en vez de pedir IDs a
+// ciegas y las tablas usan tabla.h para que los acentos no desalineen.
+enum class AccionGarantia { Registrar, Reclamar, Finalizar, Consultar, Volver };
+
+struct OpcionGarantia {
+    const char* etiqueta;
+    const char* permiso;   // vacio = siempre visible
+    AccionGarantia accion;
+};
+
+static const vector<OpcionGarantia>& opcionesGarantias() {
+    static const vector<OpcionGarantia> opciones = {
+        {"Registrar garantia",  "GARANTIAS_REGISTRAR", AccionGarantia::Registrar},
+        {"Reclamar garantia",   "GARANTIAS_RECLAMAR",  AccionGarantia::Reclamar},
+        {"Finalizar reclamo",   "GARANTIAS_FINALIZAR", AccionGarantia::Finalizar},
+        {"Consultar garantias", "GARANTIAS_CONSULTAR", AccionGarantia::Consultar},
+        {"Volver",              "",                    AccionGarantia::Volver}
+    };
+    return opciones;
+}
+
+static vector<const OpcionGarantia*> opcionesGarantiasVisibles() {
+    vector<const OpcionGarantia*> visibles;
+    for (const OpcionGarantia& opcion : opcionesGarantias()) {
+        if (opcion.permiso == nullptr || opcion.permiso[0] == '\0' || tienePermiso(opcion.permiso)) {
+            visibles.push_back(&opcion);
+        }
+    }
+    return visibles;
+}
+
+// El actor va como NULL si la sesion no tiene empleado valido: la columna es
+// NULL-able y la FK se cumple igual.
+static void setEmpleadoSesion(sql::PreparedStatement *pstmt, unsigned int indice) {
+    if (sesionActual.idEmpleado > 0) {
+        pstmt->setInt(indice, sesionActual.idEmpleado);
+    } else {
+        pstmt->setNull(indice, sql::DataType::INTEGER);
+    }
+}
+
 static void garantiaRegistrarUI() {
     cout << "\n--- REGISTRAR GARANTIA ---" << endl;
     try {
-        int idDetGar = (int)leerNumeroConIntentos("ID detalle de venta: ", 1, 999999999);
-        double defDias = 30.0;
-        int dias = (int)leerNumeroConIntentos("Dias de validez (Enter = 30): ", 1, 999999999, &defDias);
+        int idVenta = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
+
+        std::unique_ptr<sql::PreparedStatement> pLineas(globalCon->prepareStatement(
+            "CALL SP_LINEAS_VENTA_CON_GARANTIA(?)"));
+        pLineas->setInt(1, idVenta);
+        std::unique_ptr<sql::ResultSet> res(pLineas->executeQuery());
+
+        struct LineaGarantia { int idDetalle; int diasSugeridos; };
+        vector<LineaGarantia> garantizables;
+
+        const size_t W_DET = 7, W_PROD = 28, W_CANT = 5, W_DIAS = 5, W_TIENE = 6;
+        const size_t ANCHO = W_DET + W_PROD + W_CANT + W_DIAS + W_TIENE + 4 * 3;
+        const string linea(ANCHO, '-');
+        cout << "\n"
+             << tablaCelda("DETALLE", W_DET) << " | "
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("CANT", W_CANT) << " | "
+             << tablaCelda("DIAS", W_DIAS) << " | "
+             << tablaCelda("TIENE", W_TIENE) << "\n"
+             << linea << "\n";
+
+        while (res->next()) {
+            string tiene = res->getString("TIENE_GARANTIA");
+            cout << tablaCelda(to_string(res->getInt("ID_DETALLE_VENTA")), W_DET) << " | "
+                 << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                 << tablaCelda(to_string(res->getInt("CANTIDAD")), W_CANT) << " | "
+                 << tablaCelda(to_string(res->getInt("DIAS_SUGERIDOS")), W_DIAS) << " | "
+                 << (tiene == "SI" ? ROJO : VERDE)
+                 << tablaCelda(tiene, W_TIENE) << RESET << "\n"
+                 << linea << "\n";
+            if (tiene != "SI") {
+                garantizables.push_back({res->getInt("ID_DETALLE_VENTA"), res->getInt("DIAS_SUGERIDOS")});
+            }
+        }
+        drenarResultados(pLineas.get());
+
+        if (garantizables.empty()) {
+            cout << "\n[!] Esa venta no tiene lineas sin garantia." << endl;
+            return;
+        }
+
+        int idDetalle = (int)leerNumeroConIntentos("ID detalle a garantizar: ", 1, 999999999);
+        int diasSugeridos = 0;
+        bool pertenece = false;
+        for (const LineaGarantia &l : garantizables) {
+            if (l.idDetalle == idDetalle) {
+                pertenece = true;
+                diasSugeridos = l.diasSugeridos;
+                break;
+            }
+        }
+        if (!pertenece) {
+            cout << ROJO << "Ese detalle no esta en la lista de lineas garantizables." << RESET << endl;
+            return;
+        }
+
+        double defDias = diasSugeridos > 0 ? (double)diasSugeridos : 30.0;
+        int dias = (int)leerNumeroConIntentos(
+            "Dias de validez (Enter = " + to_string((int)defDias) + "): ", 1, 999999999, &defDias);
+
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_REGISTRAR_GARANTIA(?, ?)"));
-        pstmt->setInt(1, idDetGar);
+            "CALL SP_REGISTRAR_GARANTIA(?, ?, ?)"));
+        pstmt->setInt(1, idDetalle);
         pstmt->setInt(2, dias);
+        setEmpleadoSesion(pstmt.get(), 3);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -1259,16 +1370,61 @@ static void garantiaRegistrarUI() {
 static void reclamoRegistrarUI() {
     cout << "\n--- RECLAMAR GARANTIA ---" << endl;
     try {
+        std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_GARANTIAS(?, ?)"));
+        pLista->setString(1, "");
+        pLista->setInt(2, 1);
+        std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
+
+        vector<int> ids;
+        const size_t W_ID = 6, W_VENTA = 5, W_CLI = 20, W_PROD = 26, W_FIN = 10;
+        const size_t ANCHO = W_ID + W_VENTA + W_CLI + W_PROD + W_FIN + 4 * 3;
+        const string linea(ANCHO, '-');
+        cout << "\n"
+             << tablaCelda("GARANT", W_ID) << " | "
+             << tablaCelda("VENTA", W_VENTA) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("VENCE", W_FIN) << "\n"
+             << linea << "\n";
+
+        while (res->next()) {
+            ids.push_back(res->getInt("ID_GARANTIA"));
+            cout << tablaCelda(to_string(res->getInt("ID_GARANTIA")), W_ID) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VENTA) << " | "
+                 << tablaCelda(res->getString("CLIENTE"), W_CLI) << " | "
+                 << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                 << tablaCelda(res->getString("FECHA_FIN"), W_FIN) << "\n"
+                 << linea << "\n";
+        }
+        drenarResultados(pLista.get());
+
+        if (ids.empty()) {
+            cout << "\n[!] No hay garantias vigentes para reclamar." << endl;
+            return;
+        }
+
         int gIdR = (int)leerNumeroConIntentos("ID garantia: ", 1, 999999999);
+        bool pertenece = false;
+        for (int id : ids) {
+            if (id == gIdR) { pertenece = true; break; }
+        }
+        if (!pertenece) {
+            cout << ROJO << "Esa garantia no esta en la lista de vigentes." << RESET << endl;
+            return;
+        }
+
         string desc = leerDatoSeguro("Descripcion del dano: ");
         if (desc.empty()) {
             cout << ROJO << "La descripcion es obligatoria." << RESET << endl;
             return;
         }
+
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL 27_SP_REGISTRAR_RECLAMO_GARANTIA(?, ?)"));
+            "CALL 27_SP_REGISTRAR_RECLAMO_GARANTIA(?, ?, ?)"));
         pstmt->setInt(1, gIdR);
         pstmt->setString(2, desc);
+        setEmpleadoSesion(pstmt.get(), 3);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -1281,10 +1437,55 @@ static void reclamoRegistrarUI() {
 static void reclamoFinalizarUI() {
     cout << "\n--- FINALIZAR RECLAMO ---" << endl;
     try {
+        std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_RECLAMOS(?, ?)"));
+        pLista->setInt(1, 0);
+        pLista->setInt(2, 1);
+        std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
+
+        vector<int> ids;
+        const size_t W_REC = 7, W_GAR = 7, W_FECHA = 19, W_EST = 10, W_DESC = 30;
+        const size_t ANCHO = W_REC + W_GAR + W_FECHA + W_EST + W_DESC + 4 * 3;
+        const string linea(ANCHO, '-');
+        cout << "\n"
+             << tablaCelda("RECLAMO", W_REC) << " | "
+             << tablaCelda("GARANT", W_GAR) << " | "
+             << tablaCelda("FECHA", W_FECHA) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("DESCRIPCION", W_DESC) << "\n"
+             << linea << "\n";
+
+        while (res->next()) {
+            ids.push_back(res->getInt("ID_RECLAMO_GARAN"));
+            string estado = res->getString("ESTADO");
+            cout << tablaCelda(to_string(res->getInt("ID_RECLAMO_GARAN")), W_REC) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_GARANTIA")), W_GAR) << " | "
+                 << tablaCelda(res->getString("FECHA_RECLAMO"), W_FECHA) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(res->getString("DESCRIPCION"), W_DESC) << "\n"
+                 << linea << "\n";
+        }
+        drenarResultados(pLista.get());
+
+        if (ids.empty()) {
+            cout << "\n[!] No hay reclamos abiertos para finalizar." << endl;
+            return;
+        }
+
         int rId = (int)leerNumeroConIntentos("ID reclamo: ", 1, 999999999);
+        bool pertenece = false;
+        for (int id : ids) {
+            if (id == rId) { pertenece = true; break; }
+        }
+        if (!pertenece) {
+            cout << ROJO << "Ese reclamo no esta en la lista de abiertos." << RESET << endl;
+            return;
+        }
+
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(?)"));
+            "CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(?, ?)"));
         pstmt->setInt(1, rId);
+        setEmpleadoSesion(pstmt.get(), 2);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
@@ -1294,28 +1495,136 @@ static void reclamoFinalizarUI() {
     }
 }
 
+static void consultarGarantiasUI() {
+    cout << "\n--- CONSULTAR GARANTIAS ---" << endl;
+    try {
+        string filtro = leerDatoSeguro(
+            "Filtro (cliente, producto, ID venta o estado; Enter = todo): ");
+
+        std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_GARANTIAS(?, ?)"));
+        pLista->setString(1, filtro);
+        pLista->setInt(2, 0);
+        std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
+
+        vector<int> ids;
+        const size_t W_ID = 6, W_VENTA = 5, W_CLI = 18, W_PROD = 24,
+                     W_INI = 10, W_FIN = 10, W_EST = 10, W_REG = 16;
+        const size_t ANCHO = W_ID + W_VENTA + W_CLI + W_PROD + W_INI + W_FIN +
+                             W_EST + W_REG + 7 * 3;
+        const string linea(ANCHO, '-');
+        cout << "\n"
+             << tablaCelda("GARANT", W_ID) << " | "
+             << tablaCelda("VENTA", W_VENTA) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("INICIO", W_INI) << " | "
+             << tablaCelda("VENCE", W_FIN) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("REGISTRO", W_REG) << "\n"
+             << linea << "\n";
+
+        while (res->next()) {
+            ids.push_back(res->getInt("ID_GARANTIA"));
+            string estado = res->getString("ESTADO");
+            cout << tablaCelda(to_string(res->getInt("ID_GARANTIA")), W_ID) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VENTA) << " | "
+                 << tablaCelda(res->getString("CLIENTE"), W_CLI) << " | "
+                 << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                 << tablaCelda(res->getString("FECHA_INICIO"), W_INI) << " | "
+                 << tablaCelda(res->getString("FECHA_FIN"), W_FIN) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(res->getString("REGISTRO"), W_REG) << "\n"
+                 << linea << "\n";
+        }
+        drenarResultados(pLista.get());
+
+        if (ids.empty()) {
+            cout << "\n[!] No hay garantias que coincidan con el filtro." << endl;
+            return;
+        }
+
+        double dNada = 0.0;
+        int verReclamos = (int)leerNumeroConIntentos(
+            "ID garantia para ver sus reclamos (Enter = no): ", 0, 999999999, &dNada);
+        if (verReclamos <= 0) return;
+
+        bool pertenece = false;
+        for (int id : ids) {
+            if (id == verReclamos) { pertenece = true; break; }
+        }
+        if (!pertenece) {
+            cout << ROJO << "Esa garantia no esta en la lista." << RESET << endl;
+            return;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> pReclamos(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_RECLAMOS(?, ?)"));
+        pReclamos->setInt(1, verReclamos);
+        pReclamos->setInt(2, 0);
+        std::unique_ptr<sql::ResultSet> resR(pReclamos->executeQuery());
+
+        const size_t W_RECL = 7, W_FECHA_R = 19, W_EST_R = 10, W_REG_R = 16, W_DESC = 30;
+        const size_t ANCHO_R = W_RECL + W_FECHA_R + W_EST_R + W_REG_R + W_DESC + 4 * 3;
+        const string lineaR(ANCHO_R, '-');
+        cout << "\n"
+             << tablaCelda("RECLAMO", W_RECL) << " | "
+             << tablaCelda("FECHA", W_FECHA_R) << " | "
+             << tablaCelda("ESTADO", W_EST_R) << " | "
+             << tablaCelda("REGISTRO", W_REG_R) << " | "
+             << tablaCelda("DESCRIPCION", W_DESC) << "\n"
+             << lineaR << "\n";
+
+        bool hayReclamos = false;
+        while (resR->next()) {
+            hayReclamos = true;
+            string estado = resR->getString("ESTADO");
+            cout << tablaCelda(to_string(resR->getInt("ID_RECLAMO_GARAN")), W_RECL) << " | "
+                 << tablaCelda(resR->getString("FECHA_RECLAMO"), W_FECHA_R) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST_R) << RESET << " | "
+                 << tablaCelda(resR->getString("REGISTRO"), W_REG_R) << " | "
+                 << tablaCelda(resR->getString("DESCRIPCION"), W_DESC) << "\n"
+                 << lineaR << "\n";
+        }
+        if (!hayReclamos) cout << "[!] Esa garantia no tiene reclamos." << endl;
+        drenarResultados(pReclamos.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo consultar las garantias." << RESET << endl;
+    }
+}
+
 static void ejecutarSubmenuGarantias() {
     int opcion = 0;
-    do {
+    while (true) {
+        vector<const OpcionGarantia*> visibles = opcionesGarantiasVisibles();
         cout << "\n=== GARANTIAS ===" << endl;
-        cout << "1. Registrar garantia" << endl;
-        cout << "2. Reclamar garantia" << endl;
-        cout << "3. Finalizar reclamo" << endl;
-        cout << "4. Volver" << endl;
+        int n = 0;
+        for (const OpcionGarantia* opcionGarantia : visibles) {
+            cout << ++n << ". " << opcionGarantia->etiqueta << endl;
+        }
+        cout << "=================" << endl;
         cout << AZUL << "Seleccione una opcion: " << RESET;
         if (!leerOpcionMenu(opcion)) {
             cout << "\n[!] Entrada agotada. Saliendo del menu." << endl;
             break;
         }
-        switch (opcion) {
-            case 1: garantiaRegistrarUI(); break;
-            case 2: reclamoRegistrarUI(); break;
-            case 3: reclamoFinalizarUI(); break;
-            case 4: break;
-            default: cout << ROJO << "Opcion no valida." << RESET << endl; break;
+        if (opcion < 1 || opcion > (int)visibles.size()) {
+            cout << ROJO << "Opcion no valida." << RESET << endl;
+            continue;
         }
-        if (opcion != 4) pausar();
-    } while (opcion != 4);
+        const OpcionGarantia &elegido = *visibles[opcion - 1];
+        if (elegido.accion == AccionGarantia::Volver) return;
+        switch (elegido.accion) {
+            case AccionGarantia::Registrar: garantiaRegistrarUI(); break;
+            case AccionGarantia::Reclamar:  reclamoRegistrarUI(); break;
+            case AccionGarantia::Finalizar: reclamoFinalizarUI(); break;
+            case AccionGarantia::Consultar: consultarGarantiasUI(); break;
+            case AccionGarantia::Volver:    break;
+        }
+        pausar();
+    }
 }
 
 static void historialVentaUI() {

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Planes/Observaciones futuras SQL.md",
+                "file": "file:/home/balbuena/Desktop/Proyecto final en c/Entrevista genérica - manejo de finanzas.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Observaciones futuras SQL"
+              "title": "Entrevista genérica - manejo de finanzas"
             }
           }
         ]
@@ -191,6 +191,7 @@
   },
   "active": "424c5aab7ff77227",
   "lastOpenFiles": [
+    "file:/home/balbuena/Desktop/Proyecto final en c/Entrevista genérica - manejo de finanzas.md",
     "file:/home/balbuena/Desktop/Proyecto final en c/Acta de entrevista - FinanzasApp.md",
     "file:/home/balbuena/Desktop/BalbuTechApp/.agents/skills-main/Explicar_codigo.md",
     "Flujos/Flujo - Registrar producto.md",

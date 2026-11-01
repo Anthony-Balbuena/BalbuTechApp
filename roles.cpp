@@ -163,6 +163,8 @@ struct ItemMenu {
 
 // Orden fijo (el del menu historico de ADMIN): cada rol ve el subconjunto que
 // le permiten sus permisos. Agregar un modulo = agregar un item aca.
+// (30/10/2026) Ventas se abre tambien con los permisos de Garantias: si no,
+// CONTABILIDAD tendria GARANTIAS_CONSULTAR y no podria llegar a usarlo.
 static const vector<ItemMenu>& itemsMenuPrincipal() {
     static const vector<ItemMenu> items = {
         {"Asistencia",       {"REGISTRAR_ASISTENCIA", "CONSULTAR_ASISTENCIA",
@@ -184,7 +186,9 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Productos",        {"GESTIONAR_PRODUCTOS", "CONSULTAR_PRODUCTOS"}, AccionMenu::Productos},
         {"Metodos de pago",  {"METODOS_PAGO_VER", "METODOS_PAGO_CREAR",
                               "METODOS_PAGO_EDITAR", "METODOS_PAGO_ESTADO"}, AccionMenu::MetodosPago},
-        {"Ventas",           {"GESTIONAR_VENTAS"},                         AccionMenu::Ventas},
+        {"Ventas",           {"GESTIONAR_VENTAS", "GARANTIAS_REGISTRAR",
+                              "GARANTIAS_RECLAMAR", "GARANTIAS_FINALIZAR",
+                              "GARANTIAS_CONSULTAR"},                      AccionMenu::Ventas},
         {"Compras",          {"COMPRAS_VER", "COMPRAS_REGISTRAR", "COMPRAS_PAGAR",
                               "COMPRAS_CANCELAR", "COMPRAS_DEVOLVER", "COMPRAS_REPORTES"}, AccionMenu::Compras},
         {"Inventario",       {"INVENTARIO_VER", "INVENTARIO_AJUSTAR",
