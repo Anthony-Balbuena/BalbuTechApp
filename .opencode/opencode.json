@@ -1,0 +1,56 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/anthropic/claude-opus-5.5",
+  "instructions": [".opencode/instructions/cost-policy.md"],
+  "agent": {
+    "gentle-orchestrator": {
+      "model": "openrouter/anthropic/claude-opus-5.5",
+      "permission": {
+        "question": "allow",
+        "task": "deny"
+      }
+    },
+    "sdd-design": {
+      "model": "openrouter/anthropic/claude-opus-5.5"
+    },
+    "sdd-apply": {
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813"
+    },
+    "explore": {
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813"
+    },
+    "general": {
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813"
+    },
+    "sdd-verify": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-risk": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-resilience": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-readability": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-reliability": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-refuter": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "review-validator": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "jd-judge-a": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "jd-judge-b": {
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "jd-fix-agent": {
+      "model": "openrouter/deepseek/deepseek-v4-pro-0813"
+    }
+  }
+}
