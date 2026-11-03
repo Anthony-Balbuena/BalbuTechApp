@@ -327,18 +327,20 @@ static void pagarVenta(const CierreVenta &c) {
 static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
     CierreVenta out;
     if (carrito.empty()) return out;
-    int idEmp = 0, idCli = 0, idVenta = 0;
+    int idEmp = sesionActual.idEmpleado, idCli = 0, idVenta = 0;
+    if (idEmp <= 0) {
+        cout << ROJO << "La sesión no tiene un empleado asociado." << RESET << endl;
+        return out;
+    }
     try {
         bool iniciada = false;
         for (int intento = 1; intento <= MAX_INTENTOS && !iniciada; ++intento) {
             try {
-                string empStr = leerDatoSeguro("ID empleado: ");
                 string cliStr = leerDatoSeguro("ID cliente: ");
-                if (!esNumerico(empStr) || !esNumerico(cliStr)) {
-                    cout << ROJO << "IDs invalidos (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                if (!esNumerico(cliStr)) {
+                    cout << ROJO << "ID cliente invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
                     continue;
                 }
-                idEmp = stoi(empStr);
                 idCli = stoi(cliStr);
 
                 std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());

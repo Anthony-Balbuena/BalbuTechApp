@@ -72,3 +72,15 @@ echo "Verifica rutinas con: bash db/check-app-sps.sh"
 echo "Tablas en $DB_NAME:"
 mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
   --database="$DB_NAME" -e "SHOW TABLES;"
+
+# (03/11/2026) Los CREATE PROCEDURE de los modulos no traen la guarda de
+# permisos: se inyecta despues de importar y ANTES de dar el import por bueno.
+# Sin este paso, reimportar un modulo deja sus SPs sin control.
+if [ -f db/injectar-guardas.py ]; then
+  echo "Inyectando guardas de permiso en $DB_NAME ..."
+  if ! python3 db/injectar-guardas.py "$DB_NAME" --aplicar; then
+    echo "ERROR: no se pudieron inyectar las guardas de permiso." >&2
+    exit 1
+  fi
+  echo "Verifica cobertura con: DB_NAME=$DB_NAME bash db/check-app-sps.sh"
+fi

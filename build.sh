@@ -1,6 +1,6 @@
 #!/bin/bash
 # Compilacion directa con g++ (sin CMake).
-# Glob *.cpp: incluye automaticamente archivos nuevos (ej. autenticacion.cpp).
+# Glob *.cpp: incluye automaticamente cualquier archivo nuevo de la raiz.
 # Conector: prefiere el C++ 8 en ~/conectores (funciona sin sudo y exige
 # C++17); si no esta, usa el del sistema. OJO: el conector 1.1 del sistema
 # corrompe al LEER strings de mas de 64 bytes (ej. el hash) y sus headers

@@ -5,8 +5,10 @@
 # sin pedir el ID a mano.
 # Uso local:
 #   DB_HOST=127.0.0.1 DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root \
-#   DB_ADMIN_PASSWORD=<clave-admin> BALBU_PASS=<clave-app> bash db/test-asistencia-propia.sh
+#   DB_ADMIN_PASSWORD=<clave-admin> BALBU_ALLOW_DEV_LOGIN=1 \
+#   BALBU_PASS=<clave-app> bash db/test-asistencia-propia.sh
 set -u
+export BALBU_ALLOW_DEV_LOGIN=1
 
 APP="${APP:-./output/app}"
 LIMITE="${LIMITE:-5}"

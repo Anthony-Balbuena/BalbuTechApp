@@ -6,8 +6,9 @@
 #
 # Uso:  DB_HOST=127.0.0.1 DB_NAME=BALBU_TECH_TEST bash db/test-login-eof.sh
 # Necesita una base ya importada (db/import.sh) y el binario compilado.
-# No usa BALBU_USER/BALBU_PASS a proposito: el atajo de desarrollo saltea el
-# login y este test tiene que entrar por el camino interactivo.
+# No usa BALBU_USER/BALBU_PASS a proposito: el atajo de desarrollo
+# (BALBU_ALLOW_DEV_LOGIN=1 + credenciales) saltea el login y este test tiene
+# que entrar por el camino interactivo.
 set -u
 
 APP="${APP:-./output/app}"
@@ -15,7 +16,7 @@ LIMITE="${LIMITE:-5}"
 
 DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-3306}"
-DB_NAME="${DB_NAME:-BALBU_TECH}"
+DB_NAME="${DB_NAME:-BALBU_TECH_TEST}"
 DB_USER="${DB_ADMIN_USER:-balbu_admin}"
 DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD (revisar .env)}"
 

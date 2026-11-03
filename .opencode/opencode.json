@@ -2,13 +2,15 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "openrouter/anthropic/claude-opus-5.5",
   "instructions": [".opencode/instructions/cost-policy.md"],
-  "agent": {
+  "agents": {
     "gentle-orchestrator": {
       "model": "openrouter/anthropic/claude-opus-5.5",
-      "permission": {
-        "question": "allow",
-        "task": "deny"
-      }
+      "permissions": [
+        { "action": "question", "resource": "*", "effect": "allow" },
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "general", "effect": "allow" },
+        { "action": "subagent", "resource": "qa", "effect": "allow" }
+      ]
     },
     "sdd-design": {
       "model": "openrouter/anthropic/claude-opus-5.5"

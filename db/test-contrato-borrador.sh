@@ -15,10 +15,12 @@
 #
 # Uso:
 #   DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave> \
-#   BALBU_USER=<usuario> BALBU_PASS=<clave> bash db/test-contrato-borrador.sh
+#   BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=<usuario> BALBU_PASS=<clave> \
+#   bash db/test-contrato-borrador.sh
 # El repo no guarda credenciales y este test ESCRIBE: solo corre contra
 # BALBU_TECH_TEST. Usa cedulas marcador 302998878xx y las borra al salir.
 set -u
+export BALBU_ALLOW_DEV_LOGIN=1
 
 APP="${APP:-./output/app}"
 LIMITE="${LIMITE:-8}"          # segundos antes de declarar "colgado"

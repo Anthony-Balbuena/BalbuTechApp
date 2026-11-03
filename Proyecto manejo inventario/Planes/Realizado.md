@@ -940,10 +940,11 @@ que daban la viva por migrada quedan superadas por esta.
   (574 KB, dump completo). Los 6 triggers y las 3 vistas quedan sobre
   `VW_VENTA_NETA`. La devolucion existente (30.00) ahora se descuenta: el
   bruto del periodo pasa de 766514.90 a 766484.90, diferencia exacta 30.00.
-- `db/seed-admin.sh` ya no trae `admin123`: exige el segundo argumento o
+- `db/seed-admin.sh` ya no trae una clave fija: exige el segundo argumento o
   `BALBU_PASS`, con mínimo 8 caracteres. En TEST se probó el ciclo completo
-  (seed -> SHA256 -> login -> PBKDF2, clave mala rechazada) y se restauró a
-  `admin123`. La viva se rotó con una clave de 24 caracteres (backup
+  (seed -> SHA256 -> login -> PBKDF2, clave mala rechazada) y se restauró con
+  una clave de prueba que no se guarda en el repo. La viva se rotó con una
+  clave de 24 caracteres (backup
   `110-antes-clave-admin-20261029_144621.sql`) y el login quedó en PBKDF2.
 - Ojo al correr el seed: toma `DB_NAME` del entorno del contenedor
   (`BALBU_TECH`); para TEST hay que exportar `DB_NAME=BALBU_TECH_TEST`.
@@ -1035,3 +1036,133 @@ que daban la viva por migrada quedan superadas por esta.
   despliegue: backup → `63` → binario → `62`. El binario viejo llama a las
   firmas viejas, así que el `63` va antes; y el `62` va después del binario o
   Garantías desaparece del menú hasta desplegar.
+
+### 03/11 — Auditoría completa, T1, rotación de credenciales y seguridad T2
+
+**Auditoría.** Se revisó el proyecto entero y se dejaron 23 hallazgos clasificados
+por severidad en `Auditoria/Auditoria Opus - 03-11-2026.md`. Cada uno con
+evidencia (archivo y línea) y el fix propuesto. Lo que siguió en el día salió de
+ahí.
+
+**T1 — lo barato y de impacto alto.**
+
+- `seguridad.cpp`/`.h`: `dinero()` usa `fixed` + `setprecision(2)`. Antes el
+  redondeo dependía del default y salían montos con un decimal.
+- `main.cpp`: el atajo de desarrollo por `BALBU_USER`/`BALBU_PASS` ahora exige
+  `BALBU_ALLOW_DEV_LOGIN=1`. Sin esa bandera las variables no saltean el login.
+  `BALBU_PASS` sigue teniendo que ser la clave real: `intentarLogin()` la valida.
+- `ventas.cpp` y `compras.cpp`: la venta y la compra usan
+  `sesionActual.idEmpleado` en vez de pedir el ID a mano. Una sesión con
+  `idEmpleado <= 0` se rechaza.
+- `seguridad.cpp`: `leerPassword()` con `_getch` en Windows y `termios` en Linux.
+  `main.cpp` la usa; la clave ya no queda en pantalla ni en el historial.
+- `autenticacion.cpp` borrado con `git rm`: tenía credenciales hardcodeadas y
+  `build.sh` lo compilaba.
+- Cinco scripts de test actualizados con `BALBU_ALLOW_DEV_LOGIN=1`;
+  `test-login-eof.sh` corregido para apuntar a `BALBU_TECH_TEST`.
+- `PENDIENTES.md` y `Realizado.md` sin credenciales literales.
+
+**Credenciales.** Revisión de todo lo que había en el repo y en `.env`. Se rotó
+la clave del admin de `BALBU_TECH_TEST` (backup
+`backups/balbu_test_antes_clave_admin_20261103_145651.sql`), verificada por
+login real. La clave nueva quedó en `~/.balbu/` con ACL restringida al usuario,
+nunca en el repo. La de `root` local (`linux01`) se dejó como estaba por decisión
+explícita.
+
+**T2 — bloqueo por fuerza bruta (módulo 64).**
+
+- `modulos/64- SEGURIDAD_T2.sql`: índice
+  `IX_LOG_ACCESOS_USUARIO_FECHA (USUARIO_INTENTADO, FECHA_ACCESO)` y
+  `FN_TIENE_PERMISO` recreada para devolver 0 con `ESTADO = 'INACTIVO'`. Antes
+  una cuenta desactivada seguía pasando el control de permisos.
+- Bloqueo de 5 fallos en 15 minutos. Un intento ya bloqueado **no** escribe en
+  `LOG_ACCESOS`: si escribiera, cada reintento correría la ventana y el bloqueo
+  no vencería nunca.
+- `EXPLAIN` en vivo: `range`, `rows = 1`.
+- `db/test-lockout.sh` (nuevo) cubre umbral, fila no escrita, vencimiento de la
+  ventana y `FN_TIENE_PERMISO` con `ESTADO`.
+
+**Los permisos eran solo el menú.** `balbu_app` tenía `SELECT/INSERT/UPDATE/DELETE`
+sobre todas las tablas: con la clave del `.env` cualquiera cambiaba su rol, leía
+sueldos o borraba ventas sin pasar por la app.
+
+- `db/grant-minimos.sql` + `db/aplicar-grants.sh` (corre con root) dejan a
+  `balbu_app` con `EXECUTE`, `SELECT` en 13 tablas, `SELECT` por columna en
+  `EMPLEADOS` (sin `SALARIO`), `USUARIOS` y `CONTRATOS`, y `UPDATE` solo de
+  `CONTRATOS.RUTA_DOCUMENTO`. `db/rollback-grants.sql` vuelve atrás.
+- Verificado como `balbu_app`: `UPDATE USUARIOS SET ID_ROL` → `1143`,
+  `SELECT SALARIO FROM EMPLEADOS` → `1143`, `DELETE FROM VENTAS` → `1142`.
+
+**La app ya no lee hashes (módulo 65).**
+
+- `modulos/65- LOGIN_SERVIDOR.sql`: `SECRETO_SISTEMA` guarda el pepper;
+  `USUARIOS` suma `SALT_LOGIN`, `ITER_LOGIN` y `CLAVE_SERVIDOR`. La app deriva
+  PBKDF2 y manda solo el derivado; `SP_LOGIN_AUTENTICAR` compara contra
+  `SHA2(pepper || derivado)`, aplica el bloqueo y escribe `LOG_ACCESOS`.
+- `seguridad.cpp`: `derivarClaveLogin()` con sal e iteraciones impuestas por el
+  servidor. `login.cpp` reescrito: dos llamadas, ninguna lectura de `USUARIOS`.
+- Los usuarios migran solos en su primer login (`CONTRASENA` queda en `NULL`).
+  `admin` y `j.feliz` siguen en el formato viejo hasta que entren; `afeliz` migró
+  en la viva el 03/11 a las 20:35 y quedó verificado.
+- Como `balbu_app` no puede leer `CONTRASENA` ni `SECRETO_SISTEMA`, un volcado
+  de la base sin el pepper no sirve para atacar claves offline.
+- `db/seed-admin.sh` ahora genera PBKDF2 con `python3` en vez de SHA256 sin sal.
+- `db/lib-clave-prueba.sh` (nuevo): los tests derivan la clave de `BALBU_PASS`
+  en vez de copiar el hash del admin, que desde el 65 puede estar en `NULL`.
+
+**El permiso ahora vale dentro de los SPs (módulo 66).**
+
+- `SESIONES`: el login emite un token de 64 caracteres, válido 12 horas.
+  La app lo deja en `@TOKEN_SESION`; `FN_USUARIO_SESION()` lo resuelve.
+- `PERMISO_POR_RUTINA` mapea rutina → permiso y tiene `EXIGIR` por fila.
+  `LOG_PERMISO_SP` deja la evidencia.
+- `SP_EXIGIR_PERMISO('RUTINA')` es el punto único de control. Con `EXIGIR = 0`
+  solo registra; con `EXIGIR = 1` corta. El interruptor global
+  `EXIGIR_PERMISO_SP` permite volver a modo auditoría sin redeploy.
+- `db/injectar-guardas.py` (nuevo) lee `SHOW CREATE`, inserta la guarda después
+  de los `DECLARE`, normaliza el `DEFINER` y recrea la rutina. Guarda los
+  originales en `/tmp` y restaura sola si una recreación falla.
+- Guardas inyectadas en **162 de 168** procedimientos (los 6 restantes son el
+  login y el propio control). **161 exigen**; `SP_CAMBIAR_CONTRASENA` queda sin
+  mapear a propósito.
+- `db/mapear-permisos.sql`: mapeo por patrón de nombre más correcciones
+  puntuales. Una rutina sin fila aparece como `SIN_MAPEO`.
+- `db/import.sh` reinyecta las guardas al final, y `db/check-app-sps.sh` **falla**
+  si falta cobertura. Sin eso, reimportar un módulo las borraba en silencio.
+- Prueba real: con token de VENDEDOR, `SP_LISTAR_METODOS_PAGO` pasa y
+  `SP_LISTAR_CATEGORIAS` se corta con `SIN PERMISO`, registrado en
+  `LOG_PERMISO_SP`. `db/test-permisos-sp.sh` (nuevo) lo automatiza.
+
+**La viva estaba atrasada.** Le faltaban los módulos `62` (permisos de
+garantías) y `63` (flujo de garantías), igual que a TEST. Sin el 62 el test de
+menús fallaba en Garantías y en "Ventas" de CONTABILIDAD. Se aplicaron `62`,
+`63`, `64`, `65` y `66` en las dos bases.
+
+**Bugs que aparecieron en el camino** (todos corregidos):
+
+- El recorte de grants mató el lockout **en silencio**: contaba `LOG_ACCESOS` con
+  un `SELECT` directo y el `catch` devolvía 0. El test seguía en verde porque
+  solo miraba el mensaje. Ahora el conteo vive en el SP y el test falla si la
+  app avisa que no pudo evaluar el bloqueo.
+- `REVOKE ALL PRIVILEGES ON db.*` **no limpia** los grants por columna: la app
+  seguía leyendo `CONTRASENA`. Hay que revocar a nivel de tabla, y
+  `aplicar-grants.sh` ahora valida el resultado en vez de confiar en el exit code.
+- `RETURN` no existe en procedimientos de MariaDB (solo en funciones).
+- Las guardas deben ir después de los `DECLARE` o el `CREATE` falla.
+- En la viva las rutinas eran `DEFINER=root@localhost` y `balbu_admin` no podía
+  recrearlas (falta `SUPER`). Hubo que dar `GRANT SELECT ON mysql.proc` al
+  usuario de mantenimiento para leer los cuerpos.
+
+**Verificación.**
+
+- TEST con la exigencia prendida: `check-app-sps` 102/0 con cobertura completa,
+  `test-permisos-sp` OK, `test-menus-por-rol` TODOS OK, `test-lockout` OK,
+  `test-login-servidor` OK, `test-login-eof` OK, `test-garantias` 11 OK / 0 FAIL,
+  `test-migracion-roles` OK.
+- Viva: `check-app-sps` 102/0, login con clave incorrecta responde normal,
+  `SELECT CONTRASENA` y `SELECT * FROM SECRETO_SISTEMA` como `balbu_app` dan
+  `1143` y `1142`.
+- Backups de la viva: `backups/balbu_tech_antes_t2_20261103_152050.sql`,
+  `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y
+  `backups/balbu_tech_antes_guardas_20261103_165608.sql`.
+- Todo quedó sin commitear: el commit lo hace el usuario.

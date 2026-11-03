@@ -4,10 +4,12 @@
 # usuario admin existente), corre la app con el atajo DEV y verifica que el
 # menu muestre exactamente las opciones que da la matriz de permisos.
 # Uso dentro del contenedor app:
-#   BALBU_PASS=<clave del admin> bash db/test-menus-por-rol.sh
+#   BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=<clave del admin> \
+#   bash db/test-menus-por-rol.sh
 # El repo no guarda credenciales: la clave se pasa por env. DB_* y
 # DB_ADMIN_* salen del .env del contenedor.
 set -u
+export BALBU_ALLOW_DEV_LOGIN=1
 
 APP="${APP:-./output/app}"
 LIMITE="${LIMITE:-5}"
@@ -45,9 +47,12 @@ limpiar() {
 }
 trap limpiar EXIT
 
-HASH=$(Q "SELECT CONTRASENA FROM USUARIOS WHERE USUARIO='$BALBU_USER';")
+# (03/11/2026) La clave de prueba se deriva de BALBU_PASS: desde el modulo 65
+# el admin puede tener CONTRASENA en NULL y copiarla ya no sirve.
+. "$(dirname "$0")/lib-clave-prueba.sh"
+HASH=$(clave_pbkdf2 "$BALBU_PASS")
 if [ -z "$HASH" ]; then
-    echo "No existe el usuario '$BALBU_USER' en $DB_NAME." >&2
+    echo "No se pudo derivar la clave de prueba para '$BALBU_USER'." >&2
     exit 1
 fi
 

@@ -13,6 +13,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "roles.h"
+#include "sesion.h"
 #include "tabla.h"
 #include "compras.h"
 
@@ -502,7 +503,11 @@ static void mostrarFacturaCompra(int idCompra) {
 static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int idProvFijo, bool pedirProv) {
     CierreCompra out;
     if (carrito.empty()) return out;
-    int idProv = idProvFijo, idEmp = 0, idCompra = 0;
+    int idProv = idProvFijo, idEmp = sesionActual.idEmpleado, idCompra = 0;
+    if (idEmp <= 0) {
+        cout << ROJO << "La sesión no tiene un empleado asociado." << RESET << endl;
+        return out;
+    }
     try {
         bool iniciada = false;
         for (int intento = 1; intento <= MAX_INTENTOS && !iniciada; ++intento) {
@@ -515,12 +520,6 @@ static CierreCompra cerrarCompraNucleo(const vector<LineaCompra> &carrito, int i
                     }
                     idProv = stoi(provStr);
                 }
-                string empStr = leerDatoSeguro("ID empleado: ");
-                if (!esNumerico(empStr)) {
-                    cout << ROJO << "ID invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
-                    continue;
-                }
-                idEmp = stoi(empStr);
 
                 std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
                 stmt->execute("CALL 19_SP_INICIAR_COMPRA(" + to_string(idProv) + ", " + to_string(idEmp) + ", @nc)");

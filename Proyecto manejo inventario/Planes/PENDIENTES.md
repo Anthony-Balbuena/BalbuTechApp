@@ -45,7 +45,7 @@ Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026:
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`). La viva quedó en 54 permisos / 197 pares el 27/10; le faltan el `62` y el `63`.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`, `64`, `65`, `66`). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 102/0 con cobertura de guardas completa en ambas bases.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
@@ -53,11 +53,16 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 |---|---|---|
 | `bash build.sh` | compila | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 99/0 |
-| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
-| `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
-| `BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-lockout.sh` | módulo 64: bloqueo por 5 fallos / 15 min, sin fila nueva al reintentar bloqueado, `FN_TIENE_PERMISO` con `ESTADO` e índice del log | OK |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-login-servidor.sh` | módulo 65: verificación en el servidor, migración automática al primer login, segundo login, clave mala y hash inaccesible para `balbu_app` | OK |
+| `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-permisos-sp.sh` | módulo 66: sin token rechaza, token de VENDEDOR pasa lo suyo y se corta en lo ajeno, rechazo registrado | OK |
+| `DB_NAME=BALBU_TECH_TEST bash db/test-login-eof.sh` | login con entrada agotada (no gira ni ensucia `LOG_ACCESOS`) | OK |
+| `docker compose cp db/grant-minimos.sql db:/tmp/ && docker compose cp db/aplicar-grants.sh db:/tmp/ && docker compose exec -T db bash /tmp/aplicar-grants.sh BALBU_TECH_TEST` | privilegios mínimos de `balbu_app` (solo `EXECUTE` + lecturas necesarias) | OK |
 
 **Manual, por área:**
 
@@ -67,7 +72,8 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 - [ ] GERENTE ve **16** y **no** aparecen Roles ni Usuarios.
 - [ ] SUBGERENTE ve **16**, con Empleados (solo 3: buscar, listar, volver) y Asistencia (7, con Justificar).
 - [ ] RRHH ve **6**; VENDEDOR **10**; ALMACEN **11**; CONTABILIDAD **5**.
-- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`).
+- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`). Desde el módulo 64 `FN_TIENE_PERMISO` también devuelve 0 para esa cuenta.
+- [ ] **Bloqueo por fuerza bruta (módulo 64):** cinco fallos del mismo usuario dentro de 15 minutos cierran el acceso con el aviso `Cuenta bloqueada por intentos fallidos`. Cerrar y reabrir la app **no** reinicia el contador. Un intento bloqueado **no** agrega filas en `LOG_ACCESOS` (si agregara, la ventana se correría sola y el bloqueo no vencería nunca). Pasados los 15 minutos, la clave correcta vuelve a entrar.
 - [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos que le quedan de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
 - [ ] Al reingresar después de quitar los permisos, la opción sigue ausente.
 
@@ -229,6 +235,13 @@ respaldo para ventas viejas.
 
 ### 9. Bugs y deuda con impacto
 
+- [x] **Los permisos eran solo el menú (A6 de la auditoría)** — 03/11/2026: `balbu_app` tenía `SELECT/INSERT/UPDATE/DELETE` sobre todas las tablas, así que cualquier cliente con la clave del `.env` cambiaba roles, leía sueldos o borraba ventas sin pasar por el menú. Ahora solo tiene `EXECUTE`, lecturas puntuales y `UPDATE` a nivel de columna de `CONTRATOS.RUTA_DOCUMENTO`. Script: `db/grant-minimos.sql` + `db/aplicar-grants.sh` (corre con root). Rollback: `db/rollback-grants.sql`. Aplicado en TEST y en la viva.
+- [x] **Los hashes ya no son legibles por la app** — 03/11/2026, módulo `65- LOGIN_SERVIDOR.sql`: la verificación PBKDF2 se movió al servidor (`SP_LOGIN_PARAMETROS` + `SP_LOGIN_AUTENTICAR`). La app deriva y manda solo el derivado; el valor guardado es `SHA2(pepper || derivado)` y el pepper vive en `SECRETO_SISTEMA`, sin grants para `balbu_app`. Los usuarios migran solos en el primer login (`CONTRASENA` → NULL). `SELECT CONTRASENA` y `SELECT * FROM SECRETO_SISTEMA` como `balbu_app` fallan con `1143`/`1142`. Regresión: `db/test-login-servidor.sh`.
+- [x] **El permiso se valida dentro de los SPs** — 03/11/2026, módulo `66- SESIONES_GUARDAS.sql`: el login emite un token (`SESIONES`) y la app lo deja en `@TOKEN_SESION`; `FN_USUARIO_SESION()` lo resuelve y `SP_EXIGIR_PERMISO('RUTINA')` corta si el rol no tiene el permiso de `PERMISO_POR_RUTINA`. Guardas inyectadas en 162 procedimientos con `db/injectar-guardas.py` (se reaplica solo al final de `db/import.sh`). 161 exigen; `SP_CAMBIAR_CONTRASENA` queda sin mapear a propósito. Regresión: `db/test-permisos-sp.sh`. Pendiente menor: el token dura 12 h y no se renueva por actividad.
+- [ ] **`SP_CAMBIAR_CONTRASENA` sin permiso asignado** — hay que decidir si es autoservicio (cualquiera cambia la suya) o `USUARIOS_CLAVE`. Hasta entonces no exige.
+- [ ] **`CONTRATOS.SALARIO` sigue legible** — el flujo de contratos pendientes lo lee directo. Si se quiere cerrar, hay que pasarlo a un SP.
+- [ ] **`balbu_app` tiene grants sobre `BALBU_TECH_TEST` en el servidor de producción** — no hace falta ahí; quitarlo cuando el test deje de correr contra la misma instancia.
+
 - [ ] **Venta multi-línea atómica** (P-4 de la auditoría).
 - [ ] **P-3 validaciones**: 8 errores pintados en verde, advertencia de precio descartada y monto de la liquidación tomado del cliente.
 - [x] **Costo fantasma al cancelar una compra** — cerrado el 29/10/2026: `FN_COSTO_COMPRA_VIGENTE` y `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` están en TEST y en la viva; 0 discrepancias reales en ambas.
@@ -297,13 +310,13 @@ respaldo para ventas viejas.
 DB_HOST=127.0.0.1 bash db/check-app-sps.sh
 
 # Menús por rol (sobre TEST)
-BALBU_PASS='<clave-admin>' DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh
+BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS='<clave-admin>' DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh
 
 # Contrato: UI
-DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=linux01 BALBU_USER=admin BALBU_PASS=admin123 bash db/test-contrato-borrador.sh
+DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=admin BALBU_PASS=<clave-admin> bash db/test-contrato-borrador.sh
 
 # Contratos: SQL
-DB_PASSWORD=linux01 DB_NAME=BALBU_TECH_TEST bash db/test-contratos-subir.sh
+DB_PASSWORD=<clave-root> DB_NAME=BALBU_TECH_TEST bash db/test-contratos-subir.sh
 ```
 
 ---

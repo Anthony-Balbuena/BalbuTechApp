@@ -22,24 +22,16 @@ static string truncarUtf8(const string& texto, size_t maxBytes) {
     return texto.substr(0, corte);
 }
 
-// (21/10/2026) Deja el intento en LOG_ACCESOS. Nunca debe tumbar el login:
-// si el log falla, se ignora y el acceso sigue su curso.
-static void registrarAcceso(int idUsuario, const string& usuario, const char* estado) {
-    if (globalCon == nullptr) return;
-    try {
-        unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
-            "CALL SP_REGISTRAR_ACCESO(?, ?, ?)"));
-        if (idUsuario > 0) p->setInt(1, idUsuario);
-        else p->setNull(1, sql::DataType::INTEGER);
-        p->setString(2, usuario.empty() ? "(vacio)" : truncarUtf8(usuario, 50));
-        p->setString(3, estado);
-        p->execute();
-        drenarResultados(p.get());
-    } catch (...) {
-    }
-}
+// (03/11/2026) La verificacion de la clave vive en el servidor:
+//   SP_LOGIN_PARAMETROS  -> sal e iteraciones (nada secreto)
+//   SP_LOGIN_AUTENTICAR  -> compara, aplica el bloqueo y escribe LOG_ACCESOS
+// El cliente deriva PBKDF2 y manda solo el derivado; el hash nunca sale de la
+// base, asi que un volcado de USUARIOS sin el pepper no sirve para atacar
+// offline. El bloqueo tambien es del servidor: llamar al SP desde un cliente
+// SQL no lo saltea.
+bool intentarLogin(const string& usuario, const string& password, int* minutosBloqueo) {
+    if (minutosBloqueo != nullptr) *minutosBloqueo = 0;
 
-bool intentarLogin(const string& usuario, const string& password) {
     if (globalCon == nullptr) {
         cout << "[!] No hay conexión activa a la base de datos." << endl;
         return false;
@@ -52,80 +44,95 @@ bool intentarLogin(const string& usuario, const string& password) {
     }
 
     try {
-        // 1) Intentar autenticación en la tabla USUARIOS (esquema unificado)
-        std::unique_ptr<sql::PreparedStatement> pSelect(globalCon->prepareStatement(
-            "SELECT U.ID_USUARIO, U.ID_EMPLEADO, U.USUARIO, U.CONTRASENA, U.ESTADO, R.ID_ROL, R.NOMBRE_ROL "
-            "FROM USUARIOS U LEFT JOIN ROLES R ON U.ID_ROL = R.ID_ROL "
-            "WHERE U.USUARIO = ?"
-        ));
-        pSelect->setString(1, usuario);
-        std::unique_ptr<sql::ResultSet> rsel(pSelect->executeQuery());
+        // 1) Parametros de derivacion. Si la cuenta no existe, el SP devuelve
+        // una sal fija para derivar igual y no delatar por tiempo.
+        string sal;
+        string formato;
+        int iter = 0;
+        {
+            unique_ptr<sql::PreparedStatement> pPar(globalCon->prepareStatement(
+                "CALL SP_LOGIN_PARAMETROS(?)"));
+            pPar->setString(1, truncarUtf8(usuario, 50));
 
-        if (rsel->next()) {
-            string storedHash = rsel->getString("CONTRASENA");
-            string estadoCuenta = rsel->getString("ESTADO");
-            int idUsuario = rsel->getInt("ID_USUARIO");
-            int idEmpleado = rsel->getInt("ID_EMPLEADO");
-            string rol;
-            try { rol = rsel->getString("NOMBRE_ROL"); } catch (...) { rol = ""; }
-            int idRol = 0;
-            try { idRol = rsel->isNull("ID_ROL") ? 0 : rsel->getInt("ID_ROL"); } catch (...) { idRol = 0; }
-
-            // Cerrar el SELECT antes de cualquier otra query: si el UPDATE
-            // de rehash corre con esto abierto, la conexion queda
-            // desincronizada ("Commands out of sync") y todo lo posterior falla.
-            rsel.reset();
-            drenarResultados(pSelect.get());
-
-            string rehash;
-            bool ok = verificarPassword(password, storedHash, &rehash);
-            if (ok && estadoCuenta == "ACTIVO") {
-                // Si hubo rehash, actualizamos la BD al formato PBKDF2
-                if (!rehash.empty()) {
-                    try {
-                        std::unique_ptr<sql::PreparedStatement> pUpd(globalCon->prepareStatement(
-                            "UPDATE USUARIOS SET CONTRASENA = ? WHERE ID_USUARIO = ?"
-                        ));
-                        pUpd->setString(1, rehash);
-                        pUpd->setInt(2, idUsuario);
-                        pUpd->executeUpdate();
-                    } catch (...) {
-                        // no fatales: continuamos con la sesión aun si no se pudo actualizar
-                    }
-                }
-
-                registrarAcceso(idUsuario, usuario, "EXITOSO");
-                guardarSesion(idUsuario, idEmpleado, usuario, idRol, rol, estadoCuenta);
-
-                // (25/10/2026) Deja el id en la conexion para que el trigger
-                // TRG_AUDITORIA_USUARIOS sepa quien hizo cada cambio.
-                try {
-                    std::unique_ptr<sql::PreparedStatement> pSet(globalCon->prepareStatement(
-                        "SET @ID_USUARIO_ACTUAL = ?"
-                    ));
-                    pSet->setInt(1, idUsuario);
-                    pSet->execute();
-                    drenarResultados(pSet.get());
-                } catch (...) {
-                    // no fatal: el login sigue aunque no se pueda setear
-                }
-
-                return true;
+            unique_ptr<sql::ResultSet> rp(pPar->executeQuery());
+            if (rp->next()) {
+                if (!rp->isNull("SAL")) sal = rp->getString("SAL");
+                iter = rp->getInt("ITER");
+                formato = rp->getString("FORMATO");
             }
+            rp.reset();
+            drenarResultados(pPar.get());
+        }
 
-            registrarAcceso(idUsuario, usuario, ok ? "INACTIVO" : "FALLIDO");
+        // 2) Credencial derivada en el cliente. El formato SHA256 solo existe
+        // para una base sembrada con un script viejo; se migra al primer login.
+        string credencial;
+        if (formato == "SHA256") {
+            credencial = aplicarHash(password);
+        } else if (!derivarClaveLogin(password, sal, iter, credencial)) {
+            cout << ROJO << "[!] No se pudo derivar la clave de acceso." << RESET << endl;
             return false;
         }
 
-        // No encontrado: el SELECT ya no hace falta y el intento queda en el log.
-        rsel.reset();
-        drenarResultados(pSelect.get());
-        registrarAcceso(0, usuario, "FALLIDO");
-        return false;
+        // 3) Verificacion, bloqueo y registro: todo del lado del servidor.
+        string resultado;
+        string estado;
+        string rol;
+        string token;
+        int idUsuario = 0;
+        int idEmpleado = 0;
+        int idRol = 0;
+        int minutos = 0;
+        {
+            unique_ptr<sql::PreparedStatement> pAuth(globalCon->prepareStatement(
+                "CALL SP_LOGIN_AUTENTICAR(?, ?)"));
+            pAuth->setString(1, truncarUtf8(usuario, 50));
+            pAuth->setString(2, credencial);
+
+            unique_ptr<sql::ResultSet> ra(pAuth->executeQuery());
+            if (ra->next()) {
+                resultado = ra->getString("RESULTADO");
+                minutos = ra->getInt("MINUTOS");
+                if (!ra->isNull("ID_USUARIO")) idUsuario = ra->getInt("ID_USUARIO");
+                if (!ra->isNull("ID_EMPLEADO")) idEmpleado = ra->getInt("ID_EMPLEADO");
+                if (!ra->isNull("ESTADO_BD")) estado = ra->getString("ESTADO_BD");
+                if (!ra->isNull("ID_ROL")) idRol = ra->getInt("ID_ROL");
+                if (!ra->isNull("NOMBRE_ROL")) rol = ra->getString("NOMBRE_ROL");
+                if (!ra->isNull("TOKEN")) token = ra->getString("TOKEN");
+            }
+            ra.reset();
+            drenarResultados(pAuth.get());
+        }
+
+        if (resultado == "BLOQUEADO") {
+            if (minutosBloqueo != nullptr) *minutosBloqueo = minutos;
+            return false;
+        }
+        if (resultado != "OK") {
+            return false;
+        }
+
+        guardarSesion(idUsuario, idEmpleado, usuario, idRol, rol, estado);
+        guardarTokenSesion(token);
+
+        // (03/11/2026) El token y el actor de auditoria viajan en la conexion.
+        // El token no se puede inventar: solo existen los que emitio el login,
+        // y SP_EXIGIR_PERMISO los valida en cada rutina.
+        try {
+            unique_ptr<sql::PreparedStatement> pSet(globalCon->prepareStatement(
+                "SET @ID_USUARIO_ACTUAL = ?, @TOKEN_SESION = ?"));
+            pSet->setInt(1, idUsuario);
+            pSet->setString(2, token);
+            pSet->execute();
+            drenarResultados(pSet.get());
+        } catch (...) {
+            // no fatal: el login sigue aunque no se pueda setear
+        }
+
+        return true;
 
     } catch (const exception &e) {
         cout << ROJO << "[!] Error al intentar iniciar sesión: " << RESET << e.what() << endl;
         return false;
     }
 }
-

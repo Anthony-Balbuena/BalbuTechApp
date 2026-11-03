@@ -47,7 +47,7 @@ si** el empleado 1 existe y todavía no tiene cuenta. Si no, devuelve
 
 ### `SP_GET_USUARIO_LOGIN(P_USUARIO)`
 
-**Usada por la app** (`autenticacion.cpp`). Devuelve
+**Sin uso en la app actual.** La usaba `autenticacion.cpp` (eliminado el 03/11/2026); hoy `login.cpp` hace el `SELECT` directo sobre `USUARIOS`. Devuelve
 `ID_USUARIO, CONTRASENA (hash), NOMBRE_ROL` **solo si la cuenta está
 `ACTIVO`**. La app compara el hash; la base no ve la clave en claro.
 
@@ -98,7 +98,7 @@ Si no → `ERROR: USUARIO NO ENCONTRADO O CLAVE ACTUAL INCORRECTA.` Devuelve
 
 **La app no la llama.** Login por hash en un solo SP: devuelve una fila
 `ESTADO = 'EXITO'` con `ROL` e `ID_USUARIO`, o `ESTADO = 'ERROR'` con `NULL`s.
-La app usa `SP_GET_USUARIO_LOGIN` y compara del lado C++.
+La app ya no usa esta ruta: `login.cpp` consulta `USUARIOS` directo y compara del lado C++.
 
 ### `PARA_INSERTAR_USUARIOS()`
 

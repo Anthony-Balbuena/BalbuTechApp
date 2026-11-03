@@ -6,11 +6,14 @@
 # asi que el siguiente ">>" falla al instante y la opcion nunca vale la de
 # salida. El caso real llego a generar un log de 35M lineas.
 #
-# Uso:  BALBU_USER=<usuario> BALBU_PASS=<clave> bash db/test-menus-eof.sh
+# Uso:  BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=<usuario> BALBU_PASS=<clave> \
+#       bash db/test-menus-eof.sh
 # El repo no guarda credenciales: hay que exportarlas, mismo criterio que
 # db/test-contratos-subir.sh con DB_PASSWORD. Se usan para el atajo de dev
-# de main.cpp (BALBU_USER/BALBU_PASS), que saltea el login y entra al menu.
+# de main.cpp (BALBU_ALLOW_DEV_LOGIN=1 + BALBU_USER/BALBU_PASS), que saltea
+# el login y entra al menu.
 set -u
+export BALBU_ALLOW_DEV_LOGIN=1
 
 APP="${APP:-./output/app}"
 LIMITE="${LIMITE:-5}"          # segundos antes de declarar "colgado"

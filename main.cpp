@@ -28,12 +28,15 @@ int main() {
     cout << MAGENTA << "\n=== BALBU_TECH ===" << RESET << endl;
    inicializarSesion();
 
-    // (10/10/2026) SOLO PRUEBAS: si existen BALBU_USER y BALBU_PASS, entra
-    // directo sin pedir nada. La clave vive en TU terminal, jamás en el repo.
-    // Uso: BALBU_USER=<usuario> BALBU_PASS=<clave> ./output/app
+    // (03/11/2026) SOLO PRUEBAS: el bypass exige BALBU_ALLOW_DEV_LOGIN=1.
+    // Sin esa bandera, BALBU_USER/BALBU_PASS no saltean el login.
+    // La clave vive en TU terminal, jamás en el repo.
+    // Uso: BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=<usuario> BALBU_PASS=<clave> ./output/app
+    const char* allowDev = std::getenv("BALBU_ALLOW_DEV_LOGIN");
     const char* devUser = std::getenv("BALBU_USER");
     const char* devPass = std::getenv("BALBU_PASS");
-    if (devUser && devUser[0] && devPass && devPass[0]
+    if (allowDev && std::string(allowDev) == "1"
+        && devUser && devUser[0] && devPass && devPass[0]
         && intentarLogin(devUser, devPass)) {
         cout << VERDE << "\nAcceso concedido [DEV]." << RESET << endl;
         cout << "Bienvenido/a: " << sesionActual.nombreUsuario << endl;
@@ -58,13 +61,13 @@ int main() {
             return 0;
         }
 
-        cout << AZUL << "Contraseña: " << RESET;
-        if (!getline(cin, password)) {
+        if (!leerPassword(AZUL + "Contraseña: " + RESET, password)) {
             cout << "\n[!] Entrada agotada. Saliendo del sistema..." << RESET << endl;
             return 0;
         }
 
-        if (intentarLogin(usuario, password)) {
+        int minutosBloqueo = 0;
+        if (intentarLogin(usuario, password, &minutosBloqueo)) {
             cout << VERDE << "\nAcceso concedido." << RESET << endl;
             cout << "Bienvenido/a: " << sesionActual.nombreUsuario << endl;
             cout << "Rol activo: " << sesionActual.nombreRol << endl;
@@ -72,6 +75,15 @@ int main() {
             cin.get();
 
             ejecutarMenuSegunRol();
+            return 0;
+        }
+
+        // (03/11/2026, T2) La cuenta quedo bloqueada por demasiados fallos:
+        // no es una credencial mas para reintentar en este proceso.
+        if (minutosBloqueo > 0) {
+            cout << ROJO << "Cuenta bloqueada por intentos fallidos. Reintente en "
+                 << minutosBloqueo << " minuto(s)." << RESET << endl;
+            cout << ROJO << "Acceso denegado. Saliendo del sistema..." << RESET << endl;
             return 0;
         }
 

@@ -140,6 +140,9 @@ SP_HISTORIAL_VACACIONES_EMPLEADO
 SP_SUBIR_CONTRATO
 SP_FINALIZAR_CONTRATO
 SP_CONTRATOS_POR_CEDULA
+SP_ESTADO_BLOQUEO_LOGIN
+SP_LOGIN_PARAMETROS
+SP_LOGIN_AUTENTICAR
 SPS
 
 if [ "$missing" -gt 0 ]; then
@@ -148,4 +151,26 @@ if [ "$missing" -gt 0 ]; then
   exit 1
 fi
 echo "Faltantes: 0 (verificados $checked)."
+
+# (03/11/2026) Cobertura de la guarda de permisos: si un modulo se reimporta o
+# se agrega un SP nuevo, aca se ve. Sin esto la guarda se pierde en silencio,
+# que es exactamente como se rompio el lockout cuando se recortaron grants.
+sin_guarda=$(Q "SELECT COUNT(*) FROM information_schema.ROUTINES
+                 WHERE ROUTINE_SCHEMA='$DB_NAME' AND ROUTINE_TYPE='PROCEDURE'
+                   AND ROUTINE_NAME NOT IN ('SP_EXIGIR_PERMISO','SP_LOGIN_PARAMETROS',
+                       'SP_LOGIN_AUTENTICAR','SP_CERRAR_SESION_SERVIDOR',
+                       'SP_REGISTRAR_ACCESO','SP_ESTADO_BLOQUEO_LOGIN')
+                   AND ROUTINE_DEFINITION NOT LIKE '%SP_EXIGIR_PERMISO%'")
+case "$sin_guarda" in
+  ''|*[!0-9]*)
+    echo "AVISO: no se pudo verificar la cobertura de guardas ('$sin_guarda')." >&2
+    exit 1
+    ;;
+  0) echo "Guardas de permiso: cobertura completa." ;;
+  *)
+    echo "FALTA la guarda en $sin_guarda procedimiento(s)." >&2
+    echo "  Corre: python3 db/injectar-guardas.py $DB_NAME --aplicar" >&2
+    exit 1
+    ;;
+esac
 exit 0

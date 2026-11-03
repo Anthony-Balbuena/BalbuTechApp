@@ -13,6 +13,14 @@
 #include <openssl/crypto.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
+#ifdef _WIN32
+#include <conio.h>
+#include <cstdio>
+#include <io.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+#endif
 
 using namespace std;
 
@@ -29,6 +37,54 @@ string leerDatoSeguro(const string& mensaje) {
     }
 
     return entrada;
+}
+
+// (03/11/2026) Lee una contraseña sin mostrarla en pantalla. Si stdin no es
+// una terminal (pipe/test), cae a getline. Devuelve false si la entrada se
+// agotó (Ctrl+D en Linux, Ctrl+Z en Windows).
+bool leerPassword(const string& mensaje, string& out) {
+    out.clear();
+    cout << mensaje;
+#ifdef _WIN32
+    if (!_isatty(_fileno(stdin))) {
+        return static_cast<bool>(getline(cin, out));
+    }
+    int c;
+    while ((c = _getch()) != '\r' && c != '\n') {
+        if (c == 3 || c == 26) {  // Ctrl+C / Ctrl+Z
+            cout << endl;
+            return false;
+        }
+        if (c == 0 || c == 224) {  // teclas extendidas (flechas, F1...)
+            _getch();
+            continue;
+        }
+        if (c == '\b') {
+            if (!out.empty()) out.pop_back();
+        } else {
+            out.push_back(static_cast<char>(c));
+        }
+    }
+    cout << endl;
+    return true;
+#else
+    if (!isatty(STDIN_FILENO)) {
+        return static_cast<bool>(getline(cin, out));
+    }
+    termios oldt{};
+    if (tcgetattr(STDIN_FILENO, &oldt) != 0) {
+        return static_cast<bool>(getline(cin, out));
+    }
+    termios noEcho = oldt;
+    noEcho.c_lflag &= ~static_cast<tcflag_t>(ECHO);
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &noEcho) != 0) {
+        return static_cast<bool>(getline(cin, out));
+    }
+    bool ok = static_cast<bool>(getline(cin, out));
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    cout << endl;
+    return ok;
+#endif
 }
 
 // (18/10/2026) Opcion de menu a prueba de EOF.
@@ -78,9 +134,9 @@ bool esNumerico(const string& texto) {
 }
 
 string dinero(double v) {
-    // Mismo formato que cout << double (sin forzar decimales).
+    // Formato monetario fijo: siempre dos decimales (ej: $75.50, $0.00).
     ostringstream o;
-    o << "$" << v;
+    o << "$" << fixed << setprecision(2) << v;
     return o.str();
 }
 
@@ -238,4 +294,23 @@ bool verificarPassword(const std::string &password, const std::string &stored, s
         }
         return false;
     }
+}
+
+// (03/11/2026) Derivacion con sal impuesta por el servidor. La sal y las
+// iteraciones no son secretas (viajan en SP_LOGIN_PARAMETROS); lo que se
+// protege es el resultado almacenado, que solo el servidor puede comparar.
+bool derivarClaveLogin(const string &password, const string &saltB64, int iter, string &outB64) {
+    if (iter <= 0) return false;
+    vector<unsigned char> salt = base64_decode(saltB64);
+    if (salt.empty()) return false;
+
+    const int DK_LEN = 32;
+    vector<unsigned char> dk(DK_LEN);
+    if (!PKCS5_PBKDF2_HMAC(password.c_str(), static_cast<int>(password.size()),
+                           salt.data(), static_cast<int>(salt.size()),
+                           iter, EVP_sha256(), DK_LEN, dk.data())) {
+        return false;
+    }
+    outB64 = base64_encode(dk.data(), DK_LEN);
+    return true;
 }

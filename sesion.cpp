@@ -5,7 +5,7 @@
 
 using namespace std;
 
-SesionActual sesionActual = {false, 0, 0, "", "", 0, "", ""};
+SesionActual sesionActual = {false, 0, 0, "", "", 0, "", "", ""};
 
 void inicializarSesion() {
     sesionActual.activa = false;
@@ -16,6 +16,7 @@ void inicializarSesion() {
     sesionActual.idRol = 0;
     sesionActual.nombreRol = "";
     sesionActual.estadoCuenta = "";
+    sesionActual.token = "";
 }
 
 void guardarSesion(int idUsuario, int idEmpleado, const string& username, int idRol, const string& rol, const string& estadoCuenta) {
@@ -29,7 +30,22 @@ void guardarSesion(int idUsuario, int idEmpleado, const string& username, int id
     sesionActual.estadoCuenta = estadoCuenta;
 }
 
+void guardarTokenSesion(const string& token) {
+    sesionActual.token = token;
+}
+
 void cerrarSesion() {
+    // (03/11/2026) Borra el token en el servidor antes de limpiar la conexion:
+    // asi la sesion no queda viva despues del logout.
+    if (globalCon != nullptr) {
+        try {
+            std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
+                "CALL SP_CERRAR_SESION_SERVIDOR()"));
+            ps->execute();
+            drenarResultados(ps.get());
+        } catch (...) {
+        }
+    }
     // (25/10/2026) Limpia el admin de la conexion: despues del logout no
     // queda ningun usuario como autor de un cambio.
     // (29/10/2026) Limpia tambien el empleado y el motivo del historial
@@ -37,7 +53,7 @@ void cerrarSesion() {
     if (globalCon != nullptr) {
         try {
             std::unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(
-                "SET @ID_USUARIO_ACTUAL = NULL, @ID_EMPLEADO_ACTUAL = NULL, @MOTIVO_CAMBIO = NULL"
+                "SET @ID_USUARIO_ACTUAL = NULL, @ID_EMPLEADO_ACTUAL = NULL, @MOTIVO_CAMBIO = NULL, @TOKEN_SESION = NULL"
             ));
             p->execute();
             drenarResultados(p.get());
