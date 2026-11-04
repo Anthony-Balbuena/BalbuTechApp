@@ -1166,3 +1166,41 @@ menús fallaba en Garantías y en "Ventas" de CONTABILIDAD. Se aplicaron `62`,
   `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y
   `backups/balbu_tech_antes_guardas_20261103_165608.sql`.
 - Todo quedó sin commitear: el commit lo hace el usuario.
+
+### 04/11 — El inyector de guardas partía los manejadores de error
+
+**Síntoma.** Después de correr `test-garantias`, `check-app-sps` decía "FALTA la
+guarda en 7 procedimiento(s)" aunque el inyector acababa de reportar "parcheados:
+7". Al revisar el test, `27_SP_FINALIZAR_RECLAMO_TOTAL` dejó de lanzar el error
+"SOLO SE CIERRAN RECLAMOS PENDIENTES O APROBADOS" y el test bajó de 11 OK / 0
+FAIL a 10 OK / 2 FAIL.
+
+**Causa.** `db/injectar-guardas.py` insertaba la guarda justo después del último
+`DECLARE`, sin entender que `DECLARE EXIT HANDLER FOR SQLEXCEPTION` va seguido de
+un bloque `BEGIN ... END;`. La línea `CALL SP_EXIGIR_PERMISO(...)` quedaba ENTRE
+el `DECLARE EXIT HANDLER` y su `BEGIN`, partiendo el manejador: el `SIGNAL`
+original se perdía y el procedimiento dejaba de fallar como debía.
+
+**Arreglo.** El inyector ahora consume el bloque completo del handler (cuenta
+`BEGIN`/`END` anidados) antes de insertar. Además, `test-garantias.sh` vuelve a
+correr el inyector después de reimportar el módulo 63, porque el import suelto
+reescribe los SPs sin guarda. Sin eso, cada corrida del test dejaba el esquema
+sin las 7 guardas.
+
+**Verificado en `BALBU_TECH_TEST`.** `test-garantias` 11 OK / 0 FAIL con los 3
+errores esperados vistos; `check-app-sps` "Guardas de permiso: cobertura
+completa"; `test-menus-por-rol`, `test-login-eof` y `test-migracion-roles` OK.
+Commit `f12113d`.
+
+**Estado de la exigencia de permisos.** El flag global `EXIGIR_PERMISO_SP` está
+en `0` en las dos bases (modo auditoría global). Pero la exigencia real la manda
+`PERMISO_POR_RUTINA.EXIGIR`: 161 rutinas tienen `EXIGIR = 1`, así que **ya
+bloquean** aunque el flag global esté apagado. El flag global solo decide qué
+pasa con rutinas sin mapeo o con `EXIGIR = 0` (hoy: `SP_CAMBIAR_CONTRASENA`).
+Las guardas no son decorativas: bloquean en la viva en cuanto haya sesión.
+
+**La viva no ha ejercitado las guardas todavía.** `SESIONES` en `BALBU_TECH` tiene
+0 filas y `LOG_PERMISO_SP` está vacía. El último acceso registrado es
+`2026-11-03 20:35:12` y el binario nuevo se compiló a las `20:46`; el contenedor
+arrancó el 4/11 a las 13:10. O sea: no ha habido un login exitoso con el binario
+que emite token. El primer login real es lo que falta para validar los flujos.
