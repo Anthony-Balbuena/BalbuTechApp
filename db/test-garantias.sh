@@ -27,6 +27,16 @@ if ! M < "modulos/63- GARANTIAS_FLUJO.sql" >/dev/null; then
     exit 1
 fi
 
+# (04/11/2026) Reimportar el modulo 63 reescribe sus SPs SIN la guarda de
+# permisos. Si no se repone, check-app-sps.sh falla despues del test con
+# "FALTA la guarda en 7". El inyector guarda dump de las originales antes de
+# tocar nada. Como el test conecta con DB_ADMIN_USER, la guarda no bloquea
+# sus llamadas (SP_EXIGIR_PERMISO exime a root/balbu_admin).
+if ! python3 db/injectar-guardas.py "$DB_NAME" --aplicar >/dev/null 2>&1; then
+    echo "FALLO: no se pudieron reinyectar las guardas tras importar el modulo 63" >&2
+    exit 1
+fi
+
 # --force: los casos "debe fallar" son errores esperados y el cliente tiene que
 # seguir hasta el ROLLBACK. La ausencia de la fila se verifica aparte.
 OUT=$(M --force <<'SQL'

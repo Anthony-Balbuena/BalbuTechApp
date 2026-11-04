@@ -103,15 +103,43 @@ def inyectar(create_sql, nombre):
 
     # Los DECLARE tienen que ir antes de cualquier sentencia: la guarda se
     # inserta despues del ultimo DECLARE del bloque, no pegada al BEGIN.
+    # (04/11/2026) DECLARE ... HANDLER FOR ... va seguido de un bloque
+    # BEGIN...END (o de una sentencia simple). Si solo se mira la palabra
+    # DECLARE, la guarda cae ENTRE el HANDLER y su BEGIN y parte el manejador:
+    # el error original se pierde y el procedimiento deja de fallar como debe.
+    # Hay que saltarse el bloque entero del handler antes de insertar.
     destino = inicio
-    for i in range(inicio + 1, len(lineas)):
+    i = inicio + 1
+    while i < len(lineas):
         limpia = lineas[i].strip()
-        if limpia.startswith("DECLARE"):
-            destino = i
-        elif limpia == "" or limpia.startswith("--"):
+        if limpia == "" or limpia.startswith("--"):
+            i += 1
             continue
-        else:
+        if not limpia.startswith("DECLARE"):
             break
+        destino = i
+        if " HANDLER " in limpia.upper():
+            j = i + 1
+            while j < len(lineas) and lineas[j].strip() == "":
+                j += 1
+            if j < len(lineas) and lineas[j].strip() == "BEGIN":
+                nivel = 1
+                j += 1
+                while j < len(lineas) and nivel > 0:
+                    s = lineas[j].strip()
+                    if s == "BEGIN" or s.endswith(": BEGIN") or s.startswith("BEGIN "):
+                        nivel += 1
+                    if s == "END;" or s == "END" or s.startswith("END;"):
+                        nivel -= 1
+                    j += 1
+                destino = j - 1
+                i = j
+                continue
+            else:
+                destino = j
+                i = j + 1
+                continue
+        i += 1
 
     lineas.insert(destino + 1, GUARDA.format(nombre=nombre).rstrip("\n"))
     return "\n".join(lineas)
