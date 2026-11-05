@@ -136,6 +136,19 @@ def inyectar(create_sql, nombre):
                 i = j
                 continue
             else:
+                # (05/11/2026) Handler de UNA sola sentencia, que puede ocupar
+                # varias lineas:
+                #     DECLARE EXIT HANDLER FOR 1020
+                #         SIGNAL SQLSTATE '45000'
+                #         SET MESSAGE_TEXT = '...';
+                # Antes se insertaba la guarda despues de la primera linea y el
+                # SIGNAL quedaba partido al medio (fallaba el CREATE con
+                # "SET MESSAGE_TEXT ... at line N"). Hay que consumir la
+                # sentencia entera hasta su punto y coma.
+                while j < len(lineas) and not lineas[j].strip().endswith(";"):
+                    j += 1
+                if j >= len(lineas):
+                    raise RuntimeError("handler sin ';' de cierre")
                 destino = j
                 i = j + 1
                 continue
