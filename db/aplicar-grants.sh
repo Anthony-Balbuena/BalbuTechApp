@@ -32,35 +32,57 @@ fi
 TMP="$(mktemp)"
 OUT="$(mktemp)"
 trap 'rm -f "$TMP" "$OUT"' EXIT
-sed "s/__DB__/$DB/g" "$SRC" > "$TMP"
 
-echo "Aplicando privilegios minimos a '$DB' ..."
-mariadb -uroot -p"$DB_ROOT_PASSWORD" --database="$DB" --force < "$TMP" > "$OUT" 2>&1
-
-# 1141: no habia privilegios de esquema que revocar.
-# 1147: no habia grant por columna/tabla que revocar.
-errors=$(grep -E "^ERROR" "$OUT" | grep -vE " 114[17] " || true)
-if [ -n "$errors" ]; then
-    echo "ERROR: fallaron sentencias del grant:" >&2
-    printf '%s\n' "$errors" >&2
+# (05/11/2026) MariaDB identifica la cuenta por usuario@host. En el contenedor
+# la app llega como 'balbu_app'@'%'; en una base local llega como
+# 'balbu_app'@'localhost' y esa cuenta es OTRA, con sus propios privilegios.
+# Endurecer solo '%' dejaba la puerta abierta en la que realmente se usa.
+HOSTS=$(mariadb -uroot -p"$DB_ROOT_PASSWORD" -N -e \
+    "SELECT Host FROM mysql.user WHERE User = 'balbu_app' ORDER BY Host" 2>/dev/null)
+if [ -z "$HOSTS" ]; then
+    echo "ERROR: no existe ninguna cuenta 'balbu_app' en el servidor." >&2
     exit 1
 fi
 
-GRANTS=$(mariadb -uroot -p"$DB_ROOT_PASSWORD" -N -e "SHOW GRANTS FOR 'balbu_app'@'%'")
+fallo=0
+for HOST in $HOSTS; do
+    echo "Aplicando privilegios minimos a '$DB' para 'balbu_app'@'$HOST' ..."
+    sed -e "s/__DB__/$DB/g" -e "s/__HOST__/$HOST/g" "$SRC" > "$TMP"
+    mariadb -uroot -p"$DB_ROOT_PASSWORD" --database="$DB" --force < "$TMP" > "$OUT" 2>&1
 
-if printf '%s\n' "$GRANTS" | grep -q "$DB\`\.\`USUARIOS\`.*CONTRASENA"; then
-    echo "ERROR: balbu_app conserva acceso a USUARIOS.CONTRASENA." >&2
-    exit 1
-fi
-if printf '%s\n' "$GRANTS" | grep -q "$DB\`\.\`SECRETO_SISTEMA\`"; then
-    echo "ERROR: balbu_app tiene acceso a SECRETO_SISTEMA (el pepper)." >&2
-    exit 1
-fi
-if printf '%s\n' "$GRANTS" | grep -qE "INSERT|DELETE|CREATE TEMPORARY|SHOW VIEW.*\`$DB\`"; then
-    echo "ERROR: balbu_app conserva privilegios de escritura amplios sobre $DB." >&2
-    printf '%s\n' "$GRANTS" | grep -E "INSERT|DELETE|CREATE TEMPORARY|SHOW VIEW" >&2
-    exit 1
-fi
+    # 1141: no habia privilegios de esquema que revocar.
+    # 1147: no habia grant por columna/tabla que revocar.
+    errors=$(grep -E "^ERROR" "$OUT" | grep -vE " 114[17] " || true)
+    if [ -n "$errors" ]; then
+        echo "ERROR: fallaron sentencias del grant para '$HOST':" >&2
+        printf '%s\n' "$errors" >&2
+        exit 1
+    fi
 
-echo "OK: privilegios de '$DB' recortados y verificados."
-printf '%s\n' "$GRANTS" | grep -F "\`$DB\`" | sed 's/^/  /'
+    GRANTS=$(mariadb -uroot -p"$DB_ROOT_PASSWORD" -N -e "SHOW GRANTS FOR 'balbu_app'@'$HOST'")
+
+    if printf '%s\n' "$GRANTS" | grep -q "$DB\`\.\`USUARIOS\`.*CONTRASENA"; then
+        echo "ERROR: balbu_app@'$HOST' conserva acceso a USUARIOS.CONTRASENA." >&2
+        fallo=1
+    fi
+    if printf '%s\n' "$GRANTS" | grep -q "$DB\`\.\`SECRETO_SISTEMA\`"; then
+        echo "ERROR: balbu_app@'$HOST' tiene acceso a SECRETO_SISTEMA (el pepper)." >&2
+        fallo=1
+    fi
+    # (05/11/2026) El chequeo miraba cualquier linea de SHOW GRANTS: si quedaban
+    # grants viejos sobre OTROS esquemas (BALBU_TECH_PRE, ...V92), reportaba error
+    # aunque $DB estuviera bien. Ahora filtra primero las lineas de $DB.
+    amplios=$(printf '%s\n' "$GRANTS" | grep -F "\`$DB\`" | grep -E "INSERT|DELETE|CREATE TEMPORARY|SHOW VIEW" || true)
+    if [ -n "$amplios" ]; then
+        echo "ERROR: balbu_app@'$HOST' conserva privilegios de escritura amplios sobre $DB." >&2
+        printf '%s\n' "$amplios" >&2
+        fallo=1
+    fi
+
+    if [ "$fallo" -eq 0 ]; then
+        echo "OK: privilegios de '$DB' recortados y verificados para '$HOST'."
+        printf '%s\n' "$GRANTS" | grep -F "\`$DB\`" | sed 's/^/  /'
+    fi
+done
+
+exit "$fallo"
