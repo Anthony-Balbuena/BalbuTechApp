@@ -1204,3 +1204,90 @@ Las guardas no son decorativas: bloquean en la viva en cuanto haya sesión.
 `2026-11-03 20:35:12` y el binario nuevo se compiló a las `20:46`; el contenedor
 arrancó el 4/11 a las 13:10. O sea: no ha habido un login exitoso con el binario
 que emite token. El primer login real es lo que falta para validar los flujos.
+
+### 05/11 — La base de casa (3306) alcanza a la del trabajo
+
+**Punto de partida.** En esta máquina el contenedor `db` está parado y no tiene
+volúmenes: la copia migrada el 03/11 solo existía en la base del trabajo (3307).
+La MariaDB local del **3306** estaba atrás: `BALBU_TECH` con 54 permisos y 197
+pares, sin `DIAS_GARANTIA`, sin `SESIONES`, sin `PERMISO_POR_RUTINA`, sin
+`LOG_PERMISO_SP` y sin `CLAVE_SERVIDOR`; `BALBU_TECH_TEST` tenía el 62 y el 63
+pero no el 64, 65 ni 66. `output/app` era del 30/10, sin token.
+
+**Backups previos** (con rutinas y triggers):
+`backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` (608 K) y
+`backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql` (616 K).
+
+**Aplicado en `BALBU_TECH`:** `63`, `64`, `65`, `66` y `62`, todos con exit 0.
+**En `BALBU_TECH_TEST`:** `64`, `65` y `66` (ya tenía 62 y 63). Después:
+`db/mapear-permisos.sql` en las dos, `db/injectar-guardas.py --aplicar` en las
+dos (TEST 162 parcheadas, TECH 170, 0 fallidos) y `db/aplicar-grants.sh` en las
+dos. `db/check-app-sps.sh`: **102/0 y "Guardas de permiso: cobertura completa"**
+en ambas. `bash build.sh`: `OK: ./output/app`.
+
+**Tres defectos que aparecieron acá y quedaron corregidos en `db/`:**
+
+1. `db/injectar-guardas.py` partía los handlers de **una sola sentencia**. El
+   arreglo del 04/11 cubría `DECLARE EXIT HANDLER ... BEGIN ... END;`, pero no
+   el formato `DECLARE EXIT HANDLER FOR 1020 / SIGNAL ... / SET MESSAGE_TEXT =
+   '...';` que usa `SP_AGREGAR_DETALLE_VENTA`: metía la guarda después de la
+   primera línea y rompía el `SIGNAL` (`SET MESSAGE_TEXT ... at line 24`). Ahora
+   consume la sentencia hasta su `;`. Con eso quedó 161/162 en TEST y 170/170
+   en la viva.
+2. `db/aplicar-grants.sh` daba falso error por grants viejos de **otros**
+   esquemas (`BALBU_TECH_PRE`, `BALBU_TECH_TEST_V92`): el chequeo de `INSERT`/
+   `DELETE` miraba cualquier línea de `SHOW GRANTS`. Ahora filtra primero las
+   líneas de `$DB`.
+3. **El más grave de los tres.** El recorte de privilegios solo endurecía
+   `'balbu_app'@'%'`, que es la cuenta del contenedor. Fuera del contenedor la
+   app entra como `'balbu_app'@'localhost'`, **otra cuenta**, que conservaba
+   `SELECT, INSERT, UPDATE, DELETE` sobre los cuatro esquemas: el recorte no
+   tenía efecto. `db/grant-minimos.sql` ahora recibe `__HOST__` y
+   `db/aplicar-grants.sh` recorre todas las cuentas `balbu_app` del servidor y
+   verifica cada una. Se detectó porque `test-login-servidor` fallaba en el
+   caso "balbu_app todavía puede leer `USUARIOS.CONTRASENA`" mientras el script
+   decía OK.
+
+**Rutinas sin mapeo.** En la viva quedaban dos que el heurístico no reconocía
+y con `EXIGIR = 1` habrían cortado la llamada: `11_SP_REGISTRAR_ENTRADA`
+(`REGISTRAR_ASISTENCIA`) y `SP_ELIMINAR_BONO` (`EMPLEADOS_EDITAR`, como
+`SP_ANULAR_BONO`). Se agregaron a las correcciones de `db/mapear-permisos.sql`.
+Queda sin mapeo solo `SP_CAMBIAR_CONTRASENA`, a propósito.
+
+**Exigencia prendida.** `EXIGIR = 1` en todas las rutinas mapeadas:
+**169 en `BALBU_TECH`** (170 filas, 1 sin permiso) y **161 en
+`BALBU_TECH_TEST`** (162 filas). El interruptor global
+`SECRETO_SISTEMA.EXIGIR_PERMISO_SP` sigue en 0, que es lo que corresponde: la
+exigencia la manda `PERMISO_POR_RUTINA.EXIGIR`.
+
+**Batería en `BALBU_TECH_TEST` con el binario nuevo:**
+
+| Test | Resultado |
+|---|---|
+| `test-garantias` | 11 OK, 0 FAIL (3 errores esperados vistos) |
+| `test-permisos-sp` | OK (sin token, permitido, prohibido y registro) |
+| `test-login-servidor` | OK (migración, segundo login, clave mala, hash inaccesible) |
+| `test-lockout` | OK (5 fallos / 15 min, sin filas al reintentar) |
+| `test-menus-por-rol` | OK (todos los roles y submenús) |
+| `test-login-eof` | OK |
+| `test-menus-eof` | OK |
+| `test-migracion-roles` | OK |
+
+Los tests que piden `BALBU_PASS` se corrieron con una clave de prueba: crean
+sus propios usuarios desechables y la derivan localmente, así que no hace falta
+la clave real del admin.
+
+**Prueba manual en la viva.** Con un usuario ADMIN temporal en `BALBU_TECH`:
+login con el binario nuevo, alta de categoría y revisión del log. Resultado:
+`SP_INSERTAR_CATEGORIA | CATEGORIAS_CREAR | OK` en `LOG_PERMISO_SP`, `SESIONES`
+con el token emitido. Después se borraron la categoría, el usuario temporal y
+sus filas de log/sesión. Esto es lo primero que la viva ejercita las guardas.
+
+**Documentación.** Se escribieron los `.md` que faltaban de `64`, `65` y `66`
+(los tres peores de la seguridad no tenían documento) y `00- INDICE.md` pasó de
+"64 módulos / 372 objetos" a **67 módulos / 384 objetos**.
+
+**Pendiente que queda abierto:** recorrer con la app y usuarios reales los
+módulos de escritura (Ventas, Compras, Caja, Inventario, Empleados, Garantías),
+una operación por módulo, mirando `LOG_PERMISO_SP`. El mapeo salió de un
+heurístico por nombre; la prueba de fuego es el uso real.

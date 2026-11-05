@@ -1,8 +1,14 @@
-# Realizar en casa — pendientes al 03/11/2026
+# Realizar en casa — pendientes al 05/11/2026
 
 Estado de partida: T1, T2, recorte de privilegios, login en servidor (65) y
 guardas de permiso en los SPs (66) están aplicados en TEST y en la viva. Lo que
 sigue es lo que quedó abierto, ordenado por riesgo.
+
+> **05/11/2026** — La base local del 3306 quedó al día: se aplicaron `63`, `64`,
+> `65`, `66` y `62` en `BALBU_TECH` y `64`, `65` y `66` en `BALBU_TECH_TEST`,
+> con backups en `backups/*_antes_62-66_casa_20261105_004038.sql`. La exigencia
+> quedó prendida (`EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST), así que
+> el punto 1 de abajo es ahora la tarea que falta.
 
 ## 1. Validar el mapeo de permisos contra la viva (lo primero)
 
