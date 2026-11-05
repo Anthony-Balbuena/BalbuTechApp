@@ -9,6 +9,12 @@ sigue es lo que quedó abierto, ordenado por riesgo.
 > con backups en `backups/*_antes_62-66_casa_20261105_004038.sql`. La exigencia
 > quedó prendida (`EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST), así que
 > el punto 1 de abajo es ahora la tarea que falta.
+>
+> **05/11/2026 (cierre del día)** — Se aplicó el módulo `67` en las dos bases:
+> `SP_CAMBIAR_CLAVE_USUARIO` vuelve a funcionar con el login del `65` (guarda
+> `CLAVE_SERVIDOR` con pepper, deja `CONTRASENA` en `NULL` y cierra las sesiones
+> del usuario) y la app manda el derivado `pbkdf2$...` tanto al cambiar la clave
+> como al dar de alta un usuario. Regresión: `db/test-cambio-clave.sh`.
 
 ## 1. Validar el mapeo de permisos contra la viva (lo primero)
 
@@ -50,8 +56,10 @@ UPDATE SECRETO_SISTEMA SET VALOR = '0' WHERE CLAVE = 'EXIGIR_PERMISO_SP';
 
 ## 2. Decidir `SP_CAMBIAR_CONTRASENA`
 
-Es el único procedimiento sin permiso mapeado, a propósito. Hay que ver si es
-autoservicio (cualquiera cambia la suya) o si exige `USUARIOS_CLAVE`.
+Es el único procedimiento sin permiso mapeado, a propósito. No tiene caller ni
+mapeo: quedó muerto cuando la app pasó a `SP_CAMBIAR_CLAVE_USUARIO` (módulo
+`67`). Hay que decidir si se borra del módulo `10` o si se conserva como
+autoservicio; mientras exista, la decisión de permiso sigue abierta.
 
 ```sql
 -- si es autoservicio: dejarlo sin exigencia es correcto

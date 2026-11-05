@@ -1291,3 +1291,38 @@ sus filas de log/sesión. Esto es lo primero que la viva ejercita las guardas.
 módulos de escritura (Ventas, Compras, Caja, Inventario, Empleados, Garantías),
 una operación por módulo, mirando `LOG_PERMISO_SP`. El mapeo salió de un
 heurístico por nombre; la prueba de fuego es el uso real.
+
+### 05/11 (cierre) — Cambio de clave alineado con el login del 65
+
+**Síntoma.** Con el módulo `65` aplicado, "Cambiar Clave" en el menú de Usuarios
+decía `EXITO` y no cambiaba nada útil: la clave nueva no entraba, la vieja
+seguía entrando y `CONTRASENA` volvía a tener material de clave.
+
+**Causa.** `SP_CAMBIAR_CLAVE_USUARIO` seguía en la versión vieja: escribía el
+SHA256 del cliente en `CONTRASENA`. Desde el `65` el login compara
+`CLAVE_SERVIDOR` primero, así que esa escritura se ignoraba. Además el alta de
+usuarios (`registrarUsuario`) también mandaba SHA256: un usuario creado así
+queda sin sal y **no migra nunca**, porque la migración exige
+`CONTRASENA LIKE 'pbkdf2$%'`.
+
+**Arreglo.** Módulo `67- CAMBIO_CLAVE_SERVIDOR.sql`: rehace
+`SP_CAMBIAR_CLAVE_USUARIO` para recibir `pbkdf2$iter$sal$derivado`, escribir
+`SALT_LOGIN`/`ITER_LOGIN`/`CLAVE_SERVIDOR = SHA2(pepper || derivado)`, dejar
+`CONTRASENA` en `NULL` y borrar las sesiones del usuario. Rechaza cualquier cosa
+que no empiece con `pbkdf2$` (`ERROR: FORMATO DE CLAVE INVALIDO.`). La guarda
+`SP_EXIGIR_PERMISO('SP_CAMBIAR_CLAVE_USUARIO')` va dentro del cuerpo para que el
+módulo sea autosuficiente; el mapeo ya era `USUARIOS_CLAVE` con `EXIGIR = 1`.
+En la app, `registrarUsuario()` y `cambiarClaveUsuario()` pasan de `aplicarHash`
+a `generar_hash_pbkdf2`.
+
+**Regresión.** `db/test-cambio-clave.sh` (RED con 6 fallos antes del módulo,
+GREEN después). Cubre formato del servidor, sal nueva, sesiones cerradas, token
+anterior muerto, clave nueva sí / vieja no, alta en `pbkdf2`, y la guarda:
+token de `VENDEDOR` → `SIN PERMISO`, token de `ADMIN` → `EXITO`. Aplicado en
+`BALBU_TECH_TEST` y en `BALBU_TECH`; `db/check-app-sps.sh` sigue en cobertura
+completa (102 objetos) en las dos.
+
+**Nota de entorno.** En TEST el usuario `admin` tenía una clave desconocida en
+esta máquina, y los tests que entran con el atajo `DEV` fallaban en el setup.
+Se le puso una clave de prueba conocida (base descartable) y la batería completa
+volvió a verde.

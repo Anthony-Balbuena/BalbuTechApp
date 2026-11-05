@@ -21,9 +21,9 @@ gana el `.sql`.
 | Índices | 62 |
 | **Total `CREATE`** | **384** |
 
-Los tres ultimos modulos (`64`, `65`, `66`) son de seguridad y se aplican
-despues de compilar el binario nuevo: cambian el login y agregan el token de
-sesion que la app vieja no manda.
+Los cuatro ultimos modulos (`64`, `65`, `66`, `67`) son de seguridad y se
+aplican despues de compilar el binario nuevo: cambian el login, agregan el token
+de sesion que la app vieja no manda y alinean el cambio de clave con ese login.
 
 ## Cómo leer un módulo
 
@@ -133,6 +133,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [SEGURIDAD_T2](<64- SEGURIDAD_T2.md>) | 1SP · 1FN · 1IDX | Bloqueo por fuerza bruta: índice de `LOG_ACCESOS`, `FN_TIENE_PERMISO` solo activos y `SP_ESTADO_BLOQUEO_LOGIN`. | ✅ |
 | [LOGIN_SERVIDOR](<65- LOGIN_SERVIDOR.md>) | 1T · 2SP | Verificación de la clave en el servidor con pepper; migración automática del formato viejo. | ✅ |
 | [SESIONES_GUARDAS](<66- SESIONES_GUARDAS.md>) | 3T · 3SP · 1FN · 1IDX | Token de sesión de 12 h y guarda de permiso dentro de cada `SP` (`PERMISO_POR_RUTINA`, `LOG_PERMISO_SP`). | ✅ |
+| [CAMBIO_CLAVE_SERVIDOR](<67- CAMBIO_CLAVE_SERVIDOR.md>) | — | Rehace `SP_CAMBIAR_CLAVE_USUARIO` para el formato del 65: `CLAVE_SERVIDOR` con pepper, `CONTRASENA` en `NULL` y cierre de sesiones. Solo `USUARIOS_CLAVE` (ADMIN). | ✅ |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 3TR | Bitácora genérica por tabla y registro. | — |
 | [LOG_ACCESOS](<28-LOG_ACCESOS.md>) | 1T · 3SP | Intentos de login. | ✅ |

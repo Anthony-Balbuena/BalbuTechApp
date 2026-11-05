@@ -96,7 +96,15 @@ void registrarUsuario() {
 
         string nombre = leerDatoSeguro("Nombre del Usuario: ");
         string clavePlana = leerDatoSeguro("Clave: ");
-        string claveHash = aplicarHash(clavePlana);
+        // (05/11/2026) El alta guarda el derivado en el formato serializado
+        // (pbkdf2$iter$sal$hash) para que el login del modulo 65 lo pueda
+        // migrar al formato del servidor en el primer acceso. Antes se guardaba
+        // SHA256, que no tiene sal y no migra nunca.
+        string claveHash;
+        if (!generar_hash_pbkdf2(clavePlana, claveHash)) {
+            cout << "\n[!] No se pudo derivar la clave. No se dio de alta el usuario." << endl;
+            return;
+        }
 
         string idRolStr = leerDatoSeguro("ID del rol (Numero): ");
         int idRol = stoi(idRolStr);
@@ -252,7 +260,14 @@ void cambiarClaveUsuario() {
         int idUsuario = stoi(idStr);
 
         string claveNueva = leerDatoSeguro("Nueva clave: ");
-        string claveHash = aplicarHash(claveNueva);
+        // (05/11/2026) El servidor espera el derivado serializado
+        // (pbkdf2$iter$sal$hash) de la clave nueva: el modulo 67 lo guarda con
+        // el pepper y deja CONTRASENA en NULL.
+        string claveHash;
+        if (!generar_hash_pbkdf2(claveNueva, claveHash)) {
+            cout << "\n[!] No se pudo derivar la clave. No se cambio." << endl;
+            return;
+        }
 
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_CAMBIAR_CLAVE_USUARIO(?, ?)"));
         pstmt->setInt(1, idUsuario);
