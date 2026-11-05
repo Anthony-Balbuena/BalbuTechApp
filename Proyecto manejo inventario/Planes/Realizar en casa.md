@@ -54,20 +54,13 @@ Y si hiciera falta apagar todo el control sin redeploy:
 UPDATE SECRETO_SISTEMA SET VALOR = '0' WHERE CLAVE = 'EXIGIR_PERMISO_SP';
 ```
 
-## 2. Decidir `SP_CAMBIAR_CONTRASENA`
+## 2. `SP_CAMBIAR_CONTRASENA` — resuelto (eliminado)
 
-Es el único procedimiento sin permiso mapeado, a propósito. No tiene caller ni
+Era el único procedimiento sin permiso mapeado, a propósito. No tenía caller ni
 mapeo: quedó muerto cuando la app pasó a `SP_CAMBIAR_CLAVE_USUARIO` (módulo
-`67`). Hay que decidir si se borra del módulo `10` o si se conserva como
-autoservicio; mientras exista, la decisión de permiso sigue abierta.
-
-```sql
--- si es autoservicio: dejarlo sin exigencia es correcto
--- si NO lo es:
-UPDATE PERMISO_POR_RUTINA
-   SET PERMISO = 'USUARIOS_CLAVE', EXIGIR = 1
- WHERE RUTINA = 'SP_CAMBIAR_CONTRASENA';
-```
+`67`), y con el `65` su verificación de clave vieja ya no podía funcionar
+(comparaba `CONTRASENA`, que queda en `NULL`). El 05/11/2026 se eliminó del
+módulo `10` y se dropeó en las dos bases.
 
 ## 3. `CONTRATOS.SALARIO` sigue legible
 

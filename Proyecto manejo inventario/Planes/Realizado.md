@@ -1326,3 +1326,19 @@ completa (102 objetos) en las dos.
 esta máquina, y los tests que entran con el atajo `DEV` fallaban en el setup.
 Se le puso una clave de prueba conocida (base descartable) y la batería completa
 volvió a verde.
+
+### 05/11 (cierre de módulos) — Se eliminó `SP_CAMBIAR_CONTRASENA`
+
+El único procedimiento sin permiso mapeado y sin caller. Comparaba el hash viejo
+contra `CONTRASENA`, pero con el módulo `65` ese campo queda en `NULL` para todo
+usuario migrado, así que no podía funcionar. El cambio de clave real es
+`SP_CAMBIAR_CLAVE_USUARIO` (módulo `67`). Decisión del dueño: se quita.
+
+- `modulos/10- USUARIOS.sql`: se dejó solo `DROP PROCEDURE IF EXISTS` (para que
+  una base que lo tenga quede limpia al reimportar).
+- En `BALBU_TECH` y `BALBU_TECH_TEST`: `DROP PROCEDURE` y `DELETE` del mapeo
+  (`PERMISO_POR_RUTINA` pasó a 169 y 161 filas respectivamente).
+- `00- INDICE.md` pasó a **383 objetos** (167 procedimientos); módulo `10` a
+  `1T · 11SP · 1TR`.
+- `db/check-app-sps.sh` sigue 102/102 en las dos bases y
+  `db/test-cambio-clave.sh` sigue en verde.

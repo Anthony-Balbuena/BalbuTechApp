@@ -7,19 +7,19 @@ nombre.
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 05/11/2026 · 67 `.sql` + 67 `.md` · 384 objetos documentados.
+Última revisión: 05/11/2026 · 67 `.sql` + 67 `.md` · 383 objetos documentados.
 
 ## Resumen
 
 | Tipo de objeto | Cantidad |
 |---|---|
 | Tablas | 47 |
-| Procedimientos almacenados | 168 |
+| Procedimientos almacenados | 167 |
 | Triggers | 79 |
 | Vistas | 23 |
 | Funciones | 6 |
 | Índices | 62 |
-| **Total `CREATE`** | **384** |
+| **Total `CREATE`** | **383** |
 
 Los cuatro ultimos modulos (`64`, `65`, `66`, `67`) son de seguridad y se
 aplican despues de compilar el binario nuevo: cambian el login, agregan el token
@@ -96,7 +96,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
 | [EMPLEADOS](<8- EMPLEADOS.md>) | 1T · 10SP · 2TR | Empleados, cargo, salario y estado. | ◐ |
-| [USUARIOS](<10- USUARIOS.md>) | 1T · 12SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
+| [USUARIOS](<10- USUARIOS.md>) | 1T · 11SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
 | [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 7SP · 1TR | Entrada y salida por día. | ✅ |
 | [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 8SP · 2TR | Solicitudes y cupo de vacaciones. | ✅ |
 | [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 1T · 4SP · 1V | Permisos y ausencias del empleado. | ✅ |

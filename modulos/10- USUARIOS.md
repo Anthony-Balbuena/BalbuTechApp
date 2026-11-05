@@ -88,11 +88,14 @@ si** el empleado 1 existe y todavía no tiene cuenta. Si no, devuelve
 **La app no la llama.** Lista cuentas con empleado y rol; busca por nombre de
 usuario o nombre de empleado; ordena por usuario.
 
-### `SP_CAMBIAR_CONTRASENA(P_ID_USUARIO, P_CLAVE_ACTUAL_HASH, P_CLAVE_NUEVA_HASH)`
+### `SP_CAMBIAR_CONTRASENA` — eliminada (05/11/2026)
 
-**La app no la llama.** Cambia la clave **solo si el hash actual coincide**.
-Si no → `ERROR: USUARIO NO ENCONTRADO O CLAVE ACTUAL INCORRECTA.` Devuelve
-`EXITO: CONTRASEÑA ACTUALIZADA PARA EL USUARIO: "<usuario>" (ID: <id>)`.
+Existió como cambio "voluntario": comparaba el hash viejo contra `CONTRASENA`
+antes de escribir el nuevo. Con el módulo `65` ese campo queda en `NULL` para
+todo usuario migrado, así que no podía funcionar; tampoco tenía caller ni
+permiso mapeado. El módulo `10` ahora solo ejecuta
+`DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA`. El cambio de clave real es
+`SP_CAMBIAR_CLAVE_USUARIO` (módulo `67`).
 
 ### `SP_LOGIN_USUARIO(P_USUARIO, P_PASSWORD_HASH)`
 
@@ -122,13 +125,15 @@ activar/desactivar cuentas.
 
 ### `SP_CAMBIAR_CLAVE_USUARIO(P_ID_USUARIO, P_HASH)`
 
-**Usada por la app** (`usuarios.cpp:cambiarClaveUsuario`). Setea el hash
-**sin pedir la clave actual** (a diferencia de `SP_CAMBIAR_CONTRASENA`). Si el
-ID no existe devuelve `ERROR: EL USUARIO NO EXISTE.`; si existe,
+**Usada por la app** (`usuarios.cpp:cambiarClaveUsuario`). Setea la clave
+**sin pedir la clave actual**. Si el ID no existe devuelve
+`ERROR: EL USUARIO NO EXISTE.`; si existe,
 `EXITO: CLAVE DEL USUARIO ID <id> ACTUALIZADA.`
 
 > Es la vía que usa un administrador para resetear claves. El cambio
-> "voluntario" con verificación de la clave vieja es `SP_CAMBIAR_CONTRASENA`.
+> "voluntario" con verificación de la clave vieja era `SP_CAMBIAR_CONTRASENA`,
+> eliminada el 05/11/2026. Desde el módulo `67` este SP escribe
+> `CLAVE_SERVIDOR` con pepper, no `CONTRASENA`.
 
 ## Triggers
 

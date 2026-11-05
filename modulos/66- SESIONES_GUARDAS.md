@@ -130,8 +130,10 @@ permite envolver un procedimiento existente.
 ## Que preserva
 
 - Los permisos y pares existentes: no toca `PERMISOS` ni `ROL_PERMISO`.
-- `SP_CAMBIAR_CONTRASENA` queda **sin mapeo a proposito**: un usuario que no
-  puede entrar no puede pedir permiso para cambiar su clave.
+- `SP_CAMBIAR_CONTRASENA` quedo **sin mapeo a proposito** mientras existio (un
+  usuario que no puede entrar no puede pedir permiso para cambiar su clave).
+  El 05/11/2026 se elimino del modulo `10`: no tenia caller y el `65` la dejo
+  sin funcion posible.
 - El login: si el usuario ya usaba el formato del 65, sigue entrando igual.
 
 ## Que no hace

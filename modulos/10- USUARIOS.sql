@@ -264,48 +264,17 @@ END //
 DELIMITER ;
 
 
----CAMBIAR CONTRASENA
-/*
-SP_CAMBIAR_CONTRASENA
-Cambia la contrasena de un usuario pero solo si la clave actual que manda
-coincide con la guardada. Si el ID no existe o la clave actual esta mal,
-manda un error y no cambia nada.
-*/
-DELIMITER //
+-- ---------------------------------------------------------------------------
+-- (05/11/2026) SP_CAMBIAR_CONTRASENA se elimino.
+--
+-- Era un cambio "voluntario" que comparaba el hash viejo contra CONTRASENA.
+-- Con el modulo 65 ese campo queda en NULL para todo usuario migrado, asi que
+-- no podia funcionar; ademas nunca tuvo caller en la app ni mapeo de permiso.
+-- El cambio de clave real va por SP_CAMBIAR_CLAVE_USUARIO (modulo 67).
+--
+-- Se deja el DROP para que una base que ya lo tenga quede limpia al reimportar.
+-- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA ;
-CREATE PROCEDURE SP_CAMBIAR_CONTRASENA(
-    IN P_ID_USUARIO INT,
-    IN P_CLAVE_ACTUAL_HASH VARCHAR(512),
-    IN P_CLAVE_NUEVA_HASH  VARCHAR(512)
-)
-proc_label: BEGIN
-    DECLARE v_usuario_nombre VARCHAR(50);
-
-    -- 1. Validar existencia y que la clave actual sea correcta
-    SELECT `USUARIO` INTO v_usuario_nombre 
-    FROM `USUARIOS` 
-    WHERE `ID_USUARIO` = P_ID_USUARIO 
-      AND `CONTRASENA` = P_CLAVE_ACTUAL_HASH;
-
-    IF v_usuario_nombre IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: USUARIO NO ENCONTRADO O CLAVE ACTUAL INCORRECTA.';
-        LEAVE proc_label;
-    END IF;
-
-    -- 2. Actualizar a la nueva clave
-    UPDATE `USUARIOS` 
-    SET `CONTRASENA` = P_CLAVE_NUEVA_HASH
-    WHERE `ID_USUARIO` = P_ID_USUARIO;
-
-    -- 3. Mensaje de éxito incluyendo el ID y el nombre del usuario
-    SELECT CONCAT(
-        'EXITO: CONTRASEÑA ACTUALIZADA PARA EL USUARIO: "', 
-        v_usuario_nombre, 
-        '" (ID: ', P_ID_USUARIO, ')'
-    ) AS MENSAJE;
-
-END //
-DELIMITER ;
 
 
 

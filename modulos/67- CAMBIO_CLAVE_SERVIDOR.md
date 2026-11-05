@@ -90,11 +90,10 @@ igual que `66` redefinio `SP_LOGIN_AUTENTICAR`.
 
 ## Que no hace
 
-- No toca `SP_INSERTAR_USUARIO`: sigue guardando lo que recibe, y ahora recibe
-  el formato serializado.
-- No pide la clave actual ni implementa autocambio por parte del usuario.
-- No borra `SP_CAMBIAR_CONTRASENA`, el gemelo muerto del modulo `10`: no tiene
-  caller ni mapeo y su borrado queda para una decision aparte.
+- No borra `SP_INSERTAR_USUARIO` ni otros `SP` de usuarios.
+- No implementa autocambio por parte del usuario: no pide la clave actual.
+- (05/11/2026) `SP_CAMBIAR_CONTRASENA`, el gemelo muerto del modulo `10`, se
+  elimino por decision del dueno: no tenia caller ni mapeo.
 
 ## Verificacion
 
