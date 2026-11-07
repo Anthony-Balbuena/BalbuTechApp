@@ -1,7 +1,6 @@
 ---
 description: Audits a diff for memory safety, DB call hygiene, and regressions. Read-only.
 mode: subagent
-model: openrouter/anthropic/claude-sonnet-5.5
 permissions:
   - action: edit
     resource: "*"
