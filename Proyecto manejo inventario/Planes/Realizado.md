@@ -1342,3 +1342,49 @@ usuario migrado, así que no podía funcionar. El cambio de clave real es
   `1T · 11SP · 1TR`.
 - `db/check-app-sps.sh` sigue 102/102 en las dos bases y
   `db/test-cambio-clave.sh` sigue en verde.
+
+### 08/11 (cierre) — Paginación en consola, limpieza de rutinas y `import.sh`
+
+**Paginación de 10 en 10 en todas las pantallas que listan.** Se creó
+`paginacion.h` (genérico, dos modos: `SELECT` directo con `LIMIT`/`OFFSET` +
+`COUNT`, y `SP` paginado con su conteo) y se aplicó en Clientes, Proveedores,
+Marcas, Empleados, Productos, Compras, Ventas e Inventario/Kardex. Fue el
+cambio que más SPs nuevos agregó: `check-app-sps.sh` pasó de 102 a **122
+objetos** y de 19 a **39 mapeos** en las dos bases.
+
+**Usuario de empleado despedido.** `PARA_INSERTAR_USUARIOS` filtra por
+`ESTADO='ACTIVO'`, el alta y la edición rechazan empleado inactivo,
+`SP_TOGGLE_ESTADO_USUARIO` no deja reactivar la cuenta de un despedido,
+`FN_USUARIO_SESION` exige cuenta activa y
+`TR_INVALIDAR_SESION_EMPLEADO_INACTIVO` borra las sesiones al despedir.
+
+**Alineación de tablas.** `printf("%-25.25s")` cuenta bytes, no columnas: un
+nombre con `™` (3 bytes, 1 columna) corría las columnas siguientes. Se pasaron
+a `tablaCelda` las tablas que todavía lo usaban.
+
+**Rutinas sin uso.** Se anotaron con `-- SIN USO` las que reemplazó la
+paginación, y se eliminaron `2_SP_OBTENER_MARCA`, `2_SP_LISTAR_MARCAS`,
+`SP_PAGOS_ULTIMOS` y `SP_DETALLES_VENDIDOS_ULTIMOS` (sin ningún llamador).
+
+**Semillas fuera de los módulos.** Se quitaron los `CALL` que escribían datos
+al importar (marcas, métodos de pago, cliente de ejemplo, admin y un
+`PARA_ACTUALIZARDATOS()` suelto). Los datos de arranque viven en
+`db/seed-catalogo.sh` y `db/seed-admin.sh`.
+
+**`db/import.sh`.** Los errores de idempotencia (`1050`, `1061`, `1265`) pasan
+a ser avisos y ya no fallan el import; la inyección de guardas corre **siempre**
+antes de cualquier `exit 1`. Motivo: reimportar siempre "fallaba" y el script
+moría antes de inyectar, dejando SPs sin control de permisos en silencio (pasó
+dos veces: 22 rutinas en la viva y 176 en TEST).
+
+**Limpieza de la viva.** Se borraron 8 rutinas huérfanas que ningún módulo
+creaba y ningún código llamaba: `11_SP_REGISTRAR_ENTRADA`,
+`3_SP_LISTAR_ROLES_SELECT`, `9_SP_ACTUALIZAR_PRODUCTO`, `SP_BUSCAR_CATEGORIAS`,
+`SP_BUSCAR_MARCAS`, `SP_CREAR_USUARIO`, `SP_ELIMINAR_BONO` y
+`SP_INSERTAR_VACACIONES` (con sus 8 filas de `PERMISO_POR_RUTINA`). Respaldo en
+`backups/limpieza_rutinas_huerfanas_20261108_155151.sql`. Verificado: cero
+llamadores en el código, cero llamadas internas desde otras rutinas, ningún
+trigger involucrado.
+
+**Drift cerrado.** `BALBU_TECH` y `BALBU_TECH_TEST` quedan iguales:
+**192 rutinas, 80 triggers, 47 tablas**, sin diferencias por nombre.
