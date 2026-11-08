@@ -390,7 +390,7 @@ migrada.
   ALMACEN 8, CONTABILIDAD 3), 30 permisos, EMPLEADO y CAJERO retirados.
 - Matriz idéntica a TEST (diff vacío). `FN_TIENE_PERMISO` responde 1 para los
   permisos nuevos y 0 para uno inexistente.
-- Contrato #4 (Jose Alcantara, cédula 40229519463, empleado 1) y los 9 empleados
+- Contrato #4 (Jose Alcantara, empleado 1) y los 9 empleados
   intactos. `check-app-sps` → `Faltantes: 0 (verificados 93)`.
 - `bash build.sh` → `OK: ./output/app` (el binario estaba viejo: `productos.cpp`
   y `ventas.cpp` eran más nuevos que el ejecutable).
