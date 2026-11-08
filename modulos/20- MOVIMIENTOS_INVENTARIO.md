@@ -76,16 +76,31 @@ stock.
 
 ### `SP_KARDEX_PRODUCTO(P_ID_PRODUCTO)`
 
-**Usada por la app.** Los **50** movimientos más recientes de un producto:
-`ID_MOVIMIENTO`, `PRODUCTO`, `FECHA`, `TIPO_MOVIMIENTO`, `CANTIDAD`,
-`EMPLEADO`, `OBSERVACION`.
+**La app ya no la llama** (08/11/2026): la reemplazó `SP_KARDEX_PAGINADO`. Los
+**50** movimientos más recientes de un producto: `ID_MOVIMIENTO`, `PRODUCTO`,
+`FECHA`, `TIPO_MOVIMIENTO`, `CANTIDAD`, `EMPLEADO`, `OBSERVACION`.
 
 ### `SP_KARDEX_TODOS()`
 
-**Usada por la app.** Los **50** movimientos más recientes de todos los
-productos, mismo formato.
+**La app ya no la llama** (08/11/2026), mismo motivo. Los **50** movimientos
+más recientes de todos los productos, mismo formato.
 
-> Los dos kardex usan `JOIN` a `EMPLEADOS`: si un empleado desapareciera, sus
+### `SP_KARDEX_PAGINADO(P_ID_PRODUCTO, P_PAGINA, P_POR_PAGINA)`
+
+(08/11/2026) Una página del kardex, del movimiento más nuevo al más viejo.
+`P_ID_PRODUCTO = 0` o `NULL` → todos los productos. `P_PAGINA` nulo o `< 1` → 1;
+`P_POR_PAGINA` nulo o `< 1` → 10. La usa "Inventario > Movimientos".
+Permiso: `INVENTARIO_VER`.
+
+### `SP_CONTAR_MOVIMIENTOS(P_ID_PRODUCTO)`
+
+Cuántos movimientos hay (todos, o los de un producto), para el "Página 1 de N".
+Mismo criterio que el paginado: `0`/`NULL` = todos.
+
+> Un solo par sirve para las dos vistas del kardex, en vez de duplicar el
+> `SP` por producto y por todos.
+
+> Los kardex usan `JOIN` a `EMPLEADOS`: si un empleado desapareciera, sus
 > movimientos desaparecerían del kardex. No muestran el stock resultante; para
 > eso está `HISTORIAL_MOVIMIENTOS_PRODUCTO` (32).
 

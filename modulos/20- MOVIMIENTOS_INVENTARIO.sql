@@ -197,6 +197,9 @@ DROP PROCEDURE IF EXISTS SP_KARDEX_TODOS ;
 /*
 SP_KARDEX_TODOS (14/10/2026)
 Ultimos 50 movimientos de stock de todos los productos. Solo lectura.
+
+(08/11/2026) La app ya no la usa: con 47 movimientos en la viva el tope de 50
+dejaba el historial inalcanzable. La reemplaza SP_KARDEX_PAGINADO.
 */
 CREATE PROCEDURE SP_KARDEX_TODOS()
 BEGIN
@@ -206,5 +209,70 @@ BEGIN
       JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO
       JOIN EMPLEADOS E ON E.ID_EMPLEADO = M.ID_EMPLEADO
      ORDER BY M.ID_MOVIMIENTO DESC LIMIT 50;
+END //
+DELIMITER ;
+
+-- ================================================================
+-- 4.b KARDEX PAGINADO (08/11/2026)
+-- ================================================================
+-- Un solo par para las dos vistas del kardex: con P_ID_PRODUCTO = 0 (o NULL)
+-- lista todos los movimientos; con un ID, solo los de ese producto. Asi la
+-- pantalla no necesita dos SPs ni dos formas de paginar.
+-- OJO: MOVIMIENTOS_INVENTARIO no tiene SELECT para balbu_app (recorte del
+-- 03/11), asi que la lectura tiene que pasar por aca.
+DELIMITER //
+/*
+SP_KARDEX_PAGINADO
+Una pagina del kardex, del movimiento mas nuevo al mas viejo.
+Permiso: INVENTARIO_VER (el mismo que SP_KARDEX_TODOS / SP_KARDEX_PRODUCTO).
+*/
+DROP PROCEDURE IF EXISTS SP_KARDEX_PAGINADO ;
+CREATE PROCEDURE SP_KARDEX_PAGINADO(
+    IN P_ID_PRODUCTO INT,
+    IN P_PAGINA      INT,
+    IN P_POR_PAGINA  INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    IF P_ID_PRODUCTO IS NULL THEN
+        SET P_ID_PRODUCTO = 0;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT M.ID_MOVIMIENTO, P.NOMBRE AS PRODUCTO, M.FECHA, M.TIPO_MOVIMIENTO,
+           M.CANTIDAD, E.NOMBRE AS EMPLEADO, M.OBSERVACION
+      FROM MOVIMIENTOS_INVENTARIO M
+      JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO
+      JOIN EMPLEADOS E ON E.ID_EMPLEADO = M.ID_EMPLEADO
+     WHERE (P_ID_PRODUCTO = 0 OR M.ID_PRODUCTO = P_ID_PRODUCTO)
+     ORDER BY M.ID_MOVIMIENTO DESC
+     LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_MOVIMIENTOS
+Cuantos movimientos hay (todos, o los de un producto), para el "Pagina 1 de N".
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_MOVIMIENTOS ;
+CREATE PROCEDURE SP_CONTAR_MOVIMIENTOS(
+    IN P_ID_PRODUCTO INT
+)
+BEGIN
+    IF P_ID_PRODUCTO IS NULL THEN
+        SET P_ID_PRODUCTO = 0;
+    END IF;
+
+    SELECT COUNT(*) AS TOTAL
+      FROM MOVIMIENTOS_INVENTARIO M
+     WHERE (P_ID_PRODUCTO = 0 OR M.ID_PRODUCTO = P_ID_PRODUCTO);
 END //
 DELIMITER ;

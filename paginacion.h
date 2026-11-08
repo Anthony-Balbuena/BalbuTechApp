@@ -192,4 +192,47 @@ inline int mostrarPaginadoSP(const std::string &callPagina,
     });
 }
 
+// ---------------------------------------------------------------------------
+// (08/11/2026) Variante con filtro ENTERO, para SPs del estilo
+// SP_KARDEX_PAGINADO(P_ID_PRODUCTO, P_PAGINA, P_POR_PAGINA), donde 0 = todos.
+// Las funciones de arriba solo saben bindear strings; aca el que llama arma el
+// binding con un lambda y el paginador le agrega pagina y porPagina al final.
+// ---------------------------------------------------------------------------
+using BinderSP = std::function<void(sql::PreparedStatement *, unsigned int &)>;
+
+inline int paginarTotalSPCon(const std::string &callTotal, const BinderSP &bind) {
+    std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(callTotal));
+    unsigned int n = 1;
+    bind(pstmt.get(), n);
+    std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+    int total = 0;
+    if (res->next()) total = res->getInt(1);
+    res.reset();
+    drenarResultados(pstmt.get());
+    return total;
+}
+
+inline int mostrarPaginadoSPCon(const std::string &callPagina,
+                                const std::string &callTotal,
+                                const BinderSP &bind,
+                                const std::function<void(sql::ResultSet *)> &fila,
+                                int porPagina = 10) {
+    const int total = paginarTotalSPCon(callTotal, bind);
+    return navegarPaginas(total, porPagina, [&](int pagina) {
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            globalCon->prepareStatement(callPagina));
+        unsigned int n = 1;
+        bind(pstmt.get(), n);
+        pstmt->setInt(n++, pagina);
+        pstmt->setInt(n++, porPagina);
+
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        while (res->next()) {
+            fila(res.get());
+        }
+        res.reset();
+        drenarResultados(pstmt.get());
+    });
+}
+
 #endif

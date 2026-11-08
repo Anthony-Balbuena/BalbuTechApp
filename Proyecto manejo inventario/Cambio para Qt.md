@@ -285,12 +285,18 @@ Pantallas ya paginadas: Clientes (Actualizar, Cambiar Estado, Buscar, Listar),
 Proveedores (Actualizar, Cambiar Estado, Listar), Marcas (Actualizar, Cambiar
 Estado), Empleados (Actualizar, Despedir, Reactivar), Productos (Buscar,
 Actualizar, Consultar Inventario, Reporte de Stock), Compras (Ver compra con
-IVA, Devolución, Pagar, Cancelar) y Ventas (Cobrar, Anular pago, Devolución).
+IVA, Devolución, Pagar, Cancelar), Ventas (Cobrar, Anular pago, Devolución) e
+Inventario (Ajuste de stock, Ajustar p.compra, Movimientos/Kardex).
 
 Pendientes de paginar, todas por la misma razón (lectura por `SP`, sin `SELECT`
-directo): Proveedores → Buscar, Marcas → Buscar/Listar, Kardex y los reportes
-por periodo de Ventas y Compras. Cada una necesita su par de `SP`s paginados,
-como Productos o Ventas.
+directo): Proveedores → Buscar, Marcas → Buscar/Listar y los reportes por
+periodo de Ventas y Compras. Cada una necesita su par de `SP`s paginados.
+
+> **Ojo con las búsquedas puntuales:** `buscarPorId`, `buscarPorCodigo` y
+> `resolverProducto` de `ventas.cpp` también usan
+> `SP_CONSULTAR_PRODUCTOS_FILTRADO`, pero **no** se paginan a propósito: no son
+> listados, son resolución exacta de un código o ID para el carrito. Paginarlas
+> haría que un producto que cae en la página 2 no se encuentre.
 
 Consecuencia práctica: la Fase 1 deja de ser "mudar el SQL tal cual" y pasa a ser
 "mudar el SQL y agregarle `LIMIT`/`OFFSET`". El comportamiento visible de la

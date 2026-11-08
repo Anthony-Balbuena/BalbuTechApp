@@ -9,42 +9,46 @@
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "tabla.h"
 #include "inventario.h"
 
 using namespace std;
 
-static bool imprimirTablaProductos(sql::ResultSet *rl) {
-    const size_t W_ID = 5, W_NOM = 25, W_EST = 9, W_COSTO = 10, W_STOCK = 6;
-    const size_t ANCHO = W_ID + W_NOM + W_EST + W_COSTO + W_STOCK + 4 * 3;
+// (08/11/2026) Encabezado y fila por separado para poder paginar: el paginador
+// pide la fila, la pantalla imprime el encabezado una vez.
+static const size_t INV_W_ID = 5, INV_W_NOM = 25, INV_W_EST = 9,
+                    INV_W_COSTO = 10, INV_W_STOCK = 6;
+static const size_t INV_ANCHO =
+    INV_W_ID + INV_W_NOM + INV_W_EST + INV_W_COSTO + INV_W_STOCK + 4 * 3;
+
+static void imprimirEncabezadoProductosInv() {
     cout << "\n"
-         << tablaCelda("ID", W_ID) << " | "
-         << tablaCelda("NOMBRE", W_NOM) << " | "
-         << tablaCelda("ESTADO", W_EST) << " | "
-         << tablaCelda("P.COMPRA", W_COSTO) << " | "
-         << tablaCelda("STOCK", W_STOCK) << "\n"
-         << tablaLinea(ANCHO) << "\n";
-    bool hay = false;
-    while (rl->next()) {
-        hay = true;
-        int stock = 0;
-        try { stock = rl->getInt("STOCK"); } catch (...) { stock = 0; }
-        double costo = 0.0;
-        bool sinCosto = false;
-        try { costo = rl->getDouble("P_COMPRA"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
-        char bufCosto[16];
-        if (sinCosto) snprintf(bufCosto, sizeof(bufCosto), "%s", "---");
-        else snprintf(bufCosto, sizeof(bufCosto), "%.2f", costo);
-        string estado = rl->getString("ESTADO");
-        cout << tablaCelda(to_string(rl->getInt("ID_PRODUCTO")), W_ID) << " | "
-             << tablaCelda(rl->getString("NOMBRE"), W_NOM) << " | "
-             << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
-             << tablaCelda(bufCosto, W_COSTO) << " | "
-             << tablaCelda(to_string(stock), W_STOCK) << "\n"
-             << tablaLinea(ANCHO) << "\n";
-    }
-    return hay;
+         << tablaCelda("ID", INV_W_ID) << " | "
+         << tablaCelda("NOMBRE", INV_W_NOM) << " | "
+         << tablaCelda("ESTADO", INV_W_EST) << " | "
+         << tablaCelda("P.COMPRA", INV_W_COSTO) << " | "
+         << tablaCelda("STOCK", INV_W_STOCK) << "\n"
+         << tablaLinea(INV_ANCHO) << "\n";
+}
+
+static void imprimirFilaProductoInv(sql::ResultSet *rl) {
+    int stock = 0;
+    try { stock = rl->getInt("STOCK"); } catch (...) { stock = 0; }
+    double costo = 0.0;
+    bool sinCosto = false;
+    try { costo = rl->getDouble("P_COMPRA"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
+    char bufCosto[16];
+    if (sinCosto) snprintf(bufCosto, sizeof(bufCosto), "%s", "---");
+    else snprintf(bufCosto, sizeof(bufCosto), "%.2f", costo);
+    string estado = rl->getString("ESTADO");
+    cout << tablaCelda(to_string(rl->getInt("ID_PRODUCTO")), INV_W_ID) << " | "
+         << tablaCelda(rl->getString("NOMBRE"), INV_W_NOM) << " | "
+         << tablaColorEstado(estado) << tablaCelda(estado, INV_W_EST) << RESET << " | "
+         << tablaCelda(bufCosto, INV_W_COSTO) << " | "
+         << tablaCelda(to_string(stock), INV_W_STOCK) << "\n"
+         << tablaLinea(INV_ANCHO) << "\n";
 }
 
 static void registrarAjuste() {
@@ -52,13 +56,13 @@ static void registrarAjuste() {
     try {
         string filtro = leerDatoSeguro("Buscar (Enter = todos, ID o nombre): ");
         try {
-            std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-                "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
-            pl->setString(1, filtro);
-            std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-            bool hay = imprimirTablaProductos(rl.get());
-            if (!hay) cout << "[!] Sin coincidencias." << endl;
-            drenarResultados(pl.get());
+            // (08/11/2026) Paginado de 10 en 10 con el par de SPs del modulo 9.
+            imprimirEncabezadoProductosInv();
+            mostrarPaginadoSP(
+                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
+                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+                {filtro},
+                imprimirFilaProductoInv);
         } catch (const exception &) {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }
@@ -101,13 +105,13 @@ static void actualizarCostoUI() {
     try {
         string filtro = leerDatoSeguro("Buscar (Enter = todos, ID o nombre): ");
         try {
-            std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-                "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
-            pl->setString(1, filtro);
-            std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-            bool hay = imprimirTablaProductos(rl.get());
-            if (!hay) cout << "[!] Sin coincidencias." << endl;
-            drenarResultados(pl.get());
+            // (08/11/2026) Paginado de 10 en 10, igual que el ajuste de stock.
+            imprimirEncabezadoProductosInv();
+            mostrarPaginadoSP(
+                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
+                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+                {filtro},
+                imprimirFilaProductoInv);
         } catch (const exception &) {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }
@@ -132,52 +136,49 @@ static void actualizarCostoUI() {
     }
 }
 
-static string aColumna(const string &s, size_t maxCols) {
-    // El printf cuenta BYTES y la terminal muestra COLUMNAS: cada
-    // multibyte (ej. ™) se vuelve un solo '?' para no correr la tabla.
-    string out;
-    size_t cols = 0;
-    for (size_t i = 0; i < s.size() && cols < maxCols;) {
-        unsigned char c = static_cast<unsigned char>(s[i]);
-        if (c < 0x80) { out += s[i]; i++; cols++; }
-        else {
-            out += '?';
-            i++;
-            while (i < s.size() && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) i++;
-            cols++;
-        }
-    }
-    return out;
-}
-
 static void kardexUI() {
     cout << "\n--- MOVIMIENTOS DE STOCK ---" << endl;
     try {
         double dTodos = -1;
         int idProd = (int)leerNumeroConIntentos("ID producto (Enter = todos): ", 1, 999999999, &dTodos);
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            idProd < 0 ? "CALL SP_KARDEX_TODOS()" : "CALL SP_KARDEX_PRODUCTO(?)"));
-        if (idProd >= 0) pstmt->setInt(1, idProd);
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-6s | %-25s | %-19s | %-10s | %-6s | %-15s | %-30s\n", "MOV", "PRODUCTO", "FECHA", "TIPO", "CANT", "EMPLEADO", "MOTIVO");
-        printf("%s\n", string(129, '-').c_str());
-        bool hay = false;
-        while (res->next()) {
-            hay = true;
-            string motivo;
-            try { motivo = res->getString("OBSERVACION"); } catch (...) { motivo = ""; }
-            printf("%-6d | %-25s | %-19s | %-10s | %-6d | %-15s | %-30s\n",
-                   res->getInt("ID_MOVIMIENTO"),
-                   aColumna(res->getString("PRODUCTO"), 25).c_str(),
-                   res->getString("FECHA").c_str(),
-                   res->getString("TIPO_MOVIMIENTO").c_str(),
-                   res->getInt("CANTIDAD"),
-                   aColumna(res->getString("EMPLEADO"), 15).c_str(),
-                   aColumna(motivo, 30).c_str());
-            printf("%s\n", string(129, '-').c_str());
-        }
-        if (!hay) cout << "[!] Sin movimientos." << endl;
-        drenarResultados(pstmt.get());
+        const int filtroProd = (idProd < 0) ? 0 : idProd;
+
+        // (08/11/2026) Paginado de 10 en 10: SP_KARDEX_TODOS cortaba en 50 y el
+        // historial viejo era inalcanzable. Ademas se dibuja con tablaCelda:
+        // el aColumna() de antes cambiaba los acentos por '?'.
+        const size_t W_MOV = 6, W_PROD = 25, W_FEC = 19, W_TIPO = 10,
+                     W_CANT = 6, W_EMP = 15, W_MOT = 30;
+        const size_t ANCHO = W_MOV + W_PROD + W_FEC + W_TIPO + W_CANT + W_EMP + W_MOT + 6 * 3;
+        cout << "\n"
+             << tablaCelda("MOV", W_MOV) << " | "
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("TIPO", W_TIPO) << " | "
+             << tablaCelda("CANT", W_CANT) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << " | "
+             << tablaCelda("MOTIVO", W_MOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hay = mostrarPaginadoSPCon(
+            "CALL SP_KARDEX_PAGINADO(?, ?, ?)",
+            "CALL SP_CONTAR_MOVIMIENTOS(?)",
+            [filtroProd](sql::PreparedStatement *ps, unsigned int &n) {
+                ps->setInt(n++, filtroProd);
+            },
+            [=](sql::ResultSet *res) {
+                string motivo;
+                try { motivo = res->getString("OBSERVACION"); } catch (...) { motivo = ""; }
+                cout << tablaCelda(to_string(res->getInt("ID_MOVIMIENTO")), W_MOV) << " | "
+                     << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                     << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                     << tablaCelda(res->getString("TIPO_MOVIMIENTO"), W_TIPO) << " | "
+                     << tablaCelda(to_string(res->getInt("CANTIDAD")), W_CANT) << " | "
+                     << tablaCelda(res->getString("EMPLEADO"), W_EMP) << " | "
+                     << tablaCelda(motivo, W_MOT) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) cout << "[!] Sin movimientos." << endl;
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
