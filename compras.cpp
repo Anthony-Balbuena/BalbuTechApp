@@ -425,15 +425,26 @@ static void mostrarHistorialPrecios(int idProducto) {
             "CALL SP_PRODUCTO_HISTORIAL_PRECIOS(?)"));
         ph->setInt(1, idProducto);
         std::unique_ptr<sql::ResultSet> rh(ph->executeQuery());
-        printf("\n%-25s | %-10s | %-19s | %-4s\n", "PROVEEDOR", "PRECIO", "FECHA", "CANT");
+        // (08/11/2026) tablaCelda: el proveedor puede traer acentos y printf
+        // cuenta bytes, no columnas.
+        const size_t W_PROV = 25, W_PRE = 10, W_FEC = 19, W_CAN = 4;
+        const size_t ANCHO = W_PROV + W_PRE + W_FEC + W_CAN + 3 * 3;
+        cout << "\n"
+             << tablaCelda("PROVEEDOR", W_PROV) << " | "
+             << tablaCelda("PRECIO", W_PRE) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("CANT", W_CAN) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (rh->next()) {
             hay = true;
-            printf("%-25.25s | %-10.2f | %-19.19s | %-4d\n",
-                   rh->getString("PROVEEDOR").c_str(),
-                   (double)rh->getDouble("PRECIO"),
-                   rh->getString("FECHA").c_str(),
-                   rh->getInt("CANTIDAD"));
+            char precio[24];
+            snprintf(precio, sizeof(precio), "%.2f", (double)rh->getDouble("PRECIO"));
+            cout << tablaCelda(rh->getString("PROVEEDOR"), W_PROV) << " | "
+                 << tablaCelda(precio, W_PRE) << " | "
+                 << tablaCelda(rh->getString("FECHA"), W_FEC) << " | "
+                 << tablaCelda(to_string(rh->getInt("CANTIDAD")), W_CAN) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) cout << "[!] Sin historial: primera compra." << endl;
         drenarResultados(ph.get());
@@ -445,19 +456,35 @@ static void mostrarHistorialPrecios(int idProducto) {
 static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa) {
     (void)tasa;
     cout << "\n--- CARRITO (precios de factura, con IVA) ---" << endl;
-    printf("\n%-25s | %-4s | %-22s | %-15s | %-12s\n", "PRODUCTO", "CANT", "PROVEEDOR", "P.UNIT C/ITBIS", "TOTAL");
-    printf("%s\n", string(90, '-').c_str());
+    // (08/11/2026) tablaCelda: el nombre del producto y el proveedor pueden
+    // traer acentos o simbolos, y printf corre las columnas.
+    const size_t W_PRO = 25, W_CAN = 4, W_PROV = 22, W_UNI = 15, W_TOT = 12;
+    const size_t ANCHO = W_PRO + W_CAN + W_PROV + W_UNI + W_TOT + 4 * 3;
+    cout << "\n"
+         << tablaCelda("PRODUCTO", W_PRO) << " | "
+         << tablaCelda("CANT", W_CAN) << " | "
+         << tablaCelda("PROVEEDOR", W_PROV) << " | "
+         << tablaCelda("P.UNIT C/ITBIS", W_UNI) << " | "
+         << tablaCelda("TOTAL", W_TOT) << "\n"
+         << tablaLinea(ANCHO) << "\n";
     double total = 0.0;
     for (auto &l : carrito) {
         // El precio escrito ya trae ITBIS: el parcial es directo.
         double parcial = l.precioCompra * l.cantidad;
         total += parcial;
-        printf("%-25.25s | %-4d | %-22.22s | %-15s | %-12s\n",
-               l.nombre.c_str(), l.cantidad, l.nombreProveedor.c_str(),
-               dinero(l.precioCompra).c_str(), dinero(parcial).c_str());
-        printf("%s\n", string(90, '-').c_str());
+        cout << tablaCelda(l.nombre, W_PRO) << " | "
+             << tablaCelda(to_string(l.cantidad), W_CAN) << " | "
+             << tablaCelda(l.nombreProveedor, W_PROV) << " | "
+             << tablaCelda(dinero(l.precioCompra), W_UNI) << " | "
+             << tablaCelda(dinero(parcial), W_TOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
     }
-    printf("%-25s | %-4s | %-22s | %-15s | %-12s\n", "Total con IVA =", "", "", "", dinero(total).c_str());
+    cout << tablaCelda("Total con IVA =", W_PRO) << " | "
+         << tablaCelda("", W_CAN) << " | "
+         << tablaCelda("", W_PROV) << " | "
+         << tablaCelda("", W_UNI) << " | "
+         << tablaCelda(dinero(total), W_TOT) << "\n"
+         << tablaLinea(ANCHO) << endl;
 }
 
 static void mostrarFacturaCompra(int idCompra) {
@@ -484,18 +511,43 @@ static void mostrarFacturaCompra(int idCompra) {
             "CALL SP_COMPRA_LINEAS(?)"));
         pl->setInt(1, idCompra);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-25s | %-4s | %-10s | %-10s | %-10s | %-10s\n", "Nombre del producto", "Cant", "P.UNIT", "ITBIS", "Subtotal", "Total");
+        // (08/11/2026) tablaCelda: el nombre del producto puede traer acentos.
+        const size_t W_NOM = 25, W_CAN = 4, W_MON = 10;
+        const size_t ANCHO = W_NOM + W_CAN + W_MON * 4 + 5 * 3;
+        cout << "\n"
+             << tablaCelda("Nombre del producto", W_NOM) << " | "
+             << tablaCelda("Cant", W_CAN) << " | "
+             << tablaCelda("P.UNIT", W_MON) << " | "
+             << tablaCelda("ITBIS", W_MON) << " | "
+             << tablaCelda("Subtotal", W_MON) << " | "
+             << tablaCelda("Total", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         while (rl->next()) {
-            printf("%-25.25s | %-4d | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n",
-                   rl->getString("NOMBRE").c_str(),
-                   rl->getInt("CANTIDAD"),
-                   (double)rl->getDouble("PRECIO_UNITARIO"),
-                   (double)rl->getDouble("MONTO_ITBIS"),
-                   (double)rl->getDouble("SUBTOTAL"),
-                   (double)rl->getDouble("TOTAL_LINEA"));
+            char uni[24], itb[24], sub[24], tot[24];
+            snprintf(uni, sizeof(uni), "%.2f", (double)rl->getDouble("PRECIO_UNITARIO"));
+            snprintf(itb, sizeof(itb), "%.2f", (double)rl->getDouble("MONTO_ITBIS"));
+            snprintf(sub, sizeof(sub), "%.2f", (double)rl->getDouble("SUBTOTAL"));
+            snprintf(tot, sizeof(tot), "%.2f", (double)rl->getDouble("TOTAL_LINEA"));
+            cout << tablaCelda(rl->getString("NOMBRE"), W_NOM) << " | "
+                 << tablaCelda(to_string(rl->getInt("CANTIDAD")), W_CAN) << " | "
+                 << tablaCelda(uni, W_MON) << " | "
+                 << tablaCelda(itb, W_MON) << " | "
+                 << tablaCelda(sub, W_MON) << " | "
+                 << tablaCelda(tot, W_MON) << "\n";
         }
         drenarResultados(pl.get());
-        printf("%-25s | %-4s | %-10s | %-10.2f | %-10.2f | %-10.2f\n", "Total a pagar =", "", "", vItbis, vSub, vTotal);
+        char itbT[24], subT[24], totT[24];
+        snprintf(itbT, sizeof(itbT), "%.2f", vItbis);
+        snprintf(subT, sizeof(subT), "%.2f", vSub);
+        snprintf(totT, sizeof(totT), "%.2f", vTotal);
+        cout << tablaLinea(ANCHO) << "\n"
+             << tablaCelda("Total a pagar =", W_NOM) << " | "
+             << tablaCelda("", W_CAN) << " | "
+             << tablaCelda("", W_MON) << " | "
+             << tablaCelda(itbT, W_MON) << " | "
+             << tablaCelda(subT, W_MON) << " | "
+             << tablaCelda(totT, W_MON) << "\n"
+             << tablaLinea(ANCHO) << endl;
     } catch (const exception &) {
         cout << ROJO << "No se pudo mostrar la factura." << RESET << endl;
     }
@@ -698,21 +750,24 @@ static void listarProductosParaCompra() {
             "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO('')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         // Grilla: ID_PROD | NOMBRE | CANTIDAD(stock). El suplidor se elige despues.
-        const int W0 = 7, W1 = 25, W2 = 8;
+        // (08/11/2026) tablaCelda en vez de printf: el nombre del producto puede
+        // traer acentos o simbolos y corria las columnas del borde.
+        const size_t W0 = 7, W1 = 25, W2 = 8;
         string borde = "+" + string(W0 + 2, '-') + "+" + string(W1 + 2, '-') + "+"
                      + string(W2 + 2, '-') + "+";
-        cout << "\n" << borde << endl;
-        printf("| %-*s | %-*s | %-*s |\n", W0, "ID_PROD", W1, "NOMBRE", W2, "CANTIDAD");
-        cout << borde << endl;
+        cout << "\n" << borde << "\n"
+             << "| " << tablaCelda("ID_PROD", W0)
+             << " | " << tablaCelda("NOMBRE", W1)
+             << " | " << tablaCelda("CANTIDAD", W2) << " |\n"
+             << borde << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
             int stock = 0;
             try { stock = res->getInt("STOCK"); } catch (...) { stock = 0; }
-            printf("| %-*d | %-*.25s | %-*d |\n",
-                   W0, res->getInt("ID_PRODUCTO"),
-                   W1, res->getString("NOMBRE").c_str(),
-                   W2, stock);
+            cout << "| " << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W0)
+                 << " | " << tablaCelda(res->getString("NOMBRE"), W1)
+                 << " | " << tablaCelda(to_string(stock), W2) << " |\n";
         }
         cout << borde << endl;
         if (!hay) cout << "[!] Sin productos activos." << endl;
@@ -880,15 +935,25 @@ static void devolucionCompraUI() {
             "CALL SP_COMPRA_LINEAS(?)"));
         pl->setInt(1, idCompraDev);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-8s | %-25s | %-4s | %-10s\n", "ID_DET", "PRODUCTO", "CANT", "PRECIO");
+        // (08/11/2026) tablaCelda (printf contaba bytes).
+        const size_t W_DET = 8, W_PRO = 25, W_CAN = 4, W_PRE = 10;
+        const size_t ANCHO = W_DET + W_PRO + W_CAN + W_PRE + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID_DET", W_DET) << " | "
+             << tablaCelda("PRODUCTO", W_PRO) << " | "
+             << tablaCelda("CANT", W_CAN) << " | "
+             << tablaCelda("PRECIO", W_PRE) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (rl->next()) {
             hay = true;
-            printf("%-8d | %-25.25s | %-4d | %-10.2f\n",
-                   rl->getInt("ID_DETALLE_COMPRA"),
-                   rl->getString("NOMBRE").c_str(),
-                   rl->getInt("CANTIDAD"),
-                   (double)rl->getDouble("PRECIO_UNITARIO"));
+            char precio[24];
+            snprintf(precio, sizeof(precio), "%.2f", (double)rl->getDouble("PRECIO_UNITARIO"));
+            cout << tablaCelda(to_string(rl->getInt("ID_DETALLE_COMPRA")), W_DET) << " | "
+                 << tablaCelda(rl->getString("NOMBRE"), W_PRO) << " | "
+                 << tablaCelda(to_string(rl->getInt("CANTIDAD")), W_CAN) << " | "
+                 << tablaCelda(precio, W_PRE) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         drenarResultados(pl.get());
         if (!hay) {

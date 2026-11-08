@@ -440,8 +440,18 @@ static void listarProductosParaVenta(double tasa) {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_CONSULTAR_INVENTARIO('')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-5s | %-10s | %-25s | %-10s | %-6s | %-s\n", "ID", "CODIGO", "NOMBRE", "P+IVA", "STOCK", "ESTATUS");
-        printf("%s\n", string(78, '-').c_str());
+        // (08/11/2026) tablaCelda: printf cuenta bytes y un nombre con acento
+        // o simbolo (Core™) corria las columnas de la derecha.
+        const size_t W_ID = 5, W_COD = 10, W_NOM = 25, W_PRE = 10, W_STK = 6, W_EST = 10;
+        const size_t ANCHO = W_ID + W_COD + W_NOM + W_PRE + W_STK + W_EST + 5 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("CODIGO", W_COD) << " | "
+             << tablaCelda("NOMBRE", W_NOM) << " | "
+             << tablaCelda("P+IVA", W_PRE) << " | "
+             << tablaCelda("STOCK", W_STK) << " | "
+             << tablaCelda("ESTATUS", W_EST) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
@@ -450,15 +460,16 @@ static void listarProductosParaVenta(double tasa) {
             string estatus = "OK";
             try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) {}
             double conIVA = round((double)res->getDouble("PRECIO") * (100.0 + tasa)) / 100.0;
-            printf("%-5d | %-10s | %-25.25s | %-10.2f | %-6d | ", 
-                   res->getInt("ID_PRODUCTO"),
-                   res->getString("CODIGO").c_str(),
-                   res->getString("NOMBRE").c_str(),
-                   conIVA,
-                   stock);
+            char precio[24];
+            snprintf(precio, sizeof(precio), "%.2f", conIVA);
+            cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
+                 << tablaCelda(res->getString("CODIGO"), W_COD) << " | "
+                 << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+                 << tablaCelda(precio, W_PRE) << " | "
+                 << tablaCelda(to_string(stock), W_STK) << " | ";
             const string &c = (estatus == "AGOTADO" || estatus == "CR\u00cdTICO") ? ROJO
                               : (estatus == "STOCK BAJO") ? AMARILLO : VERDE;
-            cout << c << estatus << RESET << endl;
+            cout << c << tablaCelda(estatus, W_EST) << RESET << endl;
         }
         if (!hay) cout << "[!] Sin productos activos." << endl;
         drenarResultados(pstmt.get());
@@ -654,16 +665,28 @@ static void verPagosDeVenta(int idVenta) {
             "CALL SP_PAGOS_POR_VENTA(?)"));
         pl->setInt(1, idVenta);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-7s | %-12s | %-10s | %-10s | %-15s\n", "ID_PAGO", "METODO", "MONTO", "RECIBIDO", "EMPLEADO");
+        // (08/11/2026) tablaCelda (printf contaba bytes).
+        const size_t W_PAG = 7, W_MET = 12, W_MON = 10, W_EMP = 15;
+        const size_t ANCHO = W_PAG + W_MET + W_MON * 2 + W_EMP + 4 * 3;
+        cout << "\n"
+             << tablaCelda("ID_PAGO", W_PAG) << " | "
+             << tablaCelda("METODO", W_MET) << " | "
+             << tablaCelda("MONTO", W_MON) << " | "
+             << tablaCelda("RECIBIDO", W_MON) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (rl->next()) {
             hay = true;
-            printf("%-7d | %-12.12s | %-10.2f | %-10.2f | %-15.15s\n",
-                   rl->getInt("ID_PAGO"),
-                   rl->getString("NOMBRE_METODO").c_str(),
-                   (double)rl->getDouble("MONTO"),
-                   (double)rl->getDouble("MONTO_RECIBIDO"),
-                   rl->getString("NOMBRE_EMPLEADO").c_str());
+            char monto[24], recibido[24];
+            snprintf(monto, sizeof(monto), "%.2f", (double)rl->getDouble("MONTO"));
+            snprintf(recibido, sizeof(recibido), "%.2f", (double)rl->getDouble("MONTO_RECIBIDO"));
+            cout << tablaCelda(to_string(rl->getInt("ID_PAGO")), W_PAG) << " | "
+                 << tablaCelda(rl->getString("NOMBRE_METODO"), W_MET) << " | "
+                 << tablaCelda(monto, W_MON) << " | "
+                 << tablaCelda(recibido, W_MON) << " | "
+                 << tablaCelda(rl->getString("NOMBRE_EMPLEADO"), W_EMP) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) cout << "[!] La venta no tiene pagos." << endl;
         drenarResultados(pl.get());
@@ -704,13 +727,24 @@ static void cancelarVentaUI() {
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
             "CALL SP_VENTAS_ULTIMAS()"));
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-6s | %-20s | %-10s | %-10s\n", "ID", "CLIENTE", "ESTADO", "TOTAL");
+        // (08/11/2026) tablaCelda (printf contaba bytes).
+        const size_t W_ID = 6, W_CLI = 20, W_EST = 10, W_TOT = 10;
+        const size_t ANCHO = W_ID + W_CLI + W_EST + W_TOT + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("TOTAL", W_TOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         while (rl->next()) {
-            printf("%-6d | %-20.20s | %-10s | %-10.2f\n",
-                   rl->getInt("ID_VENTA"),
-                   rl->getString("CLIENTE").c_str(),
-                   rl->getString("ESTADO").c_str(),
-                   (double)rl->getDouble("TOTAL_CON_IVA"));
+            char total[24];
+            snprintf(total, sizeof(total), "%.2f", (double)rl->getDouble("TOTAL_CON_IVA"));
+            string estado = rl->getString("ESTADO");
+            cout << tablaCelda(to_string(rl->getInt("ID_VENTA")), W_ID) << " | "
+                 << tablaCelda(rl->getString("CLIENTE"), W_CLI) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(total, W_TOT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         drenarResultados(pl.get());
 
@@ -819,25 +853,42 @@ static void cierreCajaUI() {
             }
         }
         // Result sets 2 y 3: por estado y por metodo.
+        // (08/11/2026) tablaCelda: el nombre del metodo es texto libre y puede
+        // traer acentos.
+        const size_t W_TXT = 12, W_NUM = 8, W_MON = 10;
+        const size_t ANCHO = W_TXT + W_NUM + W_MON + 2 * 3;
         if (pstmt->getMoreResults()) {
             std::unique_ptr<sql::ResultSet> r2(pstmt->getResultSet());
-            printf("\n%-12s | %-8s | %-10s\n", "ESTADO", "CANT", "MONTO");
+            cout << "\n"
+                 << tablaCelda("ESTADO", W_TXT) << " | "
+                 << tablaCelda("CANT", W_NUM) << " | "
+                 << tablaCelda("MONTO", W_MON) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
             while (r2 && r2->next()) {
-                printf("%-12s | %-8d | %-10.2f\n",
-                       r2->getString("ESTADO").c_str(),
-                       r2->getInt("CANTIDAD"),
-                       (double)r2->getDouble("MONTO"));
+                char monto[24];
+                snprintf(monto, sizeof(monto), "%.2f", (double)r2->getDouble("MONTO"));
+                string estado = r2->getString("ESTADO");
+                cout << tablaColorEstado(estado) << tablaCelda(estado, W_TXT) << RESET << " | "
+                     << tablaCelda(to_string(r2->getInt("CANTIDAD")), W_NUM) << " | "
+                     << tablaCelda(monto, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
             }
             r2.reset();
         }
         if (pstmt->getMoreResults()) {
             std::unique_ptr<sql::ResultSet> r3(pstmt->getResultSet());
-            printf("\n%-12s | %-8s | %-10s\n", "METODO", "OPS", "COBRADO");
+            cout << "\n"
+                 << tablaCelda("METODO", W_TXT) << " | "
+                 << tablaCelda("OPS", W_NUM) << " | "
+                 << tablaCelda("COBRADO", W_MON) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
             while (r3 && r3->next()) {
-                printf("%-12.12s | %-8d | %-10.2f\n",
-                       r3->getString("METODO").c_str(),
-                       r3->getInt("OPERACIONES"),
-                       (double)r3->getDouble("COBRADO"));
+                char cobrado[24];
+                snprintf(cobrado, sizeof(cobrado), "%.2f", (double)r3->getDouble("COBRADO"));
+                cout << tablaCelda(r3->getString("METODO"), W_TXT) << " | "
+                     << tablaCelda(to_string(r3->getInt("OPERACIONES")), W_NUM) << " | "
+                     << tablaCelda(cobrado, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
             }
         }
         drenarResultados(pstmt.get());
@@ -1225,7 +1276,21 @@ static void verGananciasUI() {
             "CALL SP_GANANCIAS_LINEAS(?)"));
         pl->setString(1, mes);
         std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-6s | %-19s | %-25s | %-4s | %-10s | %-10s | %-10s | %-10s\n", "VENTA", "FECHA", "PRODUCTO", "CANT", "ITBIS", "P.COMPRA", "P.VENTA", "GANANCIA");
+        // (08/11/2026) tablaCelda: el nombre del producto puede traer acentos o
+        // simbolos y printf corre las columnas. Se mantiene el formato numerico
+        // de antes (dos decimales, sin simbolo de moneda).
+        const size_t W_VEN = 6, W_FEC = 19, W_PRO = 25, W_CAN = 4, W_MON = 10;
+        const size_t ANCHO = W_VEN + W_FEC + W_PRO + W_CAN + W_MON * 4 + 7 * 3;
+        cout << "\n"
+             << tablaCelda("VENTA", W_VEN) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("PRODUCTO", W_PRO) << " | "
+             << tablaCelda("CANT", W_CAN) << " | "
+             << tablaCelda("ITBIS", W_MON) << " | "
+             << tablaCelda("P.COMPRA", W_MON) << " | "
+             << tablaCelda("P.VENTA", W_MON) << " | "
+             << tablaCelda("GANANCIA", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         while (rl->next()) {
             double itbis = 0.0, pcompra = 0.0, pventa = 0.0, neta = 0.0;
             bool sinCosto = false;
@@ -1233,15 +1298,21 @@ static void verGananciasUI() {
             try { pcompra = rl->getDouble("COSTO_TOTAL"); sinCosto = rl->wasNull(); } catch (...) { sinCosto = true; }
             try { pventa = rl->getDouble("TOTAL_LINEA"); } catch (...) { pventa = 0.0; }
             try { neta = rl->getDouble("GANANCIA_NETA"); } catch (...) { neta = 0.0; }
-            char bCompra[16];
+            char bItbis[24], bCompra[24], bVenta[24], bNeta[24];
+            snprintf(bItbis, sizeof(bItbis), "%.2f", itbis);
             if (sinCosto) snprintf(bCompra, sizeof(bCompra), "%s", "---");
             else snprintf(bCompra, sizeof(bCompra), "%.2f", pcompra);
-            printf("%-6d | %-19.19s | %-25.25s | %-4d | %-10.2f | %-10s | %-10.2f | %-10.2f\n",
-                   rl->getInt("ID_VENTA"),
-                   rl->getString("FECHA").c_str(),
-                   rl->getString("PRODUCTO").c_str(),
-                   rl->getInt("CANTIDAD"),
-                   itbis, bCompra, pventa, neta);
+            snprintf(bVenta, sizeof(bVenta), "%.2f", pventa);
+            snprintf(bNeta, sizeof(bNeta), "%.2f", neta);
+            cout << tablaCelda(to_string(rl->getInt("ID_VENTA")), W_VEN) << " | "
+                 << tablaCelda(rl->getString("FECHA"), W_FEC) << " | "
+                 << tablaCelda(rl->getString("PRODUCTO"), W_PRO) << " | "
+                 << tablaCelda(to_string(rl->getInt("CANTIDAD")), W_CAN) << " | "
+                 << tablaCelda(bItbis, W_MON) << " | "
+                 << tablaCelda(bCompra, W_MON) << " | "
+                 << tablaCelda(bVenta, W_MON) << " | "
+                 << tablaCelda(bNeta, W_MON) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         drenarResultados(pl.get());
     } catch (const CancelarOperacionException &e) {
@@ -1777,20 +1848,32 @@ static void historialVentaUI() {
             "CALL SP_HISTORIAL_VENTA(?)"));
         pstmt->setInt(1, vHist);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-6s | %-19s | %-10s | %-10s | %-15s | %-30s\n",
-               "VENTA", "FECHA", "DE", "A", "EMPLEADO", "MOTIVO");
+        // (08/11/2026) tablaCelda: el empleado y el motivo pueden traer acentos.
+        const size_t W_VEN = 6, W_FEC = 19, W_EST = 10, W_EMP = 15, W_MOT = 30;
+        const size_t ANCHO = W_VEN + W_FEC + W_EST * 2 + W_EMP + W_MOT + 5 * 3;
+        cout << "\n"
+             << tablaCelda("VENTA", W_VEN) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("DE", W_EST) << " | "
+             << tablaCelda("A", W_EST) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << " | "
+             << tablaCelda("MOTIVO", W_MOT) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         bool hay = false;
         while (res->next()) {
             hay = true;
             string ant;
             try { ant = res->getString("ESTADO_ANTERIOR"); } catch (...) { ant = "---"; }
-            printf("%-6d | %-19.19s | %-10s | %-10s | %-15.15s | %-30.30s\n",
-                   res->getInt("ID_VENTA"),
-                   res->getString("FECHA").c_str(),
-                   ant.c_str(),
-                   res->getString("ESTADO_NUEVO").c_str(),
-                   res->getString("EMPLEADO").c_str(),
-                   res->getString("MOTIVO").c_str());
+            string nuevo = res->getString("ESTADO_NUEVO");
+            string motivo;
+            try { motivo = res->isNull("MOTIVO") ? "" : res->getString("MOTIVO"); } catch (...) { motivo = ""; }
+            cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VEN) << " | "
+                 << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                 << tablaColorEstado(ant) << tablaCelda(ant, W_EST) << RESET << " | "
+                 << tablaColorEstado(nuevo) << tablaCelda(nuevo, W_EST) << RESET << " | "
+                 << tablaCelda(res->getString("EMPLEADO"), W_EMP) << " | "
+                 << tablaCelda(motivo, W_MOT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
         if (!hay) cout << "[!] Sin historial." << endl;
         drenarResultados(pstmt.get());
