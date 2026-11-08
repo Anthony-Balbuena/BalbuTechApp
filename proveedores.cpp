@@ -10,6 +10,7 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "colores.h"
 #include "tabla.h"
@@ -30,7 +31,7 @@ static const vector<OpcionProveedor>& opcionesProveedores() {
     static const vector<OpcionProveedor> opciones = {
         {"Agregar proveedor",            "PROVEEDORES_CREAR",  AccionProveedor::Agregar},
         {"Actualizar proveedor",         "PROVEEDORES_EDITAR", AccionProveedor::Actualizar},
-        {"Activar/Desactivar proveedor", "PROVEEDORES_ESTADO", AccionProveedor::Estado},
+        {"Cambiar estado",               "PROVEEDORES_ESTADO", AccionProveedor::Estado},
         {"Buscar proveedor",             "PROVEEDORES_VER",    AccionProveedor::Buscar},
         {"Listar proveedores",           "PROVEEDORES_VER",    AccionProveedor::Listar},
         {"Volver al Menu Principal",     "",                   AccionProveedor::Volver}
@@ -61,6 +62,13 @@ static void imprimirMenuProveedores(const vector<const OpcionProveedor*>& visibl
 }
 
 }  // namespace
+
+// (08/11/2026) Igual que en Clientes y Empleados: se lista antes de pedir el
+// ID. "Actualizar" muestra ID y nombre; "Cambiar estado" agrega el estado y
+// trae todos, activos e inactivos. Devuelven cuantos hay para no pedir un ID
+// sobre una lista vacia.
+static int imprimirProveedoresParaElegir();
+static int imprimirProveedoresParaEstado();
 
 void registrarProveedor() {
     cout << "\n--- REGISTRO DE PROVEEDOR ---" << endl;
@@ -99,6 +107,11 @@ void registrarProveedor() {
 void actualizarProveedor() {
     cout << "\n--- ACTUALIZAR PROVEEDOR ---" << endl;
     try {
+        if (imprimirProveedoresParaElegir() == 0) {
+            cout << "\n[!] No hay proveedores registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del proveedor: ");
         int idProveedor = stoi(idStr);
 
@@ -131,8 +144,13 @@ void actualizarProveedor() {
 }
 
 void cambiarEstadoProveedor() {
-    cout << "\n--- ACTIVAR/DESACTIVAR PROVEEDOR ---" << endl;
+    cout << "\n--- CAMBIAR ESTADO DEL PROVEEDOR ---" << endl;
     try {
+        if (imprimirProveedoresParaEstado() == 0) {
+            cout << "\n[!] No hay proveedores registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del proveedor: ");
         int idProveedor = stoi(idStr);
 
@@ -154,28 +172,86 @@ void cambiarEstadoProveedor() {
     }
 }
 
-static int imprimirTablaProveedores(sql::ResultSet *res) {
-    const size_t W_ID = 4, W_NOM = 22, W_TEL = 12, W_MAIL = 30, W_EST = 9;
-    const size_t ANCHO = W_ID + W_NOM + W_TEL + W_MAIL + W_EST + 4 * 3;
+// (08/11/2026) Listados paginados de 10 en 10 con paginacion.h. El encabezado y
+// el dibujo de cada fila quedan aca; el LIMIT/OFFSET y el COUNT los pone el
+// paginador. La tabla completa sigue usandose para las consultas por SP, que no
+// se pueden paginar sin cambiar la firma del procedimiento.
+static const size_t PROV_W_ID = 4, PROV_W_NOM = 22, PROV_W_TEL = 12,
+                    PROV_W_MAIL = 30, PROV_W_EST = 9;
+static const size_t PROV_ANCHO =
+    PROV_W_ID + PROV_W_NOM + PROV_W_TEL + PROV_W_MAIL + PROV_W_EST + 4 * 3;
+
+static void imprimirEncabezadoProveedores() {
     cout << "\n"
-         << tablaCelda("ID", W_ID) << " | "
-         << tablaCelda("NOMBRE", W_NOM) << " | "
-         << tablaCelda("TELEFONO", W_TEL) << " | "
-         << tablaCelda("EMAIL", W_MAIL) << " | "
-         << tablaCelda("ESTADO", W_EST) << "\n"
-         << tablaLinea(ANCHO) << "\n";
+         << tablaCelda("ID", PROV_W_ID) << " | "
+         << tablaCelda("NOMBRE", PROV_W_NOM) << " | "
+         << tablaCelda("TELEFONO", PROV_W_TEL) << " | "
+         << tablaCelda("EMAIL", PROV_W_MAIL) << " | "
+         << tablaCelda("ESTADO", PROV_W_EST) << "\n"
+         << tablaLinea(PROV_ANCHO) << "\n";
+}
+
+static void imprimirFilaProveedor(sql::ResultSet *res) {
+    string estado = res->getString("ESTADO");
+    cout << tablaCelda(to_string(res->getInt("ID_PROVEEDOR")), PROV_W_ID) << " | "
+         << tablaCelda(res->getString("NOMBRE"), PROV_W_NOM) << " | "
+         << tablaCelda(res->getString("TELEFONO"), PROV_W_TEL) << " | "
+         << tablaCelda(res->getString("EMAIL"), PROV_W_MAIL) << " | "
+         << tablaColorEstado(estado) << tablaCelda(estado, PROV_W_EST) << RESET << "\n"
+         << tablaLinea(PROV_ANCHO) << "\n";
+}
+
+static int imprimirTablaProveedores(sql::ResultSet *res) {
+    imprimirEncabezadoProveedores();
     int n = 0;
     while (res->next()) {
         ++n;
+        imprimirFilaProveedor(res);
+    }
+    return n;
+}
+
+// Consulta directa, igual que el listado del menu: la guarda del modulo 66 vive
+// en las rutinas, no en estas lecturas de pantalla.
+static int imprimirProveedoresParaElegir() {
+    const size_t W_ID = 4, W_NOM = 30;
+    const size_t ANCHO = W_ID + W_NOM + 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    return mostrarPaginado({
+        "SELECT ID_PROVEEDOR, NOMBRE FROM PROVEEDORES ORDER BY ID_PROVEEDOR",
+        "SELECT COUNT(*) FROM PROVEEDORES",
+        {} }, [=](sql::ResultSet *res) {
+        cout << tablaCelda(to_string(res->getInt("ID_PROVEEDOR")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    });
+}
+
+// Para cambiar el estado alcanza con ver a quien se le cambia: ID, nombre y
+// estado actual. Salen todos, activos e inactivos.
+static int imprimirProveedoresParaEstado() {
+    const size_t W_ID = 4, W_NOM = 26, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + W_EST + 2 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << " | "
+         << tablaCelda("ESTADO", W_EST) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    return mostrarPaginado({
+        "SELECT ID_PROVEEDOR, NOMBRE, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR",
+        "SELECT COUNT(*) FROM PROVEEDORES",
+        {} }, [=](sql::ResultSet *res) {
         string estado = res->getString("ESTADO");
         cout << tablaCelda(to_string(res->getInt("ID_PROVEEDOR")), W_ID) << " | "
              << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
-             << tablaCelda(res->getString("TELEFONO"), W_TEL) << " | "
-             << tablaCelda(res->getString("EMAIL"), W_MAIL) << " | "
              << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
              << tablaLinea(ANCHO) << "\n";
-    }
-    return n;
+    });
 }
 
 void buscarProveedor() {

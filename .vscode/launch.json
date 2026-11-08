@@ -2,23 +2,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Ejecutar BalbuTechApp (Linux)",
+            "name": "Ejecutar BalbuTechApp (Linux, viva)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/output/app",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [
-                {"name": "DB_HOST", "value": "127.0.0.1"},
-                {"name": "DB_PORT", "value": "3306"},
-                {"name": "BALBU_ALLOW_DEV_LOGIN", "value": "1"},
-                {"name": "BALBU_USER", "value": ""},
-                {"name": "BALBU_PASS", "value": ""}
-            ],
-            "envFile": "${workspaceFolder}/.env",
-            "externalConsole": false,
+            "envFile": "${workspaceFolder}/.vscode/.env.run",
+            "externalConsole": true,
             "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "preLaunchTask": "Nativo: compilar con build.sh (Linux)"
+        },
+        {
+            "name": "Ejecutar BalbuTechApp (Linux, TEST)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/output/app",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.vscode/.env.test.run",
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "preLaunchTask": "Nativo: compilar con build.sh (Linux)"
         }
     ]

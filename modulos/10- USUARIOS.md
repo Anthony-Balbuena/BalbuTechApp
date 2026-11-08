@@ -56,10 +56,12 @@ si** el empleado 1 existe y todavía no tiene cuenta. Si no, devuelve
 **Usada por la app** (`usuarios.cpp`).
 
 1. Empleado inexistente → `ERROR: EMPLEADO NO ENCONTRADO.`
-2. Empleado con cuenta → `ERROR: ESTE EMPLEADO YA TIENE UN USUARIO ASIGNADO.`
-3. Limpia el usuario: `LOWER(REPLACE(TRIM(...), ' ', '.'))` (espacios → puntos).
-4. Usuario ya usado → `ERROR: USUARIO YA EN USO.`
-5. Inserta y devuelve `EXITO: USUARIO "<usuario>" CREADO.`
+2. Empleado `INACTIVO` (despedido) → `ERROR: EL EMPLEADO ESTA INACTIVO
+   (DESPEDIDO). NO SE LE PUEDE CREAR UN USUARIO.` (08/11/2026)
+3. Empleado con cuenta → `ERROR: ESTE EMPLEADO YA TIENE UN USUARIO ASIGNADO.`
+4. Limpia el usuario: `LOWER(REPLACE(TRIM(...), ' ', '.'))` (espacios → puntos).
+5. Usuario ya usado → `ERROR: USUARIO YA EN USO.`
+6. Inserta y devuelve `EXITO: USUARIO "<usuario>" CREADO.`
 
 > **Notas:** no valida que `P_ID_ROL` exista (lo corta la FK con error
 > técnico `1452`) ni que el usuario quede vacío (un `''` entra como usuario
@@ -70,18 +72,26 @@ si** el empleado 1 existe y todavía no tiene cuenta. Si no, devuelve
 **Usada por la app.** No toca la contraseña. `NULL` conserva.
 
 - ID inexistente → `ERROR: USUARIO NO EXISTE.`
+- Si llega `P_ID_EMPLEADO`: tiene que existir y estar `ACTIVO`
+  (`ERROR: EL EMPLEADO NO EXISTE O ESTA INACTIVO (DESPEDIDO).`) y no puede
+  tener otra cuenta (`ERROR: ESTE EMPLEADO YA TIENE UN USUARIO ASIGNADO.`).
+- Nombre de usuario repetido → `ERROR: USUARIO YA EN USO.`
 - Limpia el usuario con `LOWER(TRIM(...))` — **no** convierte espacios en
   puntos (distinto del alta).
 - Devuelve `EXITO: DATOS ACTUALIZADOS.`
 
-> Sin chequeo de duplicados: un usuario repetido o un empleado que ya tiene
-> cuenta terminan en el error técnico del `UNIQUE` (`1062`).
+> Los tres chequeos se agregaron el 08/11/2026: antes el `UNIQUE` soltaba un
+> error técnico `1062` sin explicación.
 
 ### `SP_TOGGLE_ESTADO_USUARIO(P_ID_USUARIO)`
 
 **Usada por la app.** Invierte `ACTIVO` ↔ `INACTIVO`. ID inexistente →
 `ERROR: EL USUARIO NO EXISTE.` Devuelve
 `USUARIO: "<usuario>" - CAMBIO DE: <antes> A: <después>`.
+
+> (08/11/2026) No deja activar la cuenta de un empleado despedido:
+> `ERROR: EL EMPLEADO ESTA INACTIVO (DESPEDIDO). REACTIVE AL EMPLEADO ANTES
+> DE ACTIVAR SU USUARIO.` Primero se reactiva el empleado (módulo 8).
 
 ### `SP_BUSCAR_USUARIOS_FILTRADO(P_BUSQUEDA)`
 
@@ -106,7 +116,8 @@ La app ya no usa esta ruta: `login.cpp` consulta `USUARIOS` directo y compara de
 ### `PARA_INSERTAR_USUARIOS()`
 
 **Usada por la app.** **2 result sets**: roles (`ID_ROL, NOMBRE_ROL`) y
-empleados (`ID_EMPLEADO, NOMBRE`), ambos por ID.
+empleados (`ID_EMPLEADO, NOMBRE`), ambos por ID. (08/11/2026) La lista de
+empleados viene filtrada por `ESTADO = 'ACTIVO'`: los despedidos no se ofrecen.
 
 ### `PARA_ACTUALIZAR_USUARIOS()`
 
@@ -147,7 +158,8 @@ activar/desactivar cuentas.
    `ACTIVO` → `INACTIVO`).
 
 > Se dispara también al despedir desde `SP_DESPEDIR_EMPLEADO` (módulo 8):
-> despedir al empleado le bloquea el acceso automáticamente.
+> despedir al empleado le bloquea el acceso automáticamente. Las sesiones
+> abiertas las borra `TR_INVALIDAR_SESION_EMPLEADO_INACTIVO` (módulo 66).
 
 ## Funciones
 

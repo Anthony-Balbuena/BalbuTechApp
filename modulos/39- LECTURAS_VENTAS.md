@@ -45,17 +45,17 @@ Solo el `ESTADO`. Pensado para decidir qué acciones ofrecer (`CANCELADA` y
 Pagos de la venta desde `VISTA_RESUMEN_PAGOS`: `ID_PAGO`, `NOMBRE_METODO`,
 `MONTO`, `MONTO_RECIBIDO`, `NOMBRE_EMPLEADO`, por `ID_PAGO`.
 
-### `SP_PAGOS_ULTIMOS()`
+### `SP_PAGOS_ULTIMOS()` — eliminada (08/11/2026)
 
-Los **20** pagos más recientes de `VISTA_RESUMEN_PAGOS` (con `ID_VENTA`).
+Listaba los 20 pagos más recientes. Quedó **sin caller** al paginar las
+pantallas de Ventas y se reemplazó por `SP_PAGOS_ULTIMOS_PAGINADO`. El módulo
+solo ejecuta `DROP PROCEDURE IF EXISTS` para limpiar una base que la tenga.
 
-### `SP_DETALLES_VENDIDOS_ULTIMOS()`
+### `SP_DETALLES_VENDIDOS_ULTIMOS()` — eliminada (08/11/2026)
 
-Las **20** líneas vendidas más recientes: `ID_DETALLE_VENTA`, `ID_VENTA`,
-`PRODUCTO`, `CANTIDAD`.
-
-> **No filtra por estado de la venta**: muestra líneas de ventas canceladas como
-> si fueran ventas.
+Listaba las 20 líneas vendidas más recientes (y no filtraba por estado de la
+venta: mostraba líneas de ventas canceladas). Quedó **sin caller** y se
+reemplazó por `SP_DETALLES_VENDIDOS_PAGINADO`.
 
 ### `SP_DEVOLUCION_PENDIENTE_POR_DETALLE(P_ID_DETALLE)`
 
@@ -89,6 +89,61 @@ todos si `P_MES` viene `NULL` o vacío. `ITBIS`, `COSTO_TOTAL`, `TOTAL_LINEA`,
 Las **20** compras más recientes de `VISTA_COMPRA_CON_IVA`: `ID_COMPRA`,
 `PROVEEDOR`, `FECHA`, `ESTADO`, `SUBTOTAL`, `ITBIS`, `TOTAL_CON_IVA`.
 
+> (08/11/2026) La app ya **no** la usa: no permitía llegar a una compra vieja.
+> Queda por compatibilidad; el listado va por los dos de abajo.
+
+### `SP_COMPRAS_ULTIMAS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página del mismo listado, de la más nueva a la más vieja. `P_PAGINA` nulo o
+`< 1` → 1; `P_POR_PAGINA` nulo o `< 1` → 10. La usa "Ver compra con IVA",
+"Devolucion de compra" y "Cancelar compra" (módulo `compras.cpp`).
+
+### `SP_CONTAR_COMPRAS()`
+
+`COUNT(*)` de `COMPRAS`, para el "Página 1 de N" del paginador.
+
+### `SP_COMPRAS_PENDIENTES_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página de `VISTA_COMPRAS_PENDIENTES_PAGO`: `ID_COMPRA`, `PROVEEDOR`,
+`ESTADO`, `PAGADO`, `SALDO`. La usa "Pagar compra".
+
+### `SP_CONTAR_COMPRAS_PENDIENTES()`
+
+`COUNT(*)` de las compras con saldo, para el paginador del pago.
+
+> Los cuatro van con `COMPRAS_VER`: en la matriz, todo rol con
+> `COMPRAS_PAGAR`, `COMPRAS_CANCELAR` o `COMPRAS_DEVOLVER` también lo tiene.
+
+### `SP_VENTAS_PENDIENTES_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página de `VISTA_VENTAS_PENDIENTES_PAGO`. La usa "Cobrar venta"
+(`ventas.cpp`).
+
+### `SP_CONTAR_VENTAS_PENDIENTES()`
+
+`COUNT(*)` de las ventas con saldo, para el paginador del cobro.
+
+### `SP_PAGOS_ULTIMOS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página de `VISTA_RESUMEN_PAGOS`: `ID_PAGO`, `ID_VENTA`, `NOMBRE_METODO`,
+`MONTO`, `MONTO_RECIBIDO`, `NOMBRE_EMPLEADO`. La usa "Anular pago".
+
+### `SP_CONTAR_PAGOS()`
+
+`COUNT(*)` de `PAGOS`, para el paginador de "Anular pago".
+
+### `SP_DETALLES_VENDIDOS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página de las líneas vendidas (`ID_DETALLE_VENTA`, `ID_VENTA`, `PRODUCTO`,
+`CANTIDAD`), de la más nueva a la más vieja. La usa "Devolucion de venta".
+
+### `SP_CONTAR_DETALLES_VENDIDOS()`
+
+`COUNT(*)` de `DETALLES_VENTA`, para el paginador de la devolución.
+
+> Los seis van con `GESTIONAR_VENTAS`, el mismo permiso que sus hermanas sin
+> paginar y el que exigen las tres pantallas que los llaman.
+
 ### `SP_COMPRA_ENCABEZADO(P_ID_COMPRA)`
 
 La misma fila para **una** compra. Sin ID válido, cero filas.
@@ -102,8 +157,11 @@ Líneas de la compra: `ID_DETALLE_COMPRA`, `PRODUCTO`, `CANTIDAD`,
 ## Reglas de negocio
 
 - **Estos SP no escriben nada**: son la única puerta de lectura de las pantallas.
-- **Los topes son fijos** (20 o 30 filas): no hay paginación; el resto de la
-  historia no se puede ver desde la app.
+- **Los topes son fijos** (20 o 30 filas) en las versiones viejas: **(08/11/2026)
+  las pantallas pasaron a las variantes `*_PAGINADO`, que traen de 10 en 10 con
+  un `*_CONTAR_*` al lado. Las viejas quedan por compatibilidad, salvo
+  `SP_VENTAS_PENDIENTES`, que la app todavía usa para resolver el saldo de una
+  venta puntual.**
 - **Sin validación de existencia**: un ID inexistente devuelve cero filas, nunca
   un error.
 - **Heredan los filtros de sus vistas**: donde la vista incluye `EN_PROCESO` o

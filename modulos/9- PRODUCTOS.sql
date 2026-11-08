@@ -382,6 +382,84 @@ BEGIN
 END //
 DELIMITER ;
 
+-- ================================================================
+-- 4.b LISTADO PAGINADO DE PRODUCTOS (08/11/2026)
+-- ================================================================
+-- Por que SP y no SELECT directo: balbu_app no tiene SELECT sobre PRODUCTOS
+-- ni INVENTARIO (recorte de privilegios del 03/11); la lectura pasa por SPs
+-- DEFINER. Estos dos son el par que usa la consola para paginar de 10 en 10:
+-- uno devuelve la pagina, el otro el total para saber cuantas paginas hay.
+-- El WHERE replica el de SP_CONSULTAR_PRODUCTOS_FILTRADO: si alla cambia el
+-- criterio de busqueda, aca tambien.
+DELIMITER //
+/*
+SP_CONTAR_PRODUCTOS_FILTRADOS
+Cuenta los productos que devolveria la busqueda. Lo usa el paginador para
+armar "Pagina 1 de N" y saber si hay una pagina mas.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_PRODUCTOS_FILTRADOS ;
+CREATE PROCEDURE SP_CONTAR_PRODUCTOS_FILTRADOS(
+    IN P_BUSQUEDA VARCHAR(100)
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM PRODUCTOS P
+     WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = ''
+            OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%')
+            OR P.CODIGO = P_BUSQUEDA
+            OR (P_BUSQUEDA REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_BUSQUEDA AS UNSIGNED)));
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONSULTAR_PRODUCTOS_PAGINADO
+Igual que SP_CONSULTAR_PRODUCTOS_FILTRADO pero devuelve una sola pagina.
+P_PAGINA arranca en 1; valores nulos o fuera de rango se normalizan.
+*/
+DROP PROCEDURE IF EXISTS SP_CONSULTAR_PRODUCTOS_PAGINADO ;
+CREATE PROCEDURE SP_CONSULTAR_PRODUCTOS_PAGINADO(
+    IN P_BUSQUEDA   VARCHAR(100),
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
+)
+proc_label: BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT
+        P.ID_PRODUCTO,
+        P.CODIGO,
+        P.NOMBRE,
+        M.NOMBRE AS MARCA,
+        C.NOMBRE AS CATEGORIA,
+        P.PRECIO,
+        P.P_COMPRA,
+        P.ESTADO,
+        I.STOCK_ACTUAL AS STOCK,
+        PR.NOMBRE AS PROVEEDOR,
+        P.ID_PROVEEDOR
+    FROM PRODUCTOS P
+    INNER JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
+    INNER JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
+    LEFT JOIN INVENTARIO I ON I.ID_PRODUCTO = P.ID_PRODUCTO
+    LEFT JOIN PROVEEDORES PR ON PR.ID_PROVEEDOR = P.ID_PROVEEDOR
+    WHERE (P_BUSQUEDA IS NULL OR P_BUSQUEDA = ''
+           OR P.NOMBRE LIKE CONCAT('%', P_BUSQUEDA, '%')
+           OR P.CODIGO = P_BUSQUEDA
+           OR (P_BUSQUEDA REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_BUSQUEDA AS UNSIGNED)))
+    ORDER BY P.ID_PRODUCTO ASC
+    LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
 --5. consultar inventario
 DELIMITER //
 /*
@@ -519,6 +597,188 @@ P.ID_PRODUCTO ASC,
 
 END//
 
+DELIMITER ;
+
+-- ================================================================
+-- 5.b LISTADOS PAGINADOS DE PRODUCTOS (08/11/2026)
+-- ================================================================
+-- Misma razon que el paginado de busqueda: las pantallas que piden un ID no
+-- pueden traer todo. Cada par es (pagina, total); el LIMIT vive aca porque
+-- balbu_app no tiene SELECT directo sobre PRODUCTOS ni INVENTARIO.
+-- Permiso: el mismo que ya exige su hermana sin paginar.
+DELIMITER //
+/*
+PARA_ACTUALIZARDATOS_PAGINADO
+Una pagina del listado de edicion de producto. Permiso: GESTIONAR_PRODUCTOS.
+*/
+DROP PROCEDURE IF EXISTS PARA_ACTUALIZARDATOS_PAGINADO;
+CREATE PROCEDURE PARA_ACTUALIZARDATOS_PAGINADO(
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT
+        P.ID_PRODUCTO,
+        P.NOMBRE AS PRODUCTO,
+        P.PRECIO,
+        C.ID_CATEGORIA,
+        C.NOMBRE AS CATEGORIA,
+        M.ID_MARCA,
+        M.NOMBRE AS MARCA
+    FROM PRODUCTOS AS P
+    LEFT JOIN CATEGORIAS AS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
+    LEFT JOIN MARCAS AS M ON P.ID_MARCA = M.ID_MARCA
+    ORDER BY P.ID_PRODUCTO ASC
+    LIMIT P_POR_PAGINA OFFSET v_offset;
+END//
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_PRODUCTOS
+Total de productos, para el paginador de la edicion.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_PRODUCTOS;
+CREATE PROCEDURE SP_CONTAR_PRODUCTOS()
+BEGIN
+    SELECT COUNT(*) AS TOTAL FROM PRODUCTOS;
+END//
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONSULTAR_INVENTARIO_PAGINADO
+Una pagina de SP_CONSULTAR_INVENTARIO. Mismo filtro y mismas columnas.
+Permiso: CONSULTAR_PRODUCTOS.
+*/
+DROP PROCEDURE IF EXISTS SP_CONSULTAR_INVENTARIO_PAGINADO ;
+CREATE PROCEDURE SP_CONSULTAR_INVENTARIO_PAGINADO(
+    IN P_FILTRO     VARCHAR(100),
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT
+        P.ID_PRODUCTO,
+        P.CODIGO,
+        P.NOMBRE,
+        C.NOMBRE AS CATEGORIA,
+        M.NOMBRE AS MARCA,
+        I.STOCK_ACTUAL,
+        I.STOCK_MINIMO,
+        I.UBICACION,
+        P.PRECIO,
+        P.P_COMPRA,
+        CASE
+            WHEN IFNULL(I.STOCK_ACTUAL, 0) = 0 THEN 'AGOTADO'
+            WHEN I.STOCK_ACTUAL <= I.STOCK_MINIMO THEN 'CRÍTICO'
+            WHEN I.STOCK_ACTUAL <= (I.STOCK_MINIMO * 2) THEN 'STOCK BAJO'
+            ELSE 'OK'
+        END AS ESTATUS_STOCK
+    FROM PRODUCTOS P
+    LEFT JOIN INVENTARIO I ON P.ID_PRODUCTO = I.ID_PRODUCTO
+    LEFT JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
+    LEFT JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
+    WHERE (P_FILTRO IS NULL OR P_FILTRO = ''
+           OR P.NOMBRE LIKE CONCAT('%', P_FILTRO, '%')
+           OR P.CODIGO LIKE CONCAT('%', P_FILTRO, '%')
+           OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%')
+           OR (P_FILTRO REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_FILTRO AS UNSIGNED)))
+      AND P.ESTADO = 'ACTIVO'
+    ORDER BY P.ID_PRODUCTO ASC
+    LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_INVENTARIO
+Cuantos productos devuelve ese filtro, para el paginador de la consulta.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_INVENTARIO ;
+CREATE PROCEDURE SP_CONTAR_INVENTARIO(
+    IN P_FILTRO VARCHAR(100)
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM PRODUCTOS P
+      LEFT JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
+     WHERE (P_FILTRO IS NULL OR P_FILTRO = ''
+            OR P.NOMBRE LIKE CONCAT('%', P_FILTRO, '%')
+            OR P.CODIGO LIKE CONCAT('%', P_FILTRO, '%')
+            OR C.NOMBRE LIKE CONCAT('%', P_FILTRO, '%')
+            OR (P_FILTRO REGEXP '^[0-9]+$' AND P.ID_PRODUCTO = CAST(P_FILTRO AS UNSIGNED)))
+       AND P.ESTADO = 'ACTIVO';
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_REPORTE_STOCK_CRITICO_PAGINADO
+Una pagina del reporte de stock critico. Permiso: CONSULTAR_PRODUCTOS.
+*/
+DROP PROCEDURE IF EXISTS SP_REPORTE_STOCK_CRITICO_PAGINADO ;
+CREATE PROCEDURE SP_REPORTE_STOCK_CRITICO_PAGINADO(
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT
+        P.NOMBRE,
+        I.STOCK_ACTUAL,
+        I.STOCK_MINIMO,
+        (I.STOCK_MINIMO - I.STOCK_ACTUAL) AS CANTIDAD_FALTANTE
+    FROM INVENTARIO I
+    JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
+    WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO
+    ORDER BY CANTIDAD_FALTANTE DESC
+    LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_STOCK_CRITICO
+Cuantos productos estan en o bajo su minimo, para el paginador del reporte.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_STOCK_CRITICO ;
+CREATE PROCEDURE SP_CONTAR_STOCK_CRITICO()
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM INVENTARIO I
+      JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
+     WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO;
+END //
 DELIMITER ;
 CALL PARA_ACTUALIZARDATOS(); 
 

@@ -11,6 +11,7 @@
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "caja.h"
 #include "roles.h"
 #include "sesion.h"
@@ -735,20 +736,40 @@ static void anularPagoUI() {
     cout << "\n--- ANULAR PAGO ---" << endl;
     cout << "Si la venta estaba REALIZADA, vuelve a EN_PROCESO y cae el bono." << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_PAGOS_ULTIMOS()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-7s | %-6s | %-12s | %-10s | %-10s | %-15s\n", "ID_PAGO", "VENTA", "METODO", "MONTO", "RECIBIDO", "EMPLEADO");
-        while (rl->next()) {
-            printf("%-7d | %-6d | %-12.12s | %-10.2f | %-10.2f | %-15.15s\n",
-                   rl->getInt("ID_PAGO"),
-                   rl->getInt("ID_VENTA"),
-                   rl->getString("NOMBRE_METODO").c_str(),
-                   (double)rl->getDouble("MONTO"),
-                   (double)rl->getDouble("MONTO_RECIBIDO"),
-                   rl->getString("NOMBRE_EMPLEADO").c_str());
+        // (08/11/2026) Paginado de 10 en 10 y con tablaCelda: printf contaba
+        // bytes y un nombre con acento o simbolo desalineaba la fila.
+        const size_t W_PAG = 7, W_VEN = 6, W_MET = 12, W_MON = 10, W_EMP = 15;
+        const size_t ANCHO = W_PAG + W_VEN + W_MET + W_MON * 2 + W_EMP + 5 * 3;
+        cout << "\n"
+             << tablaCelda("ID_PAGO", W_PAG) << " | "
+             << tablaCelda("VENTA", W_VEN) << " | "
+             << tablaCelda("METODO", W_MET) << " | "
+             << tablaCelda("MONTO", W_MON) << " | "
+             << tablaCelda("RECIBIDO", W_MON) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hayPagos = mostrarPaginadoSP(
+            "CALL SP_PAGOS_ULTIMOS_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_PAGOS()",
+            {},
+            [=](sql::ResultSet *res) {
+                char monto[24], recibido[24];
+                snprintf(monto, sizeof(monto), "%.2f", (double)res->getDouble("MONTO"));
+                snprintf(recibido, sizeof(recibido), "%.2f", (double)res->getDouble("MONTO_RECIBIDO"));
+                cout << tablaCelda(to_string(res->getInt("ID_PAGO")), W_PAG) << " | "
+                     << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VEN) << " | "
+                     << tablaCelda(res->getString("NOMBRE_METODO"), W_MET) << " | "
+                     << tablaCelda(monto, W_MON) << " | "
+                     << tablaCelda(recibido, W_MON) << " | "
+                     << tablaCelda(res->getString("NOMBRE_EMPLEADO"), W_EMP) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hayPagos == 0) {
+            cout << "[!] No hay pagos registrados." << endl;
+            return;
         }
-        drenarResultados(pl.get());
 
         int idPagoAnula = (int)leerNumeroConIntentos("ID pago: ", 1, 999999999);
         int idEmpAnula = (int)leerNumeroConIntentos("ID empleado que anula: ", 1, 999999999);
@@ -1051,18 +1072,32 @@ static void devolucionVentaUI() {
     cout << "\n--- DEVOLUCION DE VENTA ---" << endl;
     cout << "Registra la devolucion PENDIENTE y luego aprueba o rechaza." << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_DETALLES_VENDIDOS_ULTIMOS()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-8s | %-6s | %-25s | %-4s\n", "ID_DET", "VENTA", "PRODUCTO", "CANT");
-        while (rl->next()) {
-            printf("%-8d | %-6d | %-25.25s | %-4d\n",
-                   rl->getInt("ID_DETALLE_VENTA"),
-                   rl->getInt("ID_VENTA"),
-                   rl->getString("NOMBRE").c_str(),
-                   rl->getInt("CANTIDAD"));
+        // (08/11/2026) Paginado de 10 en 10 con tablaCelda (printf contaba bytes).
+        const size_t W_DET = 8, W_VEN = 6, W_PRO = 25, W_CAN = 4;
+        const size_t ANCHO = W_DET + W_VEN + W_PRO + W_CAN + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID_DET", W_DET) << " | "
+             << tablaCelda("VENTA", W_VEN) << " | "
+             << tablaCelda("PRODUCTO", W_PRO) << " | "
+             << tablaCelda("CANT", W_CAN) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hayDetalles = mostrarPaginadoSP(
+            "CALL SP_DETALLES_VENDIDOS_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_DETALLES_VENDIDOS()",
+            {},
+            [=](sql::ResultSet *res) {
+                cout << tablaCelda(to_string(res->getInt("ID_DETALLE_VENTA")), W_DET) << " | "
+                     << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VEN) << " | "
+                     << tablaCelda(res->getString("NOMBRE"), W_PRO) << " | "
+                     << tablaCelda(to_string(res->getInt("CANTIDAD")), W_CAN) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hayDetalles == 0) {
+            cout << "[!] No hay lineas vendidas registradas." << endl;
+            return;
         }
-        drenarResultados(pl.get());
 
         int idDet = (int)leerNumeroConIntentos("ID detalle: ", 1, 999999999);
         int idEmp = (int)leerNumeroConIntentos("ID empleado: ", 1, 999999999);
@@ -1199,29 +1234,70 @@ static void verGananciasUI() {
     }
 }
 
+// (07/11/2026) El cobro se registra a nombre del empleado de la sesion: el
+// cajero ya no elige a otro escribiendo un ID. Antes pedia "ID empleado que
+// cobra" y era un numero a memorizar (y una forma de atribuir mal el cobro).
+static string nombreEmpleadoDeSesion(int idEmp) {
+    string n;
+    if (idEmp <= 0) return n;
+    try {
+        std::unique_ptr<sql::PreparedStatement> q(globalCon->prepareStatement(
+            "SELECT NOMBRE FROM EMPLEADOS WHERE ID_EMPLEADO = ?"));
+        q->setInt(1, idEmp);
+        std::unique_ptr<sql::ResultSet> r(q->executeQuery());
+        if (r->next()) n = r->getString("NOMBRE");
+        drenarResultados(q.get());
+    } catch (const exception &) {
+        // Si la lectura falla se muestra el usuario, que ya esta en la sesion.
+    }
+    return n;
+}
+
 static void cobrarVentaUI() {
     cout << "\n--- COBRAR VENTA EN PROCESO ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_VENTAS_PENDIENTES()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-6s | %-10s | %-10s | %-10s\n", "VENTA", "ESTADO", "PAGADO", "SALDO");
-        bool hay = false;
-        while (rl->next()) {
-            hay = true;
-            printf("%-6d | %-10s | %-10.2f | %-10.2f\n",
-                   rl->getInt("ID_VENTA"),
-                   rl->getString("ESTADO").c_str(),
-                   (double)rl->getDouble("PAGADO"),
-                   (double)rl->getDouble("SALDO"));
-        }
-        drenarResultados(pl.get());
-        if (!hay) {
+        // (08/11/2026) Paginado: antes traia las 20 ventas pendientes mas
+        // recientes y una vieja quedaba inalcanzable.
+        const size_t W_ID = 6, W_EST = 12, W_MON = 12;
+        const size_t ANCHO = W_ID + W_EST + W_MON * 2 + 3 * 3;
+        cout << "\n"
+             << tablaCelda("VENTA", W_ID) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("PAGADO", W_MON) << " | "
+             << tablaCelda("SALDO", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hay = mostrarPaginadoSP(
+            "CALL SP_VENTAS_PENDIENTES_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_VENTAS_PENDIENTES()",
+            {},
+            [=](sql::ResultSet *res) {
+                char pagado[24], saldo[24];
+                snprintf(pagado, sizeof(pagado), "%.2f", (double)res->getDouble("PAGADO"));
+                snprintf(saldo, sizeof(saldo), "%.2f", (double)res->getDouble("SALDO"));
+                string estado = res->getString("ESTADO");
+                cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_ID) << " | "
+                     << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                     << tablaCelda(pagado, W_MON) << " | "
+                     << tablaCelda(saldo, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) {
             cout << "[!] Sin ventas pendientes." << endl;
             return;
         }
         int idVenta = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
-        int idEmp = (int)leerNumeroConIntentos("ID empleado que cobra: ", 1, 999999999);
+        int idEmp = sesionActual.idEmpleado;
+        if (idEmp <= 0) {
+            cout << ROJO << "Tu usuario no esta vinculado a un empleado: no se"
+                 << " puede registrar el cobro." << RESET << endl;
+            return;
+        }
+        string nombreCobra = nombreEmpleadoDeSesion(idEmp);
+        cout << "Empleado que cobra: "
+             << (nombreCobra.empty() ? sesionActual.username : nombreCobra)
+             << " (ID " << idEmp << ")" << endl;
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_VENTAS_PENDIENTES()"));
         std::unique_ptr<sql::ResultSet> rs(ps->executeQuery());
@@ -1295,7 +1371,50 @@ static void setEmpleadoSesion(sql::PreparedStatement *pstmt, unsigned int indice
 static void garantiaRegistrarUI() {
     cout << "\n--- REGISTRAR GARANTIA ---" << endl;
     try {
+        // (07/11/2026) Antes se pedia el ID de la venta a ciegas. Ahora se
+        // listan las ventas REALIZADA con lineas sin garantia, que son las
+        // unicas sobre las que se puede registrar una.
+        std::unique_ptr<sql::PreparedStatement> pVentas(globalCon->prepareStatement(
+            "CALL SP_VENTAS_GARANTIZABLES()"));
+        std::unique_ptr<sql::ResultSet> rVentas(pVentas->executeQuery());
+
+        const size_t W_VENTA = 6, W_FEC = 19, W_CLI = 22, W_EST = 10, W_LIN = 6;
+        const size_t ANCHO_V = W_VENTA + W_FEC + W_CLI + W_EST + W_LIN + 4 * 3;
+        cout << "\n"
+             << tablaCelda("VENTA", W_VENTA) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("LINEAS", W_LIN) << "\n"
+             << tablaLinea(ANCHO_V) << "\n";
+
+        vector<int> garantizablesVenta;
+        while (rVentas->next()) {
+            garantizablesVenta.push_back(rVentas->getInt("ID_VENTA"));
+            cout << tablaCelda(to_string(rVentas->getInt("ID_VENTA")), W_VENTA) << " | "
+                 << tablaCelda(rVentas->getString("FECHA"), W_FEC) << " | "
+                 << tablaCelda(rVentas->getString("CLIENTE"), W_CLI) << " | "
+                 << tablaCelda(rVentas->getString("ESTADO"), W_EST) << " | "
+                 << tablaCelda(to_string(rVentas->getInt("LINEAS_SIN_GARANTIA")), W_LIN) << "\n"
+                 << tablaLinea(ANCHO_V) << "\n";
+        }
+        drenarResultados(pVentas.get());
+
+        if (garantizablesVenta.empty()) {
+            cout << "\n[!] No hay ventas con lineas sin garantia." << endl;
+            return;
+        }
+
         int idVenta = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
+        bool ventaEnLista = false;
+        for (int v : garantizablesVenta) {
+            if (v == idVenta) { ventaEnLista = true; break; }
+        }
+        if (!ventaEnLista) {
+            cout << ROJO << "Esa venta no esta en la lista de ventas garantizables."
+                 << RESET << endl;
+            return;
+        }
 
         std::unique_ptr<sql::PreparedStatement> pLineas(globalCon->prepareStatement(
             "CALL SP_LINEAS_VENTA_CON_GARANTIA(?)"));
@@ -1632,18 +1751,24 @@ static void ejecutarSubmenuGarantias() {
 static void historialVentaUI() {
     cout << "\n--- HISTORIAL DE VENTA ---" << endl;
     try {
-        int vHist = (int)leerNumeroConIntentos("ID venta: ", 1, 999999999);
+        // (07/11/2026) Enter lista el historial de todas las ventas; un ID
+        // puntual filtra a esa venta (P_ID_VENTA = 0 en el SP).
+        double dTodas = 0.0;
+        int vHist = (int)leerNumeroConIntentos("ID venta (Enter = todas): ",
+                                               0, 999999999, &dTodas);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
             "CALL SP_HISTORIAL_VENTA(?)"));
         pstmt->setInt(1, vHist);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-19s | %-10s | %-10s | %-15s | %-30s\n", "FECHA", "DE", "A", "EMPLEADO", "MOTIVO");
+        printf("\n%-6s | %-19s | %-10s | %-10s | %-15s | %-30s\n",
+               "VENTA", "FECHA", "DE", "A", "EMPLEADO", "MOTIVO");
         bool hay = false;
         while (res->next()) {
             hay = true;
             string ant;
             try { ant = res->getString("ESTADO_ANTERIOR"); } catch (...) { ant = "---"; }
-            printf("%-19.19s | %-10s | %-10s | %-15.15s | %-30.30s\n",
+            printf("%-6d | %-19.19s | %-10s | %-10s | %-15.15s | %-30.30s\n",
+                   res->getInt("ID_VENTA"),
                    res->getString("FECHA").c_str(),
                    ant.c_str(),
                    res->getString("ESTADO_NUEVO").c_str(),

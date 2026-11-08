@@ -99,13 +99,20 @@ DROP PROCEDURE IF EXISTS SP_HISTORIAL_VENTA ;
 /*
 SP_HISTORIAL_VENTA (14/10/2026)
 Historial de estados de una venta, del mas nuevo al mas viejo. Solo lectura.
+
+(07/11/2026) P_ID_VENTA = 0 lista el historial de todas las ventas: la UI
+pide "ID venta o Enter para ver todas". Se agrega ID_VENTA a la salida para
+poder distinguir las filas cuando se listan todas; con un ID puntual el
+resultado es el mismo de antes.
 */
 CREATE PROCEDURE SP_HISTORIAL_VENTA(IN P_ID_VENTA INT)
 BEGIN
-    SELECT H.FECHA, H.ESTADO_ANTERIOR, H.ESTADO_NUEVO, E.NOMBRE AS EMPLEADO, H.MOTIVO
+    CALL SP_EXIGIR_PERMISO('SP_HISTORIAL_VENTA');
+    SELECT H.ID_VENTA, H.FECHA, H.ESTADO_ANTERIOR, H.ESTADO_NUEVO,
+           E.NOMBRE AS EMPLEADO, H.MOTIVO
       FROM HISTORIAL_ESTADOS_VENTA H
       JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO
-     WHERE H.ID_VENTA = P_ID_VENTA
+     WHERE (P_ID_VENTA = 0 OR H.ID_VENTA = P_ID_VENTA)
      ORDER BY H.ID_HISTORIAL_ESTADO DESC;
 END //
 DELIMITER ;

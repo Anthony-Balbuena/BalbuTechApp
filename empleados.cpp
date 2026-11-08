@@ -12,6 +12,7 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "sesion.h"
 #include "contrato.h"
@@ -192,9 +193,42 @@ void registrarEmpleado() {
     }
 }
 
+// (07/11/2026) Antes se pedia el ID a ciegas. Se lista ID y nombre para
+// elegir; mismo patron que "Actualizar Cliente".
+// (08/11/2026) Con filtro de estado: "Reactivar" solo ofrece los INACTIVOS,
+// asi no se pide a ciegas el ID de un despedido.
+static int imprimirEmpleadosParaElegir(const string &estado = "") {
+    const size_t W_ID = 4, W_NOM = 30;
+    const size_t ANCHO = W_ID + W_NOM + 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    // (08/11/2026) Paginado de 10 en 10: el filtro va en las dos consultas
+    // (filas y COUNT) con el mismo parametro.
+    const string filtro = estado.empty() ? "" : " WHERE ESTADO = ?";
+    const vector<string> params = estado.empty() ? vector<string>{}
+                                                 : vector<string>{estado};
+
+    return mostrarPaginado({
+        "SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS" + filtro + " ORDER BY ID_EMPLEADO",
+        "SELECT COUNT(*) FROM EMPLEADOS" + filtro,
+        params }, [=](sql::ResultSet *res) {
+        cout << tablaCelda(to_string(res->getInt("ID_EMPLEADO")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    });
+}
+
 void actualizarEmpleado() {
     cout << "\n--- ACTUALIZAR EMPLEADO ---" << endl;
     try {
+        if (imprimirEmpleadosParaElegir() == 0) {
+            cout << "\n[!] No hay empleados registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del empleado: ");
         int idEmpleado = stoi(idStr);
 
@@ -234,6 +268,11 @@ void actualizarEmpleado() {
 void despedirEmpleado() {
     cout << "\n--- DESPEDIR EMPLEADO ---" << endl;
     try {
+        if (imprimirEmpleadosParaElegir() == 0) {
+            cout << "\n[!] No hay empleados registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del empleado: ");
         int idEmpleado = stoi(idStr);
 
@@ -266,6 +305,11 @@ void despedirEmpleado() {
 void reactivarEmpleado() {
     cout << "\n--- REACTIVAR EMPLEADO ---" << endl;
     try {
+        if (imprimirEmpleadosParaElegir("INACTIVO") == 0) {
+            cout << "\n[!] No hay empleados despedidos para reactivar." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del empleado: ");
         int idEmpleado = stoi(idStr);
         string salStr = leerDatoSeguro("Nuevo salario: ");

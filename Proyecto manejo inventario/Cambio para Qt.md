@@ -133,12 +133,199 @@ La pantalla Qt hace lo mismo que el punto 3: un formulario que llama a `servicio
 - [ ] Pasar los tests existentes.
 - [ ] Objetivo: aprender el patrón con el módulo más chico (220 líneas).
 
+#### Lecturas directas: se mudan, no se reescriben (08/11/2026)
+
+Las pantallas que hoy listan antes de pedir un ID usan `SELECT` directo, no un
+`SP`:
+
+| Pantalla | Consulta actual |
+|---|---|
+| Clientes → Actualizar | `SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES` |
+| Clientes → Cambiar Estado | `SELECT ID_CLIENTE, NOMBRE, ESTADO FROM CLIENTES` |
+| Proveedores → Actualizar | `SELECT ID_PROVEEDOR, NOMBRE FROM PROVEEDORES` |
+| Proveedores → Cambiar Estado | `SELECT ID_PROVEEDOR, NOMBRE, ESTADO FROM PROVEEDORES` |
+| Marcas → Actualizar | `SELECT ID_MARCA, NOMBRE FROM MARCAS` |
+| Marcas → Cambiar Estado | `SELECT ID_MARCA, NOMBRE, ESTADO FROM MARCAS` |
+| Empleados → Actualizar / Despedir | `SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS` |
+| Empleados → Reactivar | igual, con `WHERE ESTADO = 'INACTIVO'` |
+
+**El SQL está bien: no se cambia para Qt.** Lo que cambia es dónde vive. Hoy el
+`SELECT` está adentro de la función de pantalla, junto a `cout` y a `globalCon`.
+En Qt esa pantalla no existe: no puede usar `globalCon` ni `cout`. En la Fase 1
+el `SELECT` se **muda al repositorio** (`ClienteRepo::listar()`), que es quien
+habla con MySQL; la pantalla de consola y después la de Qt solo consumen. Mudar
+la consulta no es cambiar comportamiento: el `ORDER BY` y las columnas quedan
+iguales. Lo único que se le agrega es la paginación (`LIMIT`/`OFFSET`), que se
+decide más abajo.
+
+#### No reusar `SP_LISTAR_*` desde esas pantallas
+
+`SP_LISTAR_CLIENTES`, `SP_LISTAR_PROVEEDORES` y `SP_LISTAR_MARCAS` existen,
+pero exigen el permiso de **consulta** con `EXIGIR = 1`:
+
+| Rutina | Permiso | EXIGIR |
+|---|---|---|
+| `SP_LISTAR_CLIENTES` | `CLIENTES_VER` | 1 |
+| `SP_LISTAR_PROVEEDORES` | `PROVEEDORES_VER` | 1 |
+| `SP_LISTAR_MARCAS` | `MARCAS_VER` | 1 |
+
+La matriz real de Clientes:
+
+```
+ROL           VER  EDITAR  ESTADO
+ADMIN          1     1       1
+CONTABILIDAD   1     0       0
+GERENTE        1     1       1
+SUBGERENTE     1     1       1
+VENDEDOR       0     1       1   ← tiene EDITAR y ESTADO, no VER
+```
+
+`VENDEDOR` llega a "Actualizar Cliente" y "Cambiar Estado" sin tener
+`CLIENTES_VER`. Si esas pantallas pasaran a llamar `SP_LISTAR_CLIENTES`, el
+vendedor recibiría `ERROR: SIN PERMISO PARA ESTA OPERACION.` y se le rompería
+una pantalla que hoy funciona. Hoy funciona porque la lectura directa no lleva
+guarda.
+
+Es la misma regla que gobierna el mapeo de todo el proyecto: **el permiso que
+exige un `SP` tiene que ser uno que todos los roles capaces de abrir la pantalla
+llamadora tengan.** Acá el denominador común es `CLIENTES_EDITAR`, no
+`CLIENTES_VER`.
+
+En Proveedores no hay riesgo (todos los que tienen `PROVEEDORES_EDITAR` tienen
+`PROVEEDORES_VER`), pero se mantiene el mismo patrón para no mezclar.
+
+En Marcas tampoco hay riesgo **hoy**: los cuatro roles con `MARCAS_EDITAR` o
+`MARCAS_ESTADO` (ADMIN, GERENTE, SUBGERENTE, ALMACEN) tienen además
+`MARCAS_VER`, así que `SP_LISTAR_MARCAS` funcionaría. Igual se dejó el `SELECT`
+directo, por dos motivos: mantiene el mismo patrón que los otros módulos y no
+queda atado a que `MARCAS_VER` siga siendo universal. El día que alguien reciba
+`MARCAS_EDITAR` sin `MARCAS_VER`, la pantalla no se rompe.
+
+Ojo con el enum: `MARCAS.ESTADO` es `ENUM('ACTIVA','INACTIVA')`, no
+`ACTIVO/INACTIVO` como Clientes, Proveedores y Empleados. `tablaColorEstado`
+contempla los dos, pero cualquier filtro nuevo tiene que usar los valores
+correctos.
+
+Si más adelante se quiere que las lecturas queden auditadas por permiso, la vía
+es un `SP` nuevo con el permiso de la pantalla (`CLIENTES_EDITAR`,
+`PROVEEDORES_EDITAR`, `MARCAS_EDITAR`, `EMPLEADOS_EDITAR`), **nunca** reusar
+`SP_LISTAR_*` desde la pantalla de edición.
+
+#### Paginación: 10 filas por página (08/11/2026)
+
+Decisión del dueño: los listados de selección van **paginados de 10**.
+
+Esto **no es solo UI**. Paginar obliga a cambiar la consulta y el contrato del
+repositorio:
+
+```sql
+-- 1) La página
+SELECT ID_CLIENTE, NOMBRE, ESTADO
+  FROM CLIENTES
+ ORDER BY ID_CLIENTE
+ LIMIT 10 OFFSET 20;   -- página 3
+
+-- 2) El total, con el mismo filtro, para saber cuántas páginas hay
+SELECT COUNT(*) FROM CLIENTES;
+```
+
+Y en el repositorio:
+
+```cpp
+struct PaginaClientes {
+    std::vector<Cliente> filas;  // como máximo 10
+    int total;                   // para "Página 1 de 3"
+};
+
+PaginaClientes ClienteRepo::listar(int pagina, int porPagina = 10);
+```
+
+Con `total` se calculan las páginas y se deshabilitan los botones: sin el
+`COUNT` la pantalla no sabe si hay una página más hasta que llega vacía.
+
+**Ojo con la sección anterior.** Ahí dice que el `SELECT` no se reescribe. Sigue
+siendo cierto *por Qt*: cambia por paginar, no por migrar. Pero hay que decidirlo
+en la **Fase 1**, cuando se arma el repositorio, y no en la Fase 2: si la consola
+y Qt no comparten el contrato, el repositorio termina con dos formas de leer y se
+pierde justo lo que la Fase 1 busca.
+
+**Decidido (08/11/2026): la consola también pagina.** La pantalla de consola usa
+`[N]` siguiente / `[P]` anterior y muestra "Página 1 de 3". No hay dos formas de
+leer: consola y Qt piden la misma página al mismo método del repositorio y cada
+una la dibuja a su manera.
+
+Condición para que esto sirva de verdad: **el `LIMIT`/`OFFSET` y el `COUNT`
+viven en el repositorio, no en la pantalla.** Si la paginación se implementa
+dentro de la función de consola (como está hoy `imprimirClientesParaEstado`),
+Qt no hereda nada: tendría que repetir la consulta. Lo que se comparte es el
+contrato (`listar(pagina)` que devuelve filas + total), no el `cout` ni los
+botones.
+
+Ventaja práctica de hacerlo primero en consola: se diseña y se prueba el
+contrato barato (compilar y correr en segundos) antes de meter Qt. Cuando llegue
+la PoC, la consulta paginada ya está resuelta y solo falta dibujarla.
+
+##### Implementación en consola (08/11/2026): `paginacion.h`
+
+Ya está hecho, genérico y compartido: `paginacion.h` expone `mostrarPaginado`
+y `mostrarPaginadoSP`, y las pantallas solo aportan **cómo se dibuja una fila**.
+No hay paginación copiada por módulo.
+
+| Función | Cuándo |
+|---|---|
+| `mostrarPaginado(ConsultaPaginada, fila)` | la pantalla puede leer la tabla con `SELECT` directo |
+| `mostrarPaginadoSP(callPagina, callTotal, filtros, fila)` | la tabla solo se lee por `SP` `DEFINER` |
+
+El segundo caso no es capricho: `balbu_app` tiene `SELECT` sobre 16 tablas
+nomas (recorte del 03/11). `PRODUCTOS` e `INVENTARIO` **no** están entre ellas,
+así que ahí el `LIMIT` tiene que vivir dentro del procedimiento
+(`SP_CONSULTAR_PRODUCTOS_PAGINADO` + `SP_CONTAR_PRODUCTOS_FILTRADOS`, módulo 9).
+
+Pantallas ya paginadas: Clientes (Actualizar, Cambiar Estado, Buscar, Listar),
+Proveedores (Actualizar, Cambiar Estado, Listar), Marcas (Actualizar, Cambiar
+Estado), Empleados (Actualizar, Despedir, Reactivar), Productos (Buscar,
+Actualizar, Consultar Inventario, Reporte de Stock), Compras (Ver compra con
+IVA, Devolución, Pagar, Cancelar) y Ventas (Cobrar, Anular pago, Devolución).
+
+Pendientes de paginar, todas por la misma razón (lectura por `SP`, sin `SELECT`
+directo): Proveedores → Buscar, Marcas → Buscar/Listar, Kardex y los reportes
+por periodo de Ventas y Compras. Cada una necesita su par de `SP`s paginados,
+como Productos o Ventas.
+
+Consecuencia práctica: la Fase 1 deja de ser "mudar el SQL tal cual" y pasa a ser
+"mudar el SQL y agregarle `LIMIT`/`OFFSET`". El comportamiento visible de la
+consola cambia (10 por pantalla) y eso hay que aceptarlo explícitamente, porque
+choca con el "no cambiar el comportamiento" del plan original.
+
+##### ¿Se puede hacer en Qt? Sí
+
+Paginar en Qt es de las cosas fáciles:
+
+- `QTableView` + un modelo propio que guarde **solo la página actual** (o, más
+  simple todavía, un `QTableWidget` que se rellena con las 10 filas que devolvió
+  el servicio).
+- Dos botones (anterior / siguiente) y un `QLabel` con "Página 2 de 5",
+  habilitados según `pagina > 1` y `pagina < totalPaginas`.
+- La pantalla **no hace SQL**: llama a `servicio.listar(pagina)` y muestra lo que
+  llega. Toda la consulta sigue viviendo en el repositorio.
+
+Lo que **no** conviene: usar `QSqlQueryModel::fetchMore()` para esto. Eso carga
+filas de a poco sobre una única consulta abierta; no sabe cuántas páginas hay ni
+te deja saltar a la última. Para paginación real, `LIMIT`/`OFFSET` en el
+repositorio y un modelo que solo tiene la página.
+
+Costo real: una pantalla paginada tiene dos consultas (página + total) y tres
+piezas de UI (tabla, botones, etiqueta). No cambia el esfuerzo de la migración;
+solo hay que preverlo en el contrato del repositorio desde el principio.
+
 ### Fase 2 — PoC de Qt
 
 - [ ] CMake + Qt 6.8 LTS en Windows (Docker queda solo para la base).
 - [ ] Pantalla de login + módulo Clientes.
 - [ ] Reusar el mismo servicio de la Fase 1.
 - [ ] Medir el esfuerzo real de una pantalla.
+- [ ] Incluir la paginación de 10 en la pantalla de Clientes: es la pieza que más
+      cambia el contrato del repositorio y conviene medirla en la PoC.
 
 ### Fase 3 — Migración por módulos
 

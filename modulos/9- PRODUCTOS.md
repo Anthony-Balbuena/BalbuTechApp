@@ -106,6 +106,32 @@ STOCK, PROVEEDOR, ID_PROVEEDOR`, ordenado por ID.
 - `STOCK` sale de `LEFT JOIN INVENTARIO`: un producto sin fila de inventario
   aparece con `STOCK` `NULL`, no con 0.
 
+### `SP_CONSULTAR_PRODUCTOS_PAGINADO(P_BUSQUEDA, P_PAGINA, P_POR_PAGINA)`
+
+**Usada por la app** (`productos.cpp` → "Buscar Producto", 08/11/2026).
+
+Mismas columnas y mismo criterio de búsqueda que
+`SP_CONSULTAR_PRODUCTOS_FILTRADO`, pero devuelve **una página**: `LIMIT
+P_POR_PAGINA OFFSET (P_PAGINA-1)*P_POR_PAGINA`.
+
+- `P_PAGINA` nulo o `< 1` → 1. `P_POR_PAGINA` nulo o `< 1` → 10.
+- Existe por el recorte de privilegios del 03/11: `balbu_app` **no** tiene
+  `SELECT` sobre `PRODUCTOS`, así que la pantalla no puede paginar con un
+  `SELECT` directo. El `LIMIT` tiene que vivir dentro del `SP` `DEFINER`.
+- Permiso: `CONSULTAR_PRODUCTOS`.
+
+### `SP_CONTAR_PRODUCTOS_FILTRADOS(P_BUSQUEDA)`
+
+**Usada por la app** (`productos.cpp`, 08/11/2026). Devuelve `COUNT(*) AS TOTAL`
+con el mismo `WHERE` que el paginado.
+
+Sin este conteo la pantalla no sabe cuántas páginas hay: el paginador lo usa
+para armar "Página 1 de 2" y habilitar/deshabilitar "siguiente". Permiso:
+`CONSULTAR_PRODUCTOS`.
+
+> Si cambia el criterio de búsqueda en `SP_CONSULTAR_PRODUCTOS_FILTRADO` hay
+> que cambiarlo en **los tres**: el filtrado, el paginado y el conteo.
+
 ### `SP_CONSULTAR_INVENTARIO(P_FILTRO)`
 
 **Usada por la app** (`productos.cpp`, `ventas.cpp`, `compras.cpp`). Lista
@@ -118,6 +144,26 @@ Calcula `ESTATUS_STOCK`:
 - `STOCK_ACTUAL <= STOCK_MINIMO` → **`CRÍTICO`**;
 - `STOCK_ACTUAL <= STOCK_MINIMO * 2` → **`STOCK BAJO`**;
 - resto → **`OK`**.
+
+### `SP_CONSULTAR_INVENTARIO_PAGINADO(P_FILTRO, P_PAGINA, P_POR_PAGINA)`
+
+(08/11/2026) Una página de `SP_CONSULTAR_INVENTARIO`, mismas columnas y mismo
+filtro. La usa "Productos > Consultar Inventario". Permiso:
+`CONSULTAR_PRODUCTOS`.
+
+### `SP_CONTAR_INVENTARIO(P_FILTRO)`
+
+`COUNT(*)` con el mismo filtro y el mismo `ESTADO = 'ACTIVO'`, para el
+paginador de la consulta.
+
+### `SP_REPORTE_STOCK_CRITICO_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+(08/11/2026) Una página del reporte de stock crítico, mismo orden
+(`CANTIDAD_FALTANTE DESC`). Permiso: `CONSULTAR_PRODUCTOS`.
+
+### `SP_CONTAR_STOCK_CRITICO()`
+
+Cuántos productos están en o bajo su mínimo, para el paginador del reporte.
 
 ### `SP_REPORTE_STOCK_CRITICO()`
 
@@ -140,6 +186,20 @@ proveedores (todos ordenados por ID).
 
 **Usada por la app** (`productos.cpp`). Devuelve producto, precio, categoría
 y marca para la pantalla de edición.
+
+> (08/11/2026) La app ya no la llama: el listado de edición va por
+> `PARA_ACTUALIZARDATOS_PAGINADO` + `SP_CONTAR_PRODUCTOS`. Queda por
+> compatibilidad.
+
+### `PARA_ACTUALIZARDATOS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+(08/11/2026) Una página del listado de edición: `ID_PRODUCTO`, `PRODUCTO`,
+`PRECIO`, `ID_CATEGORIA`, `CATEGORIA`, `ID_MARCA`, `MARCA`. Permiso:
+`GESTIONAR_PRODUCTOS`, el mismo que ya exigía `PARA_ACTUALIZARDATOS`.
+
+### `SP_CONTAR_PRODUCTOS()`
+
+`COUNT(*)` de `PRODUCTOS`, para el paginador de la edición.
 
 > **Nota:** al final de la definición hay un `CALL PARA_ACTUALIZARDATOS();`
 > suelto que se ejecuta **en cada import** y vuelca toda la tabla como result

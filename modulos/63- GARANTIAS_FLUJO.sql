@@ -333,6 +333,7 @@ END //
 DROP PROCEDURE IF EXISTS SP_LINEAS_VENTA_CON_GARANTIA //
 CREATE PROCEDURE SP_LINEAS_VENTA_CON_GARANTIA(IN P_ID_VENTA INT)
 BEGIN
+    CALL SP_EXIGIR_PERMISO('SP_LINEAS_VENTA_CON_GARANTIA');
     SELECT DV.ID_DETALLE_VENTA,
            P.NOMBRE AS PRODUCTO,
            DV.CANTIDAD,
@@ -343,6 +344,37 @@ BEGIN
       LEFT JOIN GARANTIAS G ON G.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
      WHERE DV.ID_VENTA = P_ID_VENTA
      ORDER BY DV.ID_DETALLE_VENTA;
+END //
+
+-- ---------------------------------------------------------------------------
+-- 10.b Ventas que todavia admiten garantia (07/11/2026)
+-- ---------------------------------------------------------------------------
+-- El alta manual pedia el ID de la venta a ciegas. Este SP lista las ventas
+-- REALIZADA con al menos una linea sin garantia, que son las unicas sobre las
+-- que tiene sentido registrar una: las que ya la tienen (por el trigger
+-- automatico o por un alta anterior) no aparecen. LIMIT 50 para que la
+-- pantalla no escupa historico completo.
+--
+-- Permiso: GARANTIAS_REGISTRAR, el mismo que abre "Registrar garantia"; todo
+-- rol que llega a esa pantalla lo tiene.
+DROP PROCEDURE IF EXISTS SP_VENTAS_GARANTIZABLES //
+CREATE PROCEDURE SP_VENTAS_GARANTIZABLES()
+BEGIN
+    CALL SP_EXIGIR_PERMISO('SP_VENTAS_GARANTIZABLES');
+    SELECT V.ID_VENTA,
+           V.FECHA,
+           C.NOMBRE AS CLIENTE,
+           V.ESTADO,
+           COUNT(*) AS LINEAS_SIN_GARANTIA
+      FROM DETALLES_VENTA DV
+      JOIN VENTAS V   ON V.ID_VENTA = DV.ID_VENTA
+      JOIN CLIENTES C ON C.ID_CLIENTE = V.ID_CLIENTE
+      LEFT JOIN GARANTIAS G ON G.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+     WHERE G.ID_GARANTIA IS NULL
+       AND V.ESTADO = 'REALIZADA'
+     GROUP BY V.ID_VENTA, V.FECHA, C.NOMBRE, V.ESTADO
+     ORDER BY V.ID_VENTA DESC
+     LIMIT 50;
 END //
 
 DELIMITER ;

@@ -8,16 +8,24 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p output
+
+# BUILD_DEBUG=1 agrega simbolos y desactiva optimizaciones para depurar
+# desde VS Code (F5). Sin la bandera el binario queda como siempre.
+EXTRA=""
+if [ "${BUILD_DEBUG:-0}" = "1" ]; then
+  EXTRA="-g -O0"
+fi
+
 C8="$HOME/conectores/mysql-connector-c++-8.4.0-linux-glibc2.28-x86-64bit"
 if [ -d "$C8/include/jdbc" ]; then
-  g++ -std=c++17 -Wall -Wextra \
+  g++ -std=c++17 -Wall -Wextra $EXTRA \
     -I"$C8/include/jdbc" \
     *.cpp \
     -o output/app \
     -L"$C8/lib64" -lmysqlcppconn -lssl -lcrypto \
     -Wl,-rpath,"$C8/lib64"
 else
-  g++ -std=c++17 -Wall -Wextra \
+  g++ -std=c++17 -Wall -Wextra $EXTRA \
     *.cpp \
     -o output/app \
     -lmysqlcppconn -lssl -lcrypto

@@ -10,6 +10,7 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "colores.h"
 #include "tabla.h"
@@ -100,9 +101,20 @@ void registrarCliente() {
     }
 }
 
+// (07/11/2026) Actualizar y cambiar estado muestran primero los clientes
+// registrados: el ID deja de ser un dato que haya que memorizar. Devuelven
+// cuantos hay para no pedir un ID sobre una lista vacia.
+static int imprimirClientesParaElegir();
+static int imprimirClientesParaEstado();
+
 void actualizarCliente() {
     cout << "\n--- ACTUALIZAR CLIENTE ---" << endl;
     try {
+        if (imprimirClientesParaElegir() == 0) {
+            cout << "\n[!] No hay clientes registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del cliente: ");
         int idCliente = stoi(idStr);
 
@@ -137,6 +149,11 @@ void actualizarCliente() {
 void cambiarEstadoCliente() {
     cout << "\n--- CAMBIAR ESTADO DEL CLIENTE ---" << endl;
     try {
+        if (imprimirClientesParaEstado() == 0) {
+            cout << "\n[!] No hay clientes registrados." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID del cliente: ");
         int idCliente = stoi(idStr);
 
@@ -158,49 +175,85 @@ void cambiarEstadoCliente() {
     }
 }
 
-static int imprimirTablaClientes(sql::ResultSet *res) {
-    const size_t W_ID = 4, W_NOM = 22, W_TEL = 12, W_MAIL = 30, W_EST = 9;
-    const size_t ANCHO = W_ID + W_NOM + W_TEL + W_MAIL + W_EST + 4 * 3;
+// (08/11/2026) Listados paginados de 10 en 10 con paginacion.h. El encabezado
+// y el dibujo de cada fila quedan aca; el LIMIT/OFFSET y el COUNT los pone el
+// paginador, que es el mismo que va a consumir la pantalla de Qt.
+static const size_t CLI_W_ID = 4, CLI_W_NOM = 22, CLI_W_TEL = 12,
+                    CLI_W_MAIL = 30, CLI_W_EST = 9;
+static const size_t CLI_ANCHO =
+    CLI_W_ID + CLI_W_NOM + CLI_W_TEL + CLI_W_MAIL + CLI_W_EST + 4 * 3;
+
+static void imprimirEncabezadoClientes() {
+    cout << "\n"
+         << tablaCelda("ID", CLI_W_ID) << " | "
+         << tablaCelda("NOMBRE", CLI_W_NOM) << " | "
+         << tablaCelda("TELEFONO", CLI_W_TEL) << " | "
+         << tablaCelda("EMAIL", CLI_W_MAIL) << " | "
+         << tablaCelda("ESTADO", CLI_W_EST) << "\n"
+         << tablaLinea(CLI_ANCHO) << "\n";
+}
+
+static void imprimirFilaCliente(sql::ResultSet *res) {
+    string estado = res->getString("ESTADO");
+    cout << tablaCelda(to_string(res->getInt("ID_CLIENTE")), CLI_W_ID) << " | "
+         << tablaCelda(res->getString("NOMBRE"), CLI_W_NOM) << " | "
+         << tablaCelda(res->getString("TELEFONO"), CLI_W_TEL) << " | "
+         << tablaCelda(res->getString("EMAIL"), CLI_W_MAIL) << " | "
+         << tablaColorEstado(estado) << tablaCelda(estado, CLI_W_EST) << RESET << "\n"
+         << tablaLinea(CLI_ANCHO) << "\n";
+}
+
+// Misma consulta directa que el listado del menu: la guarda del modulo 66 vive
+// en las rutinas, no en estas lecturas de pantalla.
+static int imprimirClientesParaElegir() {
+    imprimirEncabezadoClientes();
+    return mostrarPaginado({
+        "SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE",
+        "SELECT COUNT(*) FROM CLIENTES",
+        {} }, imprimirFilaCliente);
+}
+
+// Para cambiar el estado alcanza con ver a quien se le cambia: ID, nombre y
+// estado actual.
+static int imprimirClientesParaEstado() {
+    const size_t W_ID = 4, W_NOM = 26, W_EST = 9;
+    const size_t ANCHO = W_ID + W_NOM + W_EST + 2 * 3;
     cout << "\n"
          << tablaCelda("ID", W_ID) << " | "
          << tablaCelda("NOMBRE", W_NOM) << " | "
-         << tablaCelda("TELEFONO", W_TEL) << " | "
-         << tablaCelda("EMAIL", W_MAIL) << " | "
          << tablaCelda("ESTADO", W_EST) << "\n"
          << tablaLinea(ANCHO) << "\n";
-    int n = 0;
-    while (res->next()) {
-        ++n;
+
+    return mostrarPaginado({
+        "SELECT ID_CLIENTE, NOMBRE, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE",
+        "SELECT COUNT(*) FROM CLIENTES",
+        {} }, [=](sql::ResultSet *res) {
         string estado = res->getString("ESTADO");
         cout << tablaCelda(to_string(res->getInt("ID_CLIENTE")), W_ID) << " | "
              << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
-             << tablaCelda(res->getString("TELEFONO"), W_TEL) << " | "
-             << tablaCelda(res->getString("EMAIL"), W_MAIL) << " | "
              << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
              << tablaLinea(ANCHO) << "\n";
-    }
-    return n;
+    });
 }
 
 void buscarCliente() {
     cout << "\n--- BUSCAR CLIENTE ---" << endl;
     try {
         string filtro = leerDatoSeguro("Ingrese nombre, email o telefono o Enter para ver todos: ");
+        const string like = "%" + filtro + "%";
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES WHERE (? = '' OR NOMBRE LIKE ? OR EMAIL LIKE ? OR TELEFONO LIKE ?) ORDER BY ID_CLIENTE"));
-        pstmt->setString(1, filtro);
-        pstmt->setString(2, "%" + filtro + "%");
-        pstmt->setString(3, "%" + filtro + "%");
-        pstmt->setString(4, "%" + filtro + "%");
+        imprimirEncabezadoClientes();
+        int encontrado = mostrarPaginado({
+            "SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES "
+            "WHERE (? = '' OR NOMBRE LIKE ? OR EMAIL LIKE ? OR TELEFONO LIKE ?) "
+            "ORDER BY ID_CLIENTE",
+            "SELECT COUNT(*) FROM CLIENTES "
+            "WHERE (? = '' OR NOMBRE LIKE ? OR EMAIL LIKE ? OR TELEFONO LIKE ?)",
+            {filtro, like, like, like} }, imprimirFilaCliente);
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        bool encontrado = imprimirTablaClientes(res.get()) > 0;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n[!] No se encontraron clientes con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
         }
-
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -211,16 +264,15 @@ void buscarCliente() {
 void listarClientes() {
     cout << "\n--- LISTADO DE CLIENTES ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE"));
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        imprimirEncabezadoClientes();
+        int encontrado = mostrarPaginado({
+            "SELECT ID_CLIENTE, NOMBRE, TELEFONO, EMAIL, ESTADO FROM CLIENTES ORDER BY ID_CLIENTE",
+            "SELECT COUNT(*) FROM CLIENTES",
+            {} }, imprimirFilaCliente);
 
-        bool encontrado = imprimirTablaClientes(res.get()) > 0;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n[!] No hay clientes registrados." << endl;
         }
-
-        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar clientes: " << e.what() << endl;
     }

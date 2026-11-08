@@ -128,6 +128,7 @@ static vector<string> permisosDelUsuario(const string& usuario) {
 void mostrarPermisosActuales() {
     if (!sesionActiva()) {
         cout << ROJO << "No hay sesión activa." << RESET << endl;
+        pausar();
         return;
     }
 
@@ -137,12 +138,18 @@ void mostrarPermisosActuales() {
     vector<string> permisos = permisosDelUsuario(sesionActual.username);
     if (permisos.empty()) {
         cout << "Sin permisos asignados." << endl;
+        pausar();
         return;
     }
 
     for (const string& permiso : permisos) {
         cout << "- " << permiso << endl;
     }
+
+    // (07/11/2026) Sin pausa la lista (58 lineas para ADMIN) se iba con el
+    // redibujado del menu y parecia que la opcion no hacia nada.
+    cout << "\nTotal: " << permisos.size() << " permisos." << endl;
+    pausar();
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +203,7 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Caja (turnos)",    {"CONSULTAR_CAJA", "ABRIR_CAJA",
                               "CERRAR_CAJA"},                              AccionMenu::Caja},
         {"Accesos",          {"GESTIONAR_ROLES"},                          AccionMenu::LogAccesos},
-        {"Ver permisos",     {},                                           AccionMenu::VerPermisos},
+        {"Ver permisos",     {"GESTIONAR_ROLES"},                          AccionMenu::VerPermisos},
         {"Cerrar sesión",    {},                                           AccionMenu::CerrarSesion}
     };
     return items;

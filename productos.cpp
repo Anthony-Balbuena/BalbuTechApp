@@ -14,6 +14,7 @@
 #include "database.h"
 #include "sesion.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "colores.h"
 #include "tabla.h"
@@ -184,25 +185,33 @@ void actualizarProducto() {
     cout << "\n--- ACTUALIZAR DATOS DE PRODUCTO ---" << endl;
 
     try {
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL PARA_ACTUALIZARDATOS()"));
-        bool results = pstmt->execute();
+        // (08/11/2026) Paginado de 10 en 10: antes traia todos los productos con
+        // categoria y marca en un bloque larguisimo.
+        const size_t W_ID = 5, W_PROD = 25, W_PRE = 10, W_CAT = 20, W_MAR = 15;
+        const size_t ANCHO = W_ID + W_PROD + W_PRE + W_CAT + W_MAR + 4 * 3;
+        cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORIAS Y MARCAS ---\n" << RESET;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("PRODUCTO", W_PROD) << " | "
+             << tablaCelda("PRECIO", W_PRE) << " | "
+             << tablaCelda("CATEGORIA", W_CAT) << " | "
+             << tablaCelda("MARCA", W_MAR) << "\n"
+             << tablaLinea(ANCHO) << "\n";
 
-        if (results) {
-            std::unique_ptr<sql::ResultSet> res(pstmt->getResultSet());
-            cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORÍAS Y MARCAS ---\n" << RESET;
-
-            while (res->next()) {
-                cout << CIAN << "\n | ID Producto: " << RESET << res->getInt("ID_PRODUCTO")
-                     << CIAN << "\n | Producto: " << RESET << res->getString("PRODUCTO")
-                     << CIAN << "\n | Precio: " << RESET << "$" << res->getDouble("PRECIO")
-                     << CIAN << "\n | ID CATEGORIA: " << RESET << res->getInt("ID_CATEGORIA")
-                     << CIAN << "\n | Categoría: " << RESET << res->getString("CATEGORIA")
-                     << CIAN << "\n | ID Marca : " << RESET << res->getInt("ID_MARCA")
-                     << CIAN << "\n | Marca: " << RESET << res->getString("MARCA") << endl;
-            }
-        }
-
-        drenarResultados(pstmt.get());
+        mostrarPaginadoSP(
+            "CALL PARA_ACTUALIZARDATOS_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_PRODUCTOS()",
+            {},
+            [=](sql::ResultSet *res) {
+                char precio[24];
+                snprintf(precio, sizeof(precio), "$%.2f", (double)res->getDouble("PRECIO"));
+                cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
+                     << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
+                     << tablaCelda(precio, W_PRE) << " | "
+                     << tablaCelda(res->getString("CATEGORIA"), W_CAT) << " | "
+                     << tablaCelda(res->getString("MARCA"), W_MAR) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
     } catch (const sql::SQLException &e) {
         cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
     }
@@ -334,50 +343,63 @@ void buscarProducto() {
     try {
         string busqueda = leerDatoSeguro("Ingrese (NOMBRE O CODIGO DEL PRODUCTO) o Enter para todos: ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
-        pstmt->setString(1, busqueda);
+        // (08/11/2026) Paginado de 10 en 10 con el par de SPs del modulo 9.
+        // No se puede usar SELECT directo: balbu_app no tiene privilegios sobre
+        // PRODUCTOS (recorte del 03/11), la lectura pasa por SPs DEFINER.
+        // El dibujo va con tablaCelda, no con printf("%-25.25s"): printf cuenta
+        // BYTES y un caracter como '™' ocupa 3 bytes y 1 columna, asi que la
+        // fila se corria (caso Core™ i7-12700KF).
+        const size_t W_ID = 5, W_COD = 10, W_NOM = 25, W_MAR = 12, W_CAT = 20,
+                     W_PRE = 10, W_COS = 10, W_CAN = 8, W_EST = 8;
+        const size_t ANCHO = W_ID + W_COD + W_NOM + W_MAR + W_CAT + W_PRE + W_COS
+                           + W_CAN + W_EST + 8 * 3;
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("CODIGO", W_COD) << " | "
+             << tablaCelda("NOMBRE", W_NOM) << " | "
+             << tablaCelda("MARCA", W_MAR) << " | "
+             << tablaCelda("CATEGORIA", W_CAT) << " | "
+             << tablaCelda("PRECIO", W_PRE) << " | "
+             << tablaCelda("P.COMPRA", W_COS) << " | "
+             << tablaCelda("CANTIDAD", W_CAN) << " | "
+             << tablaCelda("ESTADO", W_EST) << "\n"
+             << tablaLinea(ANCHO) << "\n";
 
-        const char *FMT = "%-5s | %-10s | %-25s | %-12s | %-20s | %-10s | %-10s | %-8s | %-8s\n";
-        const int ANCHO = 5 + 10 + 25 + 12 + 20 + 10 + 10 + 8 + 8 + 8 * 3;
-        cout << "\n" << string(ANCHO, '-') << endl;
-        printf(FMT, "ID", "CODIGO", "NOMBRE", "MARCA", "CATEGORIA", "PRECIO", "P.COMPRA", "CANTIDAD", "ESTADO");
-        cout << string(ANCHO, '-') << endl;
+        int encontrado = mostrarPaginadoSP(
+            "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
+            "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+            {busqueda},
+            [=](sql::ResultSet *res) {
+                string costoStr;
+                try {
+                    double costo = res->getDouble("P_COMPRA");
+                    costoStr = res->wasNull() ? "---" : ("$" + to_string((long long)llround(costo)));
+                } catch (...) { costoStr = "---"; }
+                int stock = 0;
+                try { stock = res->getInt("STOCK"); } catch (...) { stock = 0; }
+                char bufPrecio[16];
+                snprintf(bufPrecio, sizeof(bufPrecio), "$%.0f", (double)res->getDouble("PRECIO"));
+                string estado = res->getString("ESTADO");
+                cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
+                     << tablaCelda(res->getString("CODIGO"), W_COD) << " | "
+                     << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
+                     << tablaCelda(res->getString("MARCA"), W_MAR) << " | "
+                     << tablaCelda(res->getString("CATEGORIA"), W_CAT) << " | "
+                     << tablaCelda(bufPrecio, W_PRE) << " | "
+                     << tablaCelda(costoStr, W_COS) << " | "
+                     << tablaCelda(to_string(stock), W_CAN) << " | "
+                     << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
 
-        bool encontrado = false;
-        while (res->next()) {
-            encontrado = true;
-            string costoStr;
-            try {
-                double costo = res->getDouble("P_COMPRA");
-                costoStr = res->wasNull() ? "---" : ("$" + to_string((long long)llround(costo)));
-            } catch (...) { costoStr = "---"; }
-            int stock = 0;
-            try { stock = res->getInt("STOCK"); } catch (...) { stock = 0; }
-            char bufPrecio[16];
-            snprintf(bufPrecio, sizeof(bufPrecio), "$%.0f", (double)res->getDouble("PRECIO"));
-            printf("%-5d | %-10s | %-25.25s | %-12.12s | %-20.20s | %-10s | %-10s | %-8d | %-8s\n",
-                   res->getInt("ID_PRODUCTO"),
-                   res->getString("CODIGO").c_str(),
-                   res->getString("NOMBRE").c_str(),
-                   res->getString("MARCA").c_str(),
-                   res->getString("CATEGORIA").c_str(),
-                   bufPrecio,
-                   costoStr.c_str(),
-                   stock,
-                   res->getString("ESTADO").c_str());
-        }
+        cout << tablaLinea(ANCHO) << endl;
 
-        cout << string(ANCHO, '-') << endl;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n [!] No se encontraron productos con el filtro: ["
                  << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
-        //cout << "----------------------------------------------------------------------------------------------------" << endl;
 
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -394,18 +416,12 @@ void consultarInventario() {
         cout << "Ingrese término de búsqueda (Código, Nombre o Categoría)\n";
         string busqueda = leerDatoSeguro("[Presione Enter para listar todo el inventario]: ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_CONSULTAR_INVENTARIO(?)"));
-        pstmt->setString(1, busqueda);
-
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
         const size_t W_ID = 6, W_COD = 10, W_PROD = 25, W_CAT = 20, W_MARCA = 12,
                      W_STOCK = 6, W_MIN = 7, W_PRECIO = 9, W_EST = 10;
         const size_t ANCHO = W_ID + W_COD + W_PROD + W_CAT + W_MARCA + W_STOCK +
                              W_MIN + W_PRECIO + W_EST + 8 * 3;
         const string linea(ANCHO, '-');
 
-        int cont = 0;
         cout << "\n"
              << tablaCelda("ID", W_ID) << " | "
              << tablaCelda("CODIGO", W_COD) << " | "
@@ -418,32 +434,35 @@ void consultarInventario() {
              << tablaCelda("ESTATUS", W_EST) << "\n"
              << linea << "\n";
 
-        while (res->next()) {
-            cont++;
-            char precio[24];
-            snprintf(precio, sizeof(precio), "$%.0f", (double)res->getDouble("PRECIO"));
-            string estatus;
-            try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) { estatus = "OK"; }
-            const string &color = tablaColorEstado(estatus);
-            cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
-                 << tablaCelda(res->getString("CODIGO"), W_COD) << " | "
-                 << tablaCelda(res->getString("NOMBRE"), W_PROD) << " | "
-                 << tablaCelda(res->getString("CATEGORIA"), W_CAT) << " | "
-                 << tablaCelda(res->getString("MARCA"), W_MARCA) << " | "
-                 << tablaCelda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
-                 << tablaCelda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
-                 << tablaCelda(precio, W_PRECIO) << " | "
-                 << color << tablaCelda(estatus, W_EST) << RESET << "\n"
-                 << linea << "\n";
-        }
+        // (08/11/2026) Paginado de 10 en 10: el inventario completo no entra en
+        // una pantalla y ademas traia todo de la base.
+        int cont = mostrarPaginadoSP(
+            "CALL SP_CONSULTAR_INVENTARIO_PAGINADO(?, ?, ?)",
+            "CALL SP_CONTAR_INVENTARIO(?)",
+            {busqueda},
+            [=](sql::ResultSet *res) {
+                char precio[24];
+                snprintf(precio, sizeof(precio), "$%.0f", (double)res->getDouble("PRECIO"));
+                string estatus;
+                try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) { estatus = "OK"; }
+                const string &color = tablaColorEstado(estatus);
+                cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
+                     << tablaCelda(res->getString("CODIGO"), W_COD) << " | "
+                     << tablaCelda(res->getString("NOMBRE"), W_PROD) << " | "
+                     << tablaCelda(res->getString("CATEGORIA"), W_CAT) << " | "
+                     << tablaCelda(res->getString("MARCA"), W_MARCA) << " | "
+                     << tablaCelda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
+                     << tablaCelda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
+                     << tablaCelda(precio, W_PRECIO) << " | "
+                     << color << tablaCelda(estatus, W_EST) << RESET << "\n"
+                     << linea << "\n";
+            });
 
         if (cont == 0) {
             cout << "\n[!] No se encontraron registros en el inventario que coincidan con: \"" << busqueda << "\"\n";
         } else {
-            cout << "\n[+] Total de filas mostradas: " << cont << "\n";
+            cout << "\n[+] Total de filas: " << cont << "\n";
         }
-
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -458,12 +477,6 @@ void reporteStockCritico() {
     cout << " Listando productos que están en o por debajo de su mínimo:\n\n";
 
     try {
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_REPORTE_STOCK_CRITICO()"));
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-        bool encontrado = false;
-        int contador = 0;
-
         const size_t W_PROD = 30, W_STOCK = 10, W_MIN = 10, W_FALTA = 9;
         const size_t ANCHO = W_PROD + W_STOCK + W_MIN + W_FALTA + 3 * 3;
         const string linea(ANCHO, '-');
@@ -474,24 +487,24 @@ void reporteStockCritico() {
              << tablaCelda("FALTANTE", W_FALTA) << "\n"
              << linea << "\n";
 
-        while (res->next()) {
-            encontrado = true;
-            contador++;
-            cout << tablaCelda(res->getString("NOMBRE"), W_PROD) << " | "
-                 << tablaCelda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
-                 << tablaCelda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
-                 << tablaCelda(to_string(res->getInt("CANTIDAD_FALTANTE")), W_FALTA) << "\n"
-                 << linea << "\n";
-        }
+        // (08/11/2026) Paginado de 10 en 10.
+        const int encontrados = mostrarPaginadoSP(
+            "CALL SP_REPORTE_STOCK_CRITICO_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_STOCK_CRITICO()",
+            {},
+            [=](sql::ResultSet *res) {
+                cout << tablaCelda(res->getString("NOMBRE"), W_PROD) << " | "
+                     << tablaCelda(to_string(res->getInt("STOCK_ACTUAL")), W_STOCK) << " | "
+                     << tablaCelda(to_string(res->getInt("STOCK_MINIMO")), W_MIN) << " | "
+                     << tablaCelda(to_string(res->getInt("CANTIDAD_FALTANTE")), W_FALTA) << "\n"
+                     << linea << "\n";
+            });
 
-        if (!encontrado) {
-            cout << "\n [✓] ¡Excelente! No hay productos con stock crítico en este momento." << endl;
+        if (encontrados == 0) {
+            cout << "\n [OK] No hay productos con stock critico en este momento." << endl;
         } else {
-            cout << "\n [!] Alerta: Se encontraron " << contador << " productos que requieren reabastecimiento." << endl;
+            cout << "\n [!] Alerta: " << encontrados << " producto(s) requieren reabastecimiento." << endl;
         }
-
-
-        drenarResultados(pstmt.get());
     } catch (const sql::SQLException &e) {
         cout << "\n [!] ERROR DE BASE DE DATOS AL GENERAR REPORTE: " << e.what() << endl;
     }

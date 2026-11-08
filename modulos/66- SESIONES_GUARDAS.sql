@@ -72,7 +72,9 @@ DROP FUNCTION IF EXISTS FN_USUARIO_SESION;
 /*
 FN_USUARIO_SESION
 Devuelve el ID_USUARIO del token que la conexion dejo en @TOKEN_SESION,
-o NULL si no hay token, no existe o vencio.
+o NULL si no hay token, no existe, vencio o la cuenta ya no esta ACTIVA.
+(08/11/2026) Se exige la cuenta ACTIVA: un usuario desactivado no conserva
+la sesion abierta aunque el token siga vigente.
 */
 CREATE FUNCTION FN_USUARIO_SESION()
 RETURNS INT
@@ -86,9 +88,11 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    SELECT ID_USUARIO INTO v_id
-      FROM SESIONES
-     WHERE TOKEN = v_token AND EXPIRA > NOW()
+    SELECT S.ID_USUARIO INTO v_id
+      FROM SESIONES S
+      INNER JOIN USUARIOS U ON U.ID_USUARIO = S.ID_USUARIO
+     WHERE S.TOKEN = v_token AND S.EXPIRA > NOW()
+       AND U.ESTADO = 'ACTIVO'
      LIMIT 1;
 
     RETURN v_id;
@@ -333,6 +337,27 @@ BEGIN
         END IF;
     END IF;
 END//
+DELIMITER ;
+
+-- ================================================================
+-- 7) CIERRE DE SESIONES AL DESPEDIR
+-- ================================================================
+-- (08/11/2026) Cuando un empleado pasa de ACTIVO a INACTIVO se borran las
+-- sesiones abiertas de su cuenta. El token deja de valer en el acto, sin
+-- depender de que la fila de PERMISO_POR_RUTINA tenga EXIGIR = 1.
+-- Va aca y no en el modulo 10 porque SESIONES se crea en este archivo.
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_INVALIDAR_SESION_EMPLEADO_INACTIVO;
+CREATE TRIGGER TR_INVALIDAR_SESION_EMPLEADO_INACTIVO
+AFTER UPDATE ON EMPLEADOS
+FOR EACH ROW
+BEGIN
+    IF NEW.ESTADO = 'INACTIVO' AND OLD.ESTADO = 'ACTIVO' THEN
+        DELETE FROM SESIONES
+        WHERE ID_USUARIO IN (SELECT ID_USUARIO FROM USUARIOS
+                              WHERE ID_EMPLEADO = NEW.ID_EMPLEADO);
+    END IF;
+END //
 DELIMITER ;
 
 SELECT 'MODULO 66 APLICADO: SESIONES Y GUARDAS LISTAS (MODO AUDITORIA).' AS RESULTADO;

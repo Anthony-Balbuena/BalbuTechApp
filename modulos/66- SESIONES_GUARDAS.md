@@ -11,8 +11,8 @@ El mecanismo:
 
 1. `SP_LOGIN_AUTENTICAR` emite un token aleatorio y lo guarda en `SESIONES`.
 2. La app lo deja en la conexion: `SET @TOKEN_SESION = '<token>'`.
-3. `FN_USUARIO_SESION()` lo resuelve a un `ID_USUARIO`, o `NULL` si no existe o
-   vencio.
+3. `FN_USUARIO_SESION()` lo resuelve a un `ID_USUARIO`, o `NULL` si no existe,
+   vencio o **la cuenta ya no esta `ACTIVO`** (08/11/2026).
 4. Cada `SP` sensible arranca con `CALL SP_EXIGIR_PERMISO('NOMBRE_SP')`.
 
 El cliente puede setear la variable, pero **no puede inventar un token**: solo
@@ -59,10 +59,17 @@ permiso renombrado arrastra el mapeo en vez de romperlo.
 
 | Objeto | Que hace |
 |---|---|
-| `FN_USUARIO_SESION()` | `ID_USUARIO` de `@TOKEN_SESION`, o `NULL` |
+| `FN_USUARIO_SESION()` | `ID_USUARIO` de `@TOKEN_SESION`, o `NULL` si vencio o la cuenta no esta `ACTIVO` |
 | `SP_EXIGIR_PERMISO(P_RUTINA)` | punto unico de control |
 | `SP_CERRAR_SESION_SERVIDOR()` | borra el token de la conexion |
 | `SP_LOGIN_AUTENTICAR(...)` | **reemplaza** la version del 65 y agrega `TOKEN` |
+
+### Trigger `TR_INVALIDAR_SESION_EMPLEADO_INACTIVO`
+
+(08/11/2026) `AFTER UPDATE ON EMPLEADOS`: cuando el empleado pasa de `ACTIVO` a
+`INACTIVO` (despido) borra las filas de `SESIONES` de su cuenta, asi el token
+deja de valer en el acto. Va en este modulo porque `SESIONES` se crea aca; el
+`UPDATE USUARIOS` lo hace `TR_DESACTIVAR_USUARIO_POST_LIQUIDACION` (modulo 10).
 
 ## Como decide `SP_EXIGIR_PERMISO`
 

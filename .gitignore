@@ -38,4 +38,7 @@ Pagina_Web/datos-web.js
 
 # Contratos generados con datos personales
 contratos/
+
+# Env generado para el depurador de VS Code (copias de .env con DB_HOST local)
+.vscode/.env*.run
 .atl/

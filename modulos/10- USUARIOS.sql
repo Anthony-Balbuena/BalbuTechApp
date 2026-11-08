@@ -103,6 +103,12 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- 1.b Un empleado despedido no puede recibir cuenta nueva
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO AND ESTADO = 'ACTIVO') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO ESTA INACTIVO (DESPEDIDO). NO SE LE PUEDE CREAR UN USUARIO.';
+        LEAVE proc_label;
+    END IF;
+
     -- 2. Validar que el empleado no tenga ya una cuenta (Regla traída de tu 2do módulo)
     IF EXISTS (SELECT 1 FROM USUARIOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE EMPLEADO YA TIENE UN USUARIO ASIGNADO.';
@@ -149,6 +155,27 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- Si se cambia el empleado, tiene que existir, estar ACTIVO y no tener
+    -- ya otra cuenta (el indice unico soltaria un error crudo).
+    IF P_ID_EMPLEADO IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM `EMPLEADOS` WHERE `ID_EMPLEADO` = P_ID_EMPLEADO AND `ESTADO` = 'ACTIVO') THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE O ESTA INACTIVO (DESPEDIDO).';
+            LEAVE proc_label;
+        END IF;
+        IF EXISTS (SELECT 1 FROM `USUARIOS` WHERE `ID_EMPLEADO` = P_ID_EMPLEADO AND `ID_USUARIO` <> P_ID_USUARIO) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE EMPLEADO YA TIENE UN USUARIO ASIGNADO.';
+            LEAVE proc_label;
+        END IF;
+    END IF;
+
+    -- El nombre de usuario tampoco puede repetirse
+    IF P_USUARIO IS NOT NULL AND EXISTS (
+            SELECT 1 FROM `USUARIOS`
+             WHERE `USUARIO` = LOWER(TRIM(P_USUARIO)) AND `ID_USUARIO` <> P_ID_USUARIO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: USUARIO YA EN USO.';
+        LEAVE proc_label;
+    END IF;
+
     -- Lógica de limpieza solo si el usuario cambió
     IF P_USUARIO IS NOT NULL THEN
         SET v_usuario_limpio = LOWER(TRIM(P_USUARIO));
@@ -174,6 +201,7 @@ DELIMITER ;
 -- que el archivo quede sin clave.
 SET @puede_crearse := (SELECT COUNT(*) FROM EMPLEADOS E
                         WHERE E.ID_EMPLEADO = 1
+                          AND E.ESTADO = 'ACTIVO'
                           AND NOT EXISTS (SELECT 1 FROM USUARIOS U WHERE U.ID_EMPLEADO = 1));
 SET @sql_semilla := IF(@puede_crearse = 1,
     'CALL SP_INSERTAR_USUARIO (1, 1, ''abalbuena'', ''CAMBIAR_ANTES_DE_USAR'')',
@@ -216,6 +244,16 @@ proc_label: BEGIN
         SET v_NUEVO_ESTADO = 'INACTIVO';
     ELSE 
         SET v_NUEVO_ESTADO = 'ACTIVO';
+    END IF;
+
+    -- 3.b No se puede activar la cuenta de un empleado despedido: primero
+    -- hay que reactivar al empleado (Empleados > Reactivar).
+    IF v_NUEVO_ESTADO = 'ACTIVO' AND NOT EXISTS (
+            SELECT 1 FROM `USUARIOS` U
+            INNER JOIN `EMPLEADOS` E ON E.`ID_EMPLEADO` = U.`ID_EMPLEADO`
+            WHERE U.`ID_USUARIO` = P_ID_USUARIO AND E.`ESTADO` = 'ACTIVO') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO ESTA INACTIVO (DESPEDIDO). REACTIVE AL EMPLEADO ANTES DE ACTIVAR SU USUARIO.';
+        LEAVE proc_label;
     END IF;
 
     -- 4. APLICAR EL CAMBIO
@@ -318,14 +356,15 @@ DELIMITER ;
 /*
 PARA_INSERTAR_USUARIOS
 Prepara los datos del formulario de alta de usuario: devuelve en dos
-result sets los roles y los empleados disponibles para llenar los selects.
+result sets los roles y los empleados ACTIVOS disponibles para llenar los
+selects. Los empleados despedidos no se listan: no pueden recibir cuenta.
 */
 DELIMITER //
 DROP PROCEDURE IF EXISTS PARA_INSERTAR_USUARIOS ;
 CREATE PROCEDURE PARA_INSERTAR_USUARIOS()
 BEGIN
     SELECT ID_ROL, NOMBRE_ROL FROM ROLES ORDER BY ID_ROL ASC;
-    SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS ORDER BY ID_EMPLEADO ASC;
+    SELECT ID_EMPLEADO, NOMBRE FROM EMPLEADOS WHERE ESTADO = 'ACTIVO' ORDER BY ID_EMPLEADO ASC;
 END //
 DELIMITER ;
 

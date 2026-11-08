@@ -181,7 +181,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 |---|---|---|
 | 1 | Agregar proveedor | `PROVEEDORES_CREAR` |
 | 2 | Actualizar proveedor | `PROVEEDORES_EDITAR` |
-| 3 | Activar/Desactivar proveedor | `PROVEEDORES_ESTADO` |
+| 3 | Cambiar estado | `PROVEEDORES_ESTADO` |
 | 4 | Buscar proveedor | `PROVEEDORES_VER` |
 | 5 | Listar proveedores | `PROVEEDORES_VER` |
 | 6 | Volver al Menu Principal | *(siempre)* |
@@ -216,7 +216,7 @@ visible**. Cada opción pide un permiso; `Volver` es siempre visible.
 |---|---|---|
 | 1 | Agregar Marca | `MARCAS_CREAR` |
 | 2 | Actualizar Marca | `MARCAS_EDITAR` |
-| 3 | Activar/Desactivar Marca | `MARCAS_ESTADO` |
+| 3 | Cambiar estado | `MARCAS_ESTADO` |
 | 4 | Buscar Marca | `MARCAS_VER` |
 | 5 | Listar Marcas | `MARCAS_VER` |
 | 6 | Volver al Menu Principal | *(siempre)* |

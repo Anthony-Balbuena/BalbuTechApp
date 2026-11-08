@@ -239,7 +239,11 @@ END IF;
     WHERE ID_EMPLEADO = P_ID_EMPLEADO;
 
     -- 5. RESPUESTA
-    SELECT CONCAT('EXITO: EL EMPLEADO ID ', P_ID_EMPLEADO, ' HA SIDO DADO DE BAJA.') AS MENSAJE;
+    -- El trigger TR_DESACTIVAR_USUARIO_POST_LIQUIDACION ya dejo INACTIVA la
+    -- cuenta vinculada (si tenia), asi que el mensaje lo avisa.
+    SELECT CONCAT('EXITO: EL EMPLEADO ID ', P_ID_EMPLEADO, ' HA SIDO DADO DE BAJA.',
+                  IF(EXISTS (SELECT 1 FROM USUARIOS WHERE ID_EMPLEADO = P_ID_EMPLEADO),
+                     ' SU USUARIO QUEDO INACTIVO Y SUS SESIONES CERRADAS.', '')) AS MENSAJE;
 
 END //
 DELIMITER ;
@@ -288,7 +292,11 @@ proc_label: BEGIN
     WHERE ID_EMPLEADO = P_ID_EMPLEADO;
     
     -- 5. RESPUESTA
-    SELECT CONCAT('EXITO: EMPLEADO ID ', P_ID_EMPLEADO, ' REINGRESADO CORRECTAMENTE.') AS MENSAJE;
+    -- La cuenta del empleado NO se reactiva sola: se avisa para que se active
+    -- a mano desde Usuarios y no vuelva a operar sin que nadie lo decida.
+    SELECT CONCAT('EXITO: EMPLEADO ID ', P_ID_EMPLEADO, ' REINGRESADO CORRECTAMENTE.',
+                  IF(EXISTS (SELECT 1 FROM USUARIOS WHERE ID_EMPLEADO = P_ID_EMPLEADO AND ESTADO = 'INACTIVO'),
+                     ' SU USUARIO SIGUE INACTIVO: ACTIVELO EN EL MODULO USUARIOS.', '')) AS MENSAJE;
 
 END //
 

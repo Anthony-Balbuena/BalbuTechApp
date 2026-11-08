@@ -133,8 +133,7 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_ROLES'
  WHERE RUTINA IN ('SP_LIMPIAR_AUDITORIA', 'SP_LIMPIAR_LOGS_ANTIGUOS',
                   'SP_REPORTAR_ACCESOS');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_REPORTES'
- WHERE RUTINA IN ('6_SP_LISTAR_AUDITORIA_GENERAL', '6_SP_CONSULTAR_HISTORIAL_REGISTRO',
-                  'SP_DETALLES_VENDIDOS_ULTIMOS', 'SP_PAGOS_ULTIMOS');
+ WHERE RUTINA IN ('6_SP_LISTAR_AUDITORIA_GENERAL', '6_SP_CONSULTAR_HISTORIAL_REGISTRO');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PRODUCTOS'
  WHERE RUTINA IN ('PARA_ACTIVARODESACTIVAR_PROC', 'PARA_ACTUALIZARDATOS');
 
@@ -142,3 +141,107 @@ SELECT COUNT(*) AS MAPEADAS,
        SUM(PERMISO IS NULL) AS SIN_PERMISO,
        SUM(EXIGIR = 1) AS EXIGIENDO
   FROM PERMISO_POR_RUTINA;
+
+-- ================================================================
+-- CORRECCIONES DE MAPEO (07/11/2026)
+-- ================================================================
+-- Regla: el permiso que exige una rutina debe ser el mismo que abre la
+-- pantalla que la llama. El heuristico de arriba mira el nombre de la rutina,
+-- no el flujo, asi que varias quedaron con el permiso de otra area y el rol
+-- que llegaba a esa pantalla recibia SIN_PERMISO (se ve en LOG_PERMISO_SP).
+-- Verificado contra la tabla de opciones de cada modulo en el codigo.
+-- ================================================================
+
+-- Ventas: cobrar una VENTA y anular su pago se abren con GESTIONAR_VENTAS.
+-- COMPRAS_PAGAR es para "Pagar compra" (SP_REGISTRAR_PAGO_COMPRA).
+-- (08/11/2026) SP_PAGOS_ULTIMOS y SP_DETALLES_VENDIDOS_ULTIMOS se eliminaron
+-- (sin caller tras el paginado); quedan solo los dos que siguen.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_VENTAS'
+ WHERE RUTINA IN ('24_SP_REGISTRAR_PAGO', 'SP_ANULAR_PAGO');
+
+-- "Reporte por rango" del menu Ventas se abre con CONSULTAR_REPORTES.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_REPORTES'
+ WHERE RUTINA = 'SP_REPORTE_VENTAS';
+
+-- Garantias: el submenu usa un permiso fino por accion. Las consultas se
+-- comparten entre "Reclamar" y "Consultar", y todo rol que reclama tambien
+-- consulta, asi que GARANTIAS_CONSULTAR cubre las dos pantallas.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_REGISTRAR'
+ WHERE RUTINA IN ('SP_REGISTRAR_GARANTIA', 'SP_LINEAS_VENTA_CON_GARANTIA');
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_RECLAMAR'
+ WHERE RUTINA = '27_SP_REGISTRAR_RECLAMO_GARANTIA';
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_FINALIZAR'
+ WHERE RUTINA = '27_SP_FINALIZAR_RECLAMO_TOTAL';
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
+ WHERE RUTINA IN ('SP_CONSULTAR_GARANTIAS', 'SP_CONSULTAR_RECLAMOS');
+-- SP_CONSULTAR_GARANTIAS llama internamente a SP_MARCAR_GARANTIAS_VENCIDAS
+-- antes de listar: si esa exige GESTIONAR_VENTAS, el rol que solo consulta
+-- garantias recibe SIN_PERMISO y no puede ver nada. Hereda el permiso de la
+-- pantalla que la dispara.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
+ WHERE RUTINA = 'SP_MARCAR_GARANTIAS_VENCIDAS';
+
+-- Historial propio: "Mis vacaciones" y "Mis permisos" se abren con
+-- SOLICITAR_PERMISO. El historial del empleado no puede exigir el permiso de
+-- gestion de RRHH: el propio empleado no lo tiene (y no debe tenerlo).
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'SOLICITAR_PERMISO'
+ WHERE RUTINA IN ('SP_HISTORIAL_VACACIONES_EMPLEADO', 'SP_HISTORIAL_PERMISOS_EMPLEADO');
+
+-- Inventario: "Ajuste de stock" se abre con INVENTARIO_AJUSTAR.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'INVENTARIO_AJUSTAR'
+ WHERE RUTINA = '20_SP_REGISTRAR_AJUSTE_INVENTARIO';
+
+-- Consulta de inventario compartida: la usan "Productos > Consultar
+-- Inventario" (CONSULTAR_PRODUCTOS) y la venta (GESTIONAR_VENTAS). Todo rol
+-- con GESTIONAR_VENTAS tambien tiene CONSULTAR_PRODUCTOS, asi que este ultimo
+-- cubre las dos pantallas.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_PRODUCTOS'
+ WHERE RUTINA = 'SP_CONSULTAR_INVENTARIO';
+
+-- Productos: "Reporte De Stock" se abre con CONSULTAR_PRODUCTOS.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_PRODUCTOS'
+ WHERE RUTINA = 'SP_REPORTE_STOCK_CRITICO';
+
+-- Usuarios: "Cambiar Estado" se abre con USUARIOS_ESTADO, no con USUARIOS_VER.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'USUARIOS_ESTADO'
+ WHERE RUTINA = 'PARA_ACT_DESAC_USUARIOS';
+
+-- Garantias: el listado de ventas sobre las que se puede registrar una
+-- garantia lo abre "Registrar garantia" (GARANTIAS_REGISTRAR). Es rutina
+-- nueva, asi que el heuristico de arriba no la conoce.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_REGISTRAR'
+ WHERE RUTINA = 'SP_VENTAS_GARANTIZABLES';
+
+-- (08/11/2026) Productos paginado: el par que usa "Buscar Producto" para traer
+-- de a 10. La pantalla se abre con CONSULTAR_PRODUCTOS (su listado hermano
+-- SP_CONSULTAR_PRODUCTOS_FILTRADO ya tiene ese permiso).
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_PRODUCTOS'
+ WHERE RUTINA IN ('SP_CONSULTAR_PRODUCTOS_PAGINADO', 'SP_CONTAR_PRODUCTOS_FILTRADOS');
+
+-- (08/11/2026) Compras paginado: el listado lo comparten "Ver compra con IVA"
+-- (COMPRAS_VER), "Devolucion" (COMPRAS_DEVOLVER), "Pagar" (COMPRAS_PAGAR) y
+-- "Cancelar" (COMPRAS_CANCELAR). En la matriz ADMIN, ALMACEN, GERENTE y
+-- SUBGERENTE tienen los cinco permisos de compras, asi que COMPRAS_VER cubre a
+-- todos los llamadores.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'COMPRAS_VER'
+ WHERE RUTINA IN ('SP_COMPRAS_ULTIMAS_PAGINADO', 'SP_CONTAR_COMPRAS',
+                  'SP_COMPRAS_PENDIENTES_PAGINADO', 'SP_CONTAR_COMPRAS_PENDIENTES');
+
+-- (08/11/2026) Ventas paginado: los tres listados los abren pantallas que
+-- exigen GESTIONAR_VENTAS (cobrar, anular pago y devolucion), y es el mismo
+-- permiso que ya tienen sus hermanas sin paginar.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_VENTAS'
+ WHERE RUTINA IN ('SP_VENTAS_PENDIENTES_PAGINADO', 'SP_CONTAR_VENTAS_PENDIENTES',
+                  'SP_PAGOS_ULTIMOS_PAGINADO', 'SP_CONTAR_PAGOS',
+                  'SP_DETALLES_VENDIDOS_PAGINADO', 'SP_CONTAR_DETALLES_VENDIDOS');
+
+-- (08/11/2026) Productos: paginado de la edicion (GESTIONAR_PRODUCTOS), de la
+-- consulta de inventario y del reporte de stock critico (CONSULTAR_PRODUCTOS).
+-- Mismo permiso que su hermana sin paginar en cada caso; la consulta de
+-- inventario ya estaba mapeada a CONSULTAR_PRODUCTOS porque la comparten
+-- "Productos > Consultar Inventario" y la venta.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PRODUCTOS'
+ WHERE RUTINA IN ('PARA_ACTUALIZARDATOS_PAGINADO', 'SP_CONTAR_PRODUCTOS');
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_PRODUCTOS'
+ WHERE RUTINA IN ('SP_CONSULTAR_INVENTARIO_PAGINADO', 'SP_CONTAR_INVENTARIO',
+                  'SP_REPORTE_STOCK_CRITICO_PAGINADO', 'SP_CONTAR_STOCK_CRITICO');

@@ -12,6 +12,7 @@
 #include "colores.h"
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "sesion.h"
 #include "tabla.h"
@@ -816,20 +817,50 @@ static void compraRapida() {
     }
 }
 
+// (08/11/2026) Listado paginado de compras, compartido por "Ver compra con
+// IVA", "Devolucion de compra" y "Cancelar compra": las tres piden un ID y
+// antes lo pedian a ciegas (o traian las ultimas 20 sin forma de llegar a una
+// vieja). El LIMIT vive en SP_COMPRAS_ULTIMAS_PAGINADO (modulo 39).
+static int listarComprasPaginado() {
+    const size_t W_ID = 6, W_PROV = 22, W_FEC = 10, W_EST = 10, W_TOT = 12;
+    const size_t ANCHO = W_ID + W_PROV + W_FEC + W_EST + W_TOT + 4 * 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("PROVEEDOR", W_PROV) << " | "
+         << tablaCelda("FECHA", W_FEC) << " | "
+         << tablaCelda("ESTADO", W_EST) << " | "
+         << tablaCelda("TOTAL", W_TOT) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    return mostrarPaginadoSP(
+        "CALL SP_COMPRAS_ULTIMAS_PAGINADO(?, ?)",
+        "CALL SP_CONTAR_COMPRAS()",
+        {},
+        [=](sql::ResultSet *res) {
+            char total[24];
+            snprintf(total, sizeof(total), "%.2f", (double)res->getDouble("TOTAL_CON_IVA"));
+            string estado = res->getString("ESTADO");
+            cout << tablaCelda(to_string(res->getInt("ID_COMPRA")), W_ID) << " | "
+                 << tablaCelda(res->getString("PROVEEDOR"), W_PROV) << " | "
+                 << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(total, W_TOT) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
+        });
+}
+
 static void verCompraConIVA() {
     cout << "\n--- COMPRAS REGISTRADAS ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_COMPRAS_ULTIMAS()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        vector<int> ids;
-        while (rl->next()) ids.push_back(rl->getInt("ID_COMPRA"));
-        drenarResultados(pl.get());
-        if (ids.empty()) {
+        // (08/11/2026) Antes imprimia la factura completa de las ultimas 20
+        // compras: una pared de texto. Ahora lista de 10 en 10 y muestra la
+        // factura de la que se elige.
+        if (listarComprasPaginado() == 0) {
             cout << "[!] Sin compras registradas." << endl;
             return;
         }
-        for (int id : ids) mostrarFacturaCompra(id);
+        int idCompra = (int)leerNumeroConIntentos("ID compra a ver: ", 1, 999999999);
+        mostrarFacturaCompra(idCompra);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
@@ -840,6 +871,10 @@ static void verCompraConIVA() {
 static void devolucionCompraUI() {
     cout << "\n--- DEVOLUCION DE COMPRA ---" << endl;
     try {
+        if (listarComprasPaginado() == 0) {
+            cout << "[!] Sin compras registradas." << endl;
+            return;
+        }
         int idCompraDev = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
             "CALL SP_COMPRA_LINEAS(?)"));
@@ -1030,25 +1065,40 @@ static void reportePeriodoCompraUI() {
 static void pagarCompraPendienteUI() {
     cout << "\n--- PAGAR COMPRA ABIERTA ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_COMPRAS_PENDIENTES()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        printf("\n%-7s | %-20s | %-10s | %-10s | %-10s\n", "COMPRA", "PROVEEDOR", "ESTADO", "PAGADO", "SALDO");
-        bool hay = false;
-        while (rl->next()) {
-            hay = true;
-            printf("%-7d | %-20.20s | %-10s | %-10.2f | %-10.2f\n",
-                   rl->getInt("ID_COMPRA"),
-                   rl->getString("PROVEEDOR").c_str(),
-                   rl->getString("ESTADO").c_str(),
-                   (double)rl->getDouble("PAGADO"),
-                   (double)rl->getDouble("SALDO"));
-        }
-        drenarResultados(pl.get());
-        if (!hay) {
+        // (08/11/2026) Paginado de 10 en 10: antes traia las 20 mas recientes y
+        // una pendiente vieja quedaba inalcanzable.
+        const size_t W_ID = 7, W_PROV = 22, W_EST = 10, W_MON = 10;
+        const size_t ANCHO = W_ID + W_PROV + W_EST + W_MON * 2 + 4 * 3;
+        cout << "\n"
+             << tablaCelda("COMPRA", W_ID) << " | "
+             << tablaCelda("PROVEEDOR", W_PROV) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("PAGADO", W_MON) << " | "
+             << tablaCelda("SALDO", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hay = mostrarPaginadoSP(
+            "CALL SP_COMPRAS_PENDIENTES_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_COMPRAS_PENDIENTES()",
+            {},
+            [=](sql::ResultSet *res) {
+                char pagado[24], saldo[24];
+                snprintf(pagado, sizeof(pagado), "%.2f", (double)res->getDouble("PAGADO"));
+                snprintf(saldo, sizeof(saldo), "%.2f", (double)res->getDouble("SALDO"));
+                string estado = res->getString("ESTADO");
+                cout << tablaCelda(to_string(res->getInt("ID_COMPRA")), W_ID) << " | "
+                     << tablaCelda(res->getString("PROVEEDOR"), W_PROV) << " | "
+                     << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                     << tablaCelda(pagado, W_MON) << " | "
+                     << tablaCelda(saldo, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) {
             cout << "[!] Sin compras pendientes." << endl;
             return;
         }
+
         int idCompraPag = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> ps(globalCon->prepareStatement(
             "CALL SP_COMPRAS_PENDIENTES()"));
@@ -1079,28 +1129,10 @@ static void cancelarCompraUI() {
     cout << "\n--- CANCELAR COMPRA ---" << endl;
     cout << "Solo compras ABIERTA sin pagos. Repone el stock." << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_COMPRAS_ULTIMAS()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        const size_t W_ID = 6, W_PROV = 20, W_EST = 10, W_TOT = 10;
-        const size_t ANCHO = W_ID + W_PROV + W_EST + W_TOT + 3 * 3;
-        cout << "\n"
-             << tablaCelda("ID", W_ID) << " | "
-             << tablaCelda("PROVEEDOR", W_PROV) << " | "
-             << tablaCelda("ESTADO", W_EST) << " | "
-             << tablaCelda("TOTAL", W_TOT) << "\n"
-             << tablaLinea(ANCHO) << "\n";
-        while (rl->next()) {
-            char total[24];
-            snprintf(total, sizeof(total), "%.2f", (double)rl->getDouble("TOTAL_CON_IVA"));
-            string estado = rl->getString("ESTADO");
-            cout << tablaCelda(to_string(rl->getInt("ID_COMPRA")), W_ID) << " | "
-                 << tablaCelda(rl->getString("PROVEEDOR"), W_PROV) << " | "
-                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
-                 << tablaCelda(total, W_TOT) << "\n"
-                 << tablaLinea(ANCHO) << "\n";
+        if (listarComprasPaginado() == 0) {
+            cout << "[!] Sin compras registradas." << endl;
+            return;
         }
-        drenarResultados(pl.get());
         int idCompraCanc = (int)leerNumeroConIntentos("ID compra: ", 1, 999999999);
         int idEmpCanc = (int)leerNumeroConIntentos("ID empleado (dueno): ", 1, 999999999);
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(

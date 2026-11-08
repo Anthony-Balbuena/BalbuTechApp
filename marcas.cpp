@@ -10,6 +10,7 @@
 
 #include "database.h"
 #include "seguridad.h"
+#include "paginacion.h"
 #include "roles.h"
 #include "colores.h"
 #include "tabla.h"
@@ -35,7 +36,7 @@ static const vector<OpcionMarca>& opcionesMarcas() {
     static const vector<OpcionMarca> opciones = {
         {"Agregar Marca",              "MARCAS_CREAR",  AccionMarca::Agregar},
         {"Actualizar Marca",           "MARCAS_EDITAR", AccionMarca::Actualizar},
-        {"Activar/Desactivar Marca",   "MARCAS_ESTADO", AccionMarca::Estado},
+        {"Cambiar estado",             "MARCAS_ESTADO", AccionMarca::Estado},
         {"Buscar Marca",               "MARCAS_VER",    AccionMarca::Buscar},
         {"Listar Marcas",              "MARCAS_VER",    AccionMarca::Listar},
         {"Volver al Menu Principal",   "",              AccionMarca::Volver}
@@ -68,6 +69,18 @@ static void imprimirMenuMarcas(const vector<const OpcionMarca*>& visibles) {
 
 }  // namespace
 
+// (08/11/2026) Igual que en Clientes, Proveedores y Empleados: se lista antes
+// de pedir el ID. "Actualizar" muestra ID y nombre; "Cambiar estado" agrega el
+// estado y trae todas, activas e inactivas. Devuelven cuantas hay para no pedir
+// un ID sobre una lista vacia.
+// Se usa SELECT directo y no SP_LISTAR_MARCAS a proposito: ese SP exige
+// MARCAS_VER con EXIGIR = 1 y estas pantallas se abren con MARCAS_EDITAR y
+// MARCAS_ESTADO. Hoy los cuatro roles que las abren tienen MARCAS_VER, pero el
+// dia que alguien reciba EDITAR sin VER la pantalla se le rompe. Misma regla
+// documentada en "Cambio para Qt.md".
+static int imprimirMarcasParaElegir();
+static int imprimirMarcasParaEstado();
+
 void registrarMarca() {
     cout << "\n--- REGISTRO DE MARCA ---" << endl;
     try {
@@ -92,6 +105,11 @@ void registrarMarca() {
 void actualizarMarca() {
     cout << "\n--- ACTUALIZAR MARCA ---" << endl;
     try {
+        if (imprimirMarcasParaElegir() == 0) {
+            cout << "\n[!] No hay marcas registradas." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID de la marca: ");
         int idMarca = stoi(idStr);
 
@@ -122,8 +140,13 @@ void actualizarMarca() {
 }
 
 void cambiarEstadoMarca() {
-    cout << "\n--- ACTIVAR/DESACTIVAR MARCA ---" << endl;
+    cout << "\n--- CAMBIAR ESTADO DE LA MARCA ---" << endl;
     try {
+        if (imprimirMarcasParaEstado() == 0) {
+            cout << "\n[!] No hay marcas registradas." << endl;
+            return;
+        }
+
         string idStr = leerDatoSeguro("ID de la marca: ");
         int idMarca = stoi(idStr);
 
@@ -145,24 +168,81 @@ void cambiarEstadoMarca() {
     }
 }
 
+// (08/11/2026) Listados paginados de 10 en 10 con paginacion.h. El encabezado y
+// el dibujo de cada fila quedan aca; el LIMIT/OFFSET y el COUNT los pone el
+// paginador. La tabla completa sigue usandose para las consultas por SP
+// (SP_LISTAR_MARCAS / SP_BUSCAR_MARCA), que no se pueden paginar sin cambiar la
+// firma del procedimiento.
+static const size_t MAR_W_ID = 5, MAR_W_NOM = 30, MAR_W_EST = 9;
+static const size_t MAR_ANCHO = MAR_W_ID + MAR_W_NOM + MAR_W_EST + 2 * 3;
+
+static void imprimirEncabezadoMarcas() {
+    cout << "\n"
+         << tablaCelda("ID", MAR_W_ID) << " | "
+         << tablaCelda("NOMBRE", MAR_W_NOM) << " | "
+         << tablaCelda("ESTADO", MAR_W_EST) << "\n"
+         << tablaLinea(MAR_ANCHO) << "\n";
+}
+
+static void imprimirFilaMarca(sql::ResultSet *res) {
+    string estado = res->getString("ESTADO");
+    cout << tablaCelda(to_string(res->getInt("ID_MARCA")), MAR_W_ID) << " | "
+         << tablaCelda(res->getString("NOMBRE"), MAR_W_NOM) << " | "
+         << tablaColorEstado(estado) << tablaCelda(estado, MAR_W_EST) << RESET << "\n"
+         << tablaLinea(MAR_ANCHO) << "\n";
+}
+
 static int imprimirTablaMarcas(sql::ResultSet *res) {
-    const size_t W_ID = 5, W_NOM = 30, W_EST = 9;
+    imprimirEncabezadoMarcas();
+    int n = 0;
+    while (res->next()) {
+        ++n;
+        imprimirFilaMarca(res);
+    }
+    return n;
+}
+
+// Consulta directa, igual que el listado del menu: la guarda del modulo 66 vive
+// en las rutinas, no en estas lecturas de pantalla.
+static int imprimirMarcasParaElegir() {
+    const size_t W_ID = 5, W_NOM = 30;
+    const size_t ANCHO = W_ID + W_NOM + 3;
+    cout << "\n"
+         << tablaCelda("ID", W_ID) << " | "
+         << tablaCelda("NOMBRE", W_NOM) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    return mostrarPaginado({
+        "SELECT ID_MARCA, NOMBRE FROM MARCAS ORDER BY ID_MARCA",
+        "SELECT COUNT(*) FROM MARCAS",
+        {} }, [=](sql::ResultSet *res) {
+        cout << tablaCelda(to_string(res->getInt("ID_MARCA")), W_ID) << " | "
+             << tablaCelda(res->getString("NOMBRE"), W_NOM) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+    });
+}
+
+// Para cambiar el estado alcanza con ver a quien se le cambia: ID, nombre y
+// estado actual. Salen todas, activas e inactivas.
+static int imprimirMarcasParaEstado() {
+    const size_t W_ID = 5, W_NOM = 26, W_EST = 9;
     const size_t ANCHO = W_ID + W_NOM + W_EST + 2 * 3;
     cout << "\n"
          << tablaCelda("ID", W_ID) << " | "
          << tablaCelda("NOMBRE", W_NOM) << " | "
          << tablaCelda("ESTADO", W_EST) << "\n"
          << tablaLinea(ANCHO) << "\n";
-    int n = 0;
-    while (res->next()) {
-        ++n;
+
+    return mostrarPaginado({
+        "SELECT ID_MARCA, NOMBRE, ESTADO FROM MARCAS ORDER BY ID_MARCA",
+        "SELECT COUNT(*) FROM MARCAS",
+        {} }, [=](sql::ResultSet *res) {
         string estado = res->getString("ESTADO");
         cout << tablaCelda(to_string(res->getInt("ID_MARCA")), W_ID) << " | "
              << tablaCelda(res->getString("NOMBRE"), W_NOM) << " | "
              << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
              << tablaLinea(ANCHO) << "\n";
-    }
-    return n;
+    });
 }
 
 void buscarMarca() {

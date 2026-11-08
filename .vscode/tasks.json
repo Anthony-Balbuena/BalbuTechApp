@@ -26,10 +26,27 @@
         },
         {
             "type": "shell",
+            "label": "Env local: generar .vscode/.env.run",
+            "detail": "Copia .env para el depurador con DB_HOST=127.0.0.1 (el .env usa 'db', que solo existe dentro de Docker).",
+            "command": "bash",
+            "args": [
+                "-c",
+                "sed 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env > .vscode/.env.run && sed 's/^DB_HOST=.*/DB_HOST=127.0.0.1/; s/^DB_NAME=.*/DB_NAME=BALBU_TECH_TEST/' .env > .vscode/.env.test.run && echo 'OK: .vscode/.env.run y .vscode/.env.test.run'"
+            ],
+            "options": {"cwd": "${workspaceFolder}"},
+            "presentation": {"reveal": "silent", "panel": "shared"},
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
             "label": "Nativo: compilar con build.sh (Linux)",
             "command": "bash",
             "args": ["build.sh"],
-            "options": {"cwd": "${workspaceFolder}"},
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {"BUILD_DEBUG": "1"}
+            },
+            "dependsOn": ["Env local: generar .vscode/.env.run"],
             "group": {
                 "kind": "build",
                 "isDefault": true

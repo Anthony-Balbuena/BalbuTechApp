@@ -138,12 +138,12 @@ revisar() {
 
 # Las listas usan | como separador; tienen que coincidir con itemsMenuPrincipal().
 revisar "ADMIN" "$BALBU_USER" 19 "Asistencia|Roles|Usuarios|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Accesos|Ver permisos|Cerrar sesión"
-revisar "GERENTE" "prueba_r7_ger" 16 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "SUBGERENTE" "prueba_r7_sub" 16 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "RRHH" "prueba_r7_rrhh" 6 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Ver permisos|Cerrar sesión"
-revisar "VENDEDOR" "prueba_r7_ven" 10 "Asistencia|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Ver permisos|Cerrar sesión"
-revisar "ALMACEN" "prueba_r7_alm" 11 "Asistencia|Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Ver permisos|Cerrar sesión"
-revisar "CONTABILIDAD" "prueba_r7_con" 6 "Asistencia|Clientes|Productos|Ventas|Ver permisos|Cerrar sesión"
+revisar "GERENTE" "prueba_r7_ger" 15 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Cerrar sesión"
+revisar "SUBGERENTE" "prueba_r7_sub" 15 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Clientes|Proveedores|Categorias|Marcas|Productos|Metodos de pago|Ventas|Compras|Inventario|Caja (turnos)|Cerrar sesión"
+revisar "RRHH" "prueba_r7_rrhh" 5 "Asistencia|Empleados|Mis permisos|Mis vacaciones|Cerrar sesión"
+revisar "VENDEDOR" "prueba_r7_ven" 9 "Asistencia|Mis permisos|Mis vacaciones|Clientes|Productos|Metodos de pago|Ventas|Caja (turnos)|Cerrar sesión"
+revisar "ALMACEN" "prueba_r7_alm" 10 "Asistencia|Mis permisos|Mis vacaciones|Proveedores|Categorias|Marcas|Productos|Compras|Inventario|Cerrar sesión"
+revisar "CONTABILIDAD" "prueba_r7_con" 5 "Asistencia|Clientes|Productos|Ventas|Cerrar sesión"
 
 # ---------------------------------------------------------------------------
 # Submenu Usuarios con permisos finos (22/10/2026): un rol con SOLO
@@ -188,11 +188,11 @@ else
     # sobre toda la salida mezclaria las dos listas numeradas.
     principal=$(sed -n '1,/=== MODULO DE USUARIOS ===/p' "$salida_usr")
     n_principal=$(printf '%s\n' "$principal" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal" -ne 3 ]; then
-        echo "FALLO $ROL_VER: $n_principal opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal" -ne 2 ]; then
+        echo "FALLO $ROL_VER: $n_principal opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Usuarios" "Ver permisos" "Cerrar sesión"; do
+    for label in "Usuarios" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal" | grep -Fq "$label"; then
             echo "FALLO $ROL_VER: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -220,7 +220,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_VER (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_VER (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -251,7 +251,7 @@ EOF
 fallos_previos=$fallos
 salida_emp="$TMP/out-empleados-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Empleados (con este rol es la
-# primera opcion visible: el menu queda Empleados, Ver permisos y Cerrar
+# primera opcion visible: el menu queda Empleados y Cerrar
 # sesion), 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_EMP" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_emp" 2>&1
@@ -268,11 +268,11 @@ else
     # sobre toda la salida mezclaria las dos listas numeradas.
     principal_emp=$(sed -n '1,/=== MODULO DE EMPLEADOS ===/p' "$salida_emp")
     n_principal_emp=$(printf '%s\n' "$principal_emp" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_emp" -ne 3 ]; then
-        echo "FALLO $ROL_EMP: $n_principal_emp opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_emp" -ne 2 ]; then
+        echo "FALLO $ROL_EMP: $n_principal_emp opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Empleados" "Ver permisos" "Cerrar sesión"; do
+    for label in "Empleados" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -302,7 +302,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_EMP (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_EMP (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -333,7 +333,7 @@ EOF
 fallos_previos=$fallos
 salida_cli="$TMP/out-clientes-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Clientes (con este rol es la
-# primera opcion visible: el menu queda Clientes, Ver permisos y Cerrar
+# primera opcion visible: el menu queda Clientes y Cerrar
 # sesion), 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_CLI" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_cli" 2>&1
@@ -350,11 +350,11 @@ else
     # sobre toda la salida mezclaria las dos listas numeradas.
     principal_cli=$(sed -n '1,/=== MODULO DE CLIENTES ===/p' "$salida_cli")
     n_principal_cli=$(printf '%s\n' "$principal_cli" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_cli" -ne 3 ]; then
-        echo "FALLO $ROL_CLI: $n_principal_cli opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_cli" -ne 2 ]; then
+        echo "FALLO $ROL_CLI: $n_principal_cli opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Clientes" "Ver permisos" "Cerrar sesión"; do
+    for label in "Clientes" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_cli" | grep -Fq "$label"; then
             echo "FALLO $ROL_CLI: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -382,7 +382,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_CLI (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_CLI (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -394,7 +394,7 @@ fi
 fallos_previos=$fallos
 salida_con="$TMP/out-clientes-contabilidad.txt"
 # Entrada: Enter del "Presione Enter", 2 = Clientes (su menu queda Asistencia,
-# Clientes, Productos, Ver permisos y Cerrar sesion), 3 = Volver.
+# Clientes, Productos y Cerrar sesion), 3 = Volver.
 printf '\n2\n3\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_con" 2>&1
 rc_con=$?
@@ -458,7 +458,7 @@ EOF
 fallos_previos=$fallos
 salida_prov="$TMP/out-proveedores-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Proveedores (con este rol es la
-# primera opcion visible: el menu queda Proveedores, Ver permisos y Cerrar
+# primera opcion visible: el menu queda Proveedores y Cerrar
 # sesion), 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_PROV" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_prov" 2>&1
@@ -473,11 +473,11 @@ elif [ "$rc_prov" -ne 0 ]; then
 else
     principal_prov=$(sed -n '1,/=== MODULO PROVEEDORES ===/p' "$salida_prov")
     n_principal_prov=$(printf '%s\n' "$principal_prov" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_prov" -ne 3 ]; then
-        echo "FALLO $ROL_PROV: $n_principal_prov opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_prov" -ne 2 ]; then
+        echo "FALLO $ROL_PROV: $n_principal_prov opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Proveedores" "Ver permisos" "Cerrar sesión"; do
+    for label in "Proveedores" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_prov" | grep -Fq "$label"; then
             echo "FALLO $ROL_PROV: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -496,7 +496,7 @@ else
             fail=1; fallos=$((fallos+1))
         fi
     done
-    for label in "Agregar proveedor" "Actualizar proveedor" "Activar/Desactivar proveedor"; do
+    for label in "Agregar proveedor" "Actualizar proveedor" "Cambiar estado"; do
         if printf '%s\n' "$submenu_prov" | grep -Fq "$label"; then
             echo "FALLO $ROL_PROV: el submenu muestra '$label' sin permiso"
             fail=1; fallos=$((fallos+1))
@@ -504,7 +504,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_PROV (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_PROV (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -533,7 +533,7 @@ else
         echo "FALLO ALMACEN/Proveedores: $n_sub_prov_alm opciones en el submenu, se esperaban 6"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Agregar proveedor" "Actualizar proveedor" "Activar/Desactivar proveedor" \
+    for label in "Agregar proveedor" "Actualizar proveedor" "Cambiar estado" \
                  "Buscar proveedor" "Listar proveedores" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_prov_alm" | grep -Fq "$label"; then
             echo "FALLO ALMACEN/Proveedores: falta la opcion '$label' en el submenu"
@@ -574,7 +574,7 @@ EOF
 fallos_previos=$fallos
 salida_cat="$TMP/out-categorias-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Categorias (con este rol es la
-# primera opcion visible: el menu queda Categorias, Ver permisos y Cerrar
+# primera opcion visible: el menu queda Categorias y Cerrar
 # sesion), 2 = Volver en un submenu de 2 opciones.
 printf '\n1\n2\n' | BALBU_USER="$USR_CAT" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_cat" 2>&1
@@ -589,11 +589,11 @@ elif [ "$rc_cat" -ne 0 ]; then
 else
     principal_cat=$(sed -n '1,/=== MODULO DE CATEGORIAS ===/p' "$salida_cat")
     n_principal_cat=$(printf '%s\n' "$principal_cat" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_cat" -ne 3 ]; then
-        echo "FALLO $ROL_CAT: $n_principal_cat opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_cat" -ne 2 ]; then
+        echo "FALLO $ROL_CAT: $n_principal_cat opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Categorias" "Ver permisos" "Cerrar sesión"; do
+    for label in "Categorias" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_cat" | grep -Fq "$label"; then
             echo "FALLO $ROL_CAT: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -620,7 +620,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_CAT (3 opciones en el menu principal y 2 en el submenu)"
+        echo "OK $ROL_CAT (2 opciones en el menu principal y 2 en el submenu)"
     fi
 fi
 
@@ -691,7 +691,7 @@ EOF
 fallos_previos=$fallos
 salida_mar="$TMP/out-marcas-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Marcas (con este rol es la primera
-# opcion visible: el menu queda Marcas, Ver permisos y Cerrar sesion),
+# opcion visible: el menu queda Marcas y Cerrar sesion),
 # 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_MAR" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_mar" 2>&1
@@ -706,11 +706,11 @@ elif [ "$rc_mar" -ne 0 ]; then
 else
     principal_mar=$(sed -n '1,/=== MODULO DE MARCAS ===/p' "$salida_mar")
     n_principal_mar=$(printf '%s\n' "$principal_mar" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_mar" -ne 3 ]; then
-        echo "FALLO $ROL_MAR: $n_principal_mar opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_mar" -ne 2 ]; then
+        echo "FALLO $ROL_MAR: $n_principal_mar opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Marcas" "Ver permisos" "Cerrar sesión"; do
+    for label in "Marcas" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_mar" | grep -Fq "$label"; then
             echo "FALLO $ROL_MAR: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -729,7 +729,7 @@ else
             fail=1; fallos=$((fallos+1))
         fi
     done
-    for label in "Agregar Marca" "Actualizar Marca" "Activar/Desactivar Marca"; do
+    for label in "Agregar Marca" "Actualizar Marca" "Cambiar estado"; do
         if printf '%s\n' "$submenu_mar" | grep -Fq "$label"; then
             echo "FALLO $ROL_MAR: el submenu muestra '$label' sin permiso"
             fail=1; fallos=$((fallos+1))
@@ -737,7 +737,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_MAR (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_MAR (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -767,7 +767,7 @@ else
         echo "FALLO ALMACEN/Marcas: $n_sub_mar_alm opciones en el submenu, se esperaban 6"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Agregar Marca" "Actualizar Marca" "Activar/Desactivar Marca" \
+    for label in "Agregar Marca" "Actualizar Marca" "Cambiar estado" \
                  "Buscar Marca" "Listar Marcas" "Volver al Menu Principal"; do
         if ! printf '%s\n' "$submenu_mar_alm" | grep -Fq "$label"; then
             echo "FALLO ALMACEN/Marcas: falta la opcion '$label' en el submenu"
@@ -808,7 +808,7 @@ EOF
 fallos_previos=$fallos
 salida_met="$TMP/out-metodos-pago-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Metodos de pago (con este rol es la
-# primera opcion visible: el menu queda Metodos de pago, Ver permisos y Cerrar
+# primera opcion visible: el menu queda Metodos de pago y Cerrar
 # sesion), 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_MET" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_met" 2>&1
@@ -823,11 +823,11 @@ elif [ "$rc_met" -ne 0 ]; then
 else
     principal_met=$(sed -n '1,/=== MODULO DE METODOS DE PAGO ===/p' "$salida_met")
     n_principal_met=$(printf '%s\n' "$principal_met" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_met" -ne 3 ]; then
-        echo "FALLO $ROL_MET: $n_principal_met opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_met" -ne 2 ]; then
+        echo "FALLO $ROL_MET: $n_principal_met opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Metodos de pago" "Ver permisos" "Cerrar sesión"; do
+    for label in "Metodos de pago" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_met" | grep -Fq "$label"; then
             echo "FALLO $ROL_MET: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -854,7 +854,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_MET (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_MET (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -867,7 +867,7 @@ fallos_previos=$fallos
 salida_cli_ven="$TMP/out-clientes-vendedor.txt"
 # Entrada: Enter del "Presione Enter", 4 = Clientes (su menu queda
 # Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos de
-# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 4 = Volver.
+# pago, Ventas, Caja (turnos) y Cerrar sesion), 4 = Volver.
 printf '\n4\n4\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_cli_ven" 2>&1
 rc_cli_ven=$?
@@ -914,7 +914,7 @@ fallos_previos=$fallos
 salida_met_ven="$TMP/out-metodos-pago-vendedor.txt"
 # Entrada: Enter del "Presione Enter", 6 = Metodos de pago (su menu queda
 # Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos de
-# pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 3 = Volver.
+# pago, Ventas, Caja (turnos) y Cerrar sesion), 3 = Volver.
 printf '\n6\n3\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_met_ven" 2>&1
 rc_met_ven=$?
@@ -1091,7 +1091,7 @@ fi
 fallos_previos=$fallos
 salida_prod_con="$TMP/out-productos-contabilidad.txt"
 # Entrada: Enter del "Presione Enter", 3 = Productos (su menu queda Asistencia,
-# Clientes, Productos, Ver permisos y Cerrar sesion), 4 = Volver en un submenu de 4.
+# Clientes, Productos y Cerrar sesion), 4 = Volver en un submenu de 4.
 printf '\n3\n4\n' | BALBU_USER="prueba_r7_con" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_prod_con" 2>&1
 rc_prod_con=$?
@@ -1214,7 +1214,7 @@ EOF
 fallos_previos=$fallos
 salida_ven_gest="$TMP/out-ventas-gest.txt"
 # Entrada: Enter del "Presione Enter", 1 = Ventas (su menu queda Ventas,
-# Ver permisos y Cerrar sesion: Caja ya no cuelga de GESTIONAR_VENTAS),
+# Cerrar sesion. Caja ya no cuelga de GESTIONAR_VENTAS),
 # 9 = Volver en un submenu de 9.
 printf '\n1\n9\n' | BALBU_USER="$USR_VEN" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_ven_gest" 2>&1
@@ -1253,8 +1253,8 @@ else
     # Caja ya no cuelga de GESTIONAR_VENTAS: este rol no debe ver el item.
     principal_ven_gest=$(sed -n '1,/=== MODULO DE VENTAS ===/p' "$salida_ven_gest")
     n_principal_ven_gest=$(printf '%s\n' "$principal_ven_gest" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_ven_gest" -ne 3 ]; then
-        echo "FALLO $ROL_VEN: $n_principal_ven_gest opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_ven_gest" -ne 2 ]; then
+        echo "FALLO $ROL_VEN: $n_principal_ven_gest opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
     if printf '%s\n' "$principal_ven_gest" | grep -Fq "Caja (turnos)"; then
@@ -1277,7 +1277,7 @@ fallos_previos=$fallos
 salida_prod_alm="$TMP/out-productos-almacen.txt"
 # Entrada: Enter del "Presione Enter", 7 = Productos (su menu queda Asistencia,
 # Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
-# Compras, Inventario, Ver permisos y Cerrar sesion), 7 = Volver.
+# Compras, Inventario y Cerrar sesion), 7 = Volver.
 printf '\n7\n7\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_prod_alm" 2>&1
 rc_prod_alm=$?
@@ -1315,7 +1315,7 @@ salida_ven_ven="$TMP/out-ventas-vendedor.txt"
 # CONSULTAR_HISTORIAL_VENTA: ve las 7 acciones de gestion, el historial,
 # Garantias y Volver. Entrada: Enter del "Presione Enter", 7 = Ventas (su menu
 # queda Asistencia, Mis permisos, Mis vacaciones, Clientes, Productos, Metodos
-# de pago, Ventas, Caja (turnos), Ver permisos y Cerrar sesion), 10 = Volver en
+# de pago, Ventas, Caja (turnos) y Cerrar sesion), 10 = Volver en
 # el submenu filtrado.
 printf '\n7\n10\n' | BALBU_USER="prueba_r7_ven" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_ven_ven" 2>&1
@@ -1488,11 +1488,11 @@ elif [ "$rc_asi" -ne 0 ]; then
     fail=1; fallos=$((fallos+1))
 else
     n_asi=$(grep -c '^[0-9]\+\. ' "$salida_asi" || true)
-    if [ "$n_asi" -ne 3 ]; then
-        echo "FALLO $ROL_ASI: $n_asi opciones, se esperaban 3"
+    if [ "$n_asi" -ne 2 ]; then
+        echo "FALLO $ROL_ASI: $n_asi opciones, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Asistencia" "Ver permisos" "Cerrar sesión"; do
+    for label in "Asistencia" "Cerrar sesión"; do
         if ! grep -Fq "$label" "$salida_asi"; then
             echo "FALLO $ROL_ASI: falta la opcion '$label'"
             fail=1; fallos=$((fallos+1))
@@ -1535,7 +1535,7 @@ EOF
 fallos_previos=$fallos
 salida_com="$TMP/out-compras-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Compras (con este rol es la primera
-# opcion visible: el menu queda Compras, Ver permisos y Cerrar sesion),
+# opcion visible: el menu queda Compras y Cerrar sesion),
 # 2 = Volver en un submenu de 2 opciones.
 printf '\n1\n2\n' | BALBU_USER="$USR_COM" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_com" 2>&1
@@ -1550,11 +1550,11 @@ elif [ "$rc_com" -ne 0 ]; then
 else
     principal_com=$(sed -n '1,/=== MODULO DE COMPRAS ===/p' "$salida_com")
     n_principal_com=$(printf '%s\n' "$principal_com" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_com" -ne 3 ]; then
-        echo "FALLO $ROL_COM: $n_principal_com opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_com" -ne 2 ]; then
+        echo "FALLO $ROL_COM: $n_principal_com opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Compras" "Ver permisos" "Cerrar sesión"; do
+    for label in "Compras" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_com" | grep -Fq "$label"; then
             echo "FALLO $ROL_COM: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -1583,7 +1583,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_COM (3 opciones en el menu principal y 2 en el submenu)"
+        echo "OK $ROL_COM (2 opciones en el menu principal y 2 en el submenu)"
     fi
 fi
 
@@ -1615,7 +1615,7 @@ EOF
 fallos_previos=$fallos
 salida_com_rp="$TMP/out-compras-reg-pag.txt"
 # Entrada: Enter del "Presione Enter", 1 = Compras (con este rol es la primera
-# opcion visible: el menu queda Compras, Ver permisos y Cerrar sesion),
+# opcion visible: el menu queda Compras y Cerrar sesion),
 # 3 = Volver en un submenu de 3 opciones.
 printf '\n1\n3\n' | BALBU_USER="$USR_COM_RP" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_com_rp" 2>&1
@@ -1630,8 +1630,8 @@ elif [ "$rc_com_rp" -ne 0 ]; then
 else
     principal_com_rp=$(sed -n '1,/=== MODULO DE COMPRAS ===/p' "$salida_com_rp")
     n_principal_com_rp=$(printf '%s\n' "$principal_com_rp" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_com_rp" -ne 3 ]; then
-        echo "FALLO $ROL_COM_RP: $n_principal_com_rp opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_com_rp" -ne 2 ]; then
+        echo "FALLO $ROL_COM_RP: $n_principal_com_rp opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
 
@@ -1656,7 +1656,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_COM_RP (3 opciones en el menu principal y 3 en el submenu)"
+        echo "OK $ROL_COM_RP (2 opciones en el menu principal y 3 en el submenu)"
     fi
 fi
 
@@ -1668,7 +1668,7 @@ fallos_previos=$fallos
 salida_com_alm="$TMP/out-compras-almacen.txt"
 # Entrada: Enter del "Presione Enter", 8 = Compras (su menu queda Asistencia,
 # Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
-# Compras, Inventario, Ver permisos y Cerrar sesion), 8 = Volver.
+# Compras, Inventario y Cerrar sesion), 8 = Volver.
 printf '\n8\n8\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_com_alm" 2>&1
 rc_com_alm=$?
@@ -1729,7 +1729,7 @@ EOF
 fallos_previos=$fallos
 salida_caja_ver="$TMP/out-caja-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Caja (unico item del menu principal
-# ademas de Ver permisos y Cerrar sesion), 2 = Volver en un submenu de 2.
+# ademas de Cerrar sesion), 2 = Volver en un submenu de 2.
 printf '\n1\n2\n' | BALBU_USER="$USR_CAJA_VER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_caja_ver" 2>&1
 rc_caja_ver=$?
@@ -2035,7 +2035,7 @@ EOF
 fallos_previos=$fallos
 salida_inv_ver="$TMP/out-inventario-ver.txt"
 # Entrada: Enter del "Presione Enter", 1 = Inventario (unico item del menu
-# principal ademas de Ver permisos y Cerrar sesion), 2 = Volver en un submenu
+# principal ademas de Cerrar sesion), 2 = Volver en un submenu
 # de 2 opciones.
 printf '\n1\n2\n' | BALBU_USER="$USR_INV_VER" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_inv_ver" 2>&1
@@ -2050,11 +2050,11 @@ elif [ "$rc_inv_ver" -ne 0 ]; then
 else
     principal_inv_ver=$(sed -n '1,/=== MODULO DE INVENTARIO ===/p' "$salida_inv_ver")
     n_principal_inv_ver=$(printf '%s\n' "$principal_inv_ver" | grep -c '^[0-9]\+\. ' || true)
-    if [ "$n_principal_inv_ver" -ne 3 ]; then
-        echo "FALLO $ROL_INV_VER: $n_principal_inv_ver opciones en el menu principal, se esperaban 3"
+    if [ "$n_principal_inv_ver" -ne 2 ]; then
+        echo "FALLO $ROL_INV_VER: $n_principal_inv_ver opciones en el menu principal, se esperaban 2"
         fail=1; fallos=$((fallos+1))
     fi
-    for label in "Inventario" "Ver permisos" "Cerrar sesión"; do
+    for label in "Inventario" "Cerrar sesión"; do
         if ! printf '%s\n' "$principal_inv_ver" | grep -Fq "$label"; then
             echo "FALLO $ROL_INV_VER: el menu principal no muestra '$label'"
             fail=1; fallos=$((fallos+1))
@@ -2081,7 +2081,7 @@ else
     done
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
-        echo "OK $ROL_INV_VER (3 opciones en el menu principal y 2 en el submenu)"
+        echo "OK $ROL_INV_VER (2 opciones en el menu principal y 2 en el submenu)"
     fi
 fi
 
@@ -2093,7 +2093,7 @@ fallos_previos=$fallos
 salida_inv_alm="$TMP/out-inventario-almacen.txt"
 # Entrada: Enter del "Presione Enter", 9 = Inventario (su menu queda Asistencia,
 # Mis permisos, Mis vacaciones, Proveedores, Categorias, Marcas, Productos,
-# Compras, Inventario, Ver permisos y Cerrar sesion), 4 = Volver.
+# Compras, Inventario y Cerrar sesion), 4 = Volver.
 printf '\n9\n4\n' | BALBU_USER="prueba_r7_alm" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
     timeout "$LIMITE" "$APP" >"$salida_inv_alm" 2>&1
 rc_inv_alm=$?

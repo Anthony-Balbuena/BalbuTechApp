@@ -85,6 +85,12 @@ Actualización parcial: `NULL` conserva.
   `ERROR: LA FECHA DE DESPIDO NO PUEDE SER FUTURA.`
 - Devuelve `EXITO: EL EMPLEADO ID <id> HA SIDO DADO DE BAJA.`
 
+> (08/11/2026) Si el empleado tenía cuenta, el mensaje agrega
+> `SU USUARIO QUEDO INACTIVO Y SUS SESIONES CERRADAS.`: el trigger
+> `TR_DESACTIVAR_USUARIO_POST_LIQUIDACION` (módulo 10) pone la cuenta en
+> `INACTIVO` y `TR_INVALIDAR_SESION_EMPLEADO_INACTIVO` (módulo 66) borra sus
+> sesiones abiertas.
+
 ### `SP_REACTIVAR_EMPLEADO(P_ID_EMPLEADO, P_NUEVO_SALARIO)`
 
 **Usada por la app.** Devuelve a `ACTIVO`, limpia `FECHA_DESPIDO`, **setea
@@ -94,6 +100,11 @@ Actualización parcial: `NULL` conserva.
 - Ya activo → `AVISO: EL EMPLEADO YA SE ENCUENTRA ACTIVO.`
 - Salario no nulo y `<= 0` → `ERROR: EL NUEVO SALARIO DEBE SER MAYOR A CERO.`
 - Devuelve `EXITO: EMPLEADO ID <id> REINGRESADO CORRECTAMENTE.`
+
+> (08/11/2026) **No reactiva la cuenta**: si el empleado tiene su usuario en
+> `INACTIVO`, el mensaje agrega `SU USUARIO SIGUE INACTIVO: ACTIVELO EN EL
+> MODULO USUARIOS.` Se prefiere que alguien lo decida a mano antes que devolver
+> el acceso solo.
 
 > El reingreso **pierde la fecha de ingreso original**: la antigüedad pasa a
 > contar desde el reingreso. Es el comportamiento documentado en el código.
