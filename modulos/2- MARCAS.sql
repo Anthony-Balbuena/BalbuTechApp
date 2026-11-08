@@ -150,33 +150,14 @@ END //
 DELIMITER ;
 
 --5. BUSCAR TODAS LAS MARCAS 
-/*
-2_SP_OBTENER_MARCA
-Devuelve la marca con el ID que se le pida.
-Sirve para cargar una marca en concreto para verla o editarla.
-*/
+-- (08/11/2026) 2_SP_OBTENER_MARCA y 2_SP_LISTAR_MARCAS ELIMINADOS: no los
+-- llamaba nadie (ni la app ni otro SP) y eran los unicos dos procedimientos del
+-- proyecto sin DROP previo, asi que cada reimport del modulo 2 fallaba con
+-- 1304 "PROCEDURE already exists". Se deja solo el DROP para limpiar una base
+-- que todavia los tenga.
 DELIMITER //
-CREATE PROCEDURE 2_SP_OBTENER_MARCA(IN P_ID INT)
-BEGIN
-    SELECT * FROM MARCAS WHERE ID_MARCA = P_ID;
-END //
-DELIMITER ;
-
---6. BUSCAR MARCAS ACTIVAS
-/*
-2_SP_LISTAR_MARCAS
-Lista las marcas, con la opcion de traer solo las activas.
-Si el parametro viene en 1 muestra solo ACTIVAS, si no muestra todas.
-*/
-DELIMITER //
-CREATE PROCEDURE 2_SP_LISTAR_MARCAS(IN P_SOLO_ACTIVAS BIT)
-BEGIN
-    IF P_SOLO_ACTIVAS = 1 THEN
-        SELECT * FROM MARCAS WHERE ESTADO = 'ACTIVA';
-    ELSE
-        SELECT * FROM MARCAS;
-    END IF;
-END //
+DROP PROCEDURE IF EXISTS 2_SP_OBTENER_MARCA //
+DROP PROCEDURE IF EXISTS 2_SP_LISTAR_MARCAS //
 DELIMITER ;
 
 CALL `SP_INSERTAR_MARCA` ('ASUS');
