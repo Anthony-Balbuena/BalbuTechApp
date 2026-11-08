@@ -2,7 +2,8 @@
 
 **Fecha:** 05/11/2026
 **Estado:** idea evaluada. No iniciada. Va después de cerrar la validación de la viva y el commit de seguridad.
-**Relacionado:** [[Realizar en casa]], [[Realizado]], [[PENDIENTES]], [[Auditoria Opus - 03-11-2026]]
+**Relacionado:** [[PENDIENTES]] — las demás notas (`Realizado`, `Realizar en casa` y
+`Auditoria Opus - 03-11-2026`) salieron del repo el 08/11/2026 y aqui no se enlazan.
 
 ## Resumen
 
@@ -379,8 +380,8 @@ Analogía: hoy el cocinero cocina en la mesa del cliente. Separar la cocina perm
 
 ## Referencias
 
-- [[Realizar en casa]] — pendientes priorizados.
-- [[Realizado]] — historial de cambios.
 - [[PENDIENTES]] — deuda técnica y matriz de pruebas.
-- [[Auditoria Opus - 03-11-2026]] — hallazgos de seguridad.
+- `Realizado` — historial de cambios. Hoy fuera del repo.
+- `Realizar en casa` — pendientes priorizados. Hoy fuera del repo.
+- `Auditoria Opus - 03-11-2026` — hallazgos de seguridad. Hoy fuera del repo.
 - Código actual: `clientes.cpp`, `main.cpp`, `sesion.cpp`, `login.cpp`, `database.h`, `build.sh`.

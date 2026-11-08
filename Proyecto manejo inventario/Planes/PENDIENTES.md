@@ -1,7 +1,8 @@
 # PENDIENTES — todo en un solo lugar
 
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
-> Lo hecho vive en `Realizado.md`; los detalles largos, en `Auditoria/` y `Flujos/`.
+> Lo hecho y los detalles largos salieron del repo el 08/11/2026: viven en
+> `../BalbuTechApp-fuera-del-repo/` (ver su `LEEME.md`).
 > Actualizado: 30/10/2026.
 
 ---
@@ -10,7 +11,7 @@
 
 ### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
 
-Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026: 7 roles, **58 permisos**, matriz **58/52/46/12/15/25/5 = 213 pares** en TEST; `test-menus-por-rol.sh` OK en TEST, `check-app-sps` 99/0 en TEST). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`). VENDEDOR quedó en 15 permisos: no busca ni lista clientes (`CLIENTES_VER`), de Métodos de pago solo conserva `METODOS_PAGO_VER`, y en Garantías registra, reclama y consulta pero **no** finaliza.
+Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026: 7 roles, **58 permisos**, matriz **58/52/46/12/15/25/5 = 213 pares** en TEST; `test-menus-por-rol.sh` OK en TEST, `check-app-sps` 99/0 en TEST). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`, hoy fuera del repo. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`). VENDEDOR quedó en 15 permisos: no busca ni lista clientes (`CLIENTES_VER`), de Métodos de pago solo conserva `METODOS_PAGO_VER`, y en Garantías registra, reclama y consulta pero **no** finaliza.
 
 
 **Estimación de esfuerzo (26/10):** ya no quedan módulos con paraguas; la Tanda B está cerrada.
@@ -36,14 +37,14 @@ Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026:
 - `REGISTRAR_ASISTENCIA` **ya no abre Empleados**: desde el 23/10/2026 abre el
   ítem propio `Asistencia` (primero del menú). `CONSULTAR_ASISTENCIA` filtra los
   reportes; VENDEDOR, ALMACEN y CONTABILIDAD solo fichan y ven lo suyo.
-  **Resuelto** (ver `Realizado.md`, 23/10).
+  **Resuelto** (ver `Realizado.md`, 23/10, hoy fuera del repo).
 - El cliente `mariadb` dentro de `docker compose exec` pierde las comillas dobles del SQL (usar archivo `.sql` o here-doc).
 - `db/import.sh` no dropea la base; y el `DROP` borra el grant de `balbu_app` (hay que volver a otorgarlo).
 - `ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE` es ambiguo si el `SELECT` también lee `ROL_PERMISO`.
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`, `64`, `65`, `66`). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 102/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería completa en verde. Detalle en `Realizado.md`.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`, `64`, `65`, `66`). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 102/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería completa en verde. Detalle en `Realizado.md`, hoy fuera del repo.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
@@ -166,7 +167,7 @@ Cierre: build OK, `check-app-sps` 99/0, visual OK, sin datos de prueba.
 
 ### 5. Contratos: campos legales RD + revisión legal
 
-- [ ] Agregar a la plantilla: nacionalidad, edad, sexo, estado civil, **RNL** (Registro Nacional del Trabajador), lugar de prestación, provincia y municipio. Checklist y fuentes: `Flujos/Contrato de trabajo - requisitos legales RD.md`.
+- [ ] Agregar a la plantilla: nacionalidad, edad, sexo, estado civil, **RNL** (Registro Nacional del Trabajador), lugar de prestación, provincia y municipio. Checklist y fuentes: `Flujos/Contrato de trabajo - requisitos legales RD.md`, hoy fuera del repo.
 - [ ] Revisión legal del texto antes de usarlo con personal real (la plantilla ya lo dice al pie).
 
 ### 6. Garantías: estructurar el flujo (implementado en TEST, falta la viva)
@@ -274,6 +275,9 @@ respaldo para ventas viejas.
 
 ## ✅ Planes cerrados (por si buscás el detalle)
 
+El detalle de la columna "Dónde quedó" vive en `Realizado.md`, que salió del
+repo: está en `../BalbuTechApp-fuera-del-repo/`.
+
 | Plan | Cuándo | Dónde quedó |
 |---|---|---|
 | Generar contrato (borrador) | 19/10 | `Realizado.md` — 3ª parte |
@@ -310,7 +314,10 @@ DB_PASSWORD=<clave-root> DB_NAME=BALBU_TECH_TEST bash db/test-contratos-subir.sh
 
 ## Referencias
 
-- `Realizado.md` — lo hecho, con evidencia.
+Todo lo que sigue salió del repo el 08/11/2026 y vive en
+`../BalbuTechApp-fuera-del-repo/` (ver su `LEEME.md`):
+
+- `Planes/Realizado.md` — lo hecho, con evidencia.
 - `Auditoria/` — hallazgos con detalle (18/10 código + BD; 08/10 solo lo abierto).
 - `Flujos/` — requisitos legales del contrato, flujo de producto y de BD.
 - `Reglas/Reglas de trabajo.md` — cómo se trabaja.
