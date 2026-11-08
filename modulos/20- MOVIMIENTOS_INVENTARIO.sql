@@ -174,6 +174,9 @@ DELIMITER ;
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 DELIMITER //
+-- SIN USO: SP_KARDEX_PRODUCTO (08/11/2026)
+-- Reemplazada por SP_KARDEX_PAGINADO con un ID de producto.
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS SP_KARDEX_PRODUCTO ;
 /*
 SP_KARDEX_PRODUCTO (14/10/2026)
@@ -193,6 +196,9 @@ END //
 DELIMITER ;
 
 DELIMITER //
+-- SIN USO: SP_KARDEX_TODOS (08/11/2026)
+-- Reemplazada por SP_KARDEX_PAGINADO (P_ID_PRODUCTO = 0 = todos).
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS SP_KARDEX_TODOS ;
 /*
 SP_KARDEX_TODOS (14/10/2026)

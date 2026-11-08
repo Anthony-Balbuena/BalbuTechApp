@@ -436,6 +436,9 @@ y con TOTAL el saldo quedaba negativo en ventas pagadas.
 
 
 DELIMITER //
+-- SIN USO: SP_REPORTE_VENTAS (08/11/2026)
+-- Reemplazada por SP_REPORTE_VENTAS_PAGINADO + SP_CONTAR_REPORTE_VENTAS.
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS SP_REPORTE_VENTAS ;
 /*
 SP_REPORTE_VENTAS

@@ -96,6 +96,9 @@ Busca marcas por nombre parcial.
 Si la busqueda viene vacia o nula, devuelve todas las marcas.
 */
 DELIMITER //
+-- SIN USO: SP_BUSCAR_MARCA (08/11/2026)
+-- Reemplazada por 'Buscar Marca' con SELECT directo paginado (paginacion.h).
+-- Se conserva sin uso desde 08/11/2026.
 drop PROCEDURE if EXISTS SP_BUSCAR_MARCA; 
 CREATE PROCEDURE SP_BUSCAR_MARCA(
     IN P_BUSQUEDA VARCHAR(100)
@@ -191,6 +194,9 @@ CALL `SP_INSERTAR_MARCA` ('RED MAGIC');
 --- SP requerido por la app C++ (marcas.cpp:listarMarcas).
 -----------------------------------------------------------------------------------------------------------------------
 DELIMITER //
+-- SIN USO: SP_LISTAR_MARCAS (08/11/2026)
+-- Reemplazada por 'Listar Marcas' con SELECT directo paginado (paginacion.h).
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS SP_LISTAR_MARCAS ;
 CREATE PROCEDURE SP_LISTAR_MARCAS()
 BEGIN

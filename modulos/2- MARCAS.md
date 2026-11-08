@@ -53,9 +53,11 @@ Cambia el nombre de una marca existente. **Usada por la app**.
 
 ### `SP_BUSCAR_MARCA(P_BUSQUEDA)`
 
-**Usada por la app.** Con `NULL` o cadena vacía devuelve todas las marcas;
-con texto busca por coincidencia parcial en `NOMBRE`
-(`LIKE '%<texto>%'`). Devuelve `SELECT *`.
+**La app ya no la llama** (08/11/2026): "Buscar Marca" pasó a `SELECT` directo
+paginado. Se conserva el procedimiento, sin uso.
+
+Con `NULL` o cadena vacía devuelve todas las marcas; con texto busca por
+coincidencia parcial en `NOMBRE` (`LIKE '%<texto>%'`). Devuelve `SELECT *`.
 
 ### `SP_TOGGLE_ESTADO_MARCA(P_ID_MARCA)`
 
@@ -83,8 +85,10 @@ Lista marcas: si `P_SOLO_ACTIVAS = 1`, solo las `ACTIVA`; si no, todas.
 
 ### `SP_LISTAR_MARCAS()`
 
-**Usada por la app** (`marcas.cpp:listarMarcas`). Devuelve
-`ID_MARCA, NOMBRE, ESTADO` ordenado por ID.
+**La app ya no la llama** (08/11/2026): "Listar Marcas" pasó a `SELECT` directo
+paginado. Se conserva el procedimiento, sin uso.
+
+Devuelve `ID_MARCA, NOMBRE, ESTADO` ordenado por ID.
 
 ## Datos iniciales (seed)
 

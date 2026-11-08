@@ -514,6 +514,9 @@ SP_REPORTE_STOCK_CRITICO
 Lista los productos que estan por debajo del stock minimo con su cantidad
 faltante, del mas urgente al menos, para priorizar la reposicion.
 */
+-- SIN USO: SP_REPORTE_STOCK_CRITICO (08/11/2026)
+-- Reemplazada por SP_REPORTE_STOCK_CRITICO_PAGINADO + SP_CONTAR_STOCK_CRITICO.
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS SP_REPORTE_STOCK_CRITICO ;
 CREATE PROCEDURE SP_REPORTE_STOCK_CRITICO()
 BEGIN
@@ -569,6 +572,9 @@ Prepara los datos del formulario de edicion de producto: devuelve el
 producto junto con su categoria y su marca para popular los controles de
 la pantalla.
 */
+-- SIN USO: PARA_ACTUALIZARDATOS (08/11/2026)
+-- Reemplazada por PARA_ACTUALIZARDATOS_PAGINADO + SP_CONTAR_PRODUCTOS.
+-- Se conserva sin uso desde 08/11/2026.
 DROP PROCEDURE IF EXISTS PARA_ACTUALIZARDATOS;
 
 CREATE PROCEDURE PARA_ACTUALIZARDATOS()

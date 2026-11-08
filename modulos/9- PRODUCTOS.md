@@ -167,10 +167,13 @@ Cuántos productos están en o bajo su mínimo, para el paginador del reporte.
 
 ### `SP_REPORTE_STOCK_CRITICO()`
 
-**Usada por la app** (`productos.cpp`). Lista los productos con
-`STOCK_ACTUAL <= STOCK_MINIMO`, con `CANTIDAD_FALTANTE = STOCK_MINIMO -
-STOCK_ACTUAL`, del más urgente al menos. Solo lee de `INVENTARIO` (un producto
-sin fila no aparece en este reporte).
+**La app ya no la llama** (08/11/2026): "Reporte De Stock" pasó a
+`SP_REPORTE_STOCK_CRITICO_PAGINADO` + `SP_CONTAR_STOCK_CRITICO`. Se conserva el
+procedimiento, sin uso.
+
+Lista los productos con `STOCK_ACTUAL <= STOCK_MINIMO`, con
+`CANTIDAD_FALTANTE = STOCK_MINIMO - STOCK_ACTUAL`, del más urgente al menos.
+Solo lee de `INVENTARIO` (un producto sin fila no aparece en este reporte).
 
 ### `PARA_INSERTAR_PRODUCTO()`
 
