@@ -213,6 +213,8 @@ FN_VALOR_TOTAL_INVENTARIO
 Suma el valor de todo el inventario: stock multiplicado por precio.
 Se usa en reportes para saber cuanto dinero hay en bodega; devuelve 0 si no hay nada.
 */
+-- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
+DROP FUNCTION IF EXISTS FN_VALOR_TOTAL_INVENTARIO;
 CREATE FUNCTION FN_VALOR_TOTAL_INVENTARIO() 
 RETURNS DECIMAL(15,2)
 DETERMINISTIC

@@ -279,4 +279,7 @@ END //
 DELIMITER ;
 
 
-CALL `SP_INSERTAR_CLIENTES` ('Jose Perez', '8097282431','perez01@gmail.com','Villa carmen');
+-- (08/11/2026) El cliente de ejemplo ya NO se carga aca: los modulos .sql
+-- importan las tablas vacias a proposito. Si lo necesitas para probar, va en un
+-- script de seed (INSERT IGNORE), no en el modulo. Con el CALL, cada reimport
+-- fallaba con 1644 y db/import.sh salia en 1 ANTES de inyectar las guardas.

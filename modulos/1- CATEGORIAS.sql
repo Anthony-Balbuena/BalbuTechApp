@@ -223,6 +223,8 @@ Trae las categorias registradas entre dos fechas.
 Sirve para filtrar por periodo en reportes.
 */
 DELIMITER //
+-- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
+DROP PROCEDURE IF EXISTS 1_SP_CATEGORIAS_POR_FECHA //
 CREATE PROCEDURE 1_SP_CATEGORIAS_POR_FECHA(
     IN P_FECHA_INICIO DATETIME,
     IN P_FECHA_FIN DATETIME
@@ -241,6 +243,8 @@ El ID que se excluye permite validar el nombre al editar sin marcarse
 como duplicado a si misma.
 */
 DELIMITER //
+-- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
+DROP PROCEDURE IF EXISTS 1_SP_VERIFICAR_CATEGORIA_EXISTE //
 CREATE PROCEDURE 1_SP_VERIFICAR_CATEGORIA_EXISTE(
     IN P_NOMBRE VARCHAR(50),
     IN P_ID_EXCLUIR INT -- Útil para edición: ignora el ID actual

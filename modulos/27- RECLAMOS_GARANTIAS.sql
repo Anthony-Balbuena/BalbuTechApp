@@ -101,6 +101,8 @@ DELIMITER //
 Cierra un reclamo y deja constancia en la auditoria, todo en una transaccion.
 Si algo falla en el camino, deshace todo para no dejar datos a medias.
 */
+-- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
+DROP PROCEDURE IF EXISTS 27_SP_FINALIZAR_RECLAMO_TOTAL //
 CREATE PROCEDURE 27_SP_FINALIZAR_RECLAMO_TOTAL(IN P_ID_RECLAMO INT)
 proc_label: BEGIN
     -- Declarar manejador de errores

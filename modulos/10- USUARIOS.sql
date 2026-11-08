@@ -193,22 +193,11 @@ proc_label: BEGIN
 END//
 DELIMITER ;
 
--- Semilla del administrador: solo se crea si existe el empleado 1 y aun no
--- tiene cuenta, asi la recarga del archivo no se queja ni duplica la fila.
--- (18/10/2026) La clave ya NO se guarda aqui: la real estaba publicada en
--- GitHub (repo publico). Pasa la que quieras con db/seed-admin.sh <usuario>
--- <clave>, o cambiala al primer login. El placeholder de abajo solo evita
--- que el archivo quede sin clave.
-SET @puede_crearse := (SELECT COUNT(*) FROM EMPLEADOS E
-                        WHERE E.ID_EMPLEADO = 1
-                          AND E.ESTADO = 'ACTIVO'
-                          AND NOT EXISTS (SELECT 1 FROM USUARIOS U WHERE U.ID_EMPLEADO = 1));
-SET @sql_semilla := IF(@puede_crearse = 1,
-    'CALL SP_INSERTAR_USUARIO (1, 1, ''abalbuena'', ''CAMBIAR_ANTES_DE_USAR'')',
-    'SELECT ''SEMILLA DE USUARIO OMITIDA (falta empleado 1 o ya tiene cuenta)'' AS AVISO');
-PREPARE semilla_usuario FROM @sql_semilla;
-EXECUTE semilla_usuario;
-DEALLOCATE PREPARE semilla_usuario;
+-- (08/11/2026) La semilla del administrador ya NO se ejecuta al importar: se
+-- quito el PREPARE/EXECUTE que llamaba a SP_INSERTAR_USUARIO. Los modulos .sql
+-- importan las tablas vacias a proposito y los datos de arranque viven en
+-- scripts: db/seed-admin.sh <usuario> <clave> crea la cuenta del admin.
+-- Con la semilla, el import creaba/omitia un usuario con clave placeholder.
 ---TOGGLER PARA ESTADO
 DELIMITER //
 

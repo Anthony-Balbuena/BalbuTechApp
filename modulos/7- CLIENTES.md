@@ -102,12 +102,10 @@ guarda en `VALOR_NUEVO`: `Nombre: <nombre>, Email: <email>`.
 
 ## Datos iniciales (seed)
 
-Un `CALL SP_INSERTAR_CLIENTES('Jose Perez', '8097282431',
-'perez01@gmail.com', 'Villa carmen')`.
-
-> **No idempotente:** al reimportar sobre una base que ya lo tiene, el `CALL`
-> responde `ERROR: ESTE TELÉFONO YA ESTÁ REGISTRADO.` (o el de email) y el
-> import lo reporta como sentencia con error.
+**Este módulo ya no carga datos.** (08/11/2026) Se quitó el
+`CALL SP_INSERTAR_CLIENTES('Jose Perez', ...)`: los `.sql` importan las tablas
+vacías a propósito. Si hace falta un cliente de prueba, va en un script de seed
+con `INSERT IGNORE`, no en el módulo.
 
 ## Reglas de negocio
 

@@ -33,15 +33,14 @@ idempotente.
 
 ## Semilla del administrador
 
-Bloque con `PREPARE`/`EXECUTE` que crea `abalbuena` (empleado 1, rol 1) **solo
-si** el empleado 1 existe y todavía no tiene cuenta. Si no, devuelve
-`SEMILLA DE USUARIO OMITIDA (...)`.
+**Este módulo ya no crea usuarios.** (08/11/2026) Se quitó el bloque
+`PREPARE`/`EXECUTE` que llamaba a `SP_INSERTAR_USUARIO` para sembrar
+`abalbuena`: los `.sql` importan las tablas vacías a propósito y los datos de
+arranque viven en scripts.
 
-> **Importante:** la contraseña sembrada es el placeholder
-> `CAMBIAR_ANTES_DE_USAR`, **no un hash**. No sirve para loguearse: la app
-> compara hashes. La clave real se setea con `db/seed-admin.sh <usuario>
-> <clave>` (o con `SP_CAMBIAR_CLAVE_USUARIO`). La clave vieja se sacó del
-> archivo porque estaba publicada en un repo público.
+La cuenta se crea con `db/seed-admin.sh <usuario> <clave>`, que arma un
+`EMPLEADOS` mínimo, inserta la fila en `USUARIOS` y deriva la clave con PBKDF2
+(`SP_LOGIN_AUTENTICAR` la migra al formato del servidor en el primer login).
 
 ## Procedimientos almacenados
 

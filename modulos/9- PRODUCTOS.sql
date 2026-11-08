@@ -786,8 +786,9 @@ BEGIN
      WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO;
 END //
 DELIMITER ;
-CALL PARA_ACTUALIZARDATOS(); 
-
+-- (08/11/2026) Se quito el CALL PARA_ACTUALIZARDATOS() suelto que habia aca:
+-- se ejecutaba en CADA import y volcaba la tabla de productos como result set
+-- (ruido de desarrollo). Ademas el SP ya no lo usa la app.
 
 --SP PARA VER EL LA LOGICA DEL C++ el backend los para activar o desactivar 
 DELIMITER //

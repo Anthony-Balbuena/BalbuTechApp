@@ -140,6 +140,9 @@ Activa o desactiva un metodo de pago.
 Verifica que exista, le da la vuelta al estado y confirma con un mensaje
 que trae el nombre y el nuevo estado.
 */
+-- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
+-- Ojo: adentro de DELIMITER // la sentencia cierra con //, no con ;
+DROP PROCEDURE IF EXISTS SP_TOGGLE_ESTADO_METODO_PAGO //
 CREATE PROCEDURE SP_TOGGLE_ESTADO_METODO_PAGO(
     IN P_ID_METODO INT
 )
@@ -168,7 +171,8 @@ END //
 
 DELIMITER ;
 
-CALL `SP_INSERTAR_METODO_PAGO` ('EFECTIVO');
-CALL `SP_INSERTAR_METODO_PAGO` ('TARJETA');
-CALL `SP_INSERTAR_METODO_PAGO` ('TRANSFERENCIA');
-CALL `SP_INSERTAR_METODO_PAGO` ('DEPOSITO');
+-- (08/11/2026) Los 4 metodos de pago iniciales ya NO se cargan aca: los
+-- modulos .sql importan las tablas vacias a proposito y el catalogo base vive
+-- en db/seed-catalogo.sh (INSERT IGNORE, idempotente), que inserta los mismos.
+-- Con los CALL, cada reimport fallaba con 1644 y db/import.sh salia en 1
+-- ANTES de inyectar las guardas de permiso.

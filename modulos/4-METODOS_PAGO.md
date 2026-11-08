@@ -80,12 +80,11 @@ ese orden como intencional: la UI muestra 1, 2, 3...).
 
 ## Datos iniciales (seed)
 
-Al final hay **4 `CALL SP_INSERTAR_METODO_PAGO(...)`**: `EFECTIVO`,
-`TARJETA`, `TRANSFERENCIA`, `DEPOSITO`.
-
-> **No idempotente:** al reimportar sobre una base que ya los tiene, cada
-> `CALL` responde `ERROR: ESTE MÉTODO DE PAGO YA EXISTE.` y el import lo
-> reporta como sentencia con error (con `--force` continúa).
+**Este módulo ya no carga datos.** (08/11/2026) Se quitaron los 4
+`CALL SP_INSERTAR_METODO_PAGO(...)` (`EFECTIVO`, `TARJETA`, `TRANSFERENCIA`,
+`DEPOSITO`): los `.sql` importan las tablas vacías a propósito, y el catálogo
+base vive en `db/seed-catalogo.sh` (`INSERT IGNORE`, idempotente), que inserta
+los mismos.
 
 ## Reglas de negocio
 
