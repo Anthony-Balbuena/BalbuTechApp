@@ -92,15 +92,17 @@ Devuelve `ID_MARCA, NOMBRE, ESTADO` ordenado por ID.
 
 ## Datos iniciales (seed)
 
-Al final del archivo hay **10 `CALL SP_INSERTAR_MARCA(...)`**: `ASUS`, `MSI`,
+**Este módulo ya no carga datos.** Los `.sql` importan las tablas vacías a
+propósito; el catálogo base es *opt-in* y vive en `db/seed-catalogo.sh`
+(`INSERT IGNORE`, idempotente), que inserta las mismas 10 marcas: `ASUS`, `MSI`,
 `LOGITECH`, `RAZER`, `HP`, `WESTERN DIGITAL`, `IPHONE`, `XIAOMI`, `JBL`,
 `RED MAGIC`.
 
-> **Importante:** el seed **no es idempotente**. Al reimportar sobre una base
-> que ya tiene esas marcas, cada `CALL` dispara `ERROR: ESTA MARCA YA EXISTE.`
-> y el import lo reporta como sentencia con error (con `--force` sigue y
-> termina; la base queda bien). Es el comportamiento esperado del seed
-> basado en SP, no un fallo del módulo.
+> (08/11/2026) Antes había acá **10 `CALL SP_INSERTAR_MARCA(...)`**. Al no ser
+> idempotentes, cada reimport disparaba `ERROR 1644: ESTA MARCA YA EXISTE.` y
+> `db/import.sh` salía con 1 **antes** de inyectar las guardas de permiso: la
+> base quedaba con SPs sin control. Se borraron porque el seed ya existía en
+> `db/seed-catalogo.sh`.
 
 ## Reglas de negocio
 

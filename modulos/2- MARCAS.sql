@@ -160,16 +160,11 @@ DROP PROCEDURE IF EXISTS 2_SP_OBTENER_MARCA //
 DROP PROCEDURE IF EXISTS 2_SP_LISTAR_MARCAS //
 DELIMITER ;
 
-CALL `SP_INSERTAR_MARCA` ('ASUS');
-CALL `SP_INSERTAR_MARCA` ('MSI');
-CALL `SP_INSERTAR_MARCA` ('LOGITECH');
-CALL `SP_INSERTAR_MARCA` ('RAZER');
-CALL `SP_INSERTAR_MARCA` ('HP');
-CALL `SP_INSERTAR_MARCA` ('WESTERN DIGITAL');
-CALL `SP_INSERTAR_MARCA` ('IPHONE');
-CALL `SP_INSERTAR_MARCA` ('XIAOMI');
-CALL `SP_INSERTAR_MARCA` ('JBL');
-CALL `SP_INSERTAR_MARCA` ('RED MAGIC');
+-- (08/11/2026) Las 10 marcas iniciales ya NO se cargan aca. Los modulos .sql
+-- importan las tablas vacias a proposito; los datos base son opt-in y viven en
+-- db/seed-catalogo.sh (INSERT IGNORE, idempotente). Con los CALL, cada
+-- reimport fallaba con 1644 'ESTA MARCA YA EXISTE' y db/import.sh salia en 1
+-- ANTES de inyectar las guardas de permiso.
 
 -----------------------------------------------------------------------------------------------------------------------
 --- SP requerido por la app C++ (marcas.cpp:listarMarcas).
