@@ -8,6 +8,14 @@
 # Por que no usar /docker-entrypoint-initdb.d:
 # - los nombres tienen espacios ("1- CATEGORIAS.sql") y no hay orden garantizado,
 # - todo_modulos.sql y Mejoras_extras.sql son consolidados/experimentos y se excluyen.
+#
+# (08/11/2026) Que significa "funciono":
+# - Reimportar sobre una base existente es NORMAL y termina en 0. Los errores de
+#   idempotencia (1050 tabla existe, 1061 indice/columna duplicada, 1265 truncation
+#   al re-aplicar un ALTER que ya estaba) se reportan como AVISOS, no como fallo.
+# - Cualquier otro ^ERROR es un error real y el script sale con 1.
+# - Las guardas de permiso se inyectan SIEMPRE, antes de cualquier exit 1: una
+#   base con SPs sin guarda es un agujero de permisos, no un detalle de reporte.
 set -e
 cd "$(dirname "$0")/.."
 
@@ -40,8 +48,17 @@ done
 echo "Importando $MODULOS_DIR a base $DB_NAME ..."
 count=0
 failed=0
+avisos=0
 # (14/10/2026) --force sale 0 aunque haya errores de sentencia adentro:
 # se cuentan las lineas ^ERROR por archivo para no mentir con "0 avisos".
+# (08/11/2026) Se separan dos clases de error:
+#   - AVISO de idempotencia (1050 tabla existe, 1061 indice/columna duplicada,
+#     1265 truncation al re-aplicar un ALTER que ya estaba): son el resultado
+#     normal de reimportar sobre una base existente. NO fallan el import.
+#   - ERROR real: cualquier otro. Ese si falla.
+# Antes cualquier 1050 contaba como fallo, asi que reimportar siempre "fallaba"
+# y el script moria ANTES de inyectar las guardas: la base quedaba con SPs sin
+# control de permisos y en silencio (paso dos veces en BALBU_TECH).
 # sort -V ordena 1,2,3...10,11...36 (y 19 < 19.5 < 19.6 < 20) correctamente.
 while IFS= read -r f; do
   case "$f" in
@@ -52,35 +69,43 @@ while IFS= read -r f; do
   log=$(mktemp)
   mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
       --default-character-set=utf8mb4 --database="$DB_NAME" --force < "$f" >"$log" 2>&1
-  errs=$(grep -c "^ERROR" "$log" || true)
-  if [ "$errs" -gt 0 ]; then
-    echo "  AVISO: $errs error(es) de sentencia en $f (sigo con --force):" >&2
-    grep "^ERROR" "$log" | head -n 5 >&2
+  n_avisos=$(grep "^ERROR" "$log" | grep -cE "^ERROR (1050|1061|1265) " || true)
+  n_reales=$(grep "^ERROR" "$log" | grep -vE "^ERROR (1050|1061|1265) " | wc -l || true)
+  if [ "$n_avisos" -gt 0 ]; then
+    avisos=$((avisos + n_avisos))
+  fi
+  if [ "$n_reales" -gt 0 ]; then
+    echo "  ERROR: $n_reales sentencia(s) con error real en $f:" >&2
+    grep "^ERROR" "$log" | grep -vE "^ERROR (1050|1061|1265) " | head -n 5 >&2
     failed=$((failed + 1))
   fi
   rm -f "$log"
 done < <(ls -1 "$MODULOS_DIR"/*.sql | sort -V)
 
-echo "Listo: $count archivos, $failed con errores de sentencia."
-# (20/10/2026) --force hace que mariadb salga 0 aunque haya errores de sentencia.
-# El conteo de arriba es el unico aviso: si hubo errores, el import falla.
+echo "Listo: $count archivos, $avisos aviso(s) de idempotencia, $failed con errores reales."
+
+# (03/11/2026) Los CREATE PROCEDURE de los modulos no traen la guarda de
+# permisos: se inyecta despues de importar.
+# (08/11/2026) Esto corre SIEMPRE, antes de cualquier exit 1: una base con SPs
+# sin guarda es un agujero de permisos, no un detalle de reporte.
+guardas_ok=0
+if [ -f db/injectar-guardas.py ]; then
+  echo "Inyectando guardas de permiso en $DB_NAME ..."
+  if python3 db/injectar-guardas.py "$DB_NAME" --aplicar; then
+    guardas_ok=1
+  else
+    echo "ERROR: no se pudieron inyectar las guardas de permiso." >&2
+    failed=$((failed + 1))
+  fi
+fi
+
 if [ "$failed" -gt 0 ]; then
-  echo "Import con errores: $failed archivo(s). Revisar los AVISOS de arriba." >&2
+  echo "Import con errores: $failed archivo(s)/paso(s). Revisar los ERROR de arriba." >&2
   exit 1
 fi
-echo "Verifica rutinas con: bash db/check-app-sps.sh"
+if [ "$guardas_ok" = "1" ]; then
+  echo "Verifica cobertura con: DB_NAME=$DB_NAME bash db/check-app-sps.sh"
+fi
 echo "Tablas en $DB_NAME:"
 mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
   --database="$DB_NAME" -e "SHOW TABLES;"
-
-# (03/11/2026) Los CREATE PROCEDURE de los modulos no traen la guarda de
-# permisos: se inyecta despues de importar y ANTES de dar el import por bueno.
-# Sin este paso, reimportar un modulo deja sus SPs sin control.
-if [ -f db/injectar-guardas.py ]; then
-  echo "Inyectando guardas de permiso en $DB_NAME ..."
-  if ! python3 db/injectar-guardas.py "$DB_NAME" --aplicar; then
-    echo "ERROR: no se pudieron inyectar las guardas de permiso." >&2
-    exit 1
-  fi
-  echo "Verifica cobertura con: DB_NAME=$DB_NAME bash db/check-app-sps.sh"
-fi
