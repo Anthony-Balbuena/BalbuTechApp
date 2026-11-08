@@ -42,3 +42,20 @@ contratos/
 # Env generado para el depurador de VS Code (copias de .env con DB_HOST local)
 .vscode/.env*.run
 .atl/
+
+# --- Fuera del repo: movidos a ../BalbuTechApp-fuera-del-repo/ ---
+# Contextos de IA por tabla, documentos personales y artefactos de herramienta.
+# No son codigo de la app: build.sh no los toca y ningun .cpp/.h/.sh/.py los usa.
+Contextos.opencodetxt/
+Documentos/
+odd/
+
+# Copia del repo de un tercero (MariaDB Agent Skills, MIT, Robert Silen) y las
+# skills locales del dueno. Viven fuera del repo.
+.agents/skills-main/
+.agents/skills/
+
+# Estado por maquina: que nota esta abierta en Obsidian y que guarda un plugin
+# de tercero. Cambian solos y no aportan nada al historial.
+Proyecto manejo inventario/.obsidian/workspace.json
+Proyecto manejo inventario/.obsidian/plugins/terminal/data.json
