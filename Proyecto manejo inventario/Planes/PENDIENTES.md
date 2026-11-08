@@ -12,8 +12,6 @@
 
 Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026: 7 roles, **58 permisos**, matriz **58/52/46/12/15/25/5 = 213 pares** en TEST; `test-menus-por-rol.sh` OK en TEST, `check-app-sps` 99/0 en TEST). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`). VENDEDOR quedó en 15 permisos: no busca ni lista clientes (`CLIENTES_VER`), de Métodos de pago solo conserva `METODOS_PAGO_VER`, y en Garantías registra, reclama y consulta pero **no** finaliza.
 
-- [x] ~~**Inventario**: migrar sus tres acciones a permisos finos.~~ Hecho en TEST el 27/10 con `INVENTARIO_VER`, `INVENTARIO_AJUSTAR` e `INVENTARIO_COSTO` (módulo `58`).
-- [x] ~~**Aplicar el `58` en la viva** con backup previo.~~ Hecho el 27/10 con backup `backups/107-antes-permisos-inventario-20261027_123943.sql`.
 
 **Estimación de esfuerzo (26/10):** ya no quedan módulos con paraguas; la Tanda B está cerrada.
 
@@ -235,19 +233,11 @@ respaldo para ventas viejas.
 
 ### 9. Bugs y deuda con impacto
 
-- [x] **Los permisos eran solo el menú (A6 de la auditoría)** — 03/11/2026: `balbu_app` tenía `SELECT/INSERT/UPDATE/DELETE` sobre todas las tablas, así que cualquier cliente con la clave del `.env` cambiaba roles, leía sueldos o borraba ventas sin pasar por el menú. Ahora solo tiene `EXECUTE`, lecturas puntuales y `UPDATE` a nivel de columna de `CONTRATOS.RUTA_DOCUMENTO`. Script: `db/grant-minimos.sql` + `db/aplicar-grants.sh` (corre con root). Rollback: `db/rollback-grants.sql`. Aplicado en TEST y en la viva. (05/11/2026) El script endurece **todas** las cuentas `balbu_app` del servidor, no solo `@'%'`: fuera del contenedor la app entra como `@'localhost'` y esa cuenta conservaba el DML amplio, o sea que el recorte no tenía efecto.
-- [x] **Los hashes ya no son legibles por la app** — 03/11/2026, módulo `65- LOGIN_SERVIDOR.sql`: la verificación PBKDF2 se movió al servidor (`SP_LOGIN_PARAMETROS` + `SP_LOGIN_AUTENTICAR`). La app deriva y manda solo el derivado; el valor guardado es `SHA2(pepper || derivado)` y el pepper vive en `SECRETO_SISTEMA`, sin grants para `balbu_app`. Los usuarios migran solos en el primer login (`CONTRASENA` → NULL). `SELECT CONTRASENA` y `SELECT * FROM SECRETO_SISTEMA` como `balbu_app` fallan con `1143`/`1142`. Regresión: `db/test-login-servidor.sh`.
-- [x] **El permiso se valida dentro de los SPs** — 03/11/2026, módulo `66- SESIONES_GUARDAS.sql`: el login emite un token (`SESIONES`) y la app lo deja en `@TOKEN_SESION`; `FN_USUARIO_SESION()` lo resuelve y `SP_EXIGIR_PERMISO('RUTINA')` corta si el rol no tiene el permiso de `PERMISO_POR_RUTINA`. Guardas inyectadas en 162 procedimientos con `db/injectar-guardas.py` (se reaplica solo al final de `db/import.sh`). (05/11/2026) La exigencia quedó prendida en las dos bases: **169 rutinas en `BALBU_TECH`** y **161 en `BALBU_TECH_TEST`**; `SP_CAMBIAR_CONTRASENA` queda sin mapear a propósito y las dos rutinas de la viva que el heurístico no reconocía (`11_SP_REGISTRAR_ENTRADA`, `SP_ELIMINAR_BONO`) ya tienen permiso. Regresión: `db/test-permisos-sp.sh`. Pendiente: validar el mapeo con uso real (una escritura por módulo mirando `LOG_PERMISO_SP`) y que el token de 12 h no se renueva por actividad.
-- [x] **`SP_CAMBIAR_CONTRASENA` eliminado** — 05/11/2026: sin caller, sin mapeo y con el módulo `65` su verificación de clave vieja ya no podía funcionar (comparaba `CONTRASENA`, que queda en `NULL`). El cambio de clave real es `SP_CAMBIAR_CLAVE_USUARIO` (módulo `67`). Se quitó del módulo `10` y se dropeó en las dos bases.
-- [x] **El cambio de clave estaba roto desde el módulo 65** — 05/11/2026, módulo `67- CAMBIO_CLAVE_SERVIDOR.sql`: `SP_CAMBIAR_CLAVE_USUARIO` escribía SHA256 en `CONTRASENA` y el login compara `CLAVE_SERVIDOR`, así que la clave nueva no entraba y la vieja seguía viva. Ahora recibe `pbkdf2$...`, escribe `SALT_LOGIN`/`ITER_LOGIN`/`CLAVE_SERVIDOR` con pepper, deja `CONTRASENA` en `NULL` y cierra las sesiones del usuario. La app manda el derivado también al dar de alta (`registrarUsuario`), que antes guardaba SHA256 y dejaba al usuario sin migración posible. Solo `USUARIOS_CLAVE` (ADMIN). Regresión: `db/test-cambio-clave.sh`. Aplicado en las dos bases.
 - [ ] **`CONTRATOS.SALARIO` sigue legible** — el flujo de contratos pendientes lo lee directo. Si se quiere cerrar, hay que pasarlo a un SP.
 - [ ] **`balbu_app` tiene grants sobre `BALBU_TECH_TEST` en el servidor de producción** — no hace falta ahí; quitarlo cuando el test deje de correr contra la misma instancia.
 
 - [ ] **Venta multi-línea atómica** (P-4 de la auditoría).
 - [ ] **P-3 validaciones**: 8 errores pintados en verde, advertencia de precio descartada y monto de la liquidación tomado del cliente.
-- [x] **Costo fantasma al cancelar una compra** — cerrado el 29/10/2026: `FN_COSTO_COMPRA_VIGENTE` y `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` están en TEST y en la viva; 0 discrepancias reales en ambas.
-- [x] **`EMPLEADOS.CEDULA` sin `UNIQUE`** — módulo 59 aplicado en TEST y en la viva el 29/10/2026 (backup 108); el duplicado se rechaza con `1062` en ambas.
-- [x] **Rotar la clave del administrador** — 29/10/2026: `seed-admin.sh` ya no tiene clave por defecto (exige el argumento o `BALBU_PASS`, mínimo 8 caracteres); la viva se rotó y el login quedó verificado en PBKDF2. La de `root` ya se había rotado el 19/10.
 - [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI).
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
 - [ ] **Barrido del resto de los `while` con `leerDatoSeguro`** (el 18/10 solo se tocó `contrato.cpp`; los bucles con EOF pueden girar sin fin).
@@ -255,9 +245,6 @@ respaldo para ventas viejas.
 ### 10. Hallazgos del mapa de módulos (21/10)
 
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
-- [x] **Devolver mercancía no baja el subtotal** — cerrado en TEST y viva el 29/10/2026 (backup 109) con el módulo 60: `VW_VENTA_NETA` centraliza el neto y lo usan reportes, cierre de caja y topes de pago. El sexto lugar era `TR_VALIDAR_ACTUALIZACION_VENTA` (21), que comparaba el pago contra el subtotal y no contra el bruto neto.
-- [x] **`VENCIDA` de GARANTIAS nunca se escribe** — cerrado el 30/10/2026 con el módulo 63: `SP_MARCAR_GARANTIAS_VENCIDAS` escribe el estado y el reclamo valida por fecha, así que una garantía vencida ya no se puede reclamar (`db/test-garantias.sh`, caso `VENCIDA_NO_RECLAMA`). Aplicado en TEST y en la viva.
-- [x] **El 18 atribuye todo al empleado 1** y el 29 guarda `ID_USUARIO_ADMIN` en `NULL`: la auditoría no dice quién fue. — cerrado el 30/10/2026: el 56 arregló el actor de usuarios y el 61 el de clientes y productos, aplicado en TEST y en la viva (backup 112). En TEST `test-auditoria-producto.sh` 5/5 y en la viva la prueba con `ROLLBACK` dio 3/3 sin dejar datos.
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
 
 ---
@@ -269,7 +256,6 @@ respaldo para ventas viejas.
 - [ ] **Consolidar los `ALTER` de 25** dentro del `CREATE TABLE`; `DROP IF EXISTS` en los `CREATE` del módulo 11.
 - [ ] **3 tests shell** pendientes y notas obsoletas del índice (`modulos/00- INDICE.md`).
 - [ ] **`db/crear-usuarios.sh` no existe**: buscar el comando de provisión de la máquina del trabajo y compararlo con `balbu_app` / `balbu_admin`.
-- [x] **`.atl/` entró en `d623ac0`** — resuelto: `de93561` lo sacó del control de versiones y `72bdedd` lo agregó a `.gitignore`.
 - [ ] **Sidecar `.borrador`** guarda PII en texto plano junto al HTML (registrado y aceptado por el dueño).
 - [ ] **`contratos/firmados/`**: sin listado, renombre ni limpieza; la administra RRHH a mano.
 - [ ] **P-6**: decidir cablear o retirar lo construido y no cableado (garantías, reclamos, reparaciones, bonos manuales).
