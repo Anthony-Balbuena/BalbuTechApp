@@ -12,6 +12,7 @@
 #include "seguridad.h"
 #include "roles.h"
 #include "colores.h"
+#include "tabla.h"
 #include "sesion.h"
 
 using namespace std;
@@ -60,11 +61,17 @@ static void mostrarHistorialPropio(int idEmpleado) {
         ps->setInt(1, idEmpleado);
         std::unique_ptr<sql::ResultSet> res(ps->executeQuery());
 
-        string separator = string(89, '-');
-        cout << separator << endl;
-        printf("%-11s | %-10s | %-10s | %-10s | %s\n",
-               "TIPO", "INICIO", "FIN", "ESTADO", "DESCRIPCION");
-        cout << separator << endl;
+        // (08/11/2026) tablaCelda en vez de printf: printf cuenta BYTES y un
+        // nombre con acento o simbolo corria las columnas siguientes.
+        const size_t W_TIPO = 11, W_FEC = 10, W_EST = 10, W_DES = 45;
+        const size_t ANCHO = W_TIPO + W_FEC * 2 + W_EST + W_DES + 4 * 3;
+        cout << "\n"
+             << tablaCelda("TIPO", W_TIPO) << " | "
+             << tablaCelda("INICIO", W_FEC) << " | "
+             << tablaCelda("FIN", W_FEC) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("DESCRIPCION", W_DES) << "\n"
+             << tablaLinea(ANCHO) << "\n";
 
         bool hay = false;
         while (res->next()) {
@@ -72,20 +79,18 @@ static void mostrarHistorialPropio(int idEmpleado) {
             string estado = res->getString("ESTADO");
             const string& color = (estado == "APROBADO") ? VERDE
                                 : (estado == "PENDIENTE") ? AMARILLO : ROJO;
-            cout << color;
-            printf("%-11.11s | %-10.10s | %-10.10s | %-10.10s | %.45s\n",
-                   res->getString("TIPO_PERMISO").c_str(),
-                   res->getString("FECHA_INICIO").c_str(),
-                   res->getString("FECHA_FIN").c_str(),
-                   estado.c_str(),
-                   res->isNull("DESCRIPCION") ? "" : res->getString("DESCRIPCION").c_str());
-            cout << RESET;
+            cout << tablaCelda(res->getString("TIPO_PERMISO"), W_TIPO) << " | "
+                 << tablaCelda(res->getString("FECHA_INICIO"), W_FEC) << " | "
+                 << tablaCelda(res->getString("FECHA_FIN"), W_FEC) << " | "
+                 << color << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(res->isNull("DESCRIPCION") ? "" : res->getString("DESCRIPCION"), W_DES) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
 
         if (!hay) {
             cout << "[!] Todavia no tienes solicitudes de permiso." << endl;
         }
-        cout << separator << endl;
+        cout << tablaLinea(ANCHO) << endl;
 
         res.reset();
         drenarResultados(ps.get());
@@ -288,18 +293,27 @@ void gestionarPermisosUI() {
             return;
         }
 
-        string separator = string(96, '-');
-        cout << separator << endl;
-        printf("%-5s | %-22s | %-11s | %-10s | %-10s | %s\n",
-               "ID", "EMPLEADO", "TIPO", "INICIO", "FIN", "DESCRIPCION");
-        cout << separator << endl;
+        // (08/11/2026) tablaCelda en vez de printf (printf cuenta bytes).
+        const size_t W_ID = 5, W_EMP = 22, W_TIPO = 11, W_FEC = 10, W_DES = 35;
+        const size_t ANCHO = W_ID + W_EMP + W_TIPO + W_FEC * 2 + W_DES + 5 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << " | "
+             << tablaCelda("TIPO", W_TIPO) << " | "
+             << tablaCelda("INICIO", W_FEC) << " | "
+             << tablaCelda("FIN", W_FEC) << " | "
+             << tablaCelda("DESCRIPCION", W_DES) << "\n"
+             << tablaLinea(ANCHO) << "\n";
         for (const PermisoPendiente& p : pendientes) {
-            printf("%-5d | %-22.22s | %-11.11s | %-10.10s | %-10.10s | %.35s\n",
-                   p.id, p.nombre.c_str(), p.tipo.c_str(),
-                   p.fechaInicio.c_str(), p.fechaFin.c_str(),
-                   p.descripcion.c_str());
+            cout << tablaCelda(to_string(p.id), W_ID) << " | "
+                 << tablaCelda(p.nombre, W_EMP) << " | "
+                 << tablaCelda(p.tipo, W_TIPO) << " | "
+                 << tablaCelda(p.fechaInicio, W_FEC) << " | "
+                 << tablaCelda(p.fechaFin, W_FEC) << " | "
+                 << tablaCelda(p.descripcion, W_DES) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
-        cout << separator << endl;
+        cout << tablaLinea(ANCHO) << endl;
 
         int idPermiso = 0;
         try {

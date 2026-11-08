@@ -20,6 +20,7 @@
 #include "database.h"
 #include "seguridad.h"
 #include "colores.h"
+#include "tabla.h"
 
 using namespace std;
 
@@ -562,14 +563,36 @@ void consultarContratosUI() {
         // El nombre y el cargo salen del contrato: puede que el empleado
         // todavia no exista en EMPLEADOS (contrato firmado antes del alta).
         cout << "\nPersona: " << filas.front().nombre << " - " << filas.front().cargo << endl;
-        printf("%-4s | %-9s | %-10s | %-10s | %10s | %-10s | %-10s | %s\n",
-               "ID", "TIPO", "INICIO", "FIN", "SALARIO", "ESTADO", "VINCULO", "DOCUMENTO");
-        printf("%s\n", string(108, '-').c_str());
+        // (08/11/2026) tablaCelda en vez de printf: printf cuenta BYTES y un
+        // nombre con acento corria las columnas siguientes.
+        const size_t W_ID = 4, W_GEN = 9, W_FEC = 10, W_SAL = 10, W_EST = 10, W_VIN = 10;
+        const size_t ANCHO = W_ID + W_GEN + W_FEC * 2 + W_SAL + W_EST + W_VIN
+                           + 3 * 3 /* separadores antes de DOCUMENTO */
+                           + 4 + 1 + 30 /* DOCUMENTO */;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("TIPO", W_GEN) << " | "
+             << tablaCelda("INICIO", W_FEC) << " | "
+             << tablaCelda("FIN", W_FEC) << " | "
+             << tablaCelda("SALARIO", W_SAL) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("VINCULO", W_VIN) << " | DOCUMENTO\n"
+             << tablaLinea(ANCHO) << "\n";
         for (const Fila &f : filas) {
-            printf("%-4d | %-9s | %-10s | %-10s | %10.2f | %-10s | %-10s | %s\n",
-                   f.id, f.tipo.c_str(), f.inicio.c_str(), f.fin.c_str(),
-                   f.salario, f.estado.c_str(), f.vinculo.c_str(), f.doc.c_str());
+            char sal[24];
+            snprintf(sal, sizeof(sal), "%.2f", f.salario);
+            string estado = f.estado;
+            cout << tablaCelda(to_string(f.id), W_ID) << " | "
+                 << tablaCelda(f.tipo, W_GEN) << " | "
+                 << tablaCelda(f.inicio, W_FEC) << " | "
+                 << tablaCelda(f.fin, W_FEC) << " | "
+                 << tablaCelda(sal, W_SAL) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(f.vinculo, W_VIN) << " | "
+                 << f.doc << "\n"
+                 << tablaLinea(ANCHO) << "\n";
         }
+
 
         // El papel se escanea cuando se puede: se adjunta despues.
         if (!confirmarSiNo("\n¿Adjuntar el escaneo firmado a un contrato?")) return;
