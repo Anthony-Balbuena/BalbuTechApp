@@ -15,7 +15,13 @@ Objetos que reemplaza:
   `TR_RECALCULAR_ESTADO_PAGO_BORRADO`.
 - Trigger de ventas: `TR_VALIDAR_ACTUALIZACION_VENTA` (el pase a
   `REALIZADA` ahora exige el 100 % del bruto neto).
-- SP: `SP_ANULAR_PAGO`, `SP_CIERRE_CAJA`, `SP_REPORTE_PERIODO`.
+- SP: `SP_ANULAR_PAGO`, `SP_CIERRE_CAJA`, `SP_REPORTE_PERIODO`,
+  `SP_REPORTE_VENTAS`.
+
+> (08/11/2026) Se agregaron `SP_REPORTE_VENTAS_PAGINADO(P_INI, P_FIN, P_PAGINA,
+> P_POR_PAGINA)` y `SP_CONTAR_REPORTE_VENTAS(P_INI, P_FIN)`: el reporte por
+> rango no tiene tope y un mes de ventas no entra en una pantalla. La app pasó
+> a usarlos; `SP_REPORTE_VENTAS` queda por compatibilidad.
 
 ## Por que
 

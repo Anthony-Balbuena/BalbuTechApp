@@ -857,28 +857,45 @@ static void reporteVentasUI() {
             cout << ROJO << "Formato invalido. Use AAAA-MM-DD." << RESET << endl;
             return;
         }
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_REPORTE_VENTAS(?, ?)"));
-        pstmt->setString(1, ini);
-        pstmt->setString(2, fin);
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        printf("\n%-6s | %-19s | %-10s | %-15s | %-20s | %-10s | %-10s | %-10s\n",
-               "ID", "FECHA", "ESTADO", "EMPLEADO", "CLIENTE", "TOTAL", "PAGADO", "SALDO");
-        bool hay = false;
-        while (res->next()) {
-            hay = true;
-            printf("%-6d | %-19.19s | %-10s | %-15.15s | %-20.20s | %-10.2f | %-10.2f | %-10.2f\n",
-                   res->getInt("ID_VENTA"),
-                   res->getString("FECHA").c_str(),
-                   res->getString("ESTADO").c_str(),
-                   res->getString("EMPLEADO").c_str(),
-                   res->getString("CLIENTE").c_str(),
-                   (double)res->getDouble("TOTAL"),
-                   (double)res->getDouble("PAGADO"),
-                   (double)res->getDouble("SALDO"));
-        }
-        if (!hay) cout << "[!] Sin ventas en el rango." << endl;
-        drenarResultados(pstmt.get());
+        // (08/11/2026) Paginado: el rango no tiene tope, un mes puede traer
+        // cientos de ventas. Se dibuja con tablaCelda porque printf contaba
+        // bytes y los nombres con acentos desalineaban la tabla.
+        const size_t W_ID = 6, W_FEC = 19, W_EST = 10, W_EMP = 15,
+                     W_CLI = 20, W_MON = 10;
+        const size_t ANCHO = W_ID + W_FEC + W_EST + W_EMP + W_CLI + W_MON * 3 + 7 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("EMPLEADO", W_EMP) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("TOTAL", W_MON) << " | "
+             << tablaCelda("PAGADO", W_MON) << " | "
+             << tablaCelda("SALDO", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hay = mostrarPaginadoSP(
+            "CALL SP_REPORTE_VENTAS_PAGINADO(?, ?, ?, ?)",
+            "CALL SP_CONTAR_REPORTE_VENTAS(?, ?)",
+            {ini, fin},
+            [=](sql::ResultSet *res) {
+                char total[24], pagado[24], saldo[24];
+                snprintf(total, sizeof(total), "%.2f", (double)res->getDouble("TOTAL"));
+                snprintf(pagado, sizeof(pagado), "%.2f", (double)res->getDouble("PAGADO"));
+                snprintf(saldo, sizeof(saldo), "%.2f", (double)res->getDouble("SALDO"));
+                string estado = res->getString("ESTADO");
+                cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_ID) << " | "
+                     << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                     << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                     << tablaCelda(res->getString("EMPLEADO"), W_EMP) << " | "
+                     << tablaCelda(res->getString("CLIENTE"), W_CLI) << " | "
+                     << tablaCelda(total, W_MON) << " | "
+                     << tablaCelda(pagado, W_MON) << " | "
+                     << tablaCelda(saldo, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) cout << "[!] Sin ventas en el rango." << endl;
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {

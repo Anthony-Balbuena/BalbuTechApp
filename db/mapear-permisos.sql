@@ -163,6 +163,10 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_VENTAS'
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_REPORTES'
  WHERE RUTINA = 'SP_REPORTE_VENTAS';
 
+-- (08/11/2026) Reporte de ventas paginado: el mismo permiso que su hermana.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_REPORTES'
+ WHERE RUTINA IN ('SP_REPORTE_VENTAS_PAGINADO', 'SP_CONTAR_REPORTE_VENTAS');
+
 -- Garantias: el submenu usa un permiso fino por accion. Las consultas se
 -- comparten entre "Reclamar" y "Consultar", y todo rol que reclama tambien
 -- consulta, asi que GARANTIAS_CONSULTAR cubre las dos pantallas.

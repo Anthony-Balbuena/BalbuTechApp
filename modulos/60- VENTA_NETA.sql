@@ -464,6 +464,67 @@ proc_label: BEGIN
 END //
 DELIMITER ;
 
+-- ================================================================
+-- REPORTE DE VENTAS PAGINADO (08/11/2026)
+-- ================================================================
+-- SP_REPORTE_VENTAS no tiene tope: un rango de un mes puede traer cientos de
+-- filas. Este par devuelve una pagina y el total del mismo rango. Las columnas
+-- son las mismas de VW_REPORTE_VENTAS; el rango invertido sigue cortando.
+-- Permiso: CONSULTAR_REPORTES, el mismo que su hermana.
+DELIMITER //
+/*
+SP_REPORTE_VENTAS_PAGINADO
+Una pagina del listado de ventas por rango. La fecha final entra completa.
+*/
+DROP PROCEDURE IF EXISTS SP_REPORTE_VENTAS_PAGINADO ;
+CREATE PROCEDURE SP_REPORTE_VENTAS_PAGINADO(
+    IN P_FECHA_INICIO DATE,
+    IN P_FECHA_FIN    DATE,
+    IN P_PAGINA       INT,
+    IN P_POR_PAGINA   INT
+)
+proc_label: BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_FECHA_INICIO > P_FECHA_FIN THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA FECHA INICIAL NO PUEDE SER MAYOR A LA FINAL.';
+    END IF;
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT *
+      FROM VW_REPORTE_VENTAS
+     WHERE FECHA >= P_FECHA_INICIO
+       AND FECHA <  P_FECHA_FIN + INTERVAL 1 DAY
+     ORDER BY FECHA DESC, ID_VENTA DESC
+     LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_REPORTE_VENTAS
+Cuantas ventas hay en el rango, para el "Pagina 1 de N" del reporte.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_REPORTE_VENTAS ;
+CREATE PROCEDURE SP_CONTAR_REPORTE_VENTAS(
+    IN P_FECHA_INICIO DATE,
+    IN P_FECHA_FIN    DATE
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM VW_REPORTE_VENTAS
+     WHERE FECHA >= P_FECHA_INICIO
+       AND FECHA <  P_FECHA_FIN + INTERVAL 1 DAY;
+END //
+DELIMITER ;
+
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_CIERRE_CAJA ;
 /*

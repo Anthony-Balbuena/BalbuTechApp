@@ -192,16 +192,6 @@ static void imprimirFilaMarca(sql::ResultSet *res) {
          << tablaLinea(MAR_ANCHO) << "\n";
 }
 
-static int imprimirTablaMarcas(sql::ResultSet *res) {
-    imprimirEncabezadoMarcas();
-    int n = 0;
-    while (res->next()) {
-        ++n;
-        imprimirFilaMarca(res);
-    }
-    return n;
-}
-
 // Consulta directa, igual que el listado del menu: la guarda del modulo 66 vive
 // en las rutinas, no en estas lecturas de pantalla.
 static int imprimirMarcasParaElegir() {
@@ -249,19 +239,21 @@ void buscarMarca() {
     cout << "\n--- BUSCAR MARCA ---" << endl;
     try {
         string busqueda = leerDatoSeguro("Ingrese nombre de la marca o Enter para ver todas: ");
+        const string like = "%" + busqueda + "%";
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_BUSCAR_MARCA(?)"));
-        pstmt->setString(1, busqueda);
+        // (08/11/2026) Paginado con SELECT directo: MARCAS si tiene grant de
+        // lectura para balbu_app, asi no hace falta un SP nuevo. Mismo criterio
+        // de busqueda que SP_BUSCAR_MARCA (nombre parcial, vacio = todas).
+        imprimirEncabezadoMarcas();
+        int encontrado = mostrarPaginado({
+            "SELECT ID_MARCA, NOMBRE, ESTADO FROM MARCAS "
+            "WHERE (? = '' OR NOMBRE LIKE ?) ORDER BY ID_MARCA",
+            "SELECT COUNT(*) FROM MARCAS WHERE (? = '' OR NOMBRE LIKE ?)",
+            {busqueda, like} }, imprimirFilaMarca);
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-        bool encontrado = imprimirTablaMarcas(res.get()) > 0;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n[!] No se encontraron resultados con: [" << (busqueda.empty() ? "TODOS" : busqueda) << "]" << endl;
         }
-
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -272,12 +264,12 @@ void buscarMarca() {
 void listarMarcas() {
     cout << "\n--- LISTADO DE MARCAS ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_MARCAS()"));
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-        imprimirTablaMarcas(res.get());
-
-        drenarResultados(pstmt.get());
+        // (08/11/2026) Paginado con SELECT directo, igual que la busqueda.
+        imprimirEncabezadoMarcas();
+        mostrarPaginado({
+            "SELECT ID_MARCA, NOMBRE, ESTADO FROM MARCAS ORDER BY ID_MARCA",
+            "SELECT COUNT(*) FROM MARCAS",
+            {} }, imprimirFilaMarca);
     } catch (const exception &e) {
         cout << "\n[!] Error al listar marcas: " << e.what() << endl;
     }

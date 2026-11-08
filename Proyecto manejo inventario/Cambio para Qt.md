@@ -282,15 +282,17 @@ así que ahí el `LIMIT` tiene que vivir dentro del procedimiento
 (`SP_CONSULTAR_PRODUCTOS_PAGINADO` + `SP_CONTAR_PRODUCTOS_FILTRADOS`, módulo 9).
 
 Pantallas ya paginadas: Clientes (Actualizar, Cambiar Estado, Buscar, Listar),
-Proveedores (Actualizar, Cambiar Estado, Listar), Marcas (Actualizar, Cambiar
-Estado), Empleados (Actualizar, Despedir, Reactivar), Productos (Buscar,
-Actualizar, Consultar Inventario, Reporte de Stock), Compras (Ver compra con
-IVA, Devolución, Pagar, Cancelar), Ventas (Cobrar, Anular pago, Devolución) e
-Inventario (Ajuste de stock, Ajustar p.compra, Movimientos/Kardex).
+Proveedores (Actualizar, Cambiar Estado, Buscar, Listar), Marcas (Actualizar,
+Cambiar Estado, Buscar, Listar), Empleados (Actualizar, Despedir, Reactivar),
+Productos (Buscar, Actualizar, Consultar Inventario, Reporte de Stock), Compras
+(Ver compra con IVA, Devolución, Pagar, Cancelar), Ventas (Cobrar, Anular pago,
+Devolución, Reporte por rango) e Inventario (Ajuste de stock, Ajustar p.compra,
+Movimientos/Kardex).
 
-Pendientes de paginar, todas por la misma razón (lectura por `SP`, sin `SELECT`
-directo): Proveedores → Buscar, Marcas → Buscar/Listar y los reportes por
-periodo de Ventas y Compras. Cada una necesita su par de `SP`s paginados.
+**Paginación terminada.** Lo que queda como resumen y no se pagina a propósito:
+`SP_REPORTE_PERIODO`, `SP_REPORTE_PERIODO_COMPRA` y
+`SP_REPORTE_PERIODO_GANANCIA` devuelven **una sola fila** de totales
+(transacciones, subtotal, ITBIS, bruto): no hay nada que paginar.
 
 > **Ojo con las búsquedas puntuales:** `buscarPorId`, `buscarPorCodigo` y
 > `resolverProducto` de `ventas.cpp` también usan

@@ -201,16 +201,6 @@ static void imprimirFilaProveedor(sql::ResultSet *res) {
          << tablaLinea(PROV_ANCHO) << "\n";
 }
 
-static int imprimirTablaProveedores(sql::ResultSet *res) {
-    imprimirEncabezadoProveedores();
-    int n = 0;
-    while (res->next()) {
-        ++n;
-        imprimirFilaProveedor(res);
-    }
-    return n;
-}
-
 // Consulta directa, igual que el listado del menu: la guarda del modulo 66 vive
 // en las rutinas, no en estas lecturas de pantalla.
 static int imprimirProveedoresParaElegir() {
@@ -258,19 +248,22 @@ void buscarProveedor() {
     cout << "\n--- BUSCAR PROVEEDOR ---" << endl;
     try {
         string filtro = leerDatoSeguro("Ingrese nombre o telefono o Enter para ver todos: ");
+        const string like = "%" + filtro + "%";
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_LISTAR_PROVEEDORES(?)"));
-        pstmt->setString(1, filtro);
+        // (08/11/2026) Paginado con SELECT directo: PROVEEDORES si tiene grant
+        // de lectura para balbu_app. Mismo criterio que SP_LISTAR_PROVEEDORES
+        // (nombre o telefono, vacio = todos).
+        imprimirEncabezadoProveedores();
+        int encontrado = mostrarPaginado({
+            "SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES "
+            "WHERE (? = '' OR NOMBRE LIKE ? OR TELEFONO LIKE ?) ORDER BY ID_PROVEEDOR",
+            "SELECT COUNT(*) FROM PROVEEDORES "
+            "WHERE (? = '' OR NOMBRE LIKE ? OR TELEFONO LIKE ?)",
+            {filtro, like, like} }, imprimirFilaProveedor);
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-        bool encontrado = imprimirTablaProveedores(res.get()) > 0;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n[!] No se encontraron resultados con: [" << (filtro.empty() ? "TODOS" : filtro) << "]" << endl;
         }
-
-        drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
@@ -281,16 +274,16 @@ void buscarProveedor() {
 void listarProveedores() {
     cout << "\n--- LISTADO DE PROVEEDORES ---" << endl;
     try {
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR"));
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        // (08/11/2026) Paginado con SELECT directo, igual que la busqueda.
+        imprimirEncabezadoProveedores();
+        int encontrado = mostrarPaginado({
+            "SELECT ID_PROVEEDOR, NOMBRE, TELEFONO, EMAIL, ESTADO FROM PROVEEDORES ORDER BY ID_PROVEEDOR",
+            "SELECT COUNT(*) FROM PROVEEDORES",
+            {} }, imprimirFilaProveedor);
 
-        bool encontrado = imprimirTablaProveedores(res.get()) > 0;
-
-        if (!encontrado) {
+        if (encontrado == 0) {
             cout << "\n[!] No hay proveedores registrados." << endl;
         }
-
-        drenarResultados(pstmt.get());
     } catch (const exception &e) {
         cout << "\n[!] Error al listar proveedores: " << e.what() << endl;
     }
