@@ -55,7 +55,8 @@ odd/
 .agents/skills-main/
 .agents/skills/
 
-# Estado por maquina: que nota esta abierta en Obsidian y que guarda un plugin
-# de tercero. Cambian solos y no aportan nada al historial.
+# Estado por maquina (que nota esta abierta en Obsidian) y el bundle compilado
+# de un plugin de tercero: 2.9 MB, mas de la mitad de lo que versiona el repo.
+# Los archivos siguen en disco porque el plugin tiene que poder cargarlos.
 Proyecto manejo inventario/.obsidian/workspace.json
-Proyecto manejo inventario/.obsidian/plugins/terminal/data.json
+Proyecto manejo inventario/.obsidian/plugins/terminal/
