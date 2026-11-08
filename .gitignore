@@ -60,3 +60,11 @@ odd/
 # Los archivos siguen en disco porque el plugin tiene que poder cargarlos.
 Proyecto manejo inventario/.obsidian/workspace.json
 Proyecto manejo inventario/.obsidian/plugins/terminal/
+
+# Notas del vault movidas fuera del repo (a ../BalbuTechApp-fuera-del-repo).
+# Son notas de trabajo e historial, no documentacion del producto.
+Proyecto manejo inventario/Auditoria/
+Proyecto manejo inventario/Flujos/
+Proyecto manejo inventario/Reglas/
+Proyecto manejo inventario/Planes/Realizar en casa.md
+Proyecto manejo inventario/Planes/Uso practico.md
