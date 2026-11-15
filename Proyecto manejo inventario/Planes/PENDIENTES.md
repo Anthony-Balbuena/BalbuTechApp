@@ -25,10 +25,11 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 129/0 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 130/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-ventas-ver-iva.sh` | «Ver venta con IVA» paginado: contrato de los SP, fallback de página y la pantalla sin volcar facturas | todos OK |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cobrar-plazo.sh` | plazo de cobro de 48 h: vigencia de los SP, borradores vacíos y el aviso en rojo de la pantalla | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 (`balbu_app` no sirve: el test hace SQL directo y corta avisando) |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -240,12 +241,17 @@ solo el repo. No se planifica encima sin mirar primero.
   `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql`. Quedan
   **0 ventas `EN_PROCESO`** en la viva.
   **Abierto (decisión de negocio):**
-  1. **¿Cuánto tiempo puede estar una venta sin cobrar?** No hay plazo hoy. La
-     respuesta define si el aviso de B va a los N días y cuál es ese N.
-  2. **Alcance revisado de B:** como `VISTA_VENTAS_PENDIENTES_PAGO` filtra
-     `SALDO > 0`, un borrador de total 0 (como eran #17 y #18) **no aparece** en
-     «Cobrar venta en proceso». B necesita dos piezas: antigüedad en las ventas
-     con saldo **y** un aviso aparte para las `EN_PROCESO` vacías y viejas.
+  1. ~~**¿Cuánto tiempo puede estar una venta sin cobrar?**~~ **Resuelto el
+     15/11/2026: 48 h.** Las ventas con saldo que pasan las 48 h se marcan en
+     rojo en «Cobrar venta en proceso».
+  2. **Aplicado el 15/11/2026 (opción B):** `VISTA_VENTAS_PENDIENTES_PAGO` (43)
+     trae `FECHA` y `HORAS_ABIERTA`; `cobrarVentaUI` muestra la columna
+     `ABIERTA` en rojo pasadas las 48 h y avisa cuántas retienen stock. Como la
+     vista filtra `SALDO > 0`, un borrador de total 0 **no aparece** ahí: para
+     esos se agregó `SP_VENTAS_BORRADOR_VIEJO(48)` (39), que los lista aparte en
+     amarillo con la instrucción de cancelarlos por ID. Umbral en un solo lugar
+     (`HORAS_PLAZO_COBRO` en `ventas.cpp`), y los SP lo reciben por parámetro.
+     Test `db/test-cobrar-plazo.sh`.
   3. **Opción C** (`SP_REGISTRAR_VENTA_COMPLETA`): cerrar cabecera + líneas en
      una transacción. Sigue pendiente y va después de B.
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
@@ -448,6 +454,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Batería de aceptación en TEST, en verde | 15/11 | 13 suites + `build.sh`, todas exit 0 (`test-menus-por-rol`, `test-garantias` 13/0, `test-contrato-borrador` 15/15, `test-migracion-roles`, `test-lockout`, `test-login-servidor`, `test-login-eof`, `test-permisos-sp`, `test-asistencia-propia`, `test-ventas-ver-iva`, `check-app-sps` 129/0, `test-cobertura-modulos`). Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
 | «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
 | Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
+| Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---

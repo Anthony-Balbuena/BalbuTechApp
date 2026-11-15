@@ -263,7 +263,8 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_VENTAS'
  WHERE RUTINA IN ('SP_VENTAS_PENDIENTES_PAGINADO', 'SP_CONTAR_VENTAS_PENDIENTES',
                   'SP_PAGOS_ULTIMOS_PAGINADO', 'SP_CONTAR_PAGOS',
                   'SP_DETALLES_VENDIDOS_PAGINADO', 'SP_CONTAR_DETALLES_VENDIDOS',
-                  'SP_VENTAS_ULTIMAS_PAGINADO', 'SP_CONTAR_VENTAS_ULTIMAS');
+                  'SP_VENTAS_ULTIMAS_PAGINADO', 'SP_CONTAR_VENTAS_ULTIMAS',
+                  'SP_VENTAS_BORRADOR_VIEJO');
 
 -- (08/11/2026) Productos: paginado de la edicion (GESTIONAR_PRODUCTOS), de la
 -- consulta de inventario y del reporte de stock critico (CONSULTAR_PRODUCTOS).
@@ -308,8 +309,30 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PERMISOS_EMPLEADO'
 UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
  WHERE RUTINA IN ('SP_CONSULTAR_ASIGNACIONES', 'SP_TECNICOS_DISPONIBLES');
 
+-- (15/11/2026) Rutinas nuevas del paginado de ventas. El heuristico de arriba
+-- les propuso el permiso pero las dejo en modo auditoria (EXIGIR = 0), asi que
+-- la guarda solo registraba y no cortaba. Sus hermanas ya exigen
+-- (SP_VENTAS_ULTIMAS, SP_VENTAS_PENDIENTES_PAGINADO, SP_VENTAS_PENDIENTES) y
+-- las pantallas que las llaman ya piden GESTIONAR_VENTAS, asi que prenderlas no
+-- cierra ninguna puerta legitima.
+--   SP_VENTAS_ULTIMAS_PAGINADO y SP_CONTAR_VENTAS_ULTIMAS: pantalla
+--     «Ver venta con IVA».
+--   SP_VENTAS_BORRADOR_VIEJO: aviso de borradores en «Cobrar venta».
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA IN ('SP_VENTAS_ULTIMAS_PAGINADO', 'SP_CONTAR_VENTAS_ULTIMAS',
+                  'SP_VENTAS_BORRADOR_VIEJO');
+
 -- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
 SELECT RUTINA, PERMISO, EXIGIR
   FROM PERMISO_POR_RUTINA
  WHERE PERMISO LIKE 'GARANTIAS%'
+ ORDER BY EXIGIR, RUTINA;
+
+-- Comprobacion: las rutinas de las pantallas de ventas tienen que quedar
+-- TODAS exigiendo (EXIGIR = 1). Si alguna sale en 0, se colo una rutina nueva
+-- y su guarda esta en modo auditoria: solo registra, no corta.
+SELECT RUTINA, PERMISO, EXIGIR
+  FROM PERMISO_POR_RUTINA
+ WHERE PERMISO = 'GESTIONAR_VENTAS'
+   AND (RUTINA LIKE 'SP_VENTAS%' OR RUTINA LIKE 'SP_CONTAR_VENTAS%')
  ORDER BY EXIGIR, RUTINA;

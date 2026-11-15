@@ -1,7 +1,7 @@
 # Módulo 39 — LECTURAS_VENTAS
 
 **Puertas de solo lectura** para la app C++ (fase 3, 13/10/2026): todo lo que las
-pantallas de ventas y compras muestran sale por estos 27 SP, sin un solo `SELECT`
+pantallas de ventas y compras muestran sale por estos 28 SP, sin un solo `SELECT`
 a mano en el `.cpp`.
 
 **Depende de:** `VISTA_VENTA_CON_IVA` y `VISTA_COMPRA_CON_IVA` y
@@ -88,7 +88,8 @@ filas. Se usa para no abrir dos reclamos sobre la misma línea.
 ### `SP_VENTAS_PENDIENTES()`
 
 Las **20** ventas más recientes de `VISTA_VENTAS_PENDIENTES_PAGO` (43):
-`ID_VENTA`, `ID_CLIENTE`, `ESTADO`, `TOTAL`, `PAGADO`, `SALDO`.
+`ID_VENTA`, `ID_CLIENTE`, `ESTADO`, `TOTAL`, `PAGADO`, `SALDO`, `FECHA` y
+`HORAS_ABIERTA`.
 
 > **`TOTAL` y `SALDO` van a BRUTO** (cambio del 12/10/2026): antes, con `TOTAL`
 > base, una venta ya pagada mostraba saldo negativo.
@@ -139,12 +140,25 @@ Una página de `VISTA_COMPRAS_PENDIENTES_PAGO`: `ID_COMPRA`, `PROVEEDOR`,
 
 ### `SP_VENTAS_PENDIENTES_PAGINADO(P_PAGINA, P_POR_PAGINA)`
 
-Una página de `VISTA_VENTAS_PENDIENTES_PAGO`. La usa "Cobrar venta"
-(`ventas.cpp`).
+Una página de `VISTA_VENTAS_PENDIENTES_PAGO`, con las mismas columnas que
+`SP_VENTAS_PENDIENTES` (incluidas `FECHA` y `HORAS_ABIERTA`). La usa "Cobrar
+venta" (`ventas.cpp`).
 
 ### `SP_CONTAR_VENTAS_PENDIENTES()`
 
 `COUNT(*)` de las ventas con saldo, para el paginador del cobro.
+
+### `SP_VENTAS_BORRADOR_VIEJO(P_HORAS)`
+
+Las ventas `EN_PROCESO` **sin líneas** y con más de `P_HORAS` horas de abiertas
+(48 si llega nulo o en 0): `ID_VENTA`, `FECHA`, `HORAS_ABIERTA`.
+
+> (15/11/2026) Existe porque estos borradores **no pueden salir** por
+> `VISTA_VENTAS_PENDIENTES_PAGO`: esa vista filtra `SALDO > 0` y un borrador sin
+> líneas tiene total 0, así que queda descartado. Tampoco se pueden cobrar (no
+> hay nada que cobrar): la salida es cancelarlas por ID. El umbral llega por
+> parámetro para que el plazo lo decida el negocio y no quede escrito en el SQL.
+> La pantalla de cobro lo usa para el aviso en amarillo.
 
 ### `SP_PAGOS_ULTIMOS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
 

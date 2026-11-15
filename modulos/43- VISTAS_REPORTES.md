@@ -80,15 +80,23 @@ y `TOTAL_CON_IVA`.
 
 ### `VISTA_VENTAS_PENDIENTES_PAGO`
 
-Las ventas **no canceladas ni devueltas** con saldo distinto de cero: `ID_VENTA`,
-`ID_CLIENTE`, `ESTADO`, `TOTAL`, `PAGADO`, `SALDO`.
+Las ventas **no canceladas ni devueltas** con `SALDO > 0`: `ID_VENTA`,
+`ID_CLIENTE`, `ESTADO`, `TOTAL`, `PAGADO`, `SALDO`, `FECHA` y `HORAS_ABIERTA`
+(horas desde que se abrió, calculadas con `NOW()`).
 
 > **`DEVUELTA` desaparece del listado** aunque tenga saldo: el reporte asume que
 > a una venta devuelta no se le cobra nada. Es una decisión de negocio, y está
 > solo acá — no en un `CHECK` ni en un trigger.
 >
-> **Agrupa con `GROUP BY` + `HAVING SALDO <> 0`**: el `HAVING` usa el alias, que
-> MySQL acepta. Es la única de las cinco que lo hace en vez de una subconsulta.
+> **`SALDO > 0`, no `<> 0`:** una devolución parcial puede dejar el saldo en
+> negativo (a favor del cliente) y esas filas no son deuda, así que no se listan.
+>
+> **Un borrador `EN_PROCESO` sin líneas queda afuera**: su total es 0, así que su
+> saldo es 0. Por eso el aviso de borradores viejos sale por
+> `SP_VENTAS_BORRADOR_VIEJO` (39) y no por esta vista.
+>
+> Lee de `VW_VENTA_NETA` con un `WHERE`; el filtro de estado y saldo vive en la
+> vista, no en quien la consulta.
 
 ### `VW_REPORTE_VENTAS`
 

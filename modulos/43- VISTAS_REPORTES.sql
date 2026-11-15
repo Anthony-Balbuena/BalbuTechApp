@@ -153,6 +153,11 @@ VW_VENTA_NETA (subtotal e ITBIS menos lo reembolsado). Se excluyen las
 ventas CANCELADAS y DEVUELTAS y las que ya estan saldadas. Una devolucion
 parcial puede dejar el saldo en negativo (a favor del cliente): esas filas
 no son deuda y no se listan aca.
+
+(15/11/2026) Trae tambien FECHA y HORAS_ABIERTA (horas desde que se abrio)
+para que «Cobrar venta en proceso» pueda marcar en rojo las que pasaron el
+plazo de cobro. Se calcula con NOW(), asi que es la antiguedad al momento
+de la consulta, no un valor guardado.
 */
 CREATE OR REPLACE VIEW VISTA_VENTAS_PENDIENTES_PAGO AS
 SELECT
@@ -161,7 +166,9 @@ SELECT
     N.ESTADO,
     N.SUBTOTAL_ORIGINAL AS TOTAL,
     N.PAGADO,
-    N.SALDO
+    N.SALDO,
+    N.FECHA,
+    TIMESTAMPDIFF(HOUR, N.FECHA, NOW()) AS HORAS_ABIERTA
 FROM VW_VENTA_NETA N
 WHERE N.ESTADO NOT IN ('CANCELADA', 'DEVUELTA')
   AND N.SALDO > 0;

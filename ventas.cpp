@@ -1391,30 +1391,77 @@ static void cobrarVentaUI() {
     try {
         // (08/11/2026) Paginado: antes traia las 20 ventas pendientes mas
         // recientes y una vieja quedaba inalcanzable.
-        const size_t W_ID = 6, W_EST = 12, W_MON = 12;
-        const size_t ANCHO = W_ID + W_EST + W_MON * 2 + 3 * 3;
+        // (15/11/2026) Plazo de cobro: 48 h. Una venta abierta retiene stock y
+        // ensucia el kardex, asi que pasadas las 48 h se marca en rojo y se
+        // avisa. Borradores vacios aparte: no tienen saldo, la vista los
+        // descarta y hay que listarlos por otro SP.
+        const int HORAS_PLAZO_COBRO = 48;
+        const size_t W_ID = 6, W_EST = 12, W_MON = 12, W_ABI = 9;
+        const size_t ANCHO = W_ID + W_EST + W_MON * 2 + W_ABI + 4 * 3;
         cout << "\n"
              << tablaCelda("VENTA", W_ID) << " | "
              << tablaCelda("ESTADO", W_EST) << " | "
              << tablaCelda("PAGADO", W_MON) << " | "
-             << tablaCelda("SALDO", W_MON) << "\n"
+             << tablaCelda("SALDO", W_MON) << " | "
+             << tablaCelda("ABIERTA", W_ABI) << "\n"
              << tablaLinea(ANCHO) << "\n";
 
+        int vencidas = 0;
         const int hay = mostrarPaginadoSP(
             "CALL SP_VENTAS_PENDIENTES_PAGINADO(?, ?)",
             "CALL SP_CONTAR_VENTAS_PENDIENTES()",
             {},
-            [=](sql::ResultSet *res) {
-                char pagado[24], saldo[24];
+            [=, &vencidas](sql::ResultSet *res) {
+                char pagado[24], saldo[24], abierta[24];
                 snprintf(pagado, sizeof(pagado), "%.2f", (double)res->getDouble("PAGADO"));
                 snprintf(saldo, sizeof(saldo), "%.2f", (double)res->getDouble("SALDO"));
+                const int horas = res->getInt("HORAS_ABIERTA");
+                if (horas >= 24)
+                    snprintf(abierta, sizeof(abierta), "%d d", horas / 24);
+                else
+                    snprintf(abierta, sizeof(abierta), "%d h", horas);
+                const bool vencida = horas >= HORAS_PLAZO_COBRO;
+                if (vencida) ++vencidas;
                 string estado = res->getString("ESTADO");
                 cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_ID) << " | "
                      << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
                      << tablaCelda(pagado, W_MON) << " | "
-                     << tablaCelda(saldo, W_MON) << "\n"
+                     << tablaCelda(saldo, W_MON) << " | "
+                     << (vencida ? ROJO : "") << tablaCelda(abierta, W_ABI)
+                     << (vencida ? RESET : "") << "\n"
                      << tablaLinea(ANCHO) << "\n";
             });
+
+        if (vencidas > 0) {
+            cout << ROJO << "[!] " << vencidas << " venta(s) de esta pagina llevan "
+                 << "mas de " << HORAS_PLAZO_COBRO << " h sin cobrarse: retienen stock."
+                 << RESET << endl;
+        }
+
+        // Borradores vacios: EN_PROCESO sin lineas y viejas. No salen en la
+        // tabla de arriba (su saldo es 0) y no se pueden cobrar. Se cancelan
+        // por ID desde «Cancelar venta».
+        try {
+            std::unique_ptr<sql::PreparedStatement> pb(globalCon->prepareStatement(
+                "CALL SP_VENTAS_BORRADOR_VIEJO(?)"));
+            pb->setInt(1, HORAS_PLAZO_COBRO);
+            std::unique_ptr<sql::ResultSet> rb(pb->executeQuery());
+            string ids;
+            int n = 0;
+            while (rb->next()) {
+                ++n;
+                if (n > 1) ids += ", ";
+                ids += to_string(rb->getInt("ID_VENTA"));
+            }
+            drenarResultados(pb.get());
+            if (n > 0) {
+                cout << AMARILLO << "[!] " << n << " venta(s) EN_PROCESO sin lineas hace "
+                     << "mas de " << HORAS_PLAZO_COBRO << " h: #" << ids
+                     << ". No hay nada que cobrar; cancelalas por ID." << RESET << endl;
+            }
+        } catch (const exception &) {
+            // El aviso es informativo: si no se puede leer, la pantalla sigue.
+        }
 
         if (hay == 0) {
             cout << "[!] Sin ventas pendientes." << endl;
