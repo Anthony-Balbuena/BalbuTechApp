@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # (07/11/2026) Pruebas de los dos cambios de esta tanda:
-#   1. SP_HISTORIAL_VENTA(0) lista todas las ventas y trae la columna VENTA.
+#   1. SP_HISTORIAL_VENTA_PAGINADO(0, 1, N) lista todas las ventas y trae la
+#      columna VENTA. (15/11/2026) Antes era SP_HISTORIAL_VENTA, que se retiro
+#      al comprobarse que no tiene LIMIT: devolvia el historial completo.
 #   2. SP_VENTAS_GARANTIZABLES() lista solo ventas REALIZADA con lineas sin
 #      garantia, y deja de listarlas apenas se registra la garantia.
 #
@@ -26,7 +28,7 @@ M() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --datab
 
 faltan=$(M -N -e "SELECT COUNT(*) FROM information_schema.ROUTINES
                    WHERE ROUTINE_SCHEMA = DATABASE()
-                     AND ROUTINE_NAME IN ('SP_HISTORIAL_VENTA', 'SP_VENTAS_GARANTIZABLES',
+                     AND ROUTINE_NAME IN ('SP_HISTORIAL_VENTA_PAGINADO', 'SP_VENTAS_GARANTIZABLES',
                                           'SP_LINEAS_VENTA_CON_GARANTIA', 'SP_REGISTRAR_GARANTIA');")
 if [ "$faltan" != "4" ]; then
     echo "FALLO: faltan rutinas ($faltan/4). Aplica los modulos 21 y 63 en $DB_NAME." >&2
@@ -68,9 +70,9 @@ CALL SP_VENTAS_GARANTIZABLES();
 SELECT 'FASE_LINEAS';
 CALL SP_LINEAS_VENTA_CON_GARANTIA(@ven);
 SELECT 'FASE_HIST_TODAS';
-CALL SP_HISTORIAL_VENTA(0);
+CALL SP_HISTORIAL_VENTA_PAGINADO(0, 1, 500);
 SELECT 'FASE_HIST_UNA';
-CALL SP_HISTORIAL_VENTA(@ven);
+CALL SP_HISTORIAL_VENTA_PAGINADO(@ven, 1, 500);
 SELECT 'FASE_ALTA';
 CALL SP_REGISTRAR_GARANTIA(@det, 30, (SELECT MIN(ID_EMPLEADO) FROM EMPLEADOS));
 SELECT 'FASE_VENTAS_DESPUES';
@@ -128,23 +130,23 @@ fi
 # --- 2) Historial: con 0 ve todas; con el ID ve solo esa ------------------
 todas=$(seccion FASE_HIST_TODAS FASE_HIST_UNA)
 if printf '%s' "$todas" | grep -q "ZZHVG MOTIVO"; then
-    ok "SP_HISTORIAL_VENTA(0) incluye el historial de la venta de prueba"
+    ok "SP_HISTORIAL_VENTA_PAGINADO(0) incluye el historial de la venta de prueba"
 else
-    fallo "SP_HISTORIAL_VENTA(0) no incluyo la venta de prueba"
+    fallo "SP_HISTORIAL_VENTA_PAGINADO(0) no incluyo la venta de prueba"
     printf '%s\n' "$todas" | head -n 5
 fi
 if printf '%s' "$todas" | grep -qE "^${VENTA}[[:space:]]"; then
-    ok "SP_HISTORIAL_VENTA(0) trae la columna ID_VENTA"
+    ok "SP_HISTORIAL_VENTA_PAGINADO(0) trae la columna ID_VENTA"
 else
-    fallo "SP_HISTORIAL_VENTA(0) no trae el ID de la venta en la primera columna"
+    fallo "SP_HISTORIAL_VENTA_PAGINADO(0) no trae el ID de la venta en la primera columna"
 fi
 
 una=$(seccion FASE_HIST_UNA FASE_ALTA)
 filas=$(printf '%s\n' "$una" | grep -c "ZZHVG MOTIVO")
 if [ "$filas" = "1" ]; then
-    ok "SP_HISTORIAL_VENTA($VENTA) devuelve solo esa venta"
+    ok "SP_HISTORIAL_VENTA_PAGINADO($VENTA) devuelve solo esa venta"
 else
-    fallo "SP_HISTORIAL_VENTA($VENTA) devolvio $filas filas con el motivo de prueba (se esperaba 1)"
+    fallo "SP_HISTORIAL_VENTA_PAGINADO($VENTA) devolvio $filas filas con el motivo de prueba (se esperaba 1)"
 fi
 
 # --- 3) Con la garantia registrada, deja de aparecer ----------------------
@@ -164,7 +166,7 @@ else
 fi
 
 # --- 4) Historial PAGINADO (15/11/2026) -----------------------------------
-# SP_HISTORIAL_VENTA no tiene LIMIT: devolvia el historial completo. La pantalla
+# SP_HISTORIAL_VENTA (ya retirado) no tenia LIMIT: devolvia el historial completo. La pantalla
 # paso a usar la variante paginada. Estas pruebas corren DESPUES del ROLLBACK,
 # asi que cuentan el historial que ya tiene la base.
 pag_sp="$(M -N -e "SELECT COUNT(*) FROM information_schema.ROUTINES

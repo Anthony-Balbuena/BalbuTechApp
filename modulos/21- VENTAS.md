@@ -133,12 +133,17 @@ Devuelve `EXITO: VENTA #<id> CANCELADA Y STOCK RESTITUIDO.`
 > Traduce el choque de carrera del índice (`SQLSTATE 23000`) al mismo mensaje
 > amigable, igual que su espejo de compras.
 
-### `SP_HISTORIAL_VENTA(P_ID_VENTA)`
+### `SP_HISTORIAL_VENTA` — ELIMINADO el 15/11/2026
 
-**Usada por la app** (`ventas.cpp`). Solo lectura: devuelve `FECHA`,
-`ESTADO_ANTERIOR`, `ESTADO_NUEVO`, `EMPLEADO` y `MOTIVO`, del más nuevo al más
-viejo (`ORDER BY ID_HISTORIAL_ESTADO DESC`). `P_ID_VENTA = 0` lista el
-historial de todas las ventas.
+Historial de estados, del más nuevo al más viejo (`ORDER BY
+ID_HISTORIAL_ESTADO DESC`), con `P_ID_VENTA = 0` = todas las ventas.
+
+**No tenía `LIMIT`**: devolvía el historial **completo**, y la pantalla no tenía
+forma de dejar de dibujar. Lo reemplaza **`SP_HISTORIAL_VENTA_PAGINADO`**
+(módulo `39`), que trae la misma data y conserva el significado de
+`P_ID_VENTA = 0`. Se retiró cuando la app dejó de llamarlo: su único uso era la
+pantalla «Historial de venta». En su lugar queda un `DROP ... IF EXISTS` para
+limpiar las bases que ya lo tenían.
 
 ## Triggers
 

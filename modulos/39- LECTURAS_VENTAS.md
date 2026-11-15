@@ -167,10 +167,11 @@ nuevo al más viejo: `ID_VENTA`, `FECHA`, `ESTADO_ANTERIOR`, `ESTADO_NUEVO`,
 `EMPLEADO`, `MOTIVO`. `P_ID_VENTA = 0` significa **todas las ventas**, igual que
 en su hermana sin paginar.
 
-> (15/11/2026) `SP_HISTORIAL_VENTA` (21) **no tiene `LIMIT`**: devolvía el
-> historial completo. Con 30 filas en la viva no molesta, pero crece para
+> (15/11/2026) `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el
+> historial completo. Con 30 filas en la viva no molestaba, pero crece para
 > siempre y la pantalla no tenía forma de dejar de dibujar. Esta es la que usa
-> «Historial de venta» desde entonces.
+> «Historial de venta» desde entonces, y **`SP_HISTORIAL_VENTA` se retiró** ese
+> mismo día: la app dejó de llamarlo.
 
 ### `SP_CONTAR_HISTORIAL_VENTA(P_ID_VENTA)`
 

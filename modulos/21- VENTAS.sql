@@ -344,28 +344,20 @@ proc_label: BEGIN
 END //
 DELIMITER ;
 
-DELIMITER //
-DROP PROCEDURE IF EXISTS SP_HISTORIAL_VENTA ;
-/*
-SP_HISTORIAL_VENTA (14/10/2026)
-Historial de estados de una venta, del mas nuevo al mas viejo. Solo lectura.
+-- HISTORIAL
 
-(07/11/2026) P_ID_VENTA = 0 lista el historial de todas las ventas: la UI
-pide "ID venta o Enter para ver todas". Se agrega ID_VENTA a la salida para
-poder distinguir las filas cuando se listan todas; con un ID puntual el
-resultado es el mismo de antes.
+/* SP_HISTORIAL_VENTA (ELIMINADO 15/11/2026)
+Historial de estados de una venta, del mas nuevo al mas viejo. NO tiene LIMIT:
+devolvia el historial COMPLETO, y la pantalla no tenia forma de dejar de
+dibujar. Su reemplazo es SP_HISTORIAL_VENTA_PAGINADO (39), que trae la misma
+data y conserva el significado de P_ID_VENTA = 0 (todas las ventas).
+Se retira porque la app dejo de llamarlo: su unico uso era la pantalla
+«Historial de venta», que ahora usa la variante paginada. El DROP limpia las
+bases que ya lo tenian.
+Va FUERA de un bloque DELIMITER // a proposito: el DROP termina en ; y adentro
+de un bloque con delimitador // la sentencia no cerraria.
 */
-CREATE PROCEDURE SP_HISTORIAL_VENTA(IN P_ID_VENTA INT)
-BEGIN
-    CALL SP_EXIGIR_PERMISO('SP_HISTORIAL_VENTA');
-    SELECT H.ID_VENTA, H.FECHA, H.ESTADO_ANTERIOR, H.ESTADO_NUEVO,
-           E.NOMBRE AS EMPLEADO, H.MOTIVO
-      FROM HISTORIAL_ESTADOS_VENTA H
-      JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO
-     WHERE (P_ID_VENTA = 0 OR H.ID_VENTA = P_ID_VENTA)
-     ORDER BY H.ID_HISTORIAL_ESTADO DESC;
-END //
-DELIMITER ;
+DROP PROCEDURE IF EXISTS SP_HISTORIAL_VENTA;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_VENTA ;

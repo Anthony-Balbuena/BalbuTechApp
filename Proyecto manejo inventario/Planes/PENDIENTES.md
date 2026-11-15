@@ -217,25 +217,25 @@ pendiente en esta sección.**
 ### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 15/11/2026)
 
 Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
-contra los SP que la app llama y los que esos llaman: **189 definiciones, 189
+contra los SP que la app llama y los que esos llaman: **188 definiciones, 188
 rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
-- **39 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **38 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
 - **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
   `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
   interna: no se tocan.
 
-> (15/11/2026) El conteo pasó de 184/38 a 189/39: entraron 5 SP nuevos (el
-> paginado de ventas, el historial y el borrador viejo) y **`SP_HISTORIAL_VENTA`
-> (21) pasó a la lista de sin uso** — la pantalla «Historial de venta» ahora usa
-> `SP_HISTORIAL_VENTA_PAGINADO` (39). **No se retira todavía**: su caso puntual
-> (una venta concreta) sigue teniendo sentido y `db/test-historial-garantias-venta.sh`
-> lo sigue verificando. Si se retira, va con los tombstones de abajo.
+> (15/11/2026) El conteo de hoy es **188/38**. Pasó por 189/39 cuando entraron
+> los 5 SP nuevos del paginado de ventas; después **`SP_HISTORIAL_VENTA` (21) se
+> retiró** (su único uso era la pantalla «Historial de venta», que ahora usa
+> `SP_HISTORIAL_VENTA_PAGINADO`), así que volvió a 188. El test
+> `db/test-historial-garantias-venta.sh` se migró al SP paginado en vez de
+> quedarse verificando una rutina muerta.
 
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
   clasificado abajo. La decisión es **por grupo**, no por SP suelto.
 
-#### 12.1 Las 39 sin llamador
+#### 12.1 Las 38 sin llamador
 
 **a) API sin pantalla — Qt probablemente las quiera, no borrar:**
 
@@ -450,6 +450,8 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
 | SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos** en ese momento, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. Lo que quedaba desalineado se cerró después ese mismo día: ver la fila «Limpieza y permisos de la viva» |
 | Cierre atómico de venta (P-4, opción C) | 15/11 | `cerrarVenta` envuelve cabecera + líneas + stock en una transacción (`TransaccionVenta`, RAII). El rollback devuelve el stock solo, así que se retiró la compensación con `SP_CANCELAR_VENTA` al fallar una línea. El ID del cliente se pide antes de abrir la transacción y la factura se imprime después del commit. Se hizo en el C++ y no como SP porque se midió que ni los dos SP del flujo ni el trigger de stock commitean por dentro. Test `db/test-cierre-atomico.sh`, que fuerza el fallo de la segunda línea con el carrito armado |
+| Trigger drift de compras ARREGLADO (por accidente) | 15/11 | Un `bash db/import.sh` corrió **completo contra la viva** por error (el `.env` exporta `DB_NAME=BALBU_TECH` y faltó el override). Consecuencia real: el orden de las cadenas de `COMPRAS UPDATE` y `DETALLE_COMPRA INSERT` quedó **igual al de una instalación limpia** —o sea, el import las **corrigió**, no las rompió—, se cayeron los tombstones (que era lo buscado) y 4 rutinas quedaron sin guarda (el script aborta antes de inyectarlas con `set -e`). Las 4 se reinjectaron. Verificado contra una instalación limpia: **triggers, procedimientos y tablas idénticos**. Datos intactos salvo los 3 pares de `GARANTIAS_AVANZAR`. Backup previo: `backups/balbu_tech_antes_reparar_follows_20261115_192257.sql` |
+| `SP_HISTORIAL_VENTA` retirado | 15/11 | No tenía `LIMIT`: devolvía el historial completo. La app ya usaba `SP_HISTORIAL_VENTA_PAGINADO` (39), así que quedó sin llamador. Tombstone en el `21` + `DROP` en las dos bases + fila de mapeo huérfana borrada; `db/test-historial-garantias-venta.sh` migrado al paginado. Repo y bases en **188 procedimientos** |
 | Limpieza y permisos de la viva (15/11/2026) | 15/11 | **Tres cierres:** (1) los 4 tombstones retirados de `BALBU_TECH` —189 rutinas, igual que el repo—; (2) las 2 rutinas de auditoría de permisos quedaron con `EXIGIR = 1` (`EXIGIR = 0` pasó de 2 a **0** en las dos bases); (3) `GARANTIAS_AVANZAR` para ADMIN/GERENTE/SUBGERENTE. Backup `backups/balbu_tech_antes_limpieza_y_permisos_20261115_191222.sql` y el de TEST del mismo timestamp |
 | `GARANTIAS_AVANZAR` faltaba en la matriz del `36` | 15/11 | **El diagnóstico inicial estaba al revés.** `SP_REGISTRAR_AVANCE_REPARACION` exige `GARANTIAS_AVANZAR` en la guarda ANTES de su autorización, y esa autorización deja que quien tiene `GARANTIAS_ASIGNAR` actúe en nombre de otro: con el permiso solo en TECNICO, **en la viva NADIE podía registrar un avance de reparación** (ni la opción se veía). El módulo `36` era el incompleto, no TEST. Corregido en el `36` y aplicado a la viva; las matrices de las dos bases quedaron **idénticas** (226 pares cada una, 61 permisos) |
 | Barrido de borradores vacíos (P-4, opción D) | 15/11 | Decisión del dueño: alcance **acotado**. Al entrar a la app se cancelan **solo** las ventas `EN_PROCESO` **sin líneas** con más de 48 h. No retienen stock, no se pueden cobrar, y nadie trabaja en algo sin líneas. **Nunca toca una venta con líneas** (puede ser un apartado legítimo). Reusa `SP_VENTAS_BORRADOR_VIEJO` + `SP_CANCELAR_VENTA`, sin SQL nuevo; avisa cuántas canceló. Test `db/test-borradores-barrido.sh` |
