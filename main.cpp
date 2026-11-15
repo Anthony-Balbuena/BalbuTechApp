@@ -14,6 +14,7 @@
 #include "login.h"
 #include "sesion.h"
 #include "roles.h"
+#include "ventas.h"
 
 using namespace std;
 
@@ -44,6 +45,9 @@ int main() {
         cout << "\nPresione Enter para continuar...";
         cin.get();
 
+        // (15/11/2026) Mantenimiento al entrar: cancelar los borradores de venta
+        // vacios que pasaron el plazo. Nunca toca una venta con lineas.
+        limpiarBorradoresVacios();
         ejecutarMenuSegunRol();
         return 0;
     }
@@ -74,6 +78,8 @@ int main() {
             cout << "\nPresione Enter para continuar...";
             cin.get();
 
+            // (15/11/2026) Mismo mantenimiento que en el camino DEV.
+            limpiarBorradoresVacios();
             ejecutarMenuSegunRol();
             return 0;
         }

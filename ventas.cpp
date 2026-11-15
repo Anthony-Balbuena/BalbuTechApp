@@ -1386,16 +1386,78 @@ static string nombreEmpleadoDeSesion(int idEmp) {
     return n;
 }
 
+// (15/11/2026) Plazo de cobro: 48 h. Una venta abierta retiene stock y ensucia
+// el kardex. Vive en un solo lugar porque lo usan DOS pantallas/flujos: el
+// aviso de «Cobrar venta en proceso» y el barrido de borradores vacios.
+static const int HORAS_PLAZO_COBRO = 48;
+
+// ---------------------------------------------------------------------------
+// Barrido de borradores vacios (opcion D de P-4, alcance acotado 15/11/2026)
+// ---------------------------------------------------------------------------
+// Cancela SOLO las ventas EN_PROCESO SIN lineas que pasaron el plazo. Esas no
+// retienen stock, no se pueden cobrar (no hay nada que cobrar) y nadie puede
+// estar trabajando en algo que no tiene ni una linea.
+//
+// NUNCA toca una venta con lineas: esa puede ser un apartado legitimo y
+// cancelarla le borraria la venta a un cajero que la tenia abierta. Por eso el
+// alcance es solo borradores vacios y no «toda EN_PROCESO vieja».
+//
+// Reusa las dos puertas que ya existen: SP_VENTAS_BORRADOR_VIEJO lista y
+// SP_CANCELAR_VENTA cancela (es la unica puerta a CANCELADA y deja el rastro en
+// HISTORIAL_ESTADOS_VENTA). Las dos exigen GESTIONAR_VENTAS: si el usuario que
+// entro no lo tiene, la guarda corta y el barrido no hace nada.
+//
+// Se llama al entrar a la app: es mantenimiento, y el cajero no deberia tener
+// que acordarse de limpiar. Si cancela algo, lo dice.
+void limpiarBorradoresVacios() {
+    if (sesionActual.idEmpleado <= 0) return;   // sin empleado no hay quien firme
+    try {
+        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
+            "CALL SP_VENTAS_BORRADOR_VIEJO(?)"));
+        pl->setInt(1, HORAS_PLAZO_COBRO);
+        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
+        vector<int> ids;
+        while (rl->next()) ids.push_back(rl->getInt("ID_VENTA"));
+        drenarResultados(pl.get());
+        if (ids.empty()) return;
+
+        int hechos = 0, fallaron = 0;
+        for (int id : ids) {
+            try {
+                std::unique_ptr<sql::PreparedStatement> pc(globalCon->prepareStatement(
+                    "CALL SP_CANCELAR_VENTA(?, ?)"));
+                pc->setInt(1, id);
+                pc->setInt(2, sesionActual.idEmpleado);
+                Recogermensaje(pc.get());
+                drenarResultados(pc.get());
+                ++hechos;
+            } catch (const exception &) {
+                ++fallaron;
+            }
+        }
+
+        if (hechos > 0 || fallaron > 0) {
+            cout << AMARILLO << "[!] " << hechos
+                 << " borrador(es) EN_PROCESO sin lineas de mas de "
+                 << HORAS_PLAZO_COBRO << " h se cancelaron (no retenian stock)."
+                 << (fallaron ? " " + to_string(fallaron) + " no se pudieron cancelar." : "")
+                 << RESET << endl;
+        }
+    } catch (const exception &) {
+        // Es mantenimiento: si no se puede (por ejemplo, sin GESTIONAR_VENTAS)
+        // la app sigue igual. El aviso de «Cobrar venta» los sigue mostrando.
+    }
+}
+
 static void cobrarVentaUI() {
     cout << "\n--- COBRAR VENTA EN PROCESO ---" << endl;
     try {
         // (08/11/2026) Paginado: antes traia las 20 ventas pendientes mas
         // recientes y una vieja quedaba inalcanzable.
-        // (15/11/2026) Plazo de cobro: 48 h. Una venta abierta retiene stock y
-        // ensucia el kardex, asi que pasadas las 48 h se marca en rojo y se
-        // avisa. Borradores vacios aparte: no tienen saldo, la vista los
-        // descarta y hay que listarlos por otro SP.
-        const int HORAS_PLAZO_COBRO = 48;
+        // (15/11/2026) Plazo de cobro: 48 h (HORAS_PLAZO_COBRO). Una venta
+        // abierta retiene stock y ensucia el kardex, asi que pasadas las 48 h
+        // se marca en rojo y se avisa. Borradores vacios aparte: no tienen
+        // saldo, la vista los descarta y hay que listarlos por otro SP.
         const size_t W_ID = 6, W_EST = 12, W_MON = 12, W_ABI = 9;
         const size_t ANCHO = W_ID + W_EST + W_MON * 2 + W_ABI + 4 * 3;
         cout << "\n"
