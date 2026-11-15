@@ -63,6 +63,11 @@ static void registrarAjuste() {
                 "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'INCLUIR')",
                 {filtro},
                 imprimirFilaProductoInv);
+        } catch (const CancelarOperacionException &e) {
+            // (15/11/2026) Cancelar sale de la pantalla; antes lo tapaba el
+            // catch de abajo y se leia "No se pudo listar productos".
+            cout << "\n[!] " << e.what() << endl;
+            return;
         } catch (const exception &) {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }
@@ -112,6 +117,11 @@ static void actualizarCostoUI() {
                 "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'INCLUIR')",
                 {filtro},
                 imprimirFilaProductoInv);
+        } catch (const CancelarOperacionException &e) {
+            // (15/11/2026) Mismo caso que el ajuste de stock: cancelar no es
+            // un fallo de listado.
+            cout << "\n[!] " << e.what() << endl;
+            return;
         } catch (const exception &) {
             cout << ROJO << "No se pudo listar productos." << RESET << endl;
         }

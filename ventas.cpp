@@ -207,6 +207,9 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
         }
         int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
         return buscarPorId(pick, out);
+    } catch (const CancelarOperacionException &) {
+        // (15/11/2026) 'xxx' lo muestra la pantalla que pidio el producto.
+        throw;
     } catch (const exception &) {
         return false;
     }

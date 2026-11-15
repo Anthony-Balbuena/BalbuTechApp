@@ -284,6 +284,9 @@ void listarProveedores() {
         if (encontrado == 0) {
             cout << "\n[!] No hay proveedores registrados." << endl;
         }
+    } catch (const CancelarOperacionException &e) {
+        // (15/11/2026) 'xxx' en el paginador es cancelar, no un error de listado.
+        cout << "\n[!] " << e.what() << endl;
     } catch (const exception &e) {
         cout << "\n[!] Error al listar proveedores: " << e.what() << endl;
     }

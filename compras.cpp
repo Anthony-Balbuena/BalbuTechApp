@@ -227,6 +227,11 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
         for (auto &c : lista) cout << c.id << " | " << c.codigo << " | " << c.nombre << endl;
         int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
         return resolverProductoC(to_string(pick), out);
+    } catch (const CancelarOperacionException &) {
+        // (15/11/2026) 'xxx' no es un fallo del resolver: la pantalla que lo
+        // llamo ya sabe mostrar la cancelacion. Sin esto el catch de abajo lo
+        // tapaba y se leia "No se pudo registrar".
+        throw;
     } catch (const exception &) {
         return false;
     }
@@ -422,6 +427,9 @@ static bool elegirSuplidor(LineaCompra &l) {
         }
         drenarResultados(pv.get());
         return ok;
+    } catch (const CancelarOperacionException &) {
+        // (15/11/2026) 'xxx' lo muestra la pantalla que llamo al suplidor.
+        throw;
     } catch (const exception &) {
         return false;
     }
