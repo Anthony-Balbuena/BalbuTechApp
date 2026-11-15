@@ -23,10 +23,17 @@ fi
 esperados=(
   "YA TIENE UN CONTRATO ACTIVO"
   "PERTENECE A UN EMPLEADO INACTIVO"
-  "HAY MAS DE UN EMPLEADO CON ESA CEDULA"
   "NECESITA UNA DURACION EN MESES MAYOR A CERO"
   "EL TIPO DEBE SER TEMPORAL O FIJO"
 )
+
+# (15/11/2026) SALE el caso "HAY MAS DE UN EMPLEADO CON ESA CEDULA".
+# El test lo armaba insertando dos EMPLEADOS con la misma cedula, y su propio
+# comentario lo delataba: "(CEDULA no tiene unique)". Eso dejo de ser cierto
+# cuando se agrego UQ_EMPLEADOS_CEDULA: el segundo INSERT ahora muere con
+# 1062 (Duplicate entry), asi que el escenario es IMPOSIBLE de armar y el
+# test nunca podia pasar. La rama del SP sigue existiendo como defensa por si
+# algun dia se cae el indice, pero no es alcanzable desde el flujo real.
 
 fail=0
 
@@ -54,11 +61,9 @@ SELECT ID_EMPLEADO INTO @pedro FROM EMPLEADOS WHERE CEDULA = '30299887779';
 INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO, ESTADO)
 VALUES ('Inactivo Prueba', '30299887780', 'Auxiliar', 5000.00, '8095553333', 'inactivo.prueba@correo.test', '2026-01-15', 'INACTIVO');
 
--- Ambigua: dos empleados con la misma cedula (CEDULA no tiene unique)
-INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
-VALUES ('Ambiguo Uno', '30299887781', 'A', 6000.00, '8095554444', 'amb1@correo.test', '2026-01-15');
-INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
-VALUES ('Ambiguo Dos', '30299887781', 'B', 6100.00, '8095555555', 'amb2@correo.test', '2026-01-15');
+-- (15/11/2026) Se quito el alta "Ambigua" (dos empleados con la misma cedula):
+-- UQ_EMPLEADOS_CEDULA lo impide, el INSERT muere con 1062 y el test no podia
+-- ni armar el escenario. Ver la nota del arreglo de `esperados`.
 
 -- T1: cedula que NO existe -> registra el contrato, NO crea al empleado
 CALL SP_SUBIR_CONTRATO('Maria Prueba', '30299887777', 'Cajera', 12000.00,
@@ -94,9 +99,9 @@ CALL SP_SUBIR_CONTRATO('Pedro Prueba', '30299887779', 'Bodeguero', 10000.00,
 CALL SP_SUBIR_CONTRATO('Inactivo Prueba', '30299887780', 'Auxiliar', 5000.00,
   '8095553333', 'inactivo.prueba@correo.test', '2026-01-15', 'FIJO', NULL, NULL);
 
--- T5: cedula ambigua -> el SP frena (no se crea contrato)
-CALL SP_SUBIR_CONTRATO('Ambiguo Tres', '30299887781', 'C', 6200.00,
-  '8095558888', 'amb3@correo.test', '2026-10-18', 'FIJO', NULL, 't.html');
+-- (15/11/2026) SALE T5: "cedula ambigua -> el SP frena". Era el CALL de
+-- '30299887781', la cedula que compartian dos empleados. Con
+-- UQ_EMPLEADOS_CEDULA esa situacion no puede existir.
 
 -- T6: temporal sin meses (cedula sin contrato ni empleado)
 CALL SP_SUBIR_CONTRATO('Meses Prueba', '30299887782', 'Auxiliar', 7000.00,

@@ -342,15 +342,6 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
 
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
-- [ ] **Un test roto de la batería: `db/test-contratos-subir.sh` (15/11/2026).**
-  Su caso «HAY MAS DE UN EMPLEADO CON ESA CEDULA» es **imposible de armar**:
-  intenta insertar dos `EMPLEADOS` con la misma cédula, pero
-  `UQ_EMPLEADOS_CEDULA` es **UNIQUE** y el `INSERT` muere con `1062`. El test
-  quedó obsoleto cuando se agregó el índice. Hay que decidir si ese error sigue
-  teniendo sentido (¿puede existir el caso con el índice puesto?) o se retira el
-  caso. Además **no tiene el guard de la base viva** (`if [ "$DB" = "BALBU_TECH" ]`)
-  que sí tienen los demás; su default es `BALBU_TECH_TEST`, así que hoy no es
-  peligroso, pero conviene agregárselo.
 - [ ] **`DB_PASSWORD` significa dos cosas distintas según el test (15/11/2026).**
   Los tests que conectan como la app (`test-permisos-sp`, `test-cambio-clave`)
   leen `APP_PASS="${DB_APP_PASSWORD:-${DB_PASSWORD:-}}"`, o sea que esperan la
@@ -361,12 +352,13 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería real son 25 tests, no 12.** Hasta el 15/11 se corrían solo los
-  de la tabla de arriba y se reportaba como «batería completa». Corridos los 25
-  con el entorno completo (`DB_APP_PASSWORD` incluido): **24 en verde, 1 en rojo**
-  (`test-contratos-subir`, arriba). Ojo con dos cosas: casi todos usan
+- [ ] **La batería son 25 tests, no 12, y hay que correrlos todos.** Hasta el
+  15/11 se corrían solo los de la tabla de arriba y se reportaba como «batería
+  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 25
+  en verde**. Ojo con dos cosas al correrlos: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
-  que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito.
+  que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. **Que estén todos en
+  verde es lo que hace que un rojo signifique algo.**
 - [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
   dobles del SQL.** Usar archivo `.sql` o here-doc.
 - [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE` y los `CALL` de semilla. Los `SELECT *` sueltos ya no están: se sacaron del `43` y del `14` (15/11/2026).
