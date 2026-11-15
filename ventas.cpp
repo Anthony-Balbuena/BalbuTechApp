@@ -707,19 +707,56 @@ static void verVentaConIVA() {
     cout << "\n--- VENTAS REGISTRADAS ---" << endl;
 
     try {
-        std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
-            "CALL SP_VENTAS_ULTIMAS()"));
-        std::unique_ptr<sql::ResultSet> rl(pl->executeQuery());
-        vector<int> ids;
-        while (rl->next()) ids.push_back(rl->getInt("ID_VENTA"));
-        drenarResultados(pl.get());
-        if (ids.empty()) {
+        // (15/11/2026) Paginado de 10 en 10. Antes traia las 20 ultimas e
+        // imprimia la factura COMPLETA de las 20: una venta vieja quedaba
+        // inalcanzable y la pantalla tapaba la terminal. Ahora se lista y el
+        // detalle se pide por ID, igual que cobrar y anular pago.
+        const size_t W_ID = 6, W_FEC = 19, W_CLI = 20, W_EST = 12, W_MON = 12;
+        const size_t ANCHO = W_ID + W_FEC + W_CLI + W_EST + W_MON * 3 + 6 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("FECHA", W_FEC) << " | "
+             << tablaCelda("CLIENTE", W_CLI) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("SUBTOTAL", W_MON) << " | "
+             << tablaCelda("ITBIS", W_MON) << " | "
+             << tablaCelda("TOTAL", W_MON) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        const int hay = mostrarPaginadoSP(
+            "CALL SP_VENTAS_ULTIMAS_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_VENTAS_ULTIMAS()",
+            {},
+            [=](sql::ResultSet *res) {
+                char sub[24], itb[24], tot[24];
+                snprintf(sub, sizeof(sub), "%.2f", (double)res->getDouble("SUBTOTAL"));
+                snprintf(itb, sizeof(itb), "%.2f", (double)res->getDouble("ITBIS"));
+                snprintf(tot, sizeof(tot), "%.2f", (double)res->getDouble("TOTAL_CON_IVA"));
+                string estado = res->getString("ESTADO");
+                cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_ID) << " | "
+                     << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                     << tablaCelda(res->getString("CLIENTE"), W_CLI) << " | "
+                     << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                     << tablaCelda(sub, W_MON) << " | "
+                     << tablaCelda(itb, W_MON) << " | "
+                     << tablaCelda(tot, W_MON) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) {
             cout << "[!] Sin ventas registradas." << endl;
             return;
         }
-        for (int id : ids) mostrarFactura(id);
+
         double dNinguno = -1;
-        int vPagos = (int)leerNumeroConIntentos("Ver pagos de una venta? ID (Enter = omitir): ", 1, 999999999, &dNinguno);
+        int vFactura = (int)leerNumeroConIntentos(
+            "Ver factura completa de una venta? ID (Enter = omitir): ",
+            1, 999999999, &dNinguno);
+        if (vFactura >= 0) mostrarFactura(vFactura);
+
+        int vPagos = (int)leerNumeroConIntentos(
+            "Ver pagos de una venta? ID (Enter = omitir): ",
+            1, 999999999, &dNinguno);
         if (vPagos >= 0) verPagosDeVenta(vPagos);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;

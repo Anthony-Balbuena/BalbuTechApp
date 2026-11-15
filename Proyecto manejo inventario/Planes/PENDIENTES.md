@@ -25,9 +25,10 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 123/0 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 129/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-ventas-ver-iva.sh` | «Ver venta con IVA» paginado: contrato de los SP, fallback de página y la pantalla sin volcar facturas | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 (`balbu_app` no sirve: el test hace SQL directo y corta avisando) |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -228,6 +229,25 @@ solo el repo. No se planifica encima sin mirar primero.
   `21_SP_INICIAR_VENTA` y cada línea entra con `SP_AGREGAR_DETALLE_VENTA`. Hay
   que decidir si una venta abierta con líneas sueltas es un borrador aceptable
   o un agujero que deja stock descontado sin venta cerrada.
+  **Medido el 15/11/2026 (solo lectura):** el descuento de stock **no** es un
+  agujero de carrera — lo hace `TR_AUDITORIA_MOVIMIENTO_VENTA` con
+  `UPDATE ... WHERE STOCK_ACTUAL >= NEW.CANTIDAD` y `ROW_COUNT()` en la misma
+  sentencia. El problema real es otro: **nadie avisa de un borrador viejo**.
+  **Aplicado (opción A, 15/11/2026):** las 4 ventas `EN_PROCESO` de la viva
+  quedaron resueltas — la #15 se cobró (`REALIZADA` + pago de 82.600) y la #8
+  se canceló, ambas por el dueño el mismo día; las #17 y #18 (0 líneas, total 0,
+  31 días) se cancelaron por `SP_CANCELAR_VENTA`. Backup
+  `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql`. Quedan
+  **0 ventas `EN_PROCESO`** en la viva.
+  **Abierto (decisión de negocio):**
+  1. **¿Cuánto tiempo puede estar una venta sin cobrar?** No hay plazo hoy. La
+     respuesta define si el aviso de B va a los N días y cuál es ese N.
+  2. **Alcance revisado de B:** como `VISTA_VENTAS_PENDIENTES_PAGO` filtra
+     `SALDO > 0`, un borrador de total 0 (como eran #17 y #18) **no aparece** en
+     «Cobrar venta en proceso». B necesita dos piezas: antigüedad en las ventas
+     con saldo **y** un aviso aparte para las `EN_PROCESO` vacías y viejas.
+  3. **Opción C** (`SP_REGISTRAR_VENTA_COMPLETA`): cerrar cabecera + líneas en
+     una transacción. Sigue pendiente y va después de B.
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
   clasificado en el ítem 12. La decisión es por grupo, no por SP suelto.
 
@@ -425,7 +445,9 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
 | Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
-| Batería de aceptación en TEST, en verde | 15/11 | 12 suites + `build.sh`, todas exit 0 (`test-menus-por-rol`, `test-garantias` 13/0, `test-contrato-borrador` 15/15, `test-migracion-roles`, `test-lockout`, `test-login-servidor`, `test-login-eof`, `test-permisos-sp`, `test-asistencia-propia`, `check-app-sps` 127/0, `test-cobertura-modulos`). Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
+| Batería de aceptación en TEST, en verde | 15/11 | 13 suites + `build.sh`, todas exit 0 (`test-menus-por-rol`, `test-garantias` 13/0, `test-contrato-borrador` 15/15, `test-migracion-roles`, `test-lockout`, `test-login-servidor`, `test-login-eof`, `test-permisos-sp`, `test-asistencia-propia`, `test-ventas-ver-iva`, `check-app-sps` 129/0, `test-cobertura-modulos`). Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
+| «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
+| Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---

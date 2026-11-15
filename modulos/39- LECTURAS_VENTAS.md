@@ -1,7 +1,7 @@
 # Módulo 39 — LECTURAS_VENTAS
 
 **Puertas de solo lectura** para la app C++ (fase 3, 13/10/2026): todo lo que las
-pantallas de ventas y compras muestran sale por estos 14 SP, sin un solo `SELECT`
+pantallas de ventas y compras muestran sale por estos 27 SP, sin un solo `SELECT`
 a mano en el `.cpp`.
 
 **Depende de:** `VISTA_VENTA_CON_IVA` y `VISTA_COMPRA_CON_IVA` y
@@ -24,6 +24,25 @@ Fuente: `modulos/39- LECTURAS_VENTAS.sql` · Base: `BALBU_TECH` · Revisado: 14/
 
 Las **20** ventas más recientes de `VISTA_VENTA_CON_IVA`: `ID_VENTA`, `CLIENTE`,
 `FECHA`, `ESTADO`, `SUBTOTAL`, `ITBIS`, `TOTAL_CON_IVA`. Sin paginar.
+
+> Sigue en uso: la llama `cancelarVentaUI` para elegir el ID a cancelar. La
+> pantalla «Ver venta con IVA» usaba este SP hasta el 15/11/2026.
+
+### `SP_VENTAS_ULTIMAS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
+
+Una página de las ventas registradas, con las mismas columnas que
+`SP_VENTAS_ULTIMAS`. Ordena por `ID_VENTA DESC` y usa 10 por página por
+defecto; `P_PAGINA` y `P_POR_PAGINA` nulas o menores a 1 caen a 1 y 10.
+
+> (15/11/2026) Reemplaza a `SP_VENTAS_ULTIMAS` en «Ver venta con IVA»: antes se
+> imprimía la factura **completa** de las 20 últimas, así que una venta vieja
+> quedaba inalcanzable y la pantalla tapaba la terminal.
+
+### `SP_CONTAR_VENTAS_ULTIMAS()`
+
+Cuántas ventas hay registradas, para el «Página 1 de N» de la pantalla. Cuenta
+sobre `VISTA_VENTA_CON_IVA`, la misma que lista el SP de arriba, así el total
+siempre cuadra.
 
 ### `SP_VENTA_ENCABEZADO(P_ID_VENTA)`
 
