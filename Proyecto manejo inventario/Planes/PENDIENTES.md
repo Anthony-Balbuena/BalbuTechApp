@@ -45,68 +45,90 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplic
 
 **Manual, por área:**
 
-> **Casi todo esto ya lo cubre `db/test-menus-por-rol.sh`**, que entra a la app
-> con cada rol y **cuenta las opciones** del menú principal y de cada submenú, y
-> verifica que estén las etiquetas esperadas. Los números de la lista vieja
-> estaban desactualizados; estos son los que verifica el test y los que valen:
->
-> | Rol | Opciones en el menú principal |
-> |---|---|
-> | ADMIN | 19 |
-> | GERENTE | 15 |
-> | SUBGERENTE | 15 |
-> | RRHH | 5 |
-> | VENDEDOR | 9 |
-> | ALMACEN | 10 |
-> | CONTABILIDAD | 5 |
->
-> Por área, también automático: Usuarios (un rol de solo `USUARIOS_VER` ve solo
-> consulta), Empleados (SUBGERENTE 3, solo lectura), Clientes (VENDEDOR 4 sin
-> buscar ni listar; CONTABILIDAD 3), Proveedores (ALMACEN 6), Categorías (ALMACEN
-> 5), Marcas (ALMACEN 6), Métodos de pago, Asistencia (VENDEDOR 3 sin reportes;
-> SUBGERENTE 7 con Justificar), Productos (ALMACEN 7; CONTABILIDAD 4; un rol de
-> solo gestión 4), Ventas (VENDEDOR 10; uno sin reportes ni garantías 8),
-> Garantías **por permiso** (ADMIN/GERENTE/SUBGERENTE, VENDEDOR, TECNICO,
-> CONTABILIDAD), Compras, Caja e Inventario.
+> **El test `db/test-menus-por-rol.sh` ya verifica los CONTEOS de opciones** de
+> cada menú y submenú entrando a la app con cada rol: eso atrapa rápido una
+> opción que se cuela o que desaparece. **No reemplaza este recorrido** — abajo
+> está lo que hay que mirar a mano. Los conteos de la lista están corregidos con
+> lo que la app muestra hoy; los viejos estaban mal (decían 16 para GERENTE y
+> son 15, etc.).
 
-#### 2.1 Lo que queda manual de verdad (permisos y cambio en caliente)
+#### 2.1 Sesión y menú principal
 
-- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
-- [ ] Al reingresar después de quitarlos, la opción sigue ausente.
-- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú, **no** queda un hueco y pasa a 3 opciones.
-- [ ] Sin `PROVEEDORES_CREAR`, la opción de alta desaparece y el resto sigue funcionando.
-- [ ] Un rol sin `CONSULTAR_PRODUCTOS` no ve Productos; uno sin ningún `EMPLEADOS_*` no ve Empleados (salvo `REGISTRAR_ASISTENCIA`/`CONSULTAR_ASISTENCIA`, que abren **Asistencia**).
-- [ ] `CONSULTAR_ASISTENCIA` **no** abre Empleados.
-- [ ] ADMIN, GERENTE, SUBGERENTE y RRHH ven los reportes de Asistencia.
-- [ ] Justificar una ausencia y ver el cambio en el reporte.
-- [ ] Un usuario con `GARANTIAS_CONSULTAR` y sin `GESTIONAR_VENTAS` llega a Garantías por el ítem «Ventas» del menú principal.
-- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`); desde el módulo 64 `FN_TIENE_PERMISO` también devuelve 0.
+- [ ] ADMIN entra y ve **19** opciones.
+- [ ] GERENTE ve **15** y **no** aparecen Roles ni Usuarios.
+- [ ] SUBGERENTE ve **15**, con Empleados (solo 3: buscar, listar, volver) y Asistencia (7, con Justificar).
+- [ ] RRHH ve **5**; VENDEDOR **9**; ALMACEN **10**; CONTABILIDAD **5**.
+- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`). Desde el módulo 64 `FN_TIENE_PERMISO` también devuelve 0 para esa cuenta.
+- [ ] **Bloqueo por fuerza bruta (módulo 64):** cinco fallos del mismo usuario dentro de 15 minutos cierran el acceso con el aviso `Cuenta bloqueada por intentos fallidos`. Cerrar y reabrir la app **no** reinicia el contador. Un intento bloqueado **no** agrega filas en `LOG_ACCESOS` (si agregara, la ventana se correría sola y el bloqueo no vencería nunca). Pasados los 15 minutos, la clave correcta vuelve a entrar.
+- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos que le quedan de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
+- [ ] Al reingresar después de quitar los permisos, la opción sigue ausente.
 
-> Ya **no** hace falta a mano, lo cubren los tests automáticos: los conteos de
-> opciones por rol, el bloqueo por fuerza bruta (5 fallos / 15 min →
-> `db/test-lockout.sh`), el cambio de clave (`db/test-cambio-clave.sh`), fichar
-> sin pedir ID (`db/test-asistencia-propia.sh`), la migración de roles
-> (`db/test-migracion-roles.sh`) y la auditoría de permisos
-> (`db/test-auditoria-permisos.sh`).
-
-#### 2.2 Usuarios, Empleados y Roles: las acciones (los menús ya son automáticos)
+#### 2.2 Usuarios (solo ADMIN)
 
 - [ ] Crear usuario con rol VENDEDOR y clave; entrar con él.
 - [ ] Editar el nombre y el rol; verificar que el menú cambie en el siguiente ingreso.
 - [ ] Desactivar la cuenta; el login falla con el aviso correspondiente.
 - [ ] Reactivar; el login vuelve a funcionar.
+- [ ] Cambiar la clave; la vieja deja de servir y la nueva entra.
+- [ ] GERENTE **no** ve el módulo Usuarios.
+
+#### 2.3 Empleados
+
 - [ ] RRHH: crear empleado, editarlo, darlo de baja y reactivarlo.
 - [ ] RRHH: gestionar contrato, permiso y vacaciones desde el submenú.
-- [ ] **Roles:** crear un rol nuevo, asignarle `CLIENTES_VER` y entrar con un usuario de ese rol; después quitarle el permiso y verificar que el módulo desaparezca.
+- [ ] SUBGERENTE: entra a Empleados pero solo ve consulta; **no** puede crear, editar ni dar de baja.
+- [ ] Un usuario sin ningún permiso `EMPLEADOS_*` no ve el módulo (salvo que tenga `REGISTRAR_ASISTENCIA` o `CONSULTAR_ASISTENCIA`, que abren **Asistencia**, no Empleados).
+
+#### 2.4 Clientes
+
+- [ ] VENDEDOR: solo crear, editar y cambiar estado (4 opciones contando Volver); **no** aparecen Buscar ni Listar.
+- [ ] CONTABILIDAD: solo `CLIENTES_VER`; ve la consulta y nada más.
+- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú, **no** queda un hueco y pasa a 3 opciones.
+
+#### 2.5 Proveedores
+
+- [ ] ALMACEN: ver, crear, editar y cambiar estado (6 opciones en el submenú).
+- [ ] Sin `PROVEEDORES_CREAR`, la opción de alta desaparece y el resto sigue funcionando.
+
+#### 2.6 Asistencia
+
+- [ ] Los 7 roles pueden **fichar** (`REGISTRAR_ASISTENCIA`).
+- [ ] VENDEDOR ve 3 opciones, **sin** reportes.
+- [ ] SUBGERENTE ve 7, con Justificar.
+- [ ] ADMIN, GERENTE, SUBGERENTE y RRHH ven los reportes (`CONSULTAR_ASISTENCIA`).
+- [ ] "Mi asistencia" usa el `ID_EMPLEADO` de la sesión, **no** pide ID a mano.
+- [ ] `CONSULTAR_ASISTENCIA` **no** abre Empleados.
+- [ ] Justificar una ausencia y ver el cambio en el reporte.
+
+#### 2.7 Productos
+
+- [ ] ALMACEN ve 7 (gestión + consulta).
+- [ ] CONTABILIDAD ve 4 (solo consulta).
+- [ ] Un rol sin `CONSULTAR_PRODUCTOS` no ve el módulo.
+- [ ] `PRUEBA_PROD_GEST` (solo gestión) ve 4 y no ve las de consulta.
+
+#### 2.8 Ventas
+
+- [ ] VENDEDOR ve 10: las 7 de gestión, historial, garantías y volver, **sin** reportes ni exportación.
+- [ ] `PRUEBA_VEN_GEST` (sin `CONSULTAR_REPORTES`) ve 8: solo las acciones sobre la venta, **sin** Garantías.
+- [ ] **Garantías** ya no cuelga de `GESTIONAR_VENTAS`: se abre con cualquiera de sus 4 permisos (módulo `62`) y el submenú filtra por permiso.
+- [ ] ADMIN/GERENTE/SUBGERENTE ven **7** opciones en Garantías (incluye "Registrar avance"); TECNICO 3; VENDEDOR 4 (sin "Finalizar reclamo"); CONTABILIDAD 2 (solo consultar).
+- [ ] Un usuario con `GARANTIAS_CONSULTAR` y sin `GESTIONAR_VENTAS` llega a Garantías por el ítem "Ventas" del menú principal.
+
+#### 2.9 Roles
+
+- [ ] Crear un rol nuevo, asignarle `CLIENTES_VER` y entrar con un usuario de ese rol.
+- [ ] Quitarle el permiso y verificar que el módulo desaparezca.
 - [ ] Borrar el rol: los usuarios que lo tenían no pueden entrar (verificar el mensaje).
 - [ ] Renombrar un rol: los permisos lo siguen (`ON UPDATE CASCADE`).
 
-#### 2.3 Migración de roles (módulo 44) — ✅ verificado en la viva el 15/11/2026
+#### 2.10 Migración de roles (módulo 44) — ✅ verificado en la viva el 15/11/2026
 
 La viva quedó en **8 roles** (los 7 del rediseño —ADMIN, GERENTE, SUBGERENTE,
 RRHH, VENDEDOR, ALMACEN, CONTABILIDAD— más **TECNICO**, que agregó el flujo de
 garantías), con **0 usuarios huérfanos** y **0 roles `EMPLEADO`/`CAJERO`**. TEST
 está igual. El test automático lo cubre (11/11).
+
 
 ### 3. RRHH: pruebas visuales pendientes
 
