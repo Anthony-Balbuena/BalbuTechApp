@@ -32,6 +32,7 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cobrar-plazo.sh` | plazo de cobro de 48 h: vigencia de los SP, borradores vacíos y el aviso en rojo de la pantalla | todos OK |
 | `DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root DB_ADMIN_PASSWORD=<clave-root> bash db/test-historial-garantias-venta.sh` | historial de venta (incluido el paginado nuevo) y ventas garantizables | OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-borradores-barrido.sh` | barrido de borradores vacíos al entrar: cancela el viejo y **no** toca el vacío reciente ni la venta con líneas | todos OK |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cierre-atomico.sh` | cierre atómico: si falla la segunda línea, la primera —ya insertada y con stock descontado— se revierte; y el camino feliz sigue igual | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 (`balbu_app` no sirve: el test hace SQL directo y corta avisando) |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -254,8 +255,32 @@ solo el repo. No se planifica encima sin mirar primero.
      amarillo con la instrucción de cancelarlos por ID. Umbral en un solo lugar
      (`HORAS_PLAZO_COBRO` en `ventas.cpp`), y los SP lo reciben por parámetro.
      Test `db/test-cobrar-plazo.sh`.
-  3. **Opción C** (`SP_REGISTRAR_VENTA_COMPLETA`): cerrar cabecera + líneas en
-     una transacción. Sigue pendiente y va después de B.
+     **Ojo, interacción con D (15/11/2026):** desde que la opción D corre, el
+     barrido cancela esos borradores **al entrar**, así que en el flujo normal
+     el aviso en amarillo ya no se ve: cuando llegás a la pantalla no queda
+     ninguno. El aviso **se deja** como red de seguridad para cuando el barrido
+     no puede correr (un usuario sin `GESTIONAR_VENTAS`, o un fallo al
+     cancelar), pero conviene saber que es un camino poco frecuente.
+     `test-cobrar-plazo.sh` ahora comprueba lo contrario: que NO aparezca.
+  3. **Aplicado el 15/11/2026 (opción C):** cierre **atómico** desde el C++.
+     `cerrarVenta` envuelve cabecera + TODAS las líneas + el descuento de stock
+     en una transacción (`TransaccionVenta`, guard RAII que revierte al salir del
+     scope si nadie confirmó). El descuento lo hace
+     `TR_AUDITORIA_MOVIMIENTO_VENTA` **dentro de la misma transacción**, así que
+     el rollback devuelve el stock solo: ya no se compensa con
+     `SP_CANCELAR_VENTA` cuando una línea falla. El ID del cliente se pide
+     **antes** de abrir la transacción (no se espera teclado con una abierta) y
+     la factura se imprime **después** del commit. Se eligió el C++ y no el SP
+     `SP_REGISTRAR_VENTA_COMPLETA` porque se midió que ni
+     `21_SP_INICIAR_VENTA`, ni `SP_AGREGAR_DETALLE_VENTA`, ni el trigger de stock
+     tienen transacción propia: envolver el cierre da la misma garantía por una
+     fracción del costo. **Queda pendiente el SP si algún día aparece un segundo
+     cliente** (la Qt app): con el C++ la garantía es solo de este cliente.
+     Test `db/test-cierre-atomico.sh`: fuerza el fallo de la SEGUNDA línea con el
+     carrito ya armado (FIFO + cambio de stock desde otra conexión) y verifica que
+     la PRIMERA línea —que ya se había insertado y ya había descontado stock— se
+     revierta. Con el código viejo quedaban 1 venta CANCELADA, 1 línea y 2
+     movimientos.
   4. **Aplicado el 15/11/2026 (opción D, alcance acotado):** barrido al entrar a
      la app que cancela **solo** las ventas `EN_PROCESO` **SIN líneas** con más
      de 48 h. Reusa `SP_VENTAS_BORRADOR_VIEJO` (lista) y `SP_CANCELAR_VENTA`
@@ -397,9 +422,9 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería real son 23 tests, no 12.** Hasta el 15/11 se corrían solo los
-  de la tabla de arriba y se reportaba como «batería completa». Corridos los 23
-  con el entorno completo (`DB_APP_PASSWORD` incluido): **22 en verde, 1 en rojo**
+- [ ] **La batería real son 25 tests, no 12.** Hasta el 15/11 se corrían solo los
+  de la tabla de arriba y se reportaba como «batería completa». Corridos los 25
+  con el entorno completo (`DB_APP_PASSWORD` incluido): **24 en verde, 1 en rojo**
   (`test-contratos-subir`, arriba). Ojo con dos cosas: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
   que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito.
@@ -485,11 +510,12 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
 | Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
-| Batería de aceptación en TEST | 15/11 | Los **23** `db/test-*.sh` corridos con el entorno completo: **22 en verde, 1 en rojo** (`test-contratos-subir`, caso obsoleto por `UQ_EMPLEADOS_CEDULA`; ver P2). La tabla de comandos de arriba solo listaba 12 y se reportaba como «batería completa»: corregido el 15/11. Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
+| Batería de aceptación en TEST | 15/11 | Los **25** `db/test-*.sh` corridos con el entorno completo: **24 en verde, 1 en rojo** (`test-contratos-subir`, caso obsoleto por `UQ_EMPLEADOS_CEDULA`; ver P2). La tabla de comandos de arriba solo listaba 12 y se reportaba como «batería completa»: corregido el 15/11. Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
 | «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
 | Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
 | Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
 | SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos**, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. **Queda desalineado:** las 4 rutinas que el repo ya retiró (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) siguen en la viva, y 2 rutinas de auditoría siguen con `EXIGIR = 0` |
+| Cierre atómico de venta (P-4, opción C) | 15/11 | `cerrarVenta` envuelve cabecera + líneas + stock en una transacción (`TransaccionVenta`, RAII). El rollback devuelve el stock solo, así que se retiró la compensación con `SP_CANCELAR_VENTA` al fallar una línea. El ID del cliente se pide antes de abrir la transacción y la factura se imprime después del commit. Se hizo en el C++ y no como SP porque se midió que ni los dos SP del flujo ni el trigger de stock commitean por dentro. Test `db/test-cierre-atomico.sh`, que fuerza el fallo de la segunda línea con el carrito armado |
 | Barrido de borradores vacíos (P-4, opción D) | 15/11 | Decisión del dueño: alcance **acotado**. Al entrar a la app se cancelan **solo** las ventas `EN_PROCESO` **sin líneas** con más de 48 h. No retienen stock, no se pueden cobrar, y nadie trabaja en algo sin líneas. **Nunca toca una venta con líneas** (puede ser un apartado legítimo). Reusa `SP_VENTAS_BORRADOR_VIEJO` + `SP_CANCELAR_VENTA`, sin SQL nuevo; avisa cuántas canceló. Test `db/test-borradores-barrido.sh` |
 | «Historial de venta» paginado | 15/11 | `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el historial completo (30 filas hoy en la viva, sin tope). Se agregaron `SP_HISTORIAL_VENTA_PAGINADO` y `SP_CONTAR_HISTORIAL_VENTA` en el `39`, con `P_ID_VENTA = 0` = todas. Pantalla de 10 en 10 con `mostrarPaginadoSPCon`. El `COUNT` lleva el mismo `JOIN` que el `SELECT` para que las páginas cuadren. Aserciones agregadas a `db/test-historial-garantias-venta.sh` |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |

@@ -236,10 +236,15 @@ grep -q -- "--- COBRAR VENTA EN PROCESO ---" "$limpio" || problemas="no abrio la
 grep -q "ABIERTA" "$limpio" || problemas="${problemas:+$problemas; }falta la columna ABIERTA"
 grep -q "llevan mas de $HORAS h sin cobrarse" "$limpio" \
     || problemas="${problemas:+$problemas; }no aviso de las vencidas"
-grep -q "EN_PROCESO sin lineas hace mas de $HORAS h" "$limpio" \
-    || problemas="${problemas:+$problemas; }no aviso de los borradores vacios"
-grep -q "#$vacia" "$limpio" \
-    || problemas="${problemas:+$problemas; }el aviso no nombra la vacia #$vacia"
+# (15/11/2026) El aviso de borradores vacios de esta pantalla quedo como RED DE
+# SEGURIDAD. El barrido de la opcion D corre al entrar a la app y ya los cancelo
+# (lo prueba test-borradores-barrido.sh), asi que en el flujo normal no se ve.
+# Lo que se comprueba ahora es eso: que el barrido los saco y no hay nada que
+# avisar. El aviso sigue en el codigo para cuando el barrido no puede correr
+# (por ejemplo un usuario sin GESTIONAR_VENTAS).
+if grep -q "EN_PROCESO sin lineas hace mas de $HORAS h" "$limpio"; then
+    problemas="${problemas:+$problemas; }aparecio el aviso de borradores vacios: el barrido no los cancelo"
+fi
 
 # El color va en la salida CRUDA: la vencida con \e[31m y la reciente sin el.
 if grep -qE "$venc .*\[31m" "$crudo"; then
@@ -255,9 +260,17 @@ else
 fi
 
 if [ -z "$problemas" ]; then
-    ok "vencida en rojo, reciente normal, y los dos avisos con su ID"
+    ok "vencida en rojo, reciente normal, y el barrido se llevó los borradores vacíos"
 else
     fallo "pantalla Cobrar venta" "$problemas"
+fi
+
+# Evidencia de que fue el barrido (y no que el borrador no existiera).
+est_vacia="$(N "SELECT ESTADO FROM VENTAS WHERE ID_VENTA=$vacia;")"
+if [ "$est_vacia" = "CANCELADA" ]; then
+    ok "el barrido canceló el borrador vacío al entrar (#$vacia)"
+else
+    fallo "barrido en el login" "el vacío #$vacia quedo en '$est_vacia', se esperaba CANCELADA"
 fi
 
 # ---------------------------------------------------------------------------

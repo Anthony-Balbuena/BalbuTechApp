@@ -333,6 +333,59 @@ static void pagarVenta(const CierreVenta &c) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Guard de transaccion para el cierre de venta (15/11/2026)
+// ---------------------------------------------------------------------------
+// Abre una transaccion en la conexion global y la revierte al salir del scope
+// si nadie confirmo. Es RAII a proposito: el riesgo real de meter transacciones
+// donde hoy no habia ninguna es que un camino de error se olvide del rollback y
+// la conexion quede en transaccion. Con el destructor no hay como olvidarse:
+// vale para return, para continue y para una excepcion.
+class TransaccionVenta {
+    bool viva = false;
+public:
+    TransaccionVenta() {
+        try {
+            globalCon->setAutoCommit(false);
+            viva = true;
+        } catch (...) {
+            viva = false;
+        }
+    }
+    bool activa() const { return viva; }
+    void confirmar() {
+        if (!viva) return;
+        globalCon->commit();
+        globalCon->setAutoCommit(true);
+        viva = false;
+    }
+    ~TransaccionVenta() {
+        if (!viva) return;
+        try {
+            globalCon->rollback();
+            globalCon->setAutoCommit(true);
+        } catch (...) {
+            // En el destructor no se propaga: si el rollback falla, el problema
+            // reaparece en la proxima operacion sobre la conexion.
+        }
+    }
+    TransaccionVenta(const TransaccionVenta &) = delete;
+    TransaccionVenta &operator=(const TransaccionVenta &) = delete;
+};
+
+// (15/11/2026) CIERRE ATOMICO. Antes no habia transaccion: la cabecera y cada
+// linea se commitaban solas, asi que una caida en el medio (crash, red, alguien
+// cierra la terminal) dejaba un carrito a medias con el stock ya descontado, y
+// nada lo detectaba. Ahora la cabecera, TODAS las lineas y el descuento de stock
+// van en una sola transaccion: o queda la venta completa, o no queda nada.
+//
+// El descuento lo hace TR_AUDITORIA_MOVIMIENTO_VENTA, que corre dentro de la
+// MISMA transaccion, asi que el rollback tambien devuelve el stock. Por eso ya
+// no hace falta compensar con SP_CANCELAR_VENTA cuando una linea falla: la
+// compensacion a mano era justamente lo que no cubria la caida.
+//
+// No elimina el EN_PROCESO: el pago sigue siendo un paso aparte
+// (24_SP_REGISTRAR_PAGO). Lo que garantiza es que el carrito sea todo o nada.
 static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
     CierreVenta out;
     if (carrito.empty()) return out;
@@ -344,14 +397,23 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
     try {
         bool iniciada = false;
         for (int intento = 1; intento <= MAX_INTENTOS && !iniciada; ++intento) {
-            try {
-                string cliStr = leerDatoSeguro("ID cliente: ");
-                if (!esNumerico(cliStr)) {
-                    cout << ROJO << "ID cliente invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
-                    continue;
-                }
-                idCli = stoi(cliStr);
+            // El ID se pide ANTES de abrir la transaccion: no se espera teclado
+            // con una transaccion abierta.
+            string cliStr = leerDatoSeguro("ID cliente: ");
+            if (!esNumerico(cliStr)) {
+                cout << ROJO << "ID cliente invalido (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                continue;
+            }
+            idCli = stoi(cliStr);
 
+            // Cada intento es su propia transaccion. Si algo falla aca, el guard
+            // la revierte y la cabecera de ese intento no queda.
+            TransaccionVenta tx;
+            if (!tx.activa()) {
+                cout << ROJO << "No se pudo abrir la transacción del cierre." << RESET << endl;
+                return out;
+            }
+            try {
                 std::unique_ptr<sql::Statement> stmt(globalCon->createStatement());
                 stmt->execute("CALL 21_SP_INICIAR_VENTA(" + to_string(idEmp) + ", " + to_string(idCli) + ", @nv)");
                 {
@@ -370,50 +432,52 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
                 drenarResultados(stmt2.get());
                 if (idVenta <= 0) {
                     cout << ROJO << "No se pudo iniciar la venta (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
-                    continue;
+                    continue;   // el guard revierte la cabecera de este intento
                 }
-                iniciada = true;
             } catch (const CancelarOperacionException &) {
                 throw;
             } catch (const exception &e) {
                 idVenta = 0;
                 cout << ROJO << e.what() << " (intento " << intento << " de " << MAX_INTENTOS << ")." << RESET << endl;
+                continue;   // idem: la cabecera de este intento no queda
             }
+
+            // Las lineas van en la MISMA transaccion que la cabecera.
+            bool lineaFallo = false;
+            for (auto &l : carrito) {
+                try {
+                    std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+                        "CALL SP_AGREGAR_DETALLE_VENTA(?, ?, ?, ?, ?)"));
+                    pstmt->setInt(1, idVenta);
+                    pstmt->setInt(2, l.idProducto);
+                    pstmt->setInt(3, l.cantidad);
+                    pstmt->setInt(4, idEmp);
+                    pstmt->setDouble(5, l.descuento);
+                    string rLinea = Recogermensaje(pstmt.get());
+                    drenarResultados(pstmt.get());
+                    if (rLinea.rfind("Error DB:", 0) == 0) throw runtime_error(rLinea);
+                } catch (const exception &e) {
+                    cout << ROJO << "Linea " << l.nombre << " fallo: " << e.what() << RESET << endl;
+                    lineaFallo = true;
+                    break;
+                }
+            }
+            if (lineaFallo) {
+                // El guard revierte al volver: cabecera, lineas ya cargadas y su
+                // descuento de stock desaparecen juntos. No queda nada a medias.
+                cout << "No se registró nada: la venta #" << idVenta
+                     << " se revirtió completa (el stock volvió solo)." << endl;
+                return out;
+            }
+
+            tx.confirmar();   // cabecera + lineas + stock, de un solo golpe
+            iniciada = true;
         }
         if (!iniciada) {
             cout << ROJO << "Venta no iniciada. El carrito se mantiene: volve a elegir Cerrar." << RESET << endl;
             return out;
         }
         cout << VERDE << "Venta #" << idVenta << " iniciada." << RESET << endl;
-
-        for (auto &l : carrito) {
-            try {
-                std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-                    "CALL SP_AGREGAR_DETALLE_VENTA(?, ?, ?, ?, ?)"));
-                pstmt->setInt(1, idVenta);
-                pstmt->setInt(2, l.idProducto);
-                pstmt->setInt(3, l.cantidad);
-                pstmt->setInt(4, idEmp);
-                pstmt->setDouble(5, l.descuento);
-                string rLinea = Recogermensaje(pstmt.get());
-                drenarResultados(pstmt.get());
-                if (rLinea.rfind("Error DB:", 0) == 0) throw runtime_error(rLinea);
-            } catch (const exception &e) {
-                cout << ROJO << "Linea " << l.nombre << " fallo: " << e.what() << RESET << endl;
-                try {
-                    std::unique_ptr<sql::PreparedStatement> pc(globalCon->prepareStatement(
-                        "CALL SP_CANCELAR_VENTA(?, ?)"));
-                    pc->setInt(1, idVenta);
-                    pc->setInt(2, idEmp);
-                    Recogermensaje(pc.get());
-                    drenarResultados(pc.get());
-                    cout << "Venta #" << idVenta << " cancelada para no dejar basura." << endl;
-                } catch (const exception &) {
-                    cout << ROJO << "No se pudo cancelar la venta parcial." << RESET << endl;
-                }
-                return out;
-            }
-        }
 
         // Aviso con el stock real ya descontado (lo pedido: alerta al vender).
         for (auto &l : carrito) avisoStockCritico(l.idProducto, 0);
