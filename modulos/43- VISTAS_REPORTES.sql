@@ -16,29 +16,73 @@
 -- tablas que necesitan. No cambiar el numero sin revisar el orden del import.
 
 /*
-VISTA_COMPRA_CON_IVA (11/10/2026)
-La compra con su ITBIS: SUBTOTAL (TOTAL) + ITBIS de lineas - ITBIS devuelto
-(solo PROCESADA mueve dinero) = TOTAL final (bruto). El TOTAL no se toca para
-no romper cobros ni candados.
+VW_COMPRA_NETA (15/11/2026)
+La base NUMERICA de una compra, en un solo lugar. Espejo de VW_VENTA_NETA
+(ventas), que ya funcionaba asi.
+
+POR QUE EXISTE: la formula del bruto (TOTAL + ITBIS de lineas - ITBIS
+devuelto) estaba escrita a mano en mas de un lugar, y en DOS estilos
+distintos: VISTA_COMPRA_CON_IVA la armaba con JOIN + SUM, y
+VISTA_COMPRAS_PENDIENTES_PAGO con subconsultas correlacionadas, DOS veces
+en la misma vista (en el SELECT y otra vez en el WHERE). Editar una copia
+y no la otra desincronizaba el reporte contra el listado de pendientes,
+en silencio.
+
+SEMANTICA (la que ya tenia compras, no la de ventas): el TOTAL de la
+compra ya viene neteado del subtotal devuelto, porque el trigger
+TR_PROCESAR_DEVOLUCION_COMPRA (19) hace TOTAL = TOTAL - SUBTOTAL_DEVUELTO
+al procesar la devolucion. Por eso aca NO se vuelve a restar el subtotal
+devuelto: solo se nete el ITBIS. Restarlo de nuevo seria contar la
+devolucion dos veces y desinflar lo que se le debe al proveedor.
+
+No lleva el JOIN con PROVEEDORES a proposito: esta es la capa de numeros,
+y el nombre lo agrega quien presenta (igual que VW_VENTA_NETA, que no
+junta CLIENTES).
 */
-CREATE OR REPLACE VIEW VISTA_COMPRA_CON_IVA AS
-SELECT C.ID_COMPRA, P.NOMBRE AS PROVEEDOR, C.FECHA, C.ESTADO,
-       C.TOTAL AS SUBTOTAL,
-       ROUND(IFNULL(D.ITBIS_LINEAS, 0) - IFNULL(DV.ITBIS_DEVUELTO, 0), 2) AS ITBIS,
-       ROUND(C.TOTAL + IFNULL(D.ITBIS_LINEAS, 0) - IFNULL(DV.ITBIS_DEVUELTO, 0), 2) AS TOTAL_CON_IVA
+CREATE OR REPLACE VIEW VW_COMPRA_NETA AS
+SELECT
+    C.ID_COMPRA,
+    C.ID_PROVEEDOR,
+    C.FECHA,
+    C.ESTADO,
+    C.TOTAL AS SUBTOTAL_ORIGINAL,
+    IFNULL(D.ITBIS_ORIGINAL, 0) AS ITBIS_ORIGINAL,
+    IFNULL(DV.ITBIS_REEMBOLSADO, 0) AS ITBIS_REEMBOLSADO,
+    ROUND(IFNULL(D.ITBIS_ORIGINAL, 0) - IFNULL(DV.ITBIS_REEMBOLSADO, 0), 2) AS ITBIS_NETO,
+    ROUND(C.TOTAL + IFNULL(D.ITBIS_ORIGINAL, 0) - IFNULL(DV.ITBIS_REEMBOLSADO, 0), 2) AS BRUTO_NETO,
+    IFNULL(PG.PAGADO, 0) AS PAGADO,
+    ROUND(C.TOTAL + IFNULL(D.ITBIS_ORIGINAL, 0) - IFNULL(DV.ITBIS_REEMBOLSADO, 0)
+          - IFNULL(PG.PAGADO, 0), 2) AS SALDO
 FROM COMPRAS C
-JOIN PROVEEDORES P ON P.ID_PROVEEDOR = C.ID_PROVEEDOR
 LEFT JOIN (
-    SELECT ID_COMPRA, SUM(MONTO_ITBIS) AS ITBIS_LINEAS
+    SELECT ID_COMPRA, SUM(MONTO_ITBIS) AS ITBIS_ORIGINAL
       FROM DETALLE_COMPRA GROUP BY ID_COMPRA
 ) D ON D.ID_COMPRA = C.ID_COMPRA
 LEFT JOIN (
-    SELECT DC.ID_COMPRA, SUM(DV.MONTO_ITBIS_DEVUELTO) AS ITBIS_DEVUELTO
+    SELECT DC.ID_COMPRA, SUM(DV.MONTO_ITBIS_DEVUELTO) AS ITBIS_REEMBOLSADO
       FROM DEVOLUCION_COMPRA DV
       JOIN DETALLE_COMPRA DC ON DC.ID_DETALLE_COMPRA = DV.ID_DETALLE_COMPRA
      WHERE DV.ESTADO = 'PROCESADA'
      GROUP BY DC.ID_COMPRA
-) DV ON DV.ID_COMPRA = C.ID_COMPRA;
+) DV ON DV.ID_COMPRA = C.ID_COMPRA
+LEFT JOIN (
+    SELECT ID_COMPRA, SUM(MONTO) AS PAGADO
+      FROM PAGOS_COMPRA GROUP BY ID_COMPRA
+) PG ON PG.ID_COMPRA = C.ID_COMPRA;
+
+/*
+VISTA_COMPRA_CON_IVA (11/10/2026)
+La compra con su ITBIS. (15/11/2026) Los numeros salen de VW_COMPRA_NETA:
+aca solo se le pone el nombre del proveedor. Las columnas y el orden son
+los mismos de antes.
+*/
+CREATE OR REPLACE VIEW VISTA_COMPRA_CON_IVA AS
+SELECT N.ID_COMPRA, P.NOMBRE AS PROVEEDOR, N.FECHA, N.ESTADO,
+       N.SUBTOTAL_ORIGINAL AS SUBTOTAL,
+       N.ITBIS_NETO AS ITBIS,
+       N.BRUTO_NETO AS TOTAL_CON_IVA
+FROM VW_COMPRA_NETA N
+JOIN PROVEEDORES P ON P.ID_PROVEEDOR = N.ID_PROVEEDOR;
 
 /*
 VISTA_COMPRAS_PENDIENTES_PAGO
@@ -46,36 +90,20 @@ Las compras que aun tienen dinero de por medio: cuanto se le paga al
 proveedor y cuanto falta por pagar (SALDO a BRUTO, 13/10/2026). Si el saldo
 sale negativo es dinero de mas a favor (compra devuelta ya pagada). Excluye
 las CANCELADAS: esas nunca se pagaron.
+
+(15/11/2026) La formula del SALDO se escribia DOS veces en esta misma vista
+(en el SELECT y otra vez en el WHERE), con subconsultas. Ahora sale una sola
+vez, de VW_COMPRA_NETA: el WHERE usa el mismo `SALDO` que el SELECT, asi que
+no pueden divergir.
 */
 CREATE OR REPLACE VIEW VISTA_COMPRAS_PENDIENTES_PAGO AS
-SELECT
-    C.ID_COMPRA,
-    P.NOMBRE AS PROVEEDOR,
-    C.FECHA,
-    C.TOTAL,
-    IFNULL(PG.PAGADO, 0) AS PAGADO,
-    ROUND(C.TOTAL
-        + IFNULL((SELECT SUM(DC2.MONTO_ITBIS) FROM DETALLE_COMPRA DC2 WHERE DC2.ID_COMPRA = C.ID_COMPRA), 0)
-        - IFNULL((SELECT SUM(DV.MONTO_ITBIS_DEVUELTO) FROM DEVOLUCION_COMPRA DV
-                  JOIN DETALLE_COMPRA DC ON DC.ID_DETALLE_COMPRA = DV.ID_DETALLE_COMPRA
-                  WHERE DC.ID_COMPRA = C.ID_COMPRA AND DV.ESTADO = 'PROCESADA'), 0)
-        - IFNULL(PG.PAGADO, 0), 2) AS SALDO,
-    C.ESTADO
-FROM COMPRAS C
-JOIN PROVEEDORES P ON P.ID_PROVEEDOR = C.ID_PROVEEDOR
-LEFT JOIN (
-    SELECT ID_COMPRA, SUM(MONTO) AS PAGADO
-      FROM PAGOS_COMPRA
-     GROUP BY ID_COMPRA
-) PG ON PG.ID_COMPRA = C.ID_COMPRA
-WHERE C.ESTADO <> 'CANCELADA'
-  AND ROUND(C.TOTAL
-        + IFNULL((SELECT SUM(DC2.MONTO_ITBIS) FROM DETALLE_COMPRA DC2 WHERE DC2.ID_COMPRA = C.ID_COMPRA), 0)
-        - IFNULL((SELECT SUM(DV.MONTO_ITBIS_DEVUELTO) FROM DEVOLUCION_COMPRA DV
-                  JOIN DETALLE_COMPRA DC ON DC.ID_DETALLE_COMPRA = DV.ID_DETALLE_COMPRA
-                  WHERE DC.ID_COMPRA = C.ID_COMPRA AND DV.ESTADO = 'PROCESADA'), 0)
-        - IFNULL(PG.PAGADO, 0), 2) <> 0
-ORDER BY C.FECHA DESC;
+SELECT N.ID_COMPRA, P.NOMBRE AS PROVEEDOR, N.FECHA,
+       N.SUBTOTAL_ORIGINAL AS TOTAL, N.PAGADO, N.SALDO, N.ESTADO
+FROM VW_COMPRA_NETA N
+JOIN PROVEEDORES P ON P.ID_PROVEEDOR = N.ID_PROVEEDOR
+WHERE N.ESTADO <> 'CANCELADA'
+  AND N.SALDO <> 0
+ORDER BY N.FECHA DESC;
 
 /*
 VISTA_VENTA_CON_IVA (11/10/2026)

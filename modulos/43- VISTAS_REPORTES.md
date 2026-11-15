@@ -27,6 +27,24 @@ cambiar el número sin revisar el orden del import.**
 
 ## Vistas
 
+### `VW_COMPRA_NETA`
+
+La base **numérica** de una compra, en un solo lugar. Espejo de `VW_VENTA_NETA`
+(ventas), que ya funcionaba así. No junta `PROVEEDORES` a propósito: el nombre
+lo agrega quien presenta.
+
+`ID_COMPRA`, `ID_PROVEEDOR`, `FECHA`, `ESTADO`, `SUBTOTAL_ORIGINAL` (=
+`COMPRAS.TOTAL`), `ITBIS_ORIGINAL`, `ITBIS_REEMBOLSADO`, `ITBIS_NETO`,
+`BRUTO_NETO`, `PAGADO` y `SALDO`.
+
+> (15/11/2026) **Existe para terminar con la fórmula repetida.** El bruto
+> (`TOTAL + ITBIS de las líneas − ITBIS devuelto`) estaba escrito a mano en más
+> de un lugar y en **dos estilos distintos**: `VISTA_COMPRA_CON_IVA` lo armaba
+> con `JOIN` + `SUM`, y `VISTA_COMPRAS_PENDIENTES_PAGO` con subconsultas
+> correlacionadas, **dos veces en la misma vista** (en el `SELECT` y otra vez en
+> el `WHERE`). Editar una copia y no la otra desincronizaba el reporte contra el
+> listado de pendientes, en silencio.
+
 ### `VISTA_COMPRA_CON_IVA`
 
 `ID_COMPRA`, `PROVEEDOR`, `FECHA`, `ESTADO`, `SUBTOTAL` (= `COMPRAS.TOTAL`),
@@ -36,13 +54,15 @@ cambiar el número sin revisar el orden del import.**
   **`PROCESADA`**.
 - `TOTAL_CON_IVA` = `SUBTOTAL` + `ITBIS`.
 
-> **Es la definición de referencia del BRUTO de compra**, la misma fórmula que
-> repiten `SP_REGISTRAR_PAGO_COMPRA` (19) y cuatro triggers. Acá está escrita
-> una vez más: son **seis** lugares.
->
-> **Solo se resta el ITBIS devuelto, no la mercancía devuelta**: devolver
-> producto no baja el `TOTAL` de la compra. El ajuste del valor de la mercancía
-> viaja por las notas de crédito de compra (19), no por acá.
+> (15/11/2026) Los números salen de **`VW_COMPRA_NETA`**: acá solo se le agrega el
+> nombre del proveedor. Antes repetía la fórmula, y la misma fórmula vivía en
+> otros lugares con otro estilo.
+
+> **Ojo con la mercancía devuelta:** acá **no** se resta, y es a propósito.
+> `COMPRAS.TOTAL` **ya viene reducido** por el trigger
+> `TR_PROCESAR_DEVOLUCION_COMPRA` (19), que hace `TOTAL = TOTAL - SUBTOTAL_DEVUELTO`
+> al procesar la devolución. Restarlo otra vez en la vista contaría la devolución
+> dos veces y bajaría de más lo que se le debe al proveedor.
 
 ### `VISTA_COMPRAS_PENDIENTES_PAGO`
 
@@ -53,13 +73,10 @@ más vieja.
 > **El saldo puede ser negativo**: significa dinero a favor (compra devuelta que
 > ya estaba pagada). Filtra `SALDO <> 0`, así que esos casos **se muestran**.
 >
-> **La fórmula del bruto está escrita dos veces en la misma vista**: una en el
-> `SELECT` y otra en el `WHERE`. Cambiar una y no la otra deja el filtro
-> desincronizado con la columna.
->
-> **Usa subconsultas correlacionadas por fila** en vez de los `JOIN` agrupados de
-> `VISTA_COMPRA_CON_IVA`: con muchas compras es más lenta que su hermana. Lo paga
-> `SP_COMPRAS_PENDIENTES`, que la lee entera y corta a 20.
+> (15/11/2026) La fórmula del `SALDO` salía de `VW_COMPRA_NETA`, y el `WHERE` usa
+> el mismo `SALDO` que el `SELECT`: ya no pueden divergir. Antes estaba escrita
+> dos veces con subconsultas correlacionadas, más lenta que los `JOIN` agrupados
+> de su hermana.
 
 ### `VISTA_VENTA_CON_IVA`
 
