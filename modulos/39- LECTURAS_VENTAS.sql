@@ -363,6 +363,68 @@ BEGIN
 END //
 DELIMITER ;
 
+-- ================================================================
+-- 3.d HISTORIAL DE VENTA PAGINADO (15/11/2026)
+-- ================================================================
+-- SP_HISTORIAL_VENTA (21) no tiene LIMIT: devuelve el historial COMPLETO.
+-- Con 30 filas no molesta, pero crece para siempre y la pantalla no tiene
+-- forma de alcanzar una fila vieja ni de dejar de dibujar. Se pagina igual
+-- que el resto de los listados de ventas.
+-- P_ID_VENTA = 0 mantiene el significado de «todas las ventas».
+-- Permiso: CONSULTAR_HISTORIAL_VENTA, el mismo que exige la pantalla y que ya
+-- tenia su hermana sin paginar.
+DELIMITER //
+/*
+SP_HISTORIAL_VENTA_PAGINADO
+Una pagina del historial de estados, del cambio mas nuevo al mas viejo.
+El conteo de SP_CONTAR_HISTORIAL_VENTA lleva el MISMO JOIN que este SELECT:
+si un empleado faltara, la fila no se listaria pero si se contaria, y las
+paginas no cuadrarian.
+*/
+DROP PROCEDURE IF EXISTS SP_HISTORIAL_VENTA_PAGINADO ;
+CREATE PROCEDURE SP_HISTORIAL_VENTA_PAGINADO(
+    IN P_ID_VENTA   INT,
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
+)
+BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT H.ID_VENTA, H.FECHA, H.ESTADO_ANTERIOR, H.ESTADO_NUEVO,
+           E.NOMBRE AS EMPLEADO, H.MOTIVO
+      FROM HISTORIAL_ESTADOS_VENTA H
+      JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO
+     WHERE (P_ID_VENTA = 0 OR H.ID_VENTA = P_ID_VENTA)
+     ORDER BY H.ID_HISTORIAL_ESTADO DESC
+     LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_HISTORIAL_VENTA
+Cuantos cambios de estado hay, para el "Pagina 1 de N" del historial.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_HISTORIAL_VENTA ;
+CREATE PROCEDURE SP_CONTAR_HISTORIAL_VENTA(
+    IN P_ID_VENTA INT
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM HISTORIAL_ESTADOS_VENTA H
+      JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO
+     WHERE (P_ID_VENTA = 0 OR H.ID_VENTA = P_ID_VENTA);
+END //
+DELIMITER ;
+
 DELIMITER //
 /*
 SP_PAGOS_ULTIMOS_PAGINADO

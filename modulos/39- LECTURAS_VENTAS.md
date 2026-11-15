@@ -1,7 +1,7 @@
 # Módulo 39 — LECTURAS_VENTAS
 
 **Puertas de solo lectura** para la app C++ (fase 3, 13/10/2026): todo lo que las
-pantallas de ventas y compras muestran sale por estos 28 SP, sin un solo `SELECT`
+pantallas de ventas y compras muestran sale por estos 30 SP, sin un solo `SELECT`
 a mano en el `.cpp`.
 
 **Depende de:** `VISTA_VENTA_CON_IVA` y `VISTA_COMPRA_CON_IVA` y
@@ -159,6 +159,25 @@ Las ventas `EN_PROCESO` **sin líneas** y con más de `P_HORAS` horas de abierta
 > hay nada que cobrar): la salida es cancelarlas por ID. El umbral llega por
 > parámetro para que el plazo lo decida el negocio y no quede escrito en el SQL.
 > La pantalla de cobro lo usa para el aviso en amarillo.
+
+### `SP_HISTORIAL_VENTA_PAGINADO(P_ID_VENTA, P_PAGINA, P_POR_PAGINA)`
+
+Una página del historial de estados (`HISTORIAL_ESTADOS_VENTA`), del cambio más
+nuevo al más viejo: `ID_VENTA`, `FECHA`, `ESTADO_ANTERIOR`, `ESTADO_NUEVO`,
+`EMPLEADO`, `MOTIVO`. `P_ID_VENTA = 0` significa **todas las ventas**, igual que
+en su hermana sin paginar.
+
+> (15/11/2026) `SP_HISTORIAL_VENTA` (21) **no tiene `LIMIT`**: devolvía el
+> historial completo. Con 30 filas en la viva no molesta, pero crece para
+> siempre y la pantalla no tenía forma de dejar de dibujar. Esta es la que usa
+> «Historial de venta» desde entonces.
+
+### `SP_CONTAR_HISTORIAL_VENTA(P_ID_VENTA)`
+
+Cuántos cambios de estado hay, para el «Página 1 de N» del historial. Lleva el
+**mismo `JOIN` con `EMPLEADOS`** que el `SELECT` de arriba a propósito: si un
+empleado faltara, la fila no se listaría pero sí se contaría, y las páginas no
+cuadrarían.
 
 ### `SP_PAGOS_ULTIMOS_PAGINADO(P_PAGINA, P_POR_PAGINA)`
 

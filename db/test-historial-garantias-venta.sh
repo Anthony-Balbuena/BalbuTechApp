@@ -163,6 +163,74 @@ else
     ok "la venta deja de aparecer al registrarse la garantia"
 fi
 
+# --- 4) Historial PAGINADO (15/11/2026) -----------------------------------
+# SP_HISTORIAL_VENTA no tiene LIMIT: devolvia el historial completo. La pantalla
+# paso a usar la variante paginada. Estas pruebas corren DESPUES del ROLLBACK,
+# asi que cuentan el historial que ya tiene la base.
+pag_sp="$(M -N -e "SELECT COUNT(*) FROM information_schema.ROUTINES
+                    WHERE ROUTINE_SCHEMA = DATABASE()
+                      AND ROUTINE_NAME IN ('SP_HISTORIAL_VENTA_PAGINADO',
+                                           'SP_CONTAR_HISTORIAL_VENTA');")"
+if [ "$pag_sp" = "2" ]; then
+    ok "los dos SP paginados del historial existen"
+else
+    fallo "faltan los SP paginados del historial ($pag_sp/2)"
+fi
+
+# El conteo del SP tiene que cuadrar con la tabla, con el mismo JOIN.
+total_hist="$(M -N -e "SELECT COUNT(*) FROM HISTORIAL_ESTADOS_VENTA H
+                         JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO;")"
+conteo_sp="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_CONTAR_HISTORIAL_VENTA(0);" \
+             | awk 'NF{print $1; exit}')"
+if [ "$conteo_sp" = "$total_hist" ]; then
+    ok "SP_CONTAR_HISTORIAL_VENTA cuadra con la tabla ($conteo_sp)"
+else
+    fallo "SP_CONTAR_HISTORIAL_VENTA dijo '$conteo_sp' y la tabla tiene $total_hist"
+fi
+
+# Una pagina del tamano del total trae TODO: el LIMIT no recorta de mas.
+todos_hist="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO(0, 1, 1000);" \
+              | grep -c .)"
+if [ "$todos_hist" = "$total_hist" ]; then
+    ok "con una pagina grande devuelve el total ($todos_hist)"
+else
+    fallo "el paginado devolvio $todos_hist filas y la tabla tiene $total_hist"
+fi
+
+# Pagina 1 de 10 y pagina 2 de 10 cubren el total sin repetir.
+p1_hist="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO(0, 1, 10);" | grep -c .)"
+p2_hist="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO(0, 2, 10);" | grep -c .)"
+p1_esp=$((total_hist < 10 ? total_hist : 10))
+p2_esp=$((total_hist > 10 ? total_hist - 10 : 0))
+if [ "$p1_hist" = "$p1_esp" ] && [ "$p2_hist" = "$p2_esp" ]; then
+    ok "pagina 1 ($p1_hist) + pagina 2 ($p2_hist) cubren el total ($total_hist)"
+else
+    fallo "paginado: p1=$p1_hist (era $p1_esp), p2=$p2_hist (era $p2_esp), total=$total_hist"
+fi
+
+# Nulo o 0 caen a pagina 1 con 10 por pagina, igual que la pagina 1 real.
+p_nula="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO(0, NULL, NULL);" | grep -c .)"
+p_cero="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO(0, 0, 0);" | grep -c .)"
+if [ "$p_nula" = "$p1_hist" ] && [ "$p_cero" = "$p1_hist" ]; then
+    ok "pagina nula o 0 cae a la 1 con 10 por pagina"
+else
+    fallo "fallback de pagina: NULL=$p_nula, 0=$p_cero, esperado=$p1_hist"
+fi
+
+# Filtrar por una venta puntual acota el resultado.
+venta_ref="$(M -N -e "SELECT ID_VENTA FROM HISTORIAL_ESTADOS_VENTA ORDER BY ID_HISTORIAL_ESTADO LIMIT 1;")"
+if [ -n "$venta_ref" ]; then
+    una_venta="$(M -N -e "SET @ID_USUARIO_ACTUAL=1; CALL SP_HISTORIAL_VENTA_PAGINADO($venta_ref, 1, 1000);" | grep -c .)"
+    esperado_una="$(M -N -e "SELECT COUNT(*) FROM HISTORIAL_ESTADOS_VENTA H
+                               JOIN EMPLEADOS E ON E.ID_EMPLEADO = H.ID_EMPLEADO
+                              WHERE H.ID_VENTA = $venta_ref;")"
+    if [ "$una_venta" = "$esperado_una" ]; then
+        ok "filtrar por la venta #$venta_ref devuelve solo sus $una_venta fila(s)"
+    else
+        fallo "filtro por venta: devolvio $una_venta, se esperaban $esperado_una"
+    fi
+fi
+
 if [ "$fallos" -eq 0 ]; then
     echo "OK historial de venta y ventas garantizables."
     exit 0

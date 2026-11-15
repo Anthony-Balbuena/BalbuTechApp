@@ -25,11 +25,12 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 130/0 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 131/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-ventas-ver-iva.sh` | «Ver venta con IVA» paginado: contrato de los SP, fallback de página y la pantalla sin volcar facturas | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cobrar-plazo.sh` | plazo de cobro de 48 h: vigencia de los SP, borradores vacíos y el aviso en rojo de la pantalla | todos OK |
+| `DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root DB_ADMIN_PASSWORD=<clave-root> bash db/test-historial-garantias-venta.sh` | historial de venta (incluido el paginado nuevo) y ventas garantizables | OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 (`balbu_app` no sirve: el test hace SQL directo y corta avisando) |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
@@ -369,6 +370,31 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   (`DB_USER=root DB_PASSWORD=<DB_ROOT_PASSWORD>`). Con root: **15/15**.
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
+- [ ] **Un test roto de la batería: `db/test-contratos-subir.sh` (15/11/2026).**
+  Su caso «HAY MAS DE UN EMPLEADO CON ESA CEDULA» es **imposible de armar**:
+  intenta insertar dos `EMPLEADOS` con la misma cédula, pero
+  `UQ_EMPLEADOS_CEDULA` es **UNIQUE** y el `INSERT` muere con `1062`. El test
+  quedó obsoleto cuando se agregó el índice. Hay que decidir si ese error sigue
+  teniendo sentido (¿puede existir el caso con el índice puesto?) o se retira el
+  caso. Además **no tiene el guard de la base viva** (`if [ "$DB" = "BALBU_TECH" ]`)
+  que sí tienen los demás; su default es `BALBU_TECH_TEST`, así que hoy no es
+  peligroso, pero conviene agregárselo.
+- [ ] **`DB_PASSWORD` significa dos cosas distintas según el test (15/11/2026).**
+  Los tests que conectan como la app (`test-permisos-sp`, `test-cambio-clave`)
+  leen `APP_PASS="${DB_APP_PASSWORD:-${DB_PASSWORD:-}}"`, o sea que esperan la
+  clave de **`balbu_app`**. Los que hacen SQL directo (`test-contrato-borrador`,
+  `test-contratos-subir`) usan `PASS="${DB_PASSWORD:-}"` con
+  `USER="${DB_USER:-root}"`, o sea la de **root**. **No hay un entorno único
+  para todos**: con `DB_PASSWORD`=root fallan los primeros, y con la de la app
+  fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
+  primera opción y ya está soportada). Conviene documentarlo en la tabla de
+  comandos o renombrar la variable en los tests que faltan.
+- [ ] **La batería real son 23 tests, no 12.** Hasta el 15/11 se corrían solo los
+  de la tabla de arriba y se reportaba como «batería completa». Corridos los 23
+  con el entorno completo (`DB_APP_PASSWORD` incluido): **22 en verde, 1 en rojo**
+  (`test-contratos-subir`, arriba). Ojo con dos cosas: casi todos usan
+  `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
+  que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito.
 - [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
   dobles del SQL.** Usar archivo `.sql` o here-doc.
 - [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE` y los `CALL` de semilla. Los `SELECT *` sueltos ya no están: se sacaron del `43` y del `14` (15/11/2026).
@@ -451,10 +477,12 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
 | Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
-| Batería de aceptación en TEST, en verde | 15/11 | 13 suites + `build.sh`, todas exit 0 (`test-menus-por-rol`, `test-garantias` 13/0, `test-contrato-borrador` 15/15, `test-migracion-roles`, `test-lockout`, `test-login-servidor`, `test-login-eof`, `test-permisos-sp`, `test-asistencia-propia`, `test-ventas-ver-iva`, `check-app-sps` 129/0, `test-cobertura-modulos`). Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
+| Batería de aceptación en TEST | 15/11 | Los **23** `db/test-*.sh` corridos con el entorno completo: **22 en verde, 1 en rojo** (`test-contratos-subir`, caso obsoleto por `UQ_EMPLEADOS_CEDULA`; ver P2). La tabla de comandos de arriba solo listaba 12 y se reportaba como «batería completa»: corregido el 15/11. Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
 | «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
 | Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
 | Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
+| SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos**, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. **Queda desalineado:** las 4 rutinas que el repo ya retiró (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) siguen en la viva, y 2 rutinas de auditoría siguen con `EXIGIR = 0` |
+| «Historial de venta» paginado | 15/11 | `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el historial completo (30 filas hoy en la viva, sin tope). Se agregaron `SP_HISTORIAL_VENTA_PAGINADO` y `SP_CONTAR_HISTORIAL_VENTA` en el `39`, con `P_ID_VENTA = 0` = todas. Pantalla de 10 en 10 con `mostrarPaginadoSPCon`. El `COUNT` lleva el mismo `JOIN` que el `SELECT` para que las páginas cuadren. Aserciones agregadas a `db/test-historial-garantias-venta.sh` |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---

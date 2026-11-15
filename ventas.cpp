@@ -2189,14 +2189,13 @@ static void historialVentaUI() {
     try {
         // (07/11/2026) Enter lista el historial de todas las ventas; un ID
         // puntual filtra a esa venta (P_ID_VENTA = 0 en el SP).
+        // (15/11/2026) Paginado de 10 en 10. SP_HISTORIAL_VENTA (21) no tiene
+        // LIMIT: devolvia el historial COMPLETO y la pantalla no tenia forma de
+        // parar. Se usa la variante con filtro entero del paginador, que ya
+        // agrega pagina y porPagina detras de P_ID_VENTA.
         double dTodas = 0.0;
         int vHist = (int)leerNumeroConIntentos("ID venta (Enter = todas): ",
                                                0, 999999999, &dTodas);
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_HISTORIAL_VENTA(?)"));
-        pstmt->setInt(1, vHist);
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        // (08/11/2026) tablaCelda: el empleado y el motivo pueden traer acentos.
         const size_t W_VEN = 6, W_FEC = 19, W_EST = 10, W_EMP = 15, W_MOT = 30;
         const size_t ANCHO = W_VEN + W_FEC + W_EST * 2 + W_EMP + W_MOT + 5 * 3;
         cout << "\n"
@@ -2207,24 +2206,29 @@ static void historialVentaUI() {
              << tablaCelda("EMPLEADO", W_EMP) << " | "
              << tablaCelda("MOTIVO", W_MOT) << "\n"
              << tablaLinea(ANCHO) << "\n";
-        bool hay = false;
-        while (res->next()) {
-            hay = true;
-            string ant;
-            try { ant = res->getString("ESTADO_ANTERIOR"); } catch (...) { ant = "---"; }
-            string nuevo = res->getString("ESTADO_NUEVO");
-            string motivo;
-            try { motivo = res->isNull("MOTIVO") ? "" : res->getString("MOTIVO"); } catch (...) { motivo = ""; }
-            cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VEN) << " | "
-                 << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
-                 << tablaColorEstado(ant) << tablaCelda(ant, W_EST) << RESET << " | "
-                 << tablaColorEstado(nuevo) << tablaCelda(nuevo, W_EST) << RESET << " | "
-                 << tablaCelda(res->getString("EMPLEADO"), W_EMP) << " | "
-                 << tablaCelda(motivo, W_MOT) << "\n"
-                 << tablaLinea(ANCHO) << "\n";
-        }
-        if (!hay) cout << "[!] Sin historial." << endl;
-        drenarResultados(pstmt.get());
+
+        const int hay = mostrarPaginadoSPCon(
+            "CALL SP_HISTORIAL_VENTA_PAGINADO(?, ?, ?)",
+            "CALL SP_CONTAR_HISTORIAL_VENTA(?)",
+            [&](sql::PreparedStatement *ps, unsigned int &n) {
+                ps->setInt(n++, vHist);
+            },
+            [=](sql::ResultSet *res) {
+                string ant;
+                try { ant = res->getString("ESTADO_ANTERIOR"); } catch (...) { ant = "---"; }
+                string nuevo = res->getString("ESTADO_NUEVO");
+                string motivo;
+                try { motivo = res->isNull("MOTIVO") ? "" : res->getString("MOTIVO"); } catch (...) { motivo = ""; }
+                cout << tablaCelda(to_string(res->getInt("ID_VENTA")), W_VEN) << " | "
+                     << tablaCelda(res->getString("FECHA"), W_FEC) << " | "
+                     << tablaColorEstado(ant) << tablaCelda(ant, W_EST) << RESET << " | "
+                     << tablaColorEstado(nuevo) << tablaCelda(nuevo, W_EST) << RESET << " | "
+                     << tablaCelda(res->getString("EMPLEADO"), W_EMP) << " | "
+                     << tablaCelda(motivo, W_MOT) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (hay == 0) cout << "[!] Sin historial." << endl;
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
