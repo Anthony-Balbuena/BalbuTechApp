@@ -39,10 +39,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest', 'prueba_inv_ver');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002', 'TESTIN001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest', 'prueba_inv_ver', 'prueba_perm_aud');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002', 'TESTIN001', 'TESTPA001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -63,7 +63,8 @@ INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_IN
  ('PRUEBA R7 RRHH','TESTR7003','PRUEBA',1000,'T-R7-003','r7-003@test.local','2026-10-22'),
  ('PRUEBA R7 VENDEDOR','TESTR7004','PRUEBA',1000,'T-R7-004','r7-004@test.local','2026-10-22'),
  ('PRUEBA R7 ALMACEN','TESTR7005','PRUEBA',1000,'T-R7-005','r7-005@test.local','2026-10-22'),
- ('PRUEBA R7 CONTABILIDAD','TESTR7006','PRUEBA',1000,'T-R7-006','r7-006@test.local','2026-10-22');
+ ('PRUEBA R7 CONTABILIDAD','TESTR7006','PRUEBA',1000,'T-R7-006','r7-006@test.local','2026-10-22'),
+ ('PRUEBA R7 TECNICO','TESTR7007','PRUEBA',1000,'T-R7-007','r7-007@test.local','2026-10-22');
 
 INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
 SELECT 'prueba_r7_ger', '$HASH', E.ID_EMPLEADO, R.ID_ROL
@@ -94,6 +95,13 @@ INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
 SELECT 'prueba_r7_con', '$HASH', E.ID_EMPLEADO, R.ID_ROL
   FROM EMPLEADOS E, ROLES R
  WHERE E.CEDULA='TESTR7006' AND R.NOMBRE_ROL='CONTABILIDAD';
+
+-- (15/11/2026) Rol TECNICO: el tecnico entra con su propio usuario y registra el
+-- avance de la reparacion. Su menu es minimo a proposito.
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT 'prueba_r7_tec', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTR7007' AND R.NOMBRE_ROL='TECNICO';
 EOF
 
 fail=0
@@ -294,6 +302,7 @@ else
     done
     for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
                  "Reactivar Empleado" "Marcar asistencia" "Gestionar permisos" \
+                 "Ver auditoria de permisos" \
                  "Gestionar vacaciones" "Generar contrato"; do
         if printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: el submenu muestra '$label' sin permiso"
@@ -1407,10 +1416,15 @@ probar_garantias() {
 }
 
 # Entrada: Enter del "Presione Enter", Ventas, Garantias, Volver.
-probar_garantias "ADMIN" "$BALBU_USER" '\n13\n12\n5\n' 5 \
-    "Registrar garantia|Reclamar garantia|Finalizar reclamo|Consultar garantias|Volver" ""
+probar_garantias "ADMIN" "$BALBU_USER" '\n13\n12\n7\n' 7 \
+    "Registrar garantia|Reclamar garantia|Asignar tecnico|Registrar avance|Finalizar reclamo|Consultar garantias|Volver" ""
 probar_garantias "VENDEDOR" "prueba_r7_ven" '\n7\n8\n4\n' 4 \
     "Registrar garantia|Reclamar garantia|Consultar garantias|Volver" "Finalizar reclamo"
+# (15/11/2026) TECNICO: menu minimo. Ve Productos y Ventas en el principal, y
+# dentro de Ventas solo Garantias. En Garantias: Avance y Consultar, nada mas.
+probar_garantias "TECNICO" "prueba_r7_tec" '\n2\n1\n3\n' 3 \
+    "Registrar avance|Consultar garantias|Volver" \
+    "Registrar garantia|Reclamar garantia|Asignar tecnico|Finalizar reclamo"
 probar_garantias "CONTABILIDAD" "prueba_r7_con" '\n4\n5\n2\n' 2 \
     "Consultar garantias|Volver" "Registrar garantia|Reclamar garantia|Finalizar reclamo"
 
@@ -2167,6 +2181,72 @@ else
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK ADMIN/Accesos (3 opciones, el 0 reimprime)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Empleados: "Ver auditoria de permisos" (12/11/2026, modulo 69).
+# Es solo lectura, asi que se abre con el mismo permiso que aprueba los
+# permisos (GESTIONAR_PERMISOS_EMPLEADO) y no con uno nuevo. Un rol con SOLO
+# ese permiso llega a Empleados y ve exactamente las dos acciones de permisos
+# mas Volver: ni alta de empleado, ni contratos, ni vacaciones.
+# ---------------------------------------------------------------------------
+ROL_AUD="PRUEBA_PERM_AUD"
+USR_AUD="prueba_perm_aud"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_AUD';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTPA001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_AUD';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_AUD')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_AUD', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='GESTIONAR_PERMISOS_EMPLEADO';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA PERM AUD','TESTPA001','PRUEBA',1000,'T-PA-001','pa-001@test.local','2026-11-12');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_AUD', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTPA001' AND R.NOMBRE_ROL='$ROL_AUD';
+EOF
+
+fallos_previos=$fallos
+salida_aud="$TMP/out-permisos-aud.txt"
+# Entrada: Enter del "Presione Enter", 1 = Empleados (unica opcion de modulo
+# visible: el menu queda Empleados y Cerrar sesion), 3 = Volver.
+printf '\n1\n3\n' | BALBU_USER="$USR_AUD" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_aud" 2>&1
+rc_aud=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_aud"; then
+    echo "FALLO $ROL_AUD: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_aud" -ne 0 ]; then
+    echo "FALLO $ROL_AUD: la app salio con $rc_aud"
+    fail=1; fallos=$((fallos+1))
+else
+    submenu_aud=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=============================$/ && f{exit}' "$salida_aud")
+    n_sub_aud=$(printf '%s\n' "$submenu_aud" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_aud" -ne 3 ]; then
+        echo "FALLO $ROL_AUD: $n_sub_aud opciones en el submenu, se esperaban 3"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Gestionar permisos" "Ver auditoria de permisos" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_aud" | grep -Fq "$label"; then
+            echo "FALLO $ROL_AUD: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
+                 "Listar Empleados" "Generar contrato" "Gestionar vacaciones"; do
+        if printf '%s\n' "$submenu_aud" | grep -Fq "$label"; then
+            echo "FALLO $ROL_AUD: el submenu muestra '$label' sin permiso"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_AUD (GESTIONAR_PERMISOS_EMPLEADO abre gestion y auditoria)"
     fi
 fi
 

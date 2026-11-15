@@ -42,6 +42,12 @@ EXCLUIR = {
     "SP_CERRAR_SESION_SERVIDOR",
     "SP_REGISTRAR_ACCESO",
     "SP_ESTADO_BLOQUEO_LOGIN",
+    # (15/11/2026) Helper interno del movimiento de stock: no decide QUIEN puede
+    # mover stock, solo COMO se mueve. Las puertas con permiso que lo llaman son
+    # 20_SP_REGISTRAR_AJUSTE_INVENTARIO (INVENTARIO_AJUSTAR) y
+    # SP_REGISTRAR_AVANCE_REPARACION (GARANTIAS_AVANZAR). Con guarda propia
+    # quedaria SIN_MAPEO en LOG_PERMISO_SP en cada movimiento.
+    "SP_MOVER_STOCK",
 }
 
 GUARDA = "    CALL SP_EXIGIR_PERMISO('{nombre}');\n"

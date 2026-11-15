@@ -354,3 +354,186 @@ BEGIN
     SELECT COUNT(*) AS TOTAL FROM DETALLES_VENTA;
 END //
 DELIMITER ;
+
+-- ================================================================
+-- REPORTE DE VENTAS PAGINADO (ex modulo 60)
+-- ================================================================
+-- ================================================================
+-- REPORTE DE VENTAS PAGINADO (08/11/2026)
+-- ================================================================
+-- SP_REPORTE_VENTAS no tiene tope: un rango de un mes puede traer cientos de
+-- filas. Este par devuelve una pagina y el total del mismo rango. Las columnas
+-- son las mismas de VW_REPORTE_VENTAS; el rango invertido sigue cortando.
+-- Permiso: CONSULTAR_REPORTES, el mismo que su hermana.
+DELIMITER //
+/*
+SP_REPORTE_VENTAS_PAGINADO
+Una pagina del listado de ventas por rango. La fecha final entra completa.
+*/
+DROP PROCEDURE IF EXISTS SP_REPORTE_VENTAS_PAGINADO ;
+CREATE PROCEDURE SP_REPORTE_VENTAS_PAGINADO(
+    IN P_FECHA_INICIO DATE,
+    IN P_FECHA_FIN    DATE,
+    IN P_PAGINA       INT,
+    IN P_POR_PAGINA   INT
+)
+proc_label: BEGIN
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_FECHA_INICIO > P_FECHA_FIN THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ERROR: LA FECHA INICIAL NO PUEDE SER MAYOR A LA FINAL.';
+    END IF;
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT *
+      FROM VW_REPORTE_VENTAS
+     WHERE FECHA >= P_FECHA_INICIO
+       AND FECHA <  P_FECHA_FIN + INTERVAL 1 DAY
+     ORDER BY FECHA DESC, ID_VENTA DESC
+     LIMIT P_POR_PAGINA OFFSET v_offset;
+END //
+DELIMITER ;
+
+DELIMITER //
+/*
+SP_CONTAR_REPORTE_VENTAS
+Cuantas ventas hay en el rango, para el "Pagina 1 de N" del reporte.
+*/
+DROP PROCEDURE IF EXISTS SP_CONTAR_REPORTE_VENTAS ;
+CREATE PROCEDURE SP_CONTAR_REPORTE_VENTAS(
+    IN P_FECHA_INICIO DATE,
+    IN P_FECHA_FIN    DATE
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM VW_REPORTE_VENTAS
+     WHERE FECHA >= P_FECHA_INICIO
+       AND FECHA <  P_FECHA_FIN + INTERVAL 1 DAY;
+END //
+DELIMITER ;
+
+
+-- ================================================================
+-- GANANCIAS (ex modulo 38)
+-- ================================================================
+
+/*
+SECCION GANANCIAS (ex modulo 38)
+Las dos vistas de ganancia (VW_GANANCIAS y VW_GANANCIAS_MENSUAL) y SP_REPORTE_PERIODO_GANANCIA: ganancia por linea vendida, neta de devoluciones aprobadas o reembolsadas y sobre la base sin IVA. Solo lectura. Los SP de este mismo archivo ya consultaban las dos vistas, asi que ahora viven juntas; MariaDB no valida las tablas del cuerpo de una rutina al crearla, solo al ejecutarla, asi que el orden dentro del archivo no rompe el import. Depende de VENTAS y DETALLES_VENTA (21) y DEVOLUCIONES (26), anteriores a este archivo.
+*/
+-- Active: 1786471144213@@127.0.0.1@3306@BALBU_TECH_TEST
+/*
+ARCHIVO 38 - GANANCIAS
+Ganancia por linea vendida (foto historica en MONTO_GANANCIA) neta de
+devoluciones aprobadas/reembolsadas. Solo lectura. La ganancia va sobre la
+base sin IVA: el impuesto no es ganancia. Carga al final (usa 21 y 26).
+*/
+
+/*
+VW_GANANCIAS
+Una fila por linea de venta: producto, cantidad, precio, costo vigente al
+vender (recalculado como base - margen unitario para mostrarlo), margen de
+la linea y margen devuelto. NULL = costo desconocido (nunca comprado).
+*/
+CREATE OR REPLACE VIEW VW_GANANCIAS AS 
+SELECT
+    DV.ID_DETALLE_VENTA,
+    DV.ID_VENTA,  
+    V.FECHA,
+    V.ESTADO AS ESTADO_VENTA,
+    P.NOMBRE AS PRODUCTO,
+    DV.CANTIDAD,
+    DV.PRECIO_UNITARIO,
+    DV.SUBTOTAL,
+    DV.MONTO_ITBIS AS ITBIS,
+    ROUND(DV.SUBTOTAL + DV.MONTO_ITBIS, 2) AS TOTAL_LINEA,
+    IF(DV.MONTO_GANANCIA IS NULL, NULL, ROUND(DV.SUBTOTAL - DV.MONTO_GANANCIA, 2)) AS COSTO_TOTAL,
+    DV.MONTO_GANANCIA AS GANANCIA,
+    IFNULL(DD.GAN_DEVUELTA, 0) AS GANANCIA_DEVUELTA,
+    ROUND(IFNULL(DV.MONTO_GANANCIA, 0) - IFNULL(DD.GAN_DEVUELTA, 0), 2) AS GANANCIA_NETA
+FROM DETALLES_VENTA DV
+JOIN VENTAS V ON V.ID_VENTA = DV.ID_VENTA
+JOIN PRODUCTOS P ON P.ID_PRODUCTO = DV.ID_PRODUCTO
+LEFT JOIN (
+    SELECT DV2.ID_DETALLE_VENTA, SUM(DV.MONTO_GANANCIA_REEMBOLSADA) AS GAN_DEVUELTA
+      FROM DEVOLUCIONES DV
+      JOIN DETALLES_VENTA DV2 ON DV2.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+     WHERE DV.ESTADO IN ('APROBADA', 'REEMBOLSADA')
+     GROUP BY DV2.ID_DETALLE_VENTA
+) DD ON DD.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA;
+
+/*
+VW_GANANCIAS_MENSUAL
+Ganancia neta agrupada por mes (para el reporte mensual pendiente).
+*/
+CREATE OR REPLACE VIEW VW_GANANCIAS_MENSUAL AS
+SELECT
+    DATE_FORMAT(V.FECHA, '%Y-%m') AS MES,
+    COUNT(DISTINCT V.ID_VENTA) AS VENTAS,
+    ROUND(IFNULL(SUM(DV.SUBTOTAL), 0), 2) AS SUBTOTAL,
+    ROUND(IFNULL(SUM(DV.MONTO_GANANCIA), 0), 2) AS GANANCIA_BRUTA,
+    ROUND(IFNULL(SUM(DV2.GAN_DEV), 0), 2) AS GANANCIA_DEVUELTA,
+    ROUND(IFNULL(SUM(DV.MONTO_GANANCIA), 0) - IFNULL(SUM(DV2.GAN_DEV), 0), 2) AS GANANCIA_NETA
+FROM VENTAS V
+JOIN DETALLES_VENTA DV ON DV.ID_VENTA = V.ID_VENTA
+LEFT JOIN (
+    SELECT DV3.ID_DETALLE_VENTA, SUM(DV.MONTO_GANANCIA_REEMBOLSADA) AS GAN_DEV
+      FROM DEVOLUCIONES DV
+      JOIN DETALLES_VENTA DV3 ON DV3.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+     WHERE DV.ESTADO IN ('APROBADA', 'REEMBOLSADA')
+     GROUP BY DV3.ID_DETALLE_VENTA
+) DV2 ON DV2.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+WHERE V.ESTADO NOT IN ('CANCELADA')
+GROUP BY DATE_FORMAT(V.FECHA, '%Y-%m')
+ORDER BY MES DESC;
+
+/*
+SP_REPORTE_PERIODO_GANANCIA (14/10/2026)
+Reporte de ganancia en un rango de fechas (inclusive). Una fila:
+transacciones, subtotal, bruta, devuelta y neta. Mismas fórmulas de
+VW_GANANCIAS, sin IVA, excluye CANCELADA. NULL = costo desconocido.
+Espejo de SP_REPORTE_PERIODO (ventas).
+*/
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_REPORTE_PERIODO_GANANCIA //
+CREATE PROCEDURE SP_REPORTE_PERIODO_GANANCIA(
+    IN P_DESDE DATE,
+    IN P_HASTA DATE
+)
+proc_label: BEGIN
+    IF P_DESDE IS NULL OR P_HASTA IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: DEBE INDICAR DESDE Y HASTA.';
+        LEAVE proc_label;
+    END IF;
+
+    IF P_DESDE > P_HASTA THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: DESDE NO PUEDE SER MAYOR QUE HASTA.';
+        LEAVE proc_label;
+    END IF;
+
+    SELECT
+        COUNT(DISTINCT V.ID_VENTA) AS TRANSACCIONES,
+        ROUND(IFNULL(SUM(DV.SUBTOTAL), 0), 2) AS SUBTOTAL,
+        ROUND(IFNULL(SUM(DV.MONTO_GANANCIA), 0), 2) AS BRUTA,
+        ROUND(IFNULL(SUM(DD.GAN_DEVUELTA), 0), 2) AS DEVUELTA,
+        ROUND(IFNULL(SUM(DV.MONTO_GANANCIA), 0) - IFNULL(SUM(DD.GAN_DEVUELTA), 0), 2) AS NETA
+    FROM VENTAS V
+    JOIN DETALLES_VENTA DV ON DV.ID_VENTA = V.ID_VENTA
+    LEFT JOIN (
+        SELECT DV2.ID_DETALLE_VENTA, SUM(DV.MONTO_GANANCIA_REEMBOLSADA) AS GAN_DEVUELTA
+          FROM DEVOLUCIONES DV
+          JOIN DETALLES_VENTA DV2 ON DV2.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+         WHERE DV.ESTADO IN ('APROBADA', 'REEMBOLSADA')
+         GROUP BY DV2.ID_DETALLE_VENTA
+    ) DD ON DD.ID_DETALLE_VENTA = DV.ID_DETALLE_VENTA
+    WHERE V.ESTADO NOT IN ('CANCELADA')
+      AND DATE(V.FECHA) BETWEEN P_DESDE AND P_HASTA;
+END //
+DELIMITER ;

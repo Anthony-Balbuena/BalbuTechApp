@@ -195,7 +195,8 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
                               "METODOS_PAGO_EDITAR", "METODOS_PAGO_ESTADO"}, AccionMenu::MetodosPago},
         {"Ventas",           {"GESTIONAR_VENTAS", "GARANTIAS_REGISTRAR",
                               "GARANTIAS_RECLAMAR", "GARANTIAS_FINALIZAR",
-                              "GARANTIAS_CONSULTAR"},                      AccionMenu::Ventas},
+                              "GARANTIAS_CONSULTAR", "GARANTIAS_ASIGNAR",
+                              "GARANTIAS_AVANZAR"},                        AccionMenu::Ventas},
         {"Compras",          {"COMPRAS_VER", "COMPRAS_REGISTRAR", "COMPRAS_PAGAR",
                               "COMPRAS_CANCELAR", "COMPRAS_DEVOLVER", "COMPRAS_REPORTES"}, AccionMenu::Compras},
         {"Inventario",       {"INVENTARIO_VER", "INVENTARIO_AJUSTAR",
@@ -265,29 +266,38 @@ void ejecutarMenuSegunRol() {
         }
 
         const ItemMenu& elegido = *visibles[opcion - 1];
-        switch (elegido.accion) {
-            case AccionMenu::Asistencia:  ejecutarSubmenuAsistencia(); break;
-            case AccionMenu::Roles:       ejecutarSubmenuRoles(); break;
-            case AccionMenu::Usuarios:    ejecutarSubmenuUsuarios(); break;
-            case AccionMenu::Empleados:   ejecutarSubmenuEmpleados(); break;
-            case AccionMenu::MisPermisos: misPermisosUI(); break;
-            case AccionMenu::MisVacaciones: misVacacionesUI(); break;
-            case AccionMenu::Clientes:    ejecutarSubmenuClientes(); break;
-            case AccionMenu::Proveedores: ejecutarSubmenuProveedores(); break;
-            case AccionMenu::Categorias:  ejecutarSubmenuCategorias(); break;
-            case AccionMenu::Marcas:      ejecutarSubmenuMarcas(); break;
-            case AccionMenu::Productos:   ejecutarSubmenuProductos(); break;
-            case AccionMenu::MetodosPago: ejecutarSubmenuMetodosPago(); break;
-            case AccionMenu::Ventas:      ejecutarSubmenuVentas(); break;
-            case AccionMenu::Compras:     ejecutarSubmenuCompras(); break;
-            case AccionMenu::Inventario:  ejecutarSubmenuInventario(); break;
-            case AccionMenu::Caja:        ejecutarSubmenuCaja(); break;
-            case AccionMenu::LogAccesos:  ejecutarSubmenuAccesos(); break;
-            case AccionMenu::VerPermisos: mostrarPermisosActuales(); break;
-            case AccionMenu::CerrarSesion:
-                cerrarSesion();
-                cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
-                return;
+        // (15/11/2026) Red de seguridad de 'xxx': la cancelacion viaja como
+        // CancelarOperacionException y una pantalla que se olvide de atraparla
+        // (o que atrape solo sql::SQLException) llegaba hasta main sin catch:
+        // std::terminate y 'Aborted (core dumped)'. Aca se corta la pantalla y
+        // se vuelve al menu, que es justo lo que promete el mensaje.
+        try {
+            switch (elegido.accion) {
+                case AccionMenu::Asistencia:  ejecutarSubmenuAsistencia(); break;
+                case AccionMenu::Roles:       ejecutarSubmenuRoles(); break;
+                case AccionMenu::Usuarios:    ejecutarSubmenuUsuarios(); break;
+                case AccionMenu::Empleados:   ejecutarSubmenuEmpleados(); break;
+                case AccionMenu::MisPermisos: misPermisosUI(); break;
+                case AccionMenu::MisVacaciones: misVacacionesUI(); break;
+                case AccionMenu::Clientes:    ejecutarSubmenuClientes(); break;
+                case AccionMenu::Proveedores: ejecutarSubmenuProveedores(); break;
+                case AccionMenu::Categorias:  ejecutarSubmenuCategorias(); break;
+                case AccionMenu::Marcas:      ejecutarSubmenuMarcas(); break;
+                case AccionMenu::Productos:   ejecutarSubmenuProductos(); break;
+                case AccionMenu::MetodosPago: ejecutarSubmenuMetodosPago(); break;
+                case AccionMenu::Ventas:      ejecutarSubmenuVentas(); break;
+                case AccionMenu::Compras:     ejecutarSubmenuCompras(); break;
+                case AccionMenu::Inventario:  ejecutarSubmenuInventario(); break;
+                case AccionMenu::Caja:        ejecutarSubmenuCaja(); break;
+                case AccionMenu::LogAccesos:  ejecutarSubmenuAccesos(); break;
+                case AccionMenu::VerPermisos: mostrarPermisosActuales(); break;
+                case AccionMenu::CerrarSesion:
+                    cerrarSesion();
+                    cout << VERDE << "Sesión cerrada correctamente." << RESET << endl;
+                    return;
+            }
+        } catch (const CancelarOperacionException &e) {
+            cout << "\n[!] " << e.what() << endl;
         }
     } while (opcion != 0);
 }

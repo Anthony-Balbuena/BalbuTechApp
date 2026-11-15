@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test de auditoria con actor (modulo 61) — 29/10/2026.
+# Test de auditoria con actor (modulos 7, 9 y 18) — 29/10/2026.
 # Verifica que clientes y productos guarden el usuario de la sesion, y que
 # el historial de estado de producto guarde el empleado de la sesion o NULL
 # si no hay empleado. Todo corre en una transaccion que se revierte.
@@ -21,10 +21,12 @@ cd "$(dirname "$0")/.." || exit 1
 
 M() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" "$@" 2>&1; }
 
-if ! M < "modulos/61- AUDITORIA_ACTOR.sql" >/dev/null; then
-    echo "FALLO: no se pudo aplicar modulos/61- AUDITORIA_ACTOR.sql" >&2
-    exit 1
-fi
+for m in "7- CLIENTES.sql" "9- PRODUCTOS.sql"; do
+    if ! M --force < "modulos/$m" >/dev/null; then
+        echo "FALLO: no se pudo aplicar modulos/$m" >&2
+        exit 1
+    fi
+done
 
 OUT=$(M -N <<'SQL'
 START TRANSACTION;

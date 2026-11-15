@@ -52,25 +52,13 @@ ALTER TABLE `USUARIOS`
 -----------------------------------------------------------------------------------------------------------------------------    
 
 
-DELIMITER //
-/*
-SP_GET_USUARIO_LOGIN
-Busca la cuenta por su nombre de usuario (solo si esta ACTIVA) y devuelve
-el hash de la contrasena junto con el rol, para que la aplicacion compare
-la clave y deje entrar.
-*/
-DROP PROCEDURE IF EXISTS SP_GET_USUARIO_LOGIN //
-CREATE PROCEDURE SP_GET_USUARIO_LOGIN(
-    IN P_USUARIO VARCHAR(50)
-)
-BEGIN
-    SELECT U.ID_USUARIO, U.CONTRASENA, R.NOMBRE_ROL 
-    FROM USUARIOS U
-    INNER JOIN ROLES R ON U.ID_ROL = R.ID_ROL
-    WHERE U.USUARIO = P_USUARIO 
-      AND U.ESTADO = 'ACTIVO';
-END //
-DELIMITER ;
+-- (12/11/2026) SP_GET_USUARIO_LOGIN RETIRADO.
+-- Devolvia USUARIOS.CONTRASENA a cualquier cliente con EXECUTE sobre el
+-- esquema. Lo reemplazo SP_LOGIN_AUTENTICAR (65/66), que compara contra
+-- CLAVE_SERVIDOR con pepper y nunca saca el hash del servidor.
+-- La app no la llama desde el 65. Se dropea en cada import: sobre una base
+-- existente la saca, y en una nueva nunca llega a existir.
+DROP PROCEDURE IF EXISTS SP_GET_USUARIO_LOGIN;
 
 
 --Sp para mostrar antes de hacer ciertas acciones. Van en el modulo de  usuarios
@@ -297,7 +285,7 @@ DELIMITER ;
 -- Era un cambio "voluntario" que comparaba el hash viejo contra CONTRASENA.
 -- Con el modulo 65 ese campo queda en NULL para todo usuario migrado, asi que
 -- no podia funcionar; ademas nunca tuvo caller en la app ni mapeo de permiso.
--- El cambio de clave real va por SP_CAMBIAR_CLAVE_USUARIO (modulo 67).
+-- El cambio de clave real va por SP_CAMBIAR_CLAVE_USUARIO (modulo 65).
 --
 -- Se deja el DROP para que una base que ya lo tenga quede limpia al reimportar.
 -- ---------------------------------------------------------------------------
@@ -305,39 +293,18 @@ DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA ;
 
 
 
--- LOGIN ADAPTADO AL NUEVO ESQUEMA
-
-/*
-SP_LOGIN_USUARIO
-Valida el login cruzando usuario, contrasena hash y estado ACTIVO, y
-devuelve EXITO con el rol y el ID de la cuenta, o ERROR si las
-credenciales no coinciden.
-*/
-DELIMITER //
+-- ---------------------------------------------------------------------------
+-- (12/11/2026) SP_LOGIN_USUARIO RETIRADO.
+-- Era el login anterior al modulo 65: comparaba en igualdad contra
+-- USUARIOS.CONTRASENA, sin pepper, sin pbkdf2, sin bloqueo por intentos y sin
+-- token. Cualquier cliente con EXECUTE sobre el esquema podia autenticarse
+-- pasando el hash leido de la propia tabla.
+-- Lo reemplazo SP_LOGIN_AUTENTICAR (65/66), que valida contra CLAVE_SERVIDOR.
+-- La app no lo llama desde el 65.
+--
+-- Se deja el DROP para que una base que ya lo tenga quede limpia al reimportar.
+-- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO ;
-CREATE PROCEDURE SP_LOGIN_USUARIO(
-    IN P_USUARIO VARCHAR(50),
-    IN P_PASSWORD_HASH VARCHAR(512)
-)
-BEGIN
-    DECLARE v_id INT;
-    DECLARE v_rol VARCHAR(50);
-
-    -- Buscamos cruzando con la tabla ROLES
-    SELECT U.ID_USUARIO, R.NOMBRE_ROL INTO v_id, v_rol 
-    FROM USUARIOS U
-    INNER JOIN ROLES R ON U.ID_ROL = R.ID_ROL
-    WHERE U.USUARIO = P_USUARIO 
-      AND U.CONTRASENA = P_PASSWORD_HASH 
-      AND U.ESTADO = 'ACTIVO';
-
-    IF v_id IS NOT NULL THEN
-        SELECT 'EXITO' AS ESTADO, v_rol AS ROL, v_id AS ID_USUARIO;
-    ELSE
-        SELECT 'ERROR' AS ESTADO, NULL AS ROL, NULL AS ID_USUARIO;
-    END IF;
-END //
-DELIMITER ;
 
 
 

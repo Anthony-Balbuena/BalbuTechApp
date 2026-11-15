@@ -3,10 +3,10 @@
 Las **cinco vistas de reportes** que cruzan compras, ventas y devoluciones. Se
 importan al final a propósito.
 
-**Depende de:** `COMPRAS` (19), `DETALLE_COMPRA`/`DEVOLUCION_COMPRA` (22),
-`PAGOS_COMPRA` (19.5), `VENTAS` (23), `PAGOS` (24), `DEVOLUCIONES` (26),
+**Depende de:** `COMPRAS` y `DETALLE_COMPRA`/`DEVOLUCION_COMPRA` (19),
+`PAGOS_COMPRA` (19), `VENTAS` (21), `PAGOS` (24), `DEVOLUCIONES` (26),
 `CLIENTES` (4), `PROVEEDORES` (5) y `EMPLEADOS` (8).
-**Son usadas por:** `SP_COMPRAS_PENDIENTES` (19.5), `SP_REPORTE_VENTAS` (24),
+**Son usadas por:** `SP_COMPRAS_PENDIENTES` (19), `SP_REPORTE_VENTAS` (24),
 `SP_VENTAS_ULTIMAS`, `SP_VENTA_ENCABEZADO`, `SP_COMPRAS_ULTIMAS`,
 `SP_COMPRA_ENCABEZADO` y `SP_VENTAS_PENDIENTES` (39).
 
@@ -16,8 +16,8 @@ importan al final a propósito.
 ## Por qué este módulo existe
 
 MariaDB **valida las tablas referenciadas al crear una vista**. Las cinco leen
-`DETALLE_COMPRA`/`DEVOLUCION_COMPRA` (22) y `DEVOLUCIONES` (26), que se importan
-**después** de los módulos donde estaban definidas (19, 19.5, 23 y 24). En una
+`DETALLE_COMPRA`/`DEVOLUCION_COMPRA` (19) y `DEVOLUCIONES` (26), que se importan
+**después** de los módulos donde estaban definidas (19, 21 y 24). En una
 base existente nunca fallaban porque las tablas ya estaban; en una reconstrucción
 desde cero el `CREATE VIEW` fallaba y el import, con `--force`, **seguía sin las
 cinco vistas**.
@@ -37,12 +37,12 @@ cambiar el número sin revisar el orden del import.**
 - `TOTAL_CON_IVA` = `SUBTOTAL` + `ITBIS`.
 
 > **Es la definición de referencia del BRUTO de compra**, la misma fórmula que
-> repiten `SP_REGISTRAR_PAGO_COMPRA` (19.5) y cuatro triggers. Acá está escrita
+> repiten `SP_REGISTRAR_PAGO_COMPRA` (19) y cuatro triggers. Acá está escrita
 > una vez más: son **seis** lugares.
 >
 > **Solo se resta el ITBIS devuelto, no la mercancía devuelta**: devolver
 > producto no baja el `TOTAL` de la compra. El ajuste del valor de la mercancía
-> viaja por `NOTA_CREDITO_COMPRA` (19.6), no por acá.
+> viaja por las notas de crédito de compra (19), no por acá.
 
 ### `VISTA_COMPRAS_PENDIENTES_PAGO`
 

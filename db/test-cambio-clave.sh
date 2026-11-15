@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# (05/11/2026) Regresion del cambio de clave desde la app (modulo 67).
+# (05/11/2026) Regresion del cambio de clave desde la app (modulo 65, ex 67).
 #
 # Cubre:
 #   1. El admin cambia la clave de otro usuario: queda en el formato del

@@ -38,7 +38,7 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_VENTA ;
 TR_HISTORIAL_VENTA
 Cuando se vende un producto, anota en el historial el stock antes y
 despues de la venta con tipo VENTA. Solo registra: el que descuenta el
-stock es TR_AUDITORIA_MOVIMIENTO_VENTA (20), que corre antes.
+stock es TR_AUDITORIA_MOVIMIENTO_VENTA (21), que corre antes.
 */
 CREATE TRIGGER TR_HISTORIAL_VENTA
 AFTER INSERT ON DETALLES_VENTA
@@ -49,7 +49,7 @@ BEGIN
     DECLARE v_stock_anterior INT;
     DECLARE v_stock_nuevo INT;
 
-    -- 1. Leemos el stock ya descontado (el trigger de la venta, archivo 20,
+    -- 1. Leemos el stock ya descontado (el trigger de la venta, archivo 21,
     -- se crea primero y por eso corre antes)
     SELECT STOCK_ACTUAL INTO v_stock_nuevo FROM INVENTARIO WHERE ID_PRODUCTO = NEW.ID_PRODUCTO;
 
@@ -76,7 +76,7 @@ DROP TRIGGER IF EXISTS TR_HISTORIAL_COMPRA ;
 TR_HISTORIAL_COMPRA
 Al comprar, anota en el historial la ENTRADA con el stock antes y
 despues. Solo registra: el que suma el stock es
-TR_ACTUALIZAR_STOCK_COMPRA (22), que corre antes.
+TR_ACTUALIZAR_STOCK_COMPRA (19), que corre antes.
 (20/10/2026) El orden de los triggers de alta ya no depende del orden de
 creacion: esta declarado con FOLLOWS (total -> stock -> auditoria -> costo
 -> historial), asi que este trigger corre al final de la cadena de la compra.
@@ -131,7 +131,7 @@ DELIMITER ;
 /*
 TR_HISTORIAL_BORRADO_COMPRA - NO SE CREA AQUI
 El historial de cuando se quita una linea de una compra lo escribe
-TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (22) dentro del mismo trigger que baja
+TR_ACTUALIZAR_STOCK_BORRADO_COMPRA (19) dentro del mismo trigger que baja
 el stock: asi el antes/despues sale siempre bien.
 (20/10/2026) Ademas el orden de los triggers de baja ya esta declarado con
 FOLLOWS (total -> stock -> auditoria -> costo).
@@ -246,3 +246,155 @@ movimiento (lista completa en 17- INVENTARIO.sql).
 
 
 
+
+-- ================================================================
+-- PRODUCTO_PROVEEDOR (ex modulo 40)
+-- ================================================================
+
+/*
+SECCION PRODUCTO_PROVEEDOR (ex modulo 40)
+Mapa de quien vende que: la tabla guarda la ULTIMA compra por pareja
+producto-proveedor (precio + fecha); el historial completo vive en las lineas de
+compra (DETALLE_COMPRA + COMPRAS). Todo lo de esta seccion vive en este archivo:
+la tabla, su trigger y los cuatro SP. El trigger es AFTER UPDATE ON COMPRAS y
+declara FOLLOWS TR_RECALCULAR_COSTO_COMPRA_CANCELADA, del modulo 19.
+*/
+/*
+ARCHIVO 40 - PRODUCTO_PROVEEDOR (mapa quién vende qué)
+Un producto puede comprarse a N suplidores y un suplidor trae N productos.
+La tabla guarda la ULTIMA compra por pareja (precio + fecha); el historial
+completo vive en las lineas de compra (DETALLE_COMPRA + COMPRAS).
+Lo actual no se toca: PRODUCTOS.ID_PROVEEDOR queda como preferido.
+*/
+CREATE TABLE PRODUCTO_PROVEEDOR (
+    ID_PRODUCTO INT NOT NULL,
+    ID_PROVEEDOR INT NOT NULL,
+    ULTIMO_PRECIO DECIMAL(10, 2) NOT NULL CHECK (ULTIMO_PRECIO >= 0),
+    ULTIMA_FECHA DATETIME NOT NULL,
+    PRIMARY KEY (ID_PRODUCTO, ID_PROVEEDOR),
+    CONSTRAINT FK_MAPA_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO),
+    CONSTRAINT FK_MAPA_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
+) ENGINE = InnoDB;
+
+DELIMITER //
+DROP TRIGGER IF EXISTS TR_MAPA_COMPRA_RECIBIDA ;
+/*
+TR_MAPA_COMPRA_RECIBIDA (14/10/2026)
+Cuando una compra pasa a RECIBIDA, cada linea enseña al mapa (o actualiza
+su precio/fecha). Solo las compras reales enseñan: ABIERTA/CANCELADA no.
+(20/10/2026) El orden de los triggers de actualizacion de COMPRAS ahora
+esta declarado con FOLLOWS: corre despues de
+TR_RECALCULAR_COSTO_COMPRA_CANCELADA (19).
+*/
+-- Version anterior (20/10/2026): sin orden declarado (dependia del orden
+-- accidentado de creacion).
+-- CREATE TRIGGER TR_MAPA_COMPRA_RECIBIDA
+-- AFTER UPDATE ON COMPRAS
+-- FOR EACH ROW
+-- BEGIN
+--     IF NEW.ESTADO = 'RECIBIDA' AND OLD.ESTADO <> 'RECIBIDA' THEN
+--         INSERT INTO PRODUCTO_PROVEEDOR (ID_PRODUCTO, ID_PROVEEDOR, ULTIMO_PRECIO, ULTIMA_FECHA)
+--         SELECT DC.ID_PRODUCTO, NEW.ID_PROVEEDOR, DC.PRECIO_UNITARIO, NEW.FECHA
+--           FROM DETALLE_COMPRA DC WHERE DC.ID_COMPRA = NEW.ID_COMPRA
+--         ON DUPLICATE KEY UPDATE
+--             ULTIMO_PRECIO = VALUES(ULTIMO_PRECIO),
+--             ULTIMA_FECHA = VALUES(ULTIMA_FECHA);
+--     END IF;
+-- END //
+CREATE TRIGGER TR_MAPA_COMPRA_RECIBIDA
+AFTER UPDATE ON COMPRAS
+FOR EACH ROW
+FOLLOWS TR_RECALCULAR_COSTO_COMPRA_CANCELADA
+BEGIN
+    IF NEW.ESTADO = 'RECIBIDA' AND OLD.ESTADO <> 'RECIBIDA' THEN
+        INSERT INTO PRODUCTO_PROVEEDOR (ID_PRODUCTO, ID_PROVEEDOR, ULTIMO_PRECIO, ULTIMA_FECHA)
+        SELECT DC.ID_PRODUCTO, NEW.ID_PROVEEDOR, DC.PRECIO_UNITARIO, NEW.FECHA
+          FROM DETALLE_COMPRA DC WHERE DC.ID_COMPRA = NEW.ID_COMPRA
+        ON DUPLICATE KEY UPDATE
+            ULTIMO_PRECIO = VALUES(ULTIMO_PRECIO),
+            ULTIMA_FECHA = VALUES(ULTIMA_FECHA);
+    END IF;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_PRODUCTO_SUPLIDORES ;
+/*
+SP_PRODUCTO_SUPLIDORES (14/10/2026)
+Quienes venden un producto con su ultimo precio y fecha, del mas barato
+al mas caro. Para elegir en el carrito.
+*/
+CREATE PROCEDURE SP_PRODUCTO_SUPLIDORES(IN P_ID_PRODUCTO INT)
+BEGIN
+    SELECT M.ID_PROVEEDOR, P.NOMBRE AS PROVEEDOR, M.ULTIMO_PRECIO, M.ULTIMA_FECHA
+      FROM PRODUCTO_PROVEEDOR M
+      JOIN PROVEEDORES P ON P.ID_PROVEEDOR = M.ID_PROVEEDOR
+     WHERE M.ID_PRODUCTO = P_ID_PRODUCTO
+     ORDER BY M.ULTIMO_PRECIO ASC;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_PRODUCTO_HISTORIAL_PRECIOS ;
+/*
+SP_PRODUCTO_HISTORIAL_PRECIOS (14/10/2026)
+Historial de precios pagados por un producto: suplidor | precio | fecha,
+de lo mas nuevo a lo mas viejo. Solo compras RECIBIDA.
+*/
+CREATE PROCEDURE SP_PRODUCTO_HISTORIAL_PRECIOS(IN P_ID_PRODUCTO INT)
+BEGIN
+    SELECT PR.NOMBRE AS PROVEEDOR, DC.PRECIO_UNITARIO AS PRECIO, C.FECHA,
+           DC.CANTIDAD, C.ID_COMPRA
+      FROM DETALLE_COMPRA DC
+      JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
+      JOIN PROVEEDORES PR ON PR.ID_PROVEEDOR = C.ID_PROVEEDOR
+     WHERE DC.ID_PRODUCTO = P_ID_PRODUCTO AND C.ESTADO = 'RECIBIDA'
+     ORDER BY C.FECHA DESC, C.ID_COMPRA DESC LIMIT 20;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_REPORTE_PRECIOS_COMPRA ;
+/*
+SP_REPORTE_PRECIOS_COMPRA (14/10/2026, 15/10/2026: + mas caro)
+Por producto: cuantos suplidores, el mas barato y el mas caro con su
+precio y suplidor, y la fecha de la ultima compra. Para ver subidas
+de un vistazo.
+*/
+CREATE PROCEDURE SP_REPORTE_PRECIOS_COMPRA()
+BEGIN
+    SELECT P.NOMBRE AS PRODUCTO,
+           COUNT(*) AS SUPLIDORES,
+           MIN(M.ULTIMO_PRECIO) AS MAS_BARATO,
+           (SELECT PR2.NOMBRE
+              FROM PRODUCTO_PROVEEDOR M2
+              JOIN PROVEEDORES PR2 ON PR2.ID_PROVEEDOR = M2.ID_PROVEEDOR
+             WHERE M2.ID_PRODUCTO = P.ID_PRODUCTO
+             ORDER BY M2.ULTIMO_PRECIO ASC, M2.ULTIMA_FECHA DESC LIMIT 1) AS DONDE_BARATO,
+           MAX(M.ULTIMO_PRECIO) AS MAS_CARO,
+           (SELECT PR3.NOMBRE
+              FROM PRODUCTO_PROVEEDOR M3
+              JOIN PROVEEDORES PR3 ON PR3.ID_PROVEEDOR = M3.ID_PROVEEDOR
+             WHERE M3.ID_PRODUCTO = P.ID_PRODUCTO
+             ORDER BY M3.ULTIMO_PRECIO DESC, M3.ULTIMA_FECHA DESC LIMIT 1) AS DONDE_CARO,
+           MAX(M.ULTIMA_FECHA) AS ULTIMA_COMPRA
+      FROM PRODUCTO_PROVEEDOR M
+      JOIN PRODUCTOS P ON P.ID_PRODUCTO = M.ID_PRODUCTO
+      JOIN PROVEEDORES PR ON PR.ID_PROVEEDOR = M.ID_PROVEEDOR
+     GROUP BY P.ID_PRODUCTO, P.NOMBRE
+     ORDER BY P.NOMBRE;
+END //
+DELIMITER ;
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_PROVEEDOR_ACTIVO ;
+/*
+SP_PROVEEDOR_ACTIVO (14/10/2026)
+Nombre de un suplidor si existe y esta ACTIVO; vacio si no. Para validar
+la eleccion por linea en el carrito de compras.
+*/
+CREATE PROCEDURE SP_PROVEEDOR_ACTIVO(IN P_ID_PROVEEDOR INT)
+BEGIN
+    SELECT NOMBRE FROM PROVEEDORES WHERE ID_PROVEEDOR = P_ID_PROVEEDOR AND ESTADO = 'ACTIVO';
+END //
+DELIMITER ;

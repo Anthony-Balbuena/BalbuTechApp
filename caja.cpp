@@ -18,7 +18,7 @@
 
 using namespace std;
 
-// Modulo de caja por turnos (archivo 41- TURNO_CAJA.sql).
+// Modulo de caja por turnos (seccion TURNO_CAJA del 24- PAGOS.sql).
 // Un turno va de la apertura al cierre; el cuadre (esperado vs real)
 // lo calcula SP_CERRAR_TURNO. La app no bloquea ventas sin turno: solo avisa.
 

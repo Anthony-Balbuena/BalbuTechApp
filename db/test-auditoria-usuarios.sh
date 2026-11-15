@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test de auditoria de usuarios (modulo 56) — 25/10/2026.
+# Test de auditoria de usuarios (modulo 29) — 25/10/2026.
 # Verifica que TRG_AUDITORIA_USUARIOS registre rol, estado y nombre de
 # usuario, y que guarde como admin el id de @ID_USUARIO_ACTUAL.
 # Uso: DB_NAME=BALBU_TECH_TEST bash db/test-auditoria-usuarios.sh
@@ -20,8 +20,8 @@ cd "$(dirname "$0")/.." || exit 1
 
 M() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" "$@" 2>&1; }
 
-if ! M < "modulos/56- AUDITORIA_USUARIOS.sql" >/dev/null; then
-    echo "FALLO: no se pudo aplicar modulos/56- AUDITORIA_USUARIOS.sql" >&2
+if ! M --force < "modulos/29- LOG_USUARIOS.sql" >/dev/null; then
+    echo "FALLO: no se pudo aplicar modulos/29- LOG_USUARIOS.sql" >&2
     exit 1
 fi
 

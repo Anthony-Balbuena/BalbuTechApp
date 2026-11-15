@@ -29,7 +29,7 @@ faltan=$(M -N -e "SELECT COUNT(*) FROM information_schema.ROUTINES
                      AND ROUTINE_NAME IN ('SP_HISTORIAL_VENTA', 'SP_VENTAS_GARANTIZABLES',
                                           'SP_LINEAS_VENTA_CON_GARANTIA', 'SP_REGISTRAR_GARANTIA');")
 if [ "$faltan" != "4" ]; then
-    echo "FALLO: faltan rutinas ($faltan/4). Aplica los modulos 21.5 y 63 en $DB_NAME." >&2
+    echo "FALLO: faltan rutinas ($faltan/4). Aplica los modulos 21 y 63 en $DB_NAME." >&2
     exit 1
 fi
 

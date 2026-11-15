@@ -8,7 +8,7 @@ reembolsa y en qué estado está la solicitud. Puede ligarse a una garantía
 stock ni dinero) y después se **procesa** (`APROBADA`, `REEMBOLSADA` o
 `RECHAZADA`). Aprobar devuelve **mercancía**, no dinero.
 
-**Depende de:** `DETALLES_VENTA` (23), `GARANTIAS` (25), `EMPLEADOS` (8),
+**Depende de:** `DETALLES_VENTA` (21), `GARANTIAS` (25), `EMPLEADOS` (8),
 `VENTAS` (21), `INVENTARIO` (17) y `CONFIGURACION` (ITBIS).
 
 > **Los nombres cruzados son reales:** el alta (`SP_REGISTRAR_DEVOLUCION`) y el

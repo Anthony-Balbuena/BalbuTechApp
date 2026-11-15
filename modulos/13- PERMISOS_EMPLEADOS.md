@@ -9,11 +9,12 @@ rechazado del mismo empleado.
 **Es consultado por:** `ASISTENCIA_EMPLEADOS` (11) — un permiso `APROBADO`
 bloquea el registro de asistencia.
 **La usa la app:** `permisos.cpp` — `misPermisosUI()` para el historial y el
-alta propia; `gestionarPermisosUI()` para que RRHH/ADMIN resuelva pendientes.
+alta propia; `gestionarPermisosUI()` para que RRHH/ADMIN resuelva pendientes;
+`verAuditoriaPermisosUI()` para leer la bitácora de cambios.
 
 > **Pantallas:** "Mis permisos" en el menú principal (permiso
-> `SOLICITAR_PERMISO`) y "16. Gestionar permisos" dentro del submenú de
-> Empleados (gate `GESTIONAR_PERMISOS_EMPLEADO`).
+> `SOLICITAR_PERMISO`) y "Gestionar permisos" + "Ver auditoría de permisos"
+> dentro del submenú de Empleados (las dos con `GESTIONAR_PERMISOS_EMPLEADO`).
 
 Fuente: `modulos/13- PERMISOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 21/10/2026.
 
@@ -93,14 +94,109 @@ también falla con "solo pendientes". Devuelve
 > mensaje amigable.
 >
 > **Quién gestiona:** el SP no sabe quién llama. El control lo hace la app con
-> el gate `GESTIONAR_PERMISOS_EMPLEADO` del submenú de Empleados. El trigger del
-> módulo 30 registra el antes/después, **no el actor**.
+> el gate `GESTIONAR_PERMISOS_EMPLEADO` del submenú de Empleados. Quién resolvió
+> la solicitud queda en `LOG_AUDITORIA_PERMISOS` (`TR_LOG_PERMISO_CAMBIO_ESTADO`,
+> más abajo).
 
 ### `SP_HISTORIAL_PERMISOS_EMPLEADO(P_ID_EMPLEADO)`
 
 Lista `TIPO_PERMISO, FECHA_INICIO, FECHA_FIN, ESTADO, DESCRIPCION` del
 empleado, del más reciente al más antiguo. La usa `misPermisosUI()` para
 refrescar el historial propio después de cada alta.
+
+## Auditoría: `LOG_AUDITORIA_PERMISOS`
+
+Bitácora de todo lo que pasa con un permiso de empleado: `ALTA`,
+`CAMBIO_ESTADO` o `BAJA`, con el estado anterior y el nuevo, cuándo y quién.
+Vive en este módulo porque es la bitácora de `PERMISOS_EMPLEADOS`.
+
+### Tabla
+
+| Columna | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `ID_LOG` | `INT` | PK, AUTO_INCREMENT | Identificador. |
+| `ID_PERMISO` | `INT` | NULL, FK → `PERMISOS_EMPLEADOS` **ON DELETE SET NULL** | Permiso afectado. |
+| `ID_EMPLEADO` | `INT` | NULL | Dueño del permiso. Sobrevive al borrado. |
+| `TIPO_PERMISO` | `VARCHAR(20)` | NULL | `MEDICO`, `PERSONAL`, … Idem. |
+| `ACCION` | `VARCHAR(20)` | NOT NULL | `ALTA`, `CAMBIO_ESTADO`, `BAJA`. |
+| `ESTADO_ANTERIOR` | `VARCHAR(20)` | NULL | Estado previo (`NULL` en un alta). |
+| `ESTADO_NUEVO` | `VARCHAR(20)` | NULL | Estado nuevo (`NULL` en una baja). |
+| `FECHA_CAMBIO` | `TIMESTAMP` | DEFAULT `CURRENT_TIMESTAMP` | Cuándo. |
+| `ID_USUARIO_ADMIN` | `INT` | NULL, FK → `USUARIOS` **ON DELETE SET NULL** | Quién lo hizo. |
+
+> **`ON DELETE SET NULL` a propósito**: borrar un permiso **no** destruye su
+> bitácora (antes era `CASCADE`).
+>
+> **Por qué `ID_EMPLEADO` y `TIPO_PERMISO` están acá** si se pueden sacar del
+> permiso: porque `ID_PERMISO` pasa a `NULL` cuando se borra el permiso. Esas
+> dos columnas son lo único que después sigue diciendo de quién era.
+>
+> **`VARCHAR(20)` en vez del `ENUM` de origen**: si mañana el estado se alarga,
+> acá no rompe, pero tampoco hay validación.
+
+### Cómo se actualiza una base que ya tenía la tabla vieja
+
+El módulo trae un bloque idempotente que pregunta cada cambio a
+`INFORMATION_SCHEMA` antes de hacerlo: agrega `ID_EMPLEADO`, `TIPO_PERMISO`,
+`ACCION` e `ID_USUARIO_ADMIN` si faltan, rellena `ACCION` con
+`'CAMBIO_ESTADO'` (las filas viejas solo podían venir de un `UPDATE`), recupera
+`ID_EMPLEADO`/`TIPO_PERMISO` por `JOIN` donde el permiso todavía existe, y recién
+después pasa `ACCION` a `NOT NULL`. Las filas que ya perdieron su permiso no se
+pueden reconstruir: quedan en `NULL`.
+
+### Triggers
+
+| Trigger | Evento | Qué escribe |
+|---|---|---|
+| `TR_LOG_PERMISO_ALTA` | `AFTER INSERT` | `ALTA`, estado anterior `NULL` |
+| `TR_LOG_PERMISO_CAMBIO_ESTADO` | `AFTER UPDATE` | solo si cambia `ESTADO`; antes y después |
+| `TR_LOG_PERMISO_BAJA` | `AFTER DELETE` | `BAJA`, estado nuevo `NULL` |
+
+El `DELETE` inserta con `ID_PERMISO = NULL` a propósito: la fila del permiso ya
+no existe y la FK rechazaría la escritura —y con ella abortaría el `DELETE`.
+
+**El actor** sale de `@ID_USUARIO_ACTUAL`, resuelto con
+`SET v_admin = (SELECT ID_USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL)`.
+Si no hay sesión, el `SELECT` no devuelve fila y queda `NULL` (es el mismo
+patrón de `LOG_USUARIOS`, módulo 29).
+
+**Los triggers nunca abortan el cambio.** Corren dentro del `INSERT`/`UPDATE`/
+`DELETE` de `PERMISOS_EMPLEADOS`: si fallaran, se caería la escritura del
+permiso. Por eso el actor es `NULL` y no un `SIGNAL`.
+
+### Vista
+
+`VIEW_HISTORIAL_PERMISOS` traduce ids a nombres: empleado afectado, tipo,
+acción, antes/después, fecha y usuario que lo hizo. `LEFT JOIN` en todo, para
+que el registro se siga leyendo aunque el permiso, el empleado o el usuario ya
+no existan.
+
+### Lectores paginados
+
+| `SP` | Qué hace | Permiso |
+|---|---|---|
+| `SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO(P_PAGINA, P_POR_PAGINA)` | una página del historial, de lo más reciente a lo más viejo | `GESTIONAR_PERMISOS_EMPLEADO` |
+| `SP_CONTAR_AUDITORIA_PERMISOS()` | total, para el "Página 1 de N" | `GESTIONAR_PERMISOS_EMPLEADO` |
+
+Los dos llevan la guarda `CALL SP_EXIGIR_PERMISO(...)` escrita a mano (como el
+21 y el 63): `db/injectar-guardas.py` la saltea si ya está. `EXIGIR = 1`,
+igual que el resto de las rutinas mapeadas.
+
+El mapeo rutina → permiso vive en `db/mapear-permisos.sql`, no en este módulo:
+`PERMISO_POR_RUTINA` la crea el módulo 66, que se importa después, así que un
+`INSERT` acá fallaría en una instalación nueva.
+
+**No hay permiso nuevo**: la pantalla se abre con `GESTIONAR_PERMISOS_EMPLEADO`,
+el mismo con el que se aprueba y rechaza (ADMIN, GERENTE, RRHH). Separar
+"aprobar" de "auditar" es aditivo y se puede hacer después sin migrar datos.
+
+### Pantalla
+
+"Empleados" → "Ver auditoría de permisos". Lista paginada de 10 en 10 con
+`FECHA · ACCIÓN · EMPLEADO · TIPO · ESTADO (antes > después) · QUIÉN`. Es de
+solo lectura: la app no edita ni borra la bitácora. `(sin sesión)` marca los
+cambios hechos por SQL a mano y `(empleado borrado)` los que perdieron el
+empleado.
 
 ## Flujo y UI
 
@@ -112,7 +208,7 @@ refrescar el historial propio después de cada alta.
    fecha inicio, fecha fin (`YYYY-MM-DD`) y descripción. Llama a
    `SP_SOLICITAR_PERMISO`, muestra `MENSAJE` o el error SQL y refresca el
    historial. No edita ni borra.
-2. **Gestión (RRHH/ADMIN):** "Empleados" → "16. Gestionar permisos". Lista los
+2. **Gestión (RRHH/ADMIN):** "Empleados" → "Gestionar permisos". Lista los
    pendientes con `SP_LISTAR_PERMISOS_PENDIENTES`, pide el ID y la acción
    (1 aprobar / 2 rechazar), llama a `SP_GESTIONAR_PERMISO` y muestra
    `MENSAJE` o el error SQL. Repite hasta que el usuario elige 0. Un permiso
@@ -139,4 +235,7 @@ tipo, fechas y estado. Sirve para ver quién está ausente en este momento.
 - **Una sola resolución**: solo un permiso `PENDIENTE` pasa a `APROBADO` o
   `RECHAZADO`; el SP no permite volver a gestionarlo.
 - **Un permiso aprobado bloquea la asistencia** del día (módulo 11).
+- **Los tres eventos dejan fila** en la bitácora, con el actor cuando hay
+  sesión; cambiar algo que no es el estado no registra nada.
+- **La bitácora sobrevive** al borrado del permiso, del empleado y del usuario.
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.

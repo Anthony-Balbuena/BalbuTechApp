@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test de Garantias (modulo 63) — 30/10/2026.
+# Test de Garantias (modulo 25, ex modulo 63) — 30/10/2026.
 # Verifica el registro automatico al confirmar la venta, el alta manual con
 # autor, la validacion por fecha al reclamar, el cierre con autor y fecha, y
 # que SP_MARCAR_GARANTIAS_VENCIDAS escriba el estado VENCIDA.
@@ -22,18 +22,33 @@ cd "$(dirname "$0")/.." || exit 1
 
 M() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" "$@" 2>&1; }
 
-if ! M < "modulos/63- GARANTIAS_FLUJO.sql" >/dev/null; then
-    echo "FALLO: no se pudo aplicar modulos/63- GARANTIAS_FLUJO.sql" >&2
+# (14/11/2026) El flujo de garantias ya no es un modulo aparte: es la seccion
+# final de "25- GARANTIAS.sql" (absorbe el ex modulo 63).
+# Reimportar sobre una base existente es lo normal: los 1050 (tabla existe) y
+# 1061 (indice o columna duplicada) son el resultado esperado, no un fallo.
+# Cualquier otro ERROR si lo es. Mismo criterio que db/import.sh: mysql --force
+# sale 0 aunque haya errores de sentencia, asi que se cuentan las lineas ERROR.
+MOD_GARANTIAS="modulos/25- GARANTIAS.sql"
+log_garantias=$(mktemp)
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
+    --default-character-set=utf8mb4 --database="$DB_NAME" --force \
+    < "$MOD_GARANTIAS" >"$log_garantias" 2>&1
+errores_reales=$(grep -E "^ERROR" "$log_garantias" | grep -vcE "^ERROR (1050|1061|1265) " || true)
+if [ "$errores_reales" -gt 0 ]; then
+    echo "FALLO: $errores_reales error(es) real(es) al aplicar $MOD_GARANTIAS:" >&2
+    grep -E "^ERROR" "$log_garantias" | grep -vE "^ERROR (1050|1061|1265) " | head -3 >&2
+    rm -f "$log_garantias"
     exit 1
 fi
+rm -f "$log_garantias"
 
-# (04/11/2026) Reimportar el modulo 63 reescribe sus SPs SIN la guarda de
+# (04/11/2026) Reimportar el modulo de garantias reescribe sus SPs SIN la guarda de
 # permisos. Si no se repone, check-app-sps.sh falla despues del test con
 # "FALTA la guarda en 7". El inyector guarda dump de las originales antes de
 # tocar nada. Como el test conecta con DB_ADMIN_USER, la guarda no bloquea
 # sus llamadas (SP_EXIGIR_PERMISO exime a root/balbu_admin).
 if ! python3 db/injectar-guardas.py "$DB_NAME" --aplicar >/dev/null 2>&1; then
-    echo "FALLO: no se pudieron reinyectar las guardas tras importar el modulo 63" >&2
+    echo "FALLO: no se pudieron reinyectar las guardas tras importar $MOD_GARANTIAS" >&2
     exit 1
 fi
 
@@ -141,18 +156,35 @@ SELECT 'RECLAMO_OK' AS CASO, IF(COUNT(*) = 1, 'OK', 'FAIL') AS RES
 SET @rec = (SELECT ID_RECLAMO_GARAN FROM RECLAMOS_GARANTIAS
              WHERE ID_GARANTIA = @gar ORDER BY ID_RECLAMO_GARAN DESC LIMIT 1);
 
--- Finalizar desde PENDIENTE: cierra y guarda autor y fecha de cierre.
-CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(@rec, @emp);
+-- (15/11/2026) El cierre va por la ASIGNACION: 27_SP_FINALIZAR_RECLAMO_TOTAL se
+-- elimino. Se asigna un tecnico y se cierra por ahi; el SP cierra la asignacion
+-- y el reclamo juntos.
+SET @ID_USUARIO_ACTUAL = (SELECT ID_USUARIO FROM USUARIOS WHERE ID_EMPLEADO = @emp LIMIT 1);
+CALL SP_ASIGNAR_TECNICO_RECLAMO(@rec, @emp, 'MEDIA', 'ZZ asignacion del test');
+SET @asi = (SELECT ID_ASIGNACION FROM ASIGNACIONES_RECLAMOS
+             WHERE ID_RECLAMO_GARAN = @rec ORDER BY ID_ASIGNACION DESC LIMIT 1);
+
+SELECT 'ASIGNAR_OK' AS CASO, IF(COUNT(*) = 1, 'OK', 'FAIL') AS RES
+  FROM ASIGNACIONES_RECLAMOS
+ WHERE ID_ASIGNACION = @asi AND ID_EMPLEADO = @emp AND ESTADO_ASIGNACION = 'EN_PROCESO';
+
+-- Finalizar desde PENDIENTE: cierra asignacion y reclamo, y sella la fecha.
+CALL SP_FINALIZAR_RECLAMO(@asi, 'ZZ cierre del test');
 
 SELECT 'FINALIZAR_OK' AS CASO, IF(COUNT(*) = 1, 'OK', 'FAIL') AS RES
   FROM RECLAMOS_GARANTIAS
  WHERE ID_RECLAMO_GARAN = @rec
    AND ESTADO = 'CERRADO'
-   AND ID_EMPLEADO_CIERRE = @emp
    AND FECHA_CIERRE IS NOT NULL;
 
--- Finalizar un CERRADO: debe fallar.
-CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(@rec, @emp);
+SELECT 'ASIGNACION_CERRADA' AS CASO, IF(COUNT(*) = 1, 'OK', 'FAIL') AS RES
+  FROM ASIGNACIONES_RECLAMOS
+ WHERE ID_ASIGNACION = @asi
+   AND ESTADO_ASIGNACION = 'COMPLETADO'
+   AND FECHA_FINALIZACION IS NOT NULL;
+
+-- Finalizar de nuevo: debe fallar (la asignacion ya esta COMPLETADO).
+CALL SP_FINALIZAR_RECLAMO(@asi, 'ZZ reintento');
 
 SELECT 'CERRADO_SIGUE_CERRADO' AS CASO, IF(COUNT(*) = 1, 'OK', 'FAIL') AS RES
   FROM RECLAMOS_GARANTIAS
@@ -187,7 +219,7 @@ OKS=$(printf '%s\n' "$OUT" | grep -c 'OK' || true)
 
 # Los tres errores esperados tienen que aparecer en la salida.
 ESPERADOS=0
-for MSG in "YA TIENE UNA GARANT" "SOLO SE CIERRAN RECLAMOS" "VENCIDA POR FECHA"; do
+for MSG in "YA TIENE UNA GARANT" "YA FUE FINALIZADA" "VENCIDA POR FECHA"; do
     if printf '%s\n' "$OUT" | grep -q "$MSG"; then
         ESPERADOS=$((ESPERADOS + 1))
     else

@@ -247,6 +247,11 @@ DELIMITER //
 TR_AUDIT_CLIENTES_INSERT
 Se dispara solo al insertar un cliente y anota en la bitacora la tabla,
 el ID, la accion, el usuario y los datos nuevos. Trabaja en automatico.
+
+(12/11/2026) El actor sale de @ID_USUARIO_ACTUAL, que la app deja en la
+conexion al iniciar sesion. Antes guardaba CURRENT_USER(), que es el usuario
+de MySQL (siempre balbu_app) y no decia quien hizo el cambio. Si la variable
+no esta o el usuario ya no existe, cae a USER() para no perder la fila.
 */
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_INSERT ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_INSERT
@@ -254,7 +259,8 @@ AFTER INSERT ON CLIENTES
 FOR EACH ROW
 BEGIN
     INSERT INTO AUDITORIA_SISTEMA (TABLA_AFECTADA, ID_REGISTRO_AFECTADO, ACCION, USUARIO_SISTEMA, VALOR_NUEVO)
-    VALUES ('CLIENTES', NEW.ID_CLIENTE, 'INSERT', CURRENT_USER(), 
+    VALUES ('CLIENTES', NEW.ID_CLIENTE, 'INSERT',
+            IFNULL((SELECT USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL), USER()),
             CONCAT('Nombre: ', NEW.NOMBRE, ', Email: ', NEW.EMAIL));
 END //
 
@@ -263,7 +269,7 @@ END //
 TR_AUDIT_CLIENTES_UPDATE
 Se dispara al actualizar un cliente y guarda en la bitacora los valores
 antes y despues del cambio junto con el usuario. Trabaja en automatico,
-sin tener que llamarlo.
+sin tener que llamarlo. El actor se resuelve igual que en el INSERT.
 */
 DROP TRIGGER IF EXISTS TR_AUDIT_CLIENTES_UPDATE ;
 CREATE TRIGGER TR_AUDIT_CLIENTES_UPDATE
@@ -271,7 +277,8 @@ AFTER UPDATE ON CLIENTES
 FOR EACH ROW
 BEGIN
     INSERT INTO AUDITORIA_SISTEMA (TABLA_AFECTADA, ID_REGISTRO_AFECTADO, ACCION, USUARIO_SISTEMA, VALOR_ANTERIOR, VALOR_NUEVO)
-    VALUES ('CLIENTES', OLD.ID_CLIENTE, 'UPDATE', CURRENT_USER(), 
+    VALUES ('CLIENTES', OLD.ID_CLIENTE, 'UPDATE',
+            IFNULL((SELECT USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL), USER()),
             CONCAT('Nombre: ', OLD.NOMBRE, ', Email: ', OLD.EMAIL),
             CONCAT('Nombre: ', NEW.NOMBRE, ', Email: ', NEW.EMAIL));
 END //

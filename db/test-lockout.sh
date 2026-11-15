@@ -191,7 +191,7 @@ fi
 # --- 6) El conteo usa el indice del bloqueo -------------------------------
 plan=$(Q "EXPLAIN SELECT COUNT(*) FROM LOG_ACCESOS WHERE USUARIO_INTENTADO = '$USR' AND ESTADO_INTENTO = 'FALLIDO' AND FECHA_ACCESO >= NOW() - INTERVAL 15 MINUTE;")
 if ! printf '%s' "$plan" | grep -q "IX_LOG_ACCESOS_USUARIO_FECHA"; then
-    fallo "EXPLAIN no usa IX_LOG_ACCESOS_USUARIO_FECHA (aplicar modulos/64- SEGURIDAD_T2.sql)"
+    fallo "EXPLAIN no usa IX_LOG_ACCESOS_USUARIO_FECHA (aplicar modulos/28-LOG_ACCESOS.sql)"
 fi
 
 if [ "$fallos" -eq 0 ]; then

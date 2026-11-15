@@ -3,55 +3,29 @@
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
 > Lo hecho y los detalles largos salieron del repo el 08/11/2026: viven en
 > `../BalbuTechApp-fuera-del-repo/` (ver su `LEEME.md`).
-> Actualizado: 30/10/2026.
+> Actualizado: 14/11/2026.
 
 ---
 
 ## 🔴 P0 — Ahora (bloquea lo que estás haciendo)
 
-### 1. Permisos finos: Tanda B cerrada en TEST y en la viva
+### 1. Permisos finos (Tanda A y B) — ✅ cerrado el 12/11/2026
 
-Estado: **TEST migrado; la viva pendiente de los módulos 62 y 63** (30/10/2026: 7 roles, **58 permisos**, matriz **58/52/46/12/15/25/5 = 213 pares** en TEST; `test-menus-por-rol.sh` OK en TEST, `check-app-sps` 99/0 en TEST). Backup vivo previo: `backups/107-antes-permisos-inventario-20261027_123943.sql`. El 27/10 se re-aplicaron `36` y `58`: el estado real anterior era 52 permisos / 193 pares y VENDEDOR con 16, no 54/197. Usuarios, Empleados, Clientes, Proveedores, Asistencia, Productos, Ventas, Categorías, Marcas, Métodos de pago, Compras, Caja e Inventario ya están cerrados; **no queda ningún módulo con permiso paraguas**. El detalle con evidencia vive en `Realizado.md`, hoy fuera del repo. VENDEDOR ya no ve reportes ni ganancias: el historial tiene permiso propio (`CONSULTAR_HISTORIAL_VENTA`). VENDEDOR quedó en 15 permisos: no busca ni lista clientes (`CLIENTES_VER`), de Métodos de pago solo conserva `METODOS_PAGO_VER`, y en Garantías registra, reclama y consulta pero **no** finaliza.
-
-
-**Estimación de esfuerzo (26/10):** ya no quedan módulos con paraguas; la Tanda B está cerrada.
-
-- **Inventario** cerrado: `INVENTARIO_VER` abre Movimientos, `INVENTARIO_AJUSTAR` el ajuste de stock e `INVENTARIO_COSTO` el precio de compra. Cualquiera de los tres abre el ítem del menú.
-- **Caja** ya quedó cerrada en esta tanda: permisos propios (`CONSULTAR_CAJA`, `ABRIR_CAJA`, `CERRAR_CAJA`), módulo `53` aplicado en TEST y VENDEDOR conserva los tres.
-- **Ventas** ya está cerrado, Garantías incluida: el módulo `62` le dio cuatro permisos propios y el submenú ya no despacha por número fijo. Falta aplicarlo en la viva.
-- Lo que sigue son los P1/P2 (garantías, RRHH, deuda técnica), no permisos finos.
-
-**Patrón** (referencia: `clientes.cpp`, el más chico y limpio):
-
-- enum de acciones + vector `{etiqueta, permiso, accion}`; `permiso` vacío = siempre visible.
-- Lista filtrada con `tienePermiso()` y **despacho por `accion`**, nunca por número absoluto.
-- Numerar sobre lo visible (sin huecos); no repetir `tienePermiso` dentro de cada `case`.
-- Incluir `roles.h` en el `.cpp`.
-- En `roles.cpp`, `{}` significa **siempre visible** (no usar vector vacío para "todos").
-
-**Por módulo:** proponer permisos (`X_VER`, `X_CREAR`, `X_EDITAR`, `X_ESTADO`), aplicar el patrón, actualizar `roles.cpp`, `modulos/36- PERMISOS_ROLES.sql/.md` y `db/test-menus-por-rol.sh`; probar en `BALBU_TECH_TEST` y **recién después** la viva con backup previo.
-
-**Trampas ya encontradas:**
-
-- `FN_TIENE_PERMISO` no valida cuentas `INACTIVO` (un usuario dado de baja sigue devolviendo `TRUE`).
-- `REGISTRAR_ASISTENCIA` **ya no abre Empleados**: desde el 23/10/2026 abre el
-  ítem propio `Asistencia` (primero del menú). `CONSULTAR_ASISTENCIA` filtra los
-  reportes; VENDEDOR, ALMACEN y CONTABILIDAD solo fichan y ven lo suyo.
-  **Resuelto** (ver `Realizado.md`, 23/10, hoy fuera del repo).
-- El cliente `mariadb` dentro de `docker compose exec` pierde las comillas dobles del SQL (usar archivo `.sql` o here-doc).
-- `db/import.sh` no dropea la base; y el `DROP` borra el grant de `balbu_app` (hay que volver a otorgarlo).
-- `ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE` es ambiguo si el `SELECT` también lee `ROL_PERMISO`.
+Verificado contra las dos bases: **58 permisos, 213 pares, 7 roles**, ningún
+módulo con permiso paraguas, 0 usuarios huérfanos y `EMPLEADO`/`CAJERO`
+erradicados. El `36` es el único dueño de la matriz. Detalle en la tabla de
+cerrados.
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (`36`, `44`, `45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`, `63`, `64`, `65`, `66`). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 102/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería completa en verde. Detalle en `Realizado.md`, hoy fuera del repo.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (la crea `36`; el resto son los módulos de soporte). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 123/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería completa en verde. Detalle en `Realizado.md`, hoy fuera del repo.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 102/0 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 123/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
@@ -154,7 +128,7 @@ Ambas deben dar 7 roles y 0 usuarios huérfanos.
 - [ ] **28 Accesos:** entrar/salir y ver las filas.
 - [ ] Limpiar los datos de prueba (permisos, vacaciones, log) al terminar.
 
-Cierre: build OK, `check-app-sps` 99/0, visual OK, sin datos de prueba.
+Cierre: build OK, `check-app-sps` 123/0, visual OK, sin datos de prueba.
 
 ### 4. Contratos: cargar los datos de la empresa
 
@@ -170,88 +144,190 @@ Cierre: build OK, `check-app-sps` 99/0, visual OK, sin datos de prueba.
 - [ ] Agregar a la plantilla: nacionalidad, edad, sexo, estado civil, **RNL** (Registro Nacional del Trabajador), lugar de prestación, provincia y municipio. Checklist y fuentes: `Flujos/Contrato de trabajo - requisitos legales RD.md`, hoy fuera del repo.
 - [ ] Revisión legal del texto antes de usarlo con personal real (la plantilla ya lo dice al pie).
 
-### 6. Garantías: estructurar el flujo (implementado en TEST, falta la viva)
+### 6. Garantías — ✅ aplicado en TEST y en la viva (30/10, confirmado 12/11)
 
-Estado: **implementado en TEST el 30/10/2026** con los módulos `62`
-(`PERMISOS_GARANTIAS`) y `63` (`GARANTIAS_FLUJO`); falta aplicarlo en la viva
-con backup previo y orden explícita. El diseño de abajo se cumplió completo:
-autor y fechas, validación por fecha, `VENCIDA`, consultas y registro
-**automático** al confirmar la venta (la opción que quedaba abierta). Queda
-sin hacer el módulo `34` (`ASIGNACIONES_RECLAMOS`, asignar técnicos).
-
-**Permisos nuevos (4):**
-
-| Permiso | Roles |
-|---|---|
-| `GARANTIAS_REGISTRAR` | ADMIN, GERENTE, SUBGERENTE, VENDEDOR |
-| `GARANTIAS_RECLAMAR` | ADMIN, GERENTE, SUBGERENTE, VENDEDOR |
-| `GARANTIAS_FINALIZAR` | ADMIN, GERENTE, SUBGERENTE |
-| `GARANTIAS_CONSULTAR` | los 4 + CONTABILIDAD |
-
-La diferencia clave: **el vendedor ya no cierra reclamos**. Atiende y registra, pero la decisión queda en Gerencia. VENDEDOR conserva `GARANTIAS_REGISTRAR` y `GARANTIAS_RECLAMAR`.
-
-**Datos (módulo 63, idempotente):**
-
-- `GARANTIAS`: `ID_EMPLEADO` (quién registró) y `FECHA_REGISTRO`.
-- `RECLAMOS_GARANTIAS`: `ID_EMPLEADO`, `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE`.
-- `PRODUCTOS.DIAS_GARANTIA` (NULL/0 = sin garantía automática; los 49
-  productos existentes quedan en NULL).
-
-**SPs:**
-
-- `SP_REGISTRAR_GARANTIA(detalle, dias, idEmpleado)`.
-- `27_SP_REGISTRAR_RECLAMO_GARANTIA(garantia, descripcion, idEmpleado)`; validar `CURRENT_DATE BETWEEN FECHA_INICIO AND FECHA_FIN`, no solo `ESTADO`.
-- `27_SP_FINALIZAR_RECLAMO_TOTAL(reclamo, idEmpleado)`; validar que el estado sea `PENDIENTE` o `APROBADO`.
-- `SP_CONSULTAR_GARANTIAS`, `SP_CONSULTAR_RECLAMOS` y `SP_LINEAS_VENTA_CON_GARANTIA`.
-- `SP_MARCAR_GARANTIAS_VENCIDAS`, invocado por `SP_CONSULTAR_GARANTIAS`
-  antes de listar (no hay scheduler).
-
-**UI:**
-
-- Registrar: pedir **ID de venta** y listar sus detalles, en vez de pedir el ID de detalle.
-- Reclamar y finalizar: listar lo que corresponde, no pedir IDs de memoria.
-
-**Decisión tomada:** registro **automático al confirmar la venta** con los días
-del producto (`TR_REGISTRAR_GARANTIA_VENTA`); el alta manual queda como
-respaldo para ventas viejas.
-
-**Cierre hecho en TEST:** build, `check-app-sps` 99/0, test de menús, `test-garantias.sh` 11/0 y `test-migracion-roles.sh` OK. Falta la prueba manual con VENDEDOR en la viva (no debe poder finalizar) y aplicar `63` → binario → `62` con backup previo.
+Módulos `62` y `63`: 4 permisos `GARANTIAS_*`, 7 SP, `TR_REGISTRAR_GARANTIA_VENTA`
+y registro automático al confirmar la venta. Único pendiente: la prueba manual
+con VENDEDOR de §2.8 (no debe poder finalizar un reclamo). Lo que queda sin
+cablear es el módulo `34` (ítem 8).
 
 ### 7. RRHH: módulos que faltan
 
-- [ ] **14 Bonos** — pantalla mínima (listar, pagar, anular). El 1% ya lo genera el trigger de 24.
-- [ ] **15 Historial laboral** — `CARGO_ANTERIOR/NUEVO VARCHAR(30)` vs `EMPLEADOS.CARGO VARCHAR(50)`: ampliar a 50 y migrar.
-- [ ] **30 Auditoría de permisos** — trigger activo; falta el lector y decidir si guarda el actor (hoy no lo tiene).
-- [ ] **16 Liquidaciones** — **no tocar todavía**: la fórmula `SALARIO * AÑOS` es placeholder y "Despedir" vs "Liquidar" no cierra. Decidir el flujo de negocio primero.
+- [ ] **14 Bonos** — pantalla mínima (listar, pagar, anular). El 1% ya lo genera el trigger de 24. *Medido el 12/11 con `db/cobertura-modulos.sh`: la app no llama ninguno de sus 5 SP.*
+- [x] **Auditoría de permisos — ✅ aplicada en la viva el 14/11/2026.** La bitácora
+  está completa y probada en TEST (`db/test-auditoria-permisos.sh` 19/0) y vive
+  **dentro del módulo `13`**: guarda el actor, audita alta/cambio/baja y agrega la
+  vista `VIEW_HISTORIAL_PERMISOS` con sus 2 SP de lectura, sin permiso nuevo (usa
+  `GESTIONAR_PERMISOS_EMPLEADO`). La viva no la tenía, así que
+  `SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO` y `SP_CONTAR_AUDITORIA_PERMISOS`
+  —que `permisos.cpp` ya llama— faltaban y la pantalla "Empleados → Ver auditoría
+  de permisos" estaba rota en producción. **Arreglado**: se aplicó la sección
+  `AUDITORIA` del `13` (`sed -n '248,$p'`), con backup
+  `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql`, y después
+  `db/mapear-permisos.sql`. `check-app-sps.sh` contra `BALBU_TECH`:
+  **Faltantes 0 (123), guardas completas, 41 mapeos**. La tabla del log pasó de 5
+  a las 9 columnas de una instalación limpia, el trigger viejo
+  `TR_LOG_GESTION_PERMISO` se retiró y quedaron los tres por evento. Humo en la
+  viva con transacción revertida: `ALTA` → `CAMBIO_ESTADO` → `BAJA`, el
+  `ON DELETE SET NULL` de `FK_LOG_PERMISO` deja el `ID_PERMISO` en NULL y
+  sobreviven `ID_EMPLEADO`/`TIPO_PERMISO`, la vista y el `SP` paginado devuelven
+  las tres filas, cero residuo. **Se aplicó solo la sección de auditoría, no el
+  módulo entero**: los demás objetos del `13` ya estaban al día en la viva y
+  reimportarlos habría recreado sus 4 `SP` sin las guardas de permiso. El ensayo
+  en seco del mapeo (sobre una copia restaurada del backup) mostró que cambia
+  exactamente 2 filas y respeta los 178 `EXIGIR = 1`.
+- [ ] **16 Liquidaciones** — **parkeado el 12/11/2026**: el dueño investiga la ley antes de tocar código. La fórmula `SALARIO * AÑOS` es placeholder. Reglas legales verificadas y plan de 6 fases quedaron en memoria (`rrhh/liquidaciones-decision`, `rrhh/liquidaciones-ley-16-92`).
 
 ### 8. Decisiones de producto (una vez cada una)
 
 - [ ] **¿RRHH va o no?** (12, 13, 14, 16 y el historial de 15). Con lo ya hecho, va.
-- [ ] **¿28 LOG_ACCESOS?** Ya está cableado y commiteado; solo falta la prueba visual (P0).
-- [ ] **¿34 ASIGNAR RECLAMOS?** Cablear el flujo o borrarlo con su tabla.
-- [ ] **¿35 DETALLE_REPARACIONES?** ¿Repuesto con stock o texto libre?
-- [ ] **¿19.5 anular pago y 22 quitar/modificar línea?** ¿Pantalla o SQL?
+- [ ] **¿Asignaciones de reclamos?** (tabla `ASIGNACIONES_RECLAMOS` y sus 2 SP, ex módulo `34`, hoy dentro del `25`). Cablear el flujo o borrarlos con su tabla. *Medido el 12/11: ninguno de sus 2 SP lo llama nadie; revalidado el 14/11 tras la fusión.*
+- [ ] **¿Detalle de reparaciones?** (tabla `DETALLE_REPARACIONES` y su SP, ex módulo `35`, hoy dentro del `25`). ¿Repuesto con stock o texto libre? *Medido el 12/11: su único SP no lo llama nadie; revalidado el 14/11 tras la fusión.*
+- [ ] **¿19 anular pago y quitar/modificar línea?** ¿Pantalla o SQL? *Medido el 12/11: 4 SP sin uso; el «22» es hoy la sección del detalle dentro del `19`.*
 
 ### 9. Bugs y deuda con impacto
 
 - [ ] **`CONTRATOS.SALARIO` sigue legible** — el flujo de contratos pendientes lo lee directo. Si se quiere cerrar, hay que pasarlo a un SP.
 - [ ] **`balbu_app` tiene grants sobre `BALBU_TECH_TEST` en el servidor de producción** — no hace falta ahí; quitarlo cuando el test deje de correr contra la misma instancia.
-
-- [ ] **Venta multi-línea atómica** (P-4 de la auditoría).
-- [ ] **P-3 validaciones**: 8 errores pintados en verde, advertencia de precio descartada y monto de la liquidación tomado del cliente.
+- [x] **P-3 validaciones — errores pintados en verde: ✅ arreglado el 14/11/2026.**
+  Eran **4**, no 5: `ventas.cpp:313`, `compras.cpp:172`, `compras.cpp:275` y
+  `compras.cpp:728`. El `empleados.cpp:440` de esta lista era en realidad la
+  **441** y **ya estaba bien**: usa salida temprana
+  (`if (error) { rojo; return; } verde;`). Los otros dos que aparecen al barrer el
+  código (`permisos.cpp`, `vacaciones.cpp`) pasan por un helper
+  `mensajeDeError()` que sí chequea. Se aplicó el patrón de `caja.cpp`/`accesos.cpp`
+  en los 4 lugares y `bash build.sh` da OK. **Falta la prueba end-to-end**, que
+  necesita un login de la app (`BALBU_PASS`): eso es lo que desbloquea re-sembrar
+  el admin de TEST (P2, abajo).
+- [ ] **P-3: advertencia de precio descartada.** *(El "monto de la liquidación
+  tomado del cliente" salió de la lista: no hay una sola referencia a liquidación
+  en el C++.)*
+- [ ] **Definiciones repetidas entre módulos** (medido el 12/11, actualizado el
+  12/11 tras la fusión de auditoría): **8 SPs** están definidos en dos módulos cada
+  uno y gana el último que se importe: `SP_REPORTE_VENTAS`, `SP_REPORTE_PERIODO` y
+  `SP_CIERRE_CAJA` (24 vs 60), `SP_CAMBIAR_CLAVE_USUARIO` (10 vs 67),
+  `SP_LOGIN_AUTENTICAR` (65 vs 66), `SP_REGISTRAR_GARANTIA` (25 vs 63) y
+  `27_SP_REGISTRAR_RECLAMO_GARANTIA` + `27_SP_FINALIZAR_RECLAMO_TOTAL` (27 vs 63).
+  Los tres de auditoría (6 vs 57) desaparecieron al disolver el `57` en el `6`.
+  Se revisa con `bash db/cobertura-modulos.sh`, que lista esta sección siempre.
 - [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI).
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
-- [ ] **Barrido del resto de los `while` con `leerDatoSeguro`** (el 18/10 solo se tocó `contrato.cpp`; los bucles con EOF pueden girar sin fin).
 
 ### 10. Hallazgos del mapa de módulos (21/10)
 
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
 
+### 11. Verificar antes de creer (sin confirmar al 12/11/2026)
+
+Nada de acá está probado salvo lo que dice explícitamente "verificado". Son
+afirmaciones del archivo viejo o del código que no se pudieron cerrar revisando
+solo el repo. No se planifica encima sin mirar primero.
+
+- [ ] **P-4 venta multi-línea atómica.** No hay `START TRANSACTION` en
+  `ventas.cpp` y no existe un SP que cierre la venta completa: se abre con
+  `21_SP_INICIAR_VENTA` y cada línea entra con `SP_AGREGAR_DETALLE_VENTA`. Hay
+  que decidir si una venta abierta con líneas sueltas es un borrador aceptable
+  o un agujero que deja stock descontado sin venta cerrada.
+- [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
+  clasificado en el ítem 12. La decisión es por grupo, no por SP suelto.
+
+### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026)
+
+Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
+contra los SP que la app llama y los que esos llaman: **197 definiciones, 186
+rutinas distintas** (11 nombres están definidos en dos módulos). De las que la
+app no llama:
+
+- **45 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
+  `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
+  interna: no se tocan.
+
+#### 12.1 Las 45 sin llamador
+
+**a) API sin pantalla — Qt probablemente las quiera, no borrar:**
+
+| Módulo | SP |
+|---|---|
+| 19 Compras | `SP_ASIGNAR_FACTURA_COMPRA` |
+| 21 Ventas | `SP_ASIGNAR_FACTURA_VENTA` |
+| 19 Pagos de compra | `SP_ANULAR_PAGO_COMPRA`, `SP_REGISTRAR_NOTA_CREDITO_COMPRA` |
+| 22 Detalle de compra | `SP_MODIFICAR_LINEA_COMPRA`, `SP_QUITAR_DETALLE_COMPRA` |
+| 17 Inventario (ex 20) | `SP_KARDEX_PRODUCTO`, `SP_KARDEX_TODOS` |
+| 8 Empleados | `SP_ANIVERSARIOS_MES`, `SP_AUMENTO_POR_CARGO`, `SP_BUSQUEDA_RAPIDA_EMPLEADOS`, `SP_CONSULTAR_EMPLEADOS`, `SP_GENERAR_RECIBO_EMPLEADO`, `SP_REPORTE_NOMINA_TOTAL` |
+| 12 Vacaciones | `SP_CONSULTAR_EMPLEADOS_DE_VACACIONES`, `SP_REPORTE_DIAS_CONSUMIDOS`, `SP_VALIDAR_CUPO_VACACIONES` |
+| 9 Productos | `SP_REPORTE_STOCK_CRITICO` |
+| 1 Categorías | `1_SP_CATEGORIAS_POR_FECHA` |
+| 2 Marcas | `SP_BUSCAR_MARCA`, `SP_LISTAR_MARCAS` |
+| 3 Roles | `SP_LISTAR_ROLES` |
+| 7 Clientes | `SP_LISTAR_CLIENTES` |
+| 10 Usuarios | `SP_BUSCAR_USUARIOS_FILTRADO` |
+| 39 Lecturas | `SP_COMPRAS_ULTIMAS` |
+
+**b) Módulos enteros sin uso — decidir si se cablean o se borran:**
+
+| Módulo | SP | Nota |
+|---|---|---|
+| 14 Bonos empleados | `SP_REGISTRAR_BONO`, `SP_ACTUALIZAR_BONO`, `SP_ANULAR_BONO`, `SP_PAGAR_BONO`, `SP_LISTAR_BONOS` | Los 5. El 1 % de ventas lo genera un trigger; la pantalla no existe. |
+| 34 Asignar reclamos | `SP_ASIGNAR_TECNICO_RECLAMO`, `SP_FINALIZAR_RECLAMO` | Sin cablear (ítem 8). |
+| 35 Detalle reparaciones | `SP_REGISTRAR_AVANCE_REPARACION` | Sin cablear (ítem 8). |
+
+**c) Restos y duplicados — candidatos a borrar:**
+
+| SP | Dónde | Por qué |
+|---|---|---|
+| `SP_REPORTE_VENTAS` | 24 **y** 60 | La app usa `_PAGINADO` |
+| `11_SP_REGISTRAR_SALIDA` | 11 | Lo reemplazó el fichaje del 66 |
+| `SP_ACTUALIZAR_VACACIONES` | 12 | Le falta validar (ítem 9) |
+| `SP_INSERTAR_INVENTARIO` | 17 | Lo reemplazó el ajuste del 20 |
+| `18_SP_CAMBIAR_ESTADO_PRODUCTO` | 9 | Lo hace el `UPDATE` + trigger |
+| `SP_OBTENER_LOG_USUARIOS` | 29 | Duplica la consulta directa |
+| `SP_ESTADO_BLOQUEO_LOGIN` | 28 | El bloqueo vive en `SP_LOGIN_AUTENTICAR` |
+| `1_SP_VERIFICAR_CATEGORIA_EXISTE` | 1 | Lo valida el `UNIQUE` |
+
+**d) Liquidaciones:** `SP_REGISTRAR_LIQUIDACION` — parkeado, no se toca.
+
+#### 12.2 Triggers que escriben donde nadie lee
+
+Criterio: la tabla destino no la nombra la app, ni la lee un SP alcanzable desde
+la app, ni la lee una vista que esos SP consulten. **15 triggers distintos, en 6
+tablas:**
+
+| Tabla destino | Triggers | Módulos |
+|---|---|---|
+| `AUDITORIA_SISTEMA` | `TR_AUDIT_PROVEEDORES_INSERT/UPDATE/DELETE`, `TR_AUDIT_CLIENTES_INSERT/UPDATE`, `TR_AUDITORIA_PRODUCTOS_UPDATE` | 6, 7, 9 |
+| `HISTORIAL_MOVIMIENTOS_PRODUCTO` | `TR_HISTORIAL_COMPRA`, `TR_HISTORIAL_VENTA`, `TR_HISTORIAL_DEVOLUCION` | 32 |
+| `HISTORIAL_ESTADOS_COMPRA` | `TR_HISTORIAL_ESTADO_COMPRA`, `TR_CAMBIO_ESTADO_COMPRA` | 19 |
+| `LOG_USUARIOS` | `TRG_AUDITORIA_USUARIOS`, `17_TR_VALIDAR_STOCK_MINIMO` | 29, 17 |
+| `HISTORIAL_ESTADOS_PRODUCTO` | `TR_LOG_CAMBIO_ESTADO_PRODUCTO` | 9 |
+| `HISTORIAL_LABORAL_EMPLEADO` | `TR_AUDITORIA_PERFIL_EMPLEADO` | 15, 55 |
+
+Matiz importante: `LOG_USUARIOS` y `AUDITORIA_SISTEMA` **sí** tienen SP de lectura
+(`SP_OBTENER_LOG_USUARIOS`, los `6_*`), pero esos SP tampoco se llaman. Si Qt les
+da pantalla, los triggers dejan de ser huérfanos. La decisión es de negocio: son
+bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable.
+
 ---
 
 ## 🟡 P2 — Media (reproducibilidad y limpieza)
 
+- [ ] **La clave del usuario `admin` en TEST no coincide con la del `.env` (14/11/2026).**
+  `test-menus-por-rol.sh` usa `BALBU_USER`/`BALBU_PASS` (por defecto `admin` y la
+  clave del `.env`) para los seis casos ADMIN; hoy los seis fallan con
+  «Credenciales inválidas» mientras los roles sembrados por el propio test pasan
+  todos. Verificado: el `admin` de TEST tiene el formato del módulo 65
+  (`CLAVE_SERVIDOR` presente, `CONTRASENA` en `NULL`, `SALT_LOGIN` e `ITER_LOGIN`
+  seteados), así que su clave se rotó en algún momento y no es la del `.env`.
+  No es un fallo de la app ni de la fusión de módulos: se confirmó creando un
+  usuario temporal con rol ADMIN y la clave del `.env`, que sí entra y ve las 5
+  opciones del submenú de garantías. Se arregla re-sembrando el admin de TEST
+  (`db/seed-admin.sh BALBU_TECH_TEST`, con backup), o pasando `BALBU_USER` y
+  `BALBU_PASS` reales al correr el test. No hace falta para la viva.
+- [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
+  `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
+- [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
+  dobles del SQL.** Usar archivo `.sql` o here-doc.
 - [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE`, los `SELECT *` y los `CALL` de semilla.
 - [ ] **`db/import.sh`** sigue con `--force` (ahora cuenta los `^ERROR` y avisa): hacerlo fallar de verdad.
 - [ ] **Consolidar los `ALTER` de 25** dentro del `CREATE TABLE`; `DROP IF EXISTS` en los `CREATE` del módulo 11.
@@ -260,6 +336,46 @@ respaldo para ventas viejas.
 - [ ] **Sidecar `.borrador`** guarda PII en texto plano junto al HTML (registrado y aceptado por el dueño).
 - [ ] **`contratos/firmados/`**: sin listado, renombre ni limpieza; la administra RRHH a mano.
 - [ ] **P-6**: decidir cablear o retirar lo construido y no cableado (garantías, reclamos, reparaciones, bonos manuales).
+- [ ] **Orden de los tres triggers `AFTER UPDATE` de `EMPLEADOS` invertido (13/11/2026).**
+  En TEST y en la viva quedaron `TR_AUDITORIA_PERFIL_EMPLEADO`=1 y
+  `TR_DESACTIVAR_USUARIO_POST_LIQUIDACION`=3, al revés que en una importación limpia
+  (`DESACTIVAR`=1, `PERFIL`=2, `INVALIDAR_SESION`=3). No lo introdujo la fusión de
+  auditoría: es drift viejo, el mismo que existía el módulo `55` para tapar, pero al
+  revés. Se arregla **reimportando el módulo `15`**, que recrea `TR_AUDITORIA_PERFIL_EMPLEADO`
+  con su `FOLLOWS` y lo reordena (verificado en una base scratch). No aplicar sin
+  autorización del dueño: toca las dos bases y no es urgente, porque las tres acciones
+  son independientes y el orden no cambia el resultado observable hoy.
+- [ ] **Reimportar el `19` o el `21` desarma cinco cadenas de `FOLLOWS` (14/11/2026).**
+  Los módulos `19` y `21` son ahora agregados completos: reimportarlos recrea sus
+  triggers propios **y** los del detalle, y todos se van al final de su grupo. Las
+  cadenas declaradas con `FOLLOWS` que se rompen son:
+  - `COMPRAS` `AFTER UPDATE` (3): `TR_CAMBIO_ESTADO_COMPRA` (19) →
+    `TR_RECALCULAR_COSTO_COMPRA_CANCELADA` (19) → `TR_MAPA_COMPRA_RECIBIDA` (32).
+  - `VENTAS` `AFTER UPDATE` (2): `TR_CAMBIO_ESTADO_VENTA` (21) →
+    `TR_REGISTRAR_GARANTIA_VENTA` (63).
+  - `DETALLE_COMPRA` `AFTER INSERT` (5): `TR_CALCULAR_TOTAL_COMPRA` →
+    `TR_ACTUALIZAR_STOCK_COMPRA` → `TR_AUDITORIA_MOVIMIENTO_COMPRA` →
+    `TR_ACTUALIZAR_COSTO_COMPRA` → `TR_HISTORIAL_COMPRA` (32).
+  - `DETALLE_COMPRA` `AFTER DELETE` (4): `TR_RECALCULAR_TOTAL_COMPRA` →
+    `TR_ACTUALIZAR_STOCK_BORRADO_COMPRA` → `TR_AUDITORIA_BORRADO_COMPRA` →
+    `TR_RECALCULAR_COSTO_BORRADO_COMPRA`.
+  - `DETALLES_VENTA` `AFTER INSERT` (3): `TR_AUDITORIA_MOVIMIENTO_VENTA` →
+    `TR_ACTUALIZAR_TOTAL_VENTA` → `TR_HISTORIAL_VENTA` (32).
+  **Se restaura reimportando en orden `32`, `40` y `63`**: cada uno declara el
+  `FOLLOWS` sobre el trigger que se corrió y se recrea detrás, así el orden vuelve
+  solo. (14/11/2026) El `54` salió de la lista: se **borró** porque era idéntico a
+  la definición que ya trae el `32`, y reimportar el `32` solo ya restaura el orden.
+  Verificado en TEST y en una instalación limpia. `SHOW CREATE TRIGGER` no
+  muestra el `FOLLOWS`; el orden real está en
+  `information_schema.TRIGGERS.ACTION_ORDER`. Importante para el próximo `import.sh`
+  sobre una base existente: el `19` y el `21` son válidos por sí solos, pero dejan el
+  catálogo desordenado. No corregir los módulos sin autorización.
+- [ ] **La cadena de compras tiene un orden distinto en la viva (13/11/2026).**
+  TEST y la viva pueden tener 1=RECALCULAR, 2=MAPA, 3=CAMBIO si alguien reimportó el
+  `19`. La instalación limpia da 1=CAMBIO, 2=RECALCULAR, 3=MAPA. Se corrige con el
+  mismo reimport de arriba; si hiciera falta sola, un `drop`+`create` de los tres en
+  orden. No es urgente: los tres leen el mismo `NEW.ESTADO` y no dependen del resultado
+  del anterior.
 
 ---
 
@@ -284,10 +400,14 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Registrar contrato firmado (fases 1–8) | 19/10 | `Realizado.md` — 4ª parte |
 | C-3: permisos administrables | 20/10 | commit del 20/10 |
 | Set final de 7 roles | 22/10 | commit `22b2f8e` |
-| Permisos finos (Tanda A y B) | 22–23/10 | `Realizado.md` — 23/10 |
 | Asistencia v1 y v2 | 16–17/10 | `Realizado.md` |
 | Flujo de compras / ventas | 08/10 | `Realizado.md` |
 | Observaciones SQL | 09/10 | cerrado salvo "consolidar ALTER" (P2) |
+| Permisos finos Tanda A y B | 22–23/10, cerrado 12/11 | 58 permisos / 213 pares en TEST y en la viva, sin paraguas; `modulos/36` es el único dueño de la matriz |
+| Garantías: flujo completo | 30/10, aplicado en la viva | módulos `62` y `63`; solo falta la prueba manual de §2.8 |
+| Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
+| Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
+| Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---
 
@@ -297,8 +417,11 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 # Build
 ./build.sh
 
-# SPs que usa la app (debe dar 99/0)
-DB_HOST=127.0.0.1 bash db/check-app-sps.sh
+# SPs que usa la app (debe dar 123/0, siempre contra TEST)
+DB_HOST=127.0.0.1 DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh
+
+# Cobertura: que SPs existen y nadie llama (no necesita base de datos)
+bash db/cobertura-modulos.sh
 
 # Menús por rol (sobre TEST)
 BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS='<clave-admin>' DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh

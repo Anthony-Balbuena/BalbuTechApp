@@ -59,8 +59,8 @@ static void registrarAjuste() {
             // (08/11/2026) Paginado de 10 en 10 con el par de SPs del modulo 9.
             imprimirEncabezadoProductosInv();
             mostrarPaginadoSP(
-                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
-                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?, 'INCLUIR')",
+                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'INCLUIR')",
                 {filtro},
                 imprimirFilaProductoInv);
         } catch (const exception &) {
@@ -108,8 +108,8 @@ static void actualizarCostoUI() {
             // (08/11/2026) Paginado de 10 en 10, igual que el ajuste de stock.
             imprimirEncabezadoProductosInv();
             mostrarPaginadoSP(
-                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
-                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+                "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?, 'INCLUIR')",
+                "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'INCLUIR')",
                 {filtro},
                 imprimirFilaProductoInv);
         } catch (const exception &) {

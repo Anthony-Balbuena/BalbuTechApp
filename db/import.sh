@@ -59,7 +59,7 @@ avisos=0
 # Antes cualquier 1050 contaba como fallo, asi que reimportar siempre "fallaba"
 # y el script moria ANTES de inyectar las guardas: la base quedaba con SPs sin
 # control de permisos y en silencio (paso dos veces en BALBU_TECH).
-# sort -V ordena 1,2,3...10,11...36 (y 19 < 19.5 < 19.6 < 20) correctamente.
+# sort -V ordena 1,2,3...10,11...36 (y ya no quedan decimales) correctamente.
 while IFS= read -r f; do
   case "$f" in
     *todo_modulos.sql|*probando*|*BALBU_TECH*) continue ;;

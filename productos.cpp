@@ -150,7 +150,12 @@ void registrarProducto() {
 
         string imagen = leerDatoSeguro("\nImagen (ruta o URL, presione Enter para omitir): ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?,?)"));
+        // (15/11/2026) Un repuesto de garantia tiene su propio CODIGO y NO se
+        // vende: se guarda para reparar. El flujo de venta lo rechaza.
+        string esRep = leerDatoSeguro("\nEs repuesto de garantia? (s/N): ");
+        int esRepuesto = (esRep == "s" || esRep == "S" || esRep == "si" || esRep == "SI") ? 1 : 0;
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_INSERTAR_PRODUCTO(?,?,?,?,?,?,?,?,?,?)"));
         pstmt->setString(1, nombre);
         pstmt->setString(2, descripcion);
         pstmt->setDouble(3, compra);
@@ -165,6 +170,7 @@ void registrarProducto() {
         } else {
             pstmt->setString(9, imagen);
         }
+        pstmt->setInt(10, esRepuesto);
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -212,6 +218,14 @@ void actualizarProducto() {
                      << tablaCelda(res->getString("MARCA"), W_MAR) << "\n"
                      << tablaLinea(ANCHO) << "\n";
             });
+    } catch (const CancelarOperacionException &e) {
+        // (15/11/2026) El paginador lee su tecla con leerDatoSeguro, asi que 'xxx'
+        // lanza CancelarOperacionException. Este try solo atrapaba sql::SQLException
+        // (hermano de std::exception, no hijo) y la excepcion salia hasta main:
+        // std::terminate y 'Aborted (core dumped)'.
+        // Cancelar aca es abandonar la pantalla, no seguir pidiendo el ID.
+        cout << "\n[!] " << e.what() << endl;
+        return;
     } catch (const sql::SQLException &e) {
         cerr << CIAN << "Error al mostrar las listas: " << RESET << e.what() << endl;
     }
@@ -226,7 +240,7 @@ void actualizarProducto() {
         string codigo = leerDatoSeguro("Nuevo codigo: ");
         string descripcion = leerDatoSeguro("Nueva descripcion: ");
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement("CALL SP_ACTUALIZAR_PRODUCTOS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         pstmt->setInt(1, idProducto);
 
         if (nombre.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
@@ -262,6 +276,12 @@ void actualizarProducto() {
         double vCosto = leerNumeroConIntentos("Precio de compra $ (Enter para omitir): ", 0, 999999999.99, &dMenosUno);
         if (vCosto < 0) pstmt->setNull(10, sql::DataType::DOUBLE);
         else pstmt->setDouble(10, vCosto);
+
+        // (15/11/2026) s/n para marcarlo como repuesto de garantia; Enter = dejarlo
+        // como esta.
+        string esRep = leerDatoSeguro("Es repuesto de garantia? (s/N, Enter = no cambiar): ");
+        if (esRep.empty()) pstmt->setNull(11, sql::DataType::INTEGER);
+        else pstmt->setInt(11, (esRep == "s" || esRep == "S" || esRep == "si" || esRep == "SI") ? 1 : 0);
 
         string respuesta = Recogermensaje(pstmt.get());
         cout << "\n--------------------------------------------" << endl;
@@ -304,7 +324,7 @@ void cambiarEstadoProducto() {
         int idProducto = (int)leerNumeroConIntentos("Ingrese el ID del producto (NUMERO): ", 1, 999999999);
 
         // (29/10/2026) Deja el actor en la conexion para que el trigger
-        // TR_LOG_CAMBIO_ESTADO_PRODUCTO (modulo 61) no caiga al empleado 1.
+        // TR_LOG_CAMBIO_ESTADO_PRODUCTO (modulo 9) no caiga al empleado 1.
         // La subconsulta devuelve NULL si el empleado de la sesion no existe.
         std::unique_ptr<sql::PreparedStatement> pActor(globalCon->prepareStatement(
             "SET @ID_EMPLEADO_ACTUAL = (SELECT ID_EMPLEADO FROM EMPLEADOS WHERE ID_EMPLEADO = ?)"
@@ -366,9 +386,16 @@ void buscarProducto() {
              << tablaCelda("ESTADO", W_EST) << "\n"
              << tablaLinea(ANCHO) << "\n";
 
+        // (15/11/2026) Un vendedor no ve los repuestos, y esta pantalla es el
+        // camino por donde hoy ve stock (columna CANTIDAD = STOCK_ACTUAL). El
+        // permiso decide el filtro; va como literal para no pelear con el binding
+        // del paginador (que agrega pagina y porPagina al final).
+        const bool verRepuestos = tienePermiso("REPUESTO_VER");
         int encontrado = mostrarPaginadoSP(
-            "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?)",
-            "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?)",
+            verRepuestos ? "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?, 'INCLUIR')"
+                         : "CALL SP_CONSULTAR_PRODUCTOS_PAGINADO(?, ?, ?, 'EXCLUIR')",
+            verRepuestos ? "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'INCLUIR')"
+                         : "CALL SP_CONTAR_PRODUCTOS_FILTRADOS(?, 'EXCLUIR')",
             {busqueda},
             [=](sql::ResultSet *res) {
                 string costoStr;
@@ -505,6 +532,10 @@ void reporteStockCritico() {
         } else {
             cout << "\n [!] Alerta: " << encontrados << " producto(s) requieren reabastecimiento." << endl;
         }
+    } catch (const CancelarOperacionException &e) {
+        // (15/11/2026) Mismo caso que la lista de actualizar: 'xxx' en el
+        // paginador de stock critico no era sql::SQLException y abortaba la app.
+        cout << "\n[!] " << e.what() << endl;
     } catch (const sql::SQLException &e) {
         cout << "\n [!] ERROR DE BASE DE DATOS AL GENERAR REPORTE: " << e.what() << endl;
     }

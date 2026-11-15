@@ -86,19 +86,36 @@ ordena **por nombre**.
 
 ## Triggers
 
-### `TR_AUDIT_CLIENTES_INSERT`
+### `TR_AUDIT_CLIENTES_INSERT` (`AFTER INSERT ON CLIENTES`)
 
-`AFTER INSERT ON CLIENTES`. Escribe en `AUDITORIA_SISTEMA`
-(`TABLA_AFECTADA = 'CLIENTES'`, `ACCION = 'INSERT'`, `CURRENT_USER()`) y
-guarda en `VALOR_NUEVO`: `Nombre: <nombre>, Email: <email>`.
+Escribe en `AUDITORIA_SISTEMA` (`TABLA_AFECTADA = 'CLIENTES'`,
+`ACCION = 'INSERT'`) y guarda en `VALOR_NUEVO`:
+`Nombre: <nombre>, Email: <email>`.
 
-### `TR_AUDIT_CLIENTES_UPDATE`
+### `TR_AUDIT_CLIENTES_UPDATE` (`AFTER UPDATE ON CLIENTES`)
 
-`AFTER UPDATE ON CLIENTES`. Misma bitácora con `ACCION = 'UPDATE'`, guardando
-`VALOR_ANTERIOR` y `VALOR_NUEVO` con nombre y email de antes y después.
+Misma bitácora con `ACCION = 'UPDATE'`, guardando `VALOR_ANTERIOR` y
+`VALOR_NUEVO` con nombre y email de antes y después.
+
+### Quién figura como autor
+
+Los dos resuelven el nombre con:
+
+```sql
+IFNULL((SELECT USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL), USER())
+```
+
+La app deja `@ID_USUARIO_ACTUAL` en la conexión al iniciar sesión. Si la
+variable no está (un cambio por consola) o el usuario ya no existe, cae a
+`USER()`, el usuario de MySQL, y el cambio se aplica igual.
+
+Hasta el 12/11/2026 guardaban `CURRENT_USER()`, que es la cuenta de la base —
+siempre `balbu_app`. La bitácora decía "lo hizo la app", no quién lo hizo.
 
 > La auditoría **no** guarda teléfono ni dirección; solo nombre y email.
 > `AUDITORIA_SISTEMA` se crea en el módulo 6, anterior en el orden de import.
+> El `UPDATE` escribe una fila en **cada** `UPDATE`, aunque no haya cambiado
+> nada.
 
 ## Datos iniciales (seed)
 

@@ -1,7 +1,8 @@
 # Módulo 29 — LOG_USUARIOS
 
-Bitácora de los cambios de **rol** y **estado** de un usuario, con el valor
-anterior y el nuevo. Se alimenta sola desde un trigger sobre `USUARIOS`.
+Bitácora de los cambios de **rol**, **estado** y **nombre de usuario**, con el
+valor anterior y el nuevo, y **quién** lo hizo. Se alimenta sola desde un trigger
+sobre `USUARIOS`.
 
 **Depende de:** `USUARIOS` (10).
 **Es usado por:** **la app no la consulta**. `SP_OBTENER_LOG_USUARIOS` y la vista
@@ -17,19 +18,20 @@ Fuente: `modulos/29- LOG_USUARIOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/
 |---|---|---|---|
 | `ID_LOG` | `INT` | PK, AUTO_INCREMENT | Identificador. |
 | `ID_USUARIO` | `INT` | NULL, FK → `USUARIOS` | Usuario afectado. |
-| `ACCION` | `VARCHAR(50)` | NULL | `CAMBIO_ROL` o `CAMBIO_ESTADO`. |
+| `ACCION` | `VARCHAR(50)` | NULL | `CAMBIO_ROL`, `CAMBIO_ESTADO` o `CAMBIO_USUARIO`. |
 | `VALOR_ANTERIOR` | `VARCHAR(255)` | NULL | Antes. |
 | `VALOR_NUEVO` | `VARCHAR(255)` | NULL | Después. |
 | `FECHA_CAMBIO` | `TIMESTAMP` | DEFAULT `CURRENT_TIMESTAMP` | Cuándo. |
 | `ID_USUARIO_ADMIN` | `INT` | NULL, FK → `USUARIOS` | Quién hizo el cambio. |
 
-> **`ID_USUARIO_ADMIN` queda siempre en `NULL`.** La columna existe, el
-> comentario del archivo dice "quién realizó el cambio", pero el trigger **no la
-> escribe**. El `SP` de alta de usuarios (10) no deja rastro del admin en ninguna
-> variable, así que no hay de dónde sacarlo.
+> **`ID_USUARIO_ADMIN` guarda al autor desde el 12/11/2026.** Sale de
+> `@ID_USUARIO_ACTUAL`, que la app deja en la conexión al iniciar sesión: el
+> trigger lo resuelve con un `SELECT` y, si no hay sesión o el usuario ya no
+> existe, queda `NULL` —nunca aborta el cambio de usuario—. Antes la columna
+> existía pero no se escribía nunca.
 >
-> **`ACCION` no está acotada** y el comentario promete `CAMBIO_USUARIO`, que
-> **nunca se genera**: cambiar el nombre de usuario no deja fila.
+> **`ACCION` no está acotada**: `VARCHAR(50)` sin `CHECK` ni `ENUM`, para que
+> agregar una acción nueva no requiera un `ALTER`.
 >
 > **Sin `ON DELETE`** en los dos FK: con una sola fila de log, el usuario ya no
 > se puede borrar. Es un candado implícito, no declarado.
@@ -53,8 +55,12 @@ Fuente: `modulos/29- LOG_USUARIOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/
 
 ### `TRG_AUDITORIA_USUARIOS` (`AFTER UPDATE ON USUARIOS`)
 
-- si `OLD.ID_ROL <> NEW.ID_ROL` → fila `CAMBIO_ROL` con los dos IDs como texto.
-- si `OLD.ESTADO <> NEW.ESTADO` → fila `CAMBIO_ESTADO` con los dos estados.
+- si cambia `ID_ROL` → fila `CAMBIO_ROL` con los dos IDs como texto.
+- si cambia `ESTADO` → fila `CAMBIO_ESTADO` con los dos estados.
+- si cambia `USUARIO` → fila `CAMBIO_USUARIO` con el nombre anterior y el nuevo.
+
+Las tres comparaciones usan `<=>` para tratar `NULL` sin sorpresas, y todas
+escriben `ID_USUARIO_ADMIN` con el autor de la sesión.
 
 > **Un solo `UPDATE` que cambie rol y estado deja dos filas**, no una. La
 > bitácora se lee como eventos, no como versiones del registro.
@@ -69,16 +75,16 @@ Fuente: `modulos/29- LOG_USUARIOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/
 ### `VIEW_HISTORIAL_CAMBIOS_USUARIOS`
 
 `ID_LOG`, `USUARIO_AFECTADO` (el nombre, no el ID), `ACCION`, `VALOR_ANTERIOR`,
-`VALOR_NUEVO`, `FECHA_CAMBIO`, del más nuevo al más viejo.
+`VALOR_NUEVO`, `FECHA_CAMBIO`, `ID_USUARIO_ADMIN` y `USUARIO_ADMIN` (el nombre
+del que hizo el cambio), del más nuevo al más viejo.
 
-> El `INNER JOIN` **oculta** los cambios de usuarios borrados. Como el `FK` sin
-> `ON DELETE` impide borrar, en la práctica no hay caso, pero la vista depende de
-> eso.
+> Usa `LEFT JOIN` en los dos usuarios: si una cuenta se borra, el registro no
+> desaparece, solo se queda sin nombre.
 
 ## Reglas de negocio
 
-- **Cada cambio de rol o de estado deja una fila.**
+- **Cada cambio de rol, de estado o de nombre de usuario deja una fila.**
 - **El rol se guarda por ID, no por nombre.**
-- **No se registra quién hizo el cambio** (`ID_USUARIO_ADMIN` siempre `NULL`).
-- **Cambiar el nombre de usuario no deja rastro.**
+- **Se registra quién hizo el cambio** cuando hay sesión; sin sesión queda
+  `NULL` y el cambio se aplica igual.
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.

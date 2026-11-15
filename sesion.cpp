@@ -49,7 +49,7 @@ void cerrarSesion() {
     // (25/10/2026) Limpia el admin de la conexion: despues del logout no
     // queda ningun usuario como autor de un cambio.
     // (29/10/2026) Limpia tambien el empleado y el motivo del historial
-    // de estado de producto (modulo 61).
+    // de estado de producto (modulo 18).
     if (globalCon != nullptr) {
         try {
             std::unique_ptr<sql::PreparedStatement> p(globalCon->prepareStatement(

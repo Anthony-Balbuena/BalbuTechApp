@@ -44,11 +44,17 @@ La cuenta se crea con `db/seed-admin.sh <usuario> <clave>`, que arma un
 
 ## Procedimientos almacenados
 
-### `SP_GET_USUARIO_LOGIN(P_USUARIO)`
+### `SP_GET_USUARIO_LOGIN` — eliminada (12/11/2026)
 
-**Sin uso en la app actual.** La usaba `autenticacion.cpp` (eliminado el 03/11/2026); hoy `login.cpp` hace el `SELECT` directo sobre `USUARIOS`. Devuelve
-`ID_USUARIO, CONTRASENA (hash), NOMBRE_ROL` **solo si la cuenta está
-`ACTIVO`**. La app compara el hash; la base no ve la clave en claro.
+Devolvía `ID_USUARIO, CONTRASENA (hash), NOMBRE_ROL` para cualquier cuenta
+`ACTIVO`. El problema no era el uso: era que **sacaba el hash del servidor**, y
+`SP_LOGIN_USUARIO` comparaba contra ese mismo valor en igualdad, así que leer el
+hash alcanzaba para entrar. Cualquier cliente con `EXECUTE` sobre el esquema
+podía hacer las dos llamadas y saltear todo el módulo `65`/`66`.
+
+La reemplaza `SP_LOGIN_AUTENTICAR` (módulos `65`/`66`), que valida contra
+`CLAVE_SERVIDOR` con pepper y nunca devuelve el hash. El módulo `10` ahora solo
+ejecuta `DROP PROCEDURE IF EXISTS SP_GET_USUARIO_LOGIN`.
 
 ### `SP_INSERTAR_USUARIO(P_ID_EMPLEADO, P_ID_ROL, P_USUARIO, P_HASH_CLAVE)`
 
@@ -106,11 +112,15 @@ permiso mapeado. El módulo `10` ahora solo ejecuta
 `DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA`. El cambio de clave real es
 `SP_CAMBIAR_CLAVE_USUARIO` (módulo `67`).
 
-### `SP_LOGIN_USUARIO(P_USUARIO, P_PASSWORD_HASH)`
+### `SP_LOGIN_USUARIO` — eliminada (12/11/2026)
 
-**La app no la llama.** Login por hash en un solo SP: devuelve una fila
-`ESTADO = 'EXITO'` con `ROL` e `ID_USUARIO`, o `ESTADO = 'ERROR'` con `NULL`s.
-La app ya no usa esta ruta: `login.cpp` consulta `USUARIOS` directo y compara del lado C++.
+Era el login anterior al módulo `65`: comparaba en igualdad
+`U.CONTRASENA = P_PASSWORD_HASH` y devolvía `ESTADO = 'EXITO'` con `ROL` e
+`ID_USUARIO`, o `ESTADO = 'ERROR'`. Sin pepper, sin pbkdf2, sin bloqueo por
+intentos y sin token. La app la llamó en el login viejo; después del módulo `65`
+nadie la llama, porque `login.cpp` usa `SP_LOGIN_AUTENTICAR`.
+
+El módulo `10` ahora solo ejecuta `DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO`.
 
 ### `PARA_INSERTAR_USUARIOS()`
 

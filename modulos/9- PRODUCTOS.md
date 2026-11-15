@@ -6,8 +6,8 @@ módulo del que cuelga medio sistema: inventario, compras, ventas, garantías y
 devoluciones lo referencian.
 
 **Depende de:** `MARCAS` (2), `CATEGORIAS` (1) y `PROVEEDORES` (5), por FK.
-**Es referenciado por:** `INVENTARIO` (17), `DETALLE_COMPRA` (22),
-`DETALLE_VENTA` (23), `PRODUCTO_PROVEEDOR` (40), entre otros.
+**Es referenciado por:** `INVENTARIO` (17), `DETALLE_COMPRA` (19),
+`DETALLES_VENTA` (21), `PRODUCTO_PROVEEDOR` (32), entre otros.
 
 Fuente: `modulos/9- PRODUCTOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
 
@@ -220,12 +220,22 @@ activar/desactivar en bloque.
 
 `AFTER UPDATE ON PRODUCTOS`. Solo cuando **cambia el precio de venta**
 (`OLD.PRECIO <> NEW.PRECIO`) inserta en `AUDITORIA_SISTEMA`:
-`TABLA_AFECTADA = 'PRODUCTOS'`, `ACCION = 'UPDATE'`, `USUARIO_SISTEMA =
-USER()`, y `VALOR_ANTERIOR` / `VALOR_NUEVO` con
-`Precio venta anterior: <x>` / `Precio venta nuevo: <y>`.
+`TABLA_AFECTADA = 'PRODUCTOS'`, `ACCION = 'UPDATE'`, y `VALOR_ANTERIOR` /
+`VALOR_NUEVO` con `Precio venta anterior: <x>` / `Precio venta nuevo: <y>`.
+
+El autor se resuelve con
+`IFNULL((SELECT USUARIO FROM USUARIOS WHERE ID_USUARIO = @ID_USUARIO_ACTUAL), USER())`:
+primero el usuario de la sesión de la app; si no hay, el de MySQL. Hasta el
+12/11/2026 guardaba `USER()` a secas, que es siempre `balbu_app`.
 
 > No audita cambios de nombre, stock, costo ni estado: **solo precio de
-> venta**. Usa `USER()` (no `CURRENT_USER()` como los triggers de CLIENTES).
+> venta**.
+>
+> **Es el trigger líder de `PRODUCTOS`.** `TR_LOG_CAMBIO_ESTADO_PRODUCTO` (sección
+> «HISTORIAL_ESTADOS_PRODUCTO (ex módulo 18)», al final de este mismo archivo)
+> declara `FOLLOWS` sobre este, así que el orden es precio primero e historial de
+> estado después. Los dos viven ahora en el mismo archivo: esta definición tiene
+> que quedar **arriba**.
 
 ## Sentencias de migración y verificación (histórico)
 
@@ -256,6 +266,117 @@ borran sin una limpieza acordada.
   los SP).
 - **No hay borrado físico:** toggle de estado.
 - **Proveedor preferido** en `ID_PROVEEDOR`; el historial de proveedores y
-  precios vive en `PRODUCTO_PROVEEDOR` (40).
+  precios vive en `PRODUCTO_PROVEEDOR` (32).
 - **Auditoría de precio de venta** vía trigger.
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.
+
+---
+
+## HISTORIAL_ESTADOS_PRODUCTO (ex módulo 18)
+
+Bitácora de estados absorbida dentro del `9` el 14/11/2026 (ver el `## Log` de
+`odd/tasks/consolidacion-modulos.md`). El cuerpo del ex `18` viaja **verbatim**:
+acá solo se degradaron los encabezados un nivel.
+
+Bitácora de los cambios `ACTIVO` ↔ `INACTIVO` de un producto: quién, cuándo, de
+qué estado a cuál y por qué. Ningún cambio de estado queda sin rastro.
+
+**Depende de:** `PRODUCTOS` (esta misma sección, arriba) y `EMPLEADOS` (8).
+
+> **La app no llama el SP ni la vista de este módulo.** **Pero la tabla sí se
+> llena**: la app cambia el estado con `SP_TOGGLE_ESTADO_PRODUCTOS` (9), que hace
+> `UPDATE PRODUCTOS SET ESTADO` y dispara el trigger. Desde el 12/11/2026 la app
+> deja `@ID_EMPLEADO_ACTUAL` y `@MOTIVO_CAMBIO` en la conexión al cambiar el
+> estado (`productos.cpp`), así que la fila queda con el empleado real. Sin
+> sesión, el empleado queda `NULL`, no `1`.
+
+Fuente: `modulos/9- PRODUCTOS.sql`, sección del ex módulo `18` · Base:
+`BALBU_TECH` · Revisado: 20/10/2026 · Fusionado: 14/11/2026.
+
+### Tablas
+
+#### HISTORIAL_ESTADOS_PRODUCTO
+
+| Columna | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `ID_HISTORIAL` | `INT` | PK, AUTO_INCREMENT | Identificador. |
+| `ID_PRODUCTO` | `INT` | NOT NULL, FK → `PRODUCTOS` | Producto afectado. |
+| `ID_EMPLEADO` | `INT` | NULL, FK → `EMPLEADOS` | Quién hizo el cambio. `NULL` = no se sabe. |
+| `ESTADO` | `ENUM('ACTIVO','INACTIVO')` | NOT NULL | Estado nuevo. |
+| `ESTADO_ANTERIOR` | `ENUM('ACTIVO','INACTIVO')` | NULL | Estado previo (la tabla admite nulos, el trigger nunca los manda). |
+| `MOTIVO_CAMBIO` | `VARCHAR(255)` | NULL | Motivo. |
+| `FECHA_CAMBIO` | `TIMESTAMP` | NOT NULL, DEFAULT `CURRENT_TIMESTAMP` | Cuándo. |
+
+**Índices:** `HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO` (`FECHA_CAMBIO`),
+`IX_HISTORIAL_ESTADO_ACTUAL` (`ESTADO`) e `IX_HISTORIAL_ESTADO_ANTERIOR`
+(`ESTADO_ANTERIOR`).
+
+> **`ID_EMPLEADO` es `NULL` a propósito** (12/11/2026). Antes era `NOT NULL` y
+> el trigger caía a `IFNULL(@ID_EMPLEADO_ACTUAL, 1)`: todo cambio sin sesión
+> quedaba firmado por el empleado 1, que es un dato falso, no un dato vacío.
+> Peor: si el empleado 1 no existía, el `INSERT` del trigger reventaba por FK y
+> **se caía el `UPDATE` del producto**. El módulo trae el `ALTER ... MODIFY ...
+> NULL` idempotente para las bases que ya tenían la columna `NOT NULL`.
+>
+> Tres índices para una tabla que en la práctica solo se lee ordenada por fecha.
+> Los dos del estado son de baja selectividad: con dos valores posibles, el
+> optimizador casi nunca los va a preferir.
+
+### Procedimientos almacenados
+
+#### `18_SP_CAMBIAR_ESTADO_PRODUCTO(P_ID_PRODUCTO, P_ID_EMPLEADO, P_NUEVO_ESTADO, P_MOTIVO)`
+
+**La app no lo llama.** Deja el empleado y el motivo en variables de sesión,
+hace el `UPDATE` de `PRODUCTOS.ESTADO` y después **limpia** esas variables. El
+trigger del módulo lee de ahí.
+
+> **Es el único camino que deja un historial con datos útiles**, y aun así no
+> valida nada: producto inexistente devuelve éxito silencioso (el `UPDATE`
+> afecta 0 filas), empleado inexistente termina en el `1452` del FK del trigger,
+> y cambiar al mismo estado **no escribe historial ni avisa**. **La app no lo
+> llama**: el cambio de estado real pasa por `SP_TOGGLE_ESTADO_PRODUCTOS` (9), que
+> no setea estas variables.
+>
+> **No hay `EXIT HANDLER`:** si el `UPDATE` falla, las variables de sesión quedan
+> prendidas con el último empleado y motivo, y el próximo cambio de estado por
+> otro camino los hereda. Es el mismo patrón riesgoso que `@VENTAS_INTERNO` y
+> `@COMPRAS_INTERNO`.
+>
+> **Sin mensaje de confirmación**: no devuelve fila, ni siquiera un `EXITO`.
+
+### Triggers
+
+#### `TR_LOG_CAMBIO_ESTADO_PRODUCTO` (`AFTER UPDATE ON PRODUCTOS`)
+
+Solo si `OLD.ESTADO <> NEW.ESTADO`, inserta la fila con `ESTADO = NEW.ESTADO`,
+`ESTADO_ANTERIOR = OLD.ESTADO`, el empleado de `@ID_EMPLEADO_ACTUAL` (sin
+fallback: si no hay sesión queda `NULL`) y el motivo de `@MOTIVO_CAMBIO`.
+
+> Declara `FOLLOWS TR_AUDITORIA_PRODUCTOS_UPDATE`, el trigger de precio del
+> módulo 9, que vive **más arriba en este mismo archivo**: ese corre primero. El
+> `FOLLOWS` exige que el líder ya exista, así que hay que mantener ese orden
+> dentro del archivo.
+>
+> **Sin motivo**, queda `'Cambio de estado automático'`, que se confunde con un
+> cambio real hecho por el sistema.
+>
+> Un `UPDATE PRODUCTOS SET ESTADO = ...` directo **sí pasa** por el trigger: no
+> hay candado de estado, a diferencia de compras y ventas.
+
+### Vistas
+
+#### `VISTA_ULTIMOS_MOVIMIENTOS`
+
+Los **10** cambios más recientes: `FECHA_CAMBIO`, `PRODUCTO` y `MOTIVO_CAMBIO`.
+Usa `JOIN` a `PRODUCTOS`, así que un producto borrado (imposible por FK) quedaría
+fuera. **La app no la usa.**
+
+### Reglas de negocio
+
+- **Cada cambio de estado deja una fila**, venga del SP o de un `UPDATE` directo.
+- **El empleado responsable sale de una variable de sesión**; sin sesión queda
+  `NULL`, nunca un empleado inventado.
+- **El motivo es opcional** y se rellena con un texto genérico.
+- **Cambiar al mismo estado no registra nada ni avisa.**
+- **Sin `USE` hardcodeado:** la base la define el `--database` del import.
+

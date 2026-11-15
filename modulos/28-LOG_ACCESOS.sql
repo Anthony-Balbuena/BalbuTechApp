@@ -117,3 +117,70 @@ DELIMITER ;
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
+
+-- ================================================================
+-- SEGURIDAD_T2 (ex modulo 64)
+-- ================================================================
+
+/*
+SECCION SEGURIDAD_T2 (ex modulo 64)
+Bloqueo por fuerza bruta del login, repartido a su dueno: el indice que cuenta
+fallos y el SP que los consulta viven aca, al lado de la tabla LOG_ACCESOS.
+
+No entra la FN_TIENE_PERMISO que el modulo 64 tambien traia: el 36 ya define la
+version final (solo cuentas con ESTADO = 'ACTIVO') y reimportar el 36 la vuelve a
+crear, asi que en el 64 era una copia sin efecto. Queda una sola definicion.
+
+Los dos bloques de abajo son idempotentes: el ALTER usa ADD INDEX IF NOT EXISTS y
+el SP hace DROP + CREATE. No aportan triggers ni FOLLOWS.
+*/
+-- ================================================================
+-- 1) INDICE DEL BLOQUEO
+-- ================================================================
+-- El login consulta: USUARIO_INTENTADO = ? AND ESTADO_INTENTO = 'FALLIDO'
+-- AND FECHA_ACCESO >= NOW() - INTERVAL 15 MINUTE. La clave compuesta deja ese
+-- filtro en un rango sobre el indice en vez de un recorrido de tabla.
+ALTER TABLE LOG_ACCESOS
+    ADD INDEX IF NOT EXISTS IX_LOG_ACCESOS_USUARIO_FECHA (USUARIO_INTENTADO, FECHA_ACCESO);
+-- ================================================================
+-- 3) SP DEL BLOQUEO
+-- ================================================================
+-- (03/11/2026) El login necesita contar fallos por usuario, pero darle a
+-- balbu_app SELECT sobre LOG_ACCESOS le abriria todo el historial de accesos.
+-- Este SP corre como DEFINER: la app recibe solo FALLOS y MINUTOS, y el log
+-- queda privado.
+-- P_VENTANA_MIN llega desde login.cpp (VENTANA_BLOQUEO_MIN) para que el
+-- umbral viva en un solo lugar.
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_ESTADO_BLOQUEO_LOGIN;
+CREATE PROCEDURE SP_ESTADO_BLOQUEO_LOGIN(
+    IN P_USUARIO VARCHAR(50),
+    IN P_VENTANA_MIN INT
+)
+BEGIN
+    DECLARE v_desde TIMESTAMP DEFAULT TIMESTAMP '1970-01-01 00:00:01';
+    DECLARE v_ventana INT DEFAULT 15;
+
+    IF P_VENTANA_MIN IS NOT NULL AND P_VENTANA_MIN > 0 THEN
+        SET v_ventana = P_VENTANA_MIN;
+    END IF;
+
+    -- Un acceso exitoso reinicia la cuenta sin borrar evidencia: solo cuentan
+    -- los fallos posteriores al ultimo EXITOSO.
+    SELECT IFNULL(MAX(FECHA_ACCESO), v_desde) INTO v_desde
+    FROM LOG_ACCESOS
+    WHERE USUARIO_INTENTADO = P_USUARIO
+      AND ESTADO_INTENTO = 'EXITOSO';
+
+    SELECT COUNT(*) AS FALLOS,
+           IFNULL(CEIL(TIMESTAMPDIFF(SECOND, NOW(),
+                  MIN(FECHA_ACCESO) + INTERVAL v_ventana MINUTE) / 60), 0) AS MINUTOS
+    FROM LOG_ACCESOS
+    WHERE USUARIO_INTENTADO = P_USUARIO
+      AND ESTADO_INTENTO = 'FALLIDO'
+      AND FECHA_ACCESO >= NOW() - INTERVAL v_ventana MINUTE
+      AND FECHA_ACCESO > v_desde;
+END//
+DELIMITER ;
+
+SELECT 'T2 SEGURIDAD: SP_ESTADO_BLOQUEO_LOGIN LISTO.' AS RESULTADO;

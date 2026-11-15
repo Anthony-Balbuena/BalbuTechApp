@@ -169,7 +169,11 @@ static bool registroRapidoC(const string &entrada, LineaCompra &out) {
         pstmt->setNull(9, sql::DataType::VARCHAR);
         string msg = Recogermensaje(pstmt.get());
         drenarResultados(pstmt.get());
-        cout << VERDE << msg << RESET << endl;
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0) {
+            cout << ROJO << msg << RESET << endl;
+        } else {
+            cout << VERDE << msg << RESET << endl;
+        }
         return resolverProductoC(codigo, out);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
@@ -183,7 +187,7 @@ static bool registroRapidoC(const string &entrada, LineaCompra &out) {
 static bool resolverProductoC(const string &entrada, LineaCompra &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'INCLUIR')"));
         pstmt->setString(1, entrada);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         struct Cand { int id; string codigo; string nombre; };
@@ -231,7 +235,7 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
 static int stockDeC(int idProducto) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_INVENTARIO(?)"));
+            "CALL SP_CONSULTAR_INVENTARIO(?, 'INCLUIR')"));
         pstmt->setString(1, to_string(idProducto));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         int stock = 0;
@@ -272,7 +276,11 @@ static bool registroRapidoS(LineaCompra &l, const string &sugerido = "") {
         pi->setNull(4, sql::DataType::VARCHAR);
         string msg = Recogermensaje(pi.get());
         drenarResultados(pi.get());
-        cout << VERDE << msg << RESET << endl;
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0) {
+            cout << ROJO << msg << RESET << endl;
+        } else {
+            cout << VERDE << msg << RESET << endl;
+        }
         int nuevoId = 0;
         try {
             std::unique_ptr<sql::PreparedStatement> pl(globalCon->prepareStatement(
@@ -725,7 +733,11 @@ static void pagarCompra(const CierreCompra &c) {
         else pp->setInt(4, (int)empVal);
         string msg = Recogermensaje(pp.get());
         drenarResultados(pp.get());
-        cout << VERDE << msg << RESET << endl;
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0) {
+            cout << ROJO << msg << RESET << endl;
+        } else {
+            cout << VERDE << msg << RESET << endl;
+        }
 
         std::unique_ptr<sql::PreparedStatement> pe(globalCon->prepareStatement(
             "CALL SP_COMPRA_ENCABEZADO(?)"));
@@ -747,7 +759,7 @@ static void pagarCompra(const CierreCompra &c) {
 static void listarProductosParaCompra() {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO('')"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO('', 'INCLUIR')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         // Grilla: ID_PROD | NOMBRE | CANTIDAD(stock). El suplidor se elige despues.
         // (08/11/2026) tablaCelda en vez de printf: el nombre del producto puede
@@ -1063,6 +1075,9 @@ static void reportePeriodoCompraUI() {
 
         int transGlobal = 0;
         double subGlobal = 0.0, itbisGlobal = 0.0, brutoGlobal = 0.0;
+        // (15/11/2026) Repuesto vs reventa: el SP ya los separa; sin esto el dato
+        // existia y no se veia en ningun lado.
+        double repuestoGlobal = 0.0, reventaGlobal = 0.0;
 
         for (int m = mesInicio; m <= mesFin; ++m) {
             int maxDias = diasEnMesC(ano, m);
@@ -1090,11 +1105,14 @@ static void reportePeriodoCompraUI() {
             std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
             int trans = 0;
             double sub = 0.0, itbis = 0.0, bruto = 0.0;
+            double repuesto = 0.0, reventa = 0.0;
             if (res->next()) {
                 trans = res->getInt("TRANSACCIONES");
                 sub = res->getDouble("SUBTOTAL");
                 itbis = res->getDouble("ITBIS");
                 bruto = res->getDouble("BRUTO");
+                repuesto = res->getDouble("COMPRAS_REPUESTO");
+                reventa = res->getDouble("COMPRAS_REVENTA");
             }
             drenarResultados(pstmt.get());
 
@@ -1102,6 +1120,8 @@ static void reportePeriodoCompraUI() {
             subGlobal += sub;
             itbisGlobal += itbis;
             brutoGlobal += bruto;
+            repuestoGlobal += repuesto;
+            reventaGlobal += reventa;
 
             cout << "\n--------------------------------------------------" << endl;
             cout << " [ " << nombreMesC(m) << " " << ano << " ]" << endl;
@@ -1111,6 +1131,10 @@ static void reportePeriodoCompraUI() {
             printf(" %-14s: $%.2f\n", "Subtotal", sub);
             printf(" %-14s: $%.2f\n", "ITBIS", itbis);
             printf(" %-14s: $%.2f\n", "Total", bruto);
+            // (15/11/2026) Para saber que compra fue para vender y cual para
+            // repuestos: el reporte ya lo separa, antes no se mostraba.
+            printf(" %-14s: $%.2f\n", "Para repuesto", repuesto);
+            printf(" %-14s: $%.2f\n", "Para reventa", reventa);
         }
 
         cout << "\n===================================================" << endl;
@@ -1120,6 +1144,8 @@ static void reportePeriodoCompraUI() {
         printf(" %-14s: $%.2f\n", "Subtotal", subGlobal);
         printf(" %-14s: $%.2f\n", "ITBIS", itbisGlobal);
         printf(" %-14s: $%.2f\n", "Gran total", brutoGlobal);
+        printf(" %-14s: $%.2f\n", "Para repuesto", repuestoGlobal);
+        printf(" %-14s: $%.2f\n", "Para reventa", reventaGlobal);
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {

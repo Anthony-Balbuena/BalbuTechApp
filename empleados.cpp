@@ -33,7 +33,7 @@ namespace {
 enum class AccionEmpleado {
     Agregar, Actualizar, Despedir, Reactivar, Buscar, Listar,
     GenerarContrato, SubirContrato, VerContratos, FinalizarContrato,
-    Permisos, Vacaciones, Volver
+    Permisos, AuditoriaPermisos, Vacaciones, Volver
 };
 
 struct OpcionEmpleado {
@@ -55,6 +55,7 @@ static const vector<OpcionEmpleado>& opcionesEmpleados() {
         {"Ver contratos",                "GESTIONAR_CONTRATOS",             AccionEmpleado::VerContratos},
         {"Finalizar contrato",           "GESTIONAR_CONTRATOS",             AccionEmpleado::FinalizarContrato},
         {"Gestionar permisos",           "GESTIONAR_PERMISOS_EMPLEADO",     AccionEmpleado::Permisos},
+        {"Ver auditoria de permisos",    "GESTIONAR_PERMISOS_EMPLEADO",     AccionEmpleado::AuditoriaPermisos},
         {"Gestionar vacaciones",         "GESTIONAR_VACACIONES_EMPLEADO",   AccionEmpleado::Vacaciones},
         {"Volver al Menu Principal",     "",                                AccionEmpleado::Volver}
     };
@@ -737,6 +738,7 @@ void ejecutarSubmenuEmpleados() {
             case AccionEmpleado::VerContratos:      consultarContratosUI(); break;
             case AccionEmpleado::FinalizarContrato: finalizarContratoUI(); break;
             case AccionEmpleado::Permisos:          gestionarPermisosUI(); break;
+            case AccionEmpleado::AuditoriaPermisos: verAuditoriaPermisosUI(); break;
             case AccionEmpleado::Vacaciones:        gestionarVacacionesUI(); break;
             case AccionEmpleado::Volver:            return;
         }

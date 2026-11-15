@@ -13,13 +13,16 @@
 #include "roles.h"
 #include "colores.h"
 #include "tabla.h"
+#include "paginacion.h"
 #include "sesion.h"
 
 using namespace std;
 
-// Modulo 13-PERMISOS_EMPLEADOS. Dos pantallas sobre los mismos SP:
+// Modulo 13-PERMISOS_EMPLEADOS. Tres pantallas sobre permisos de empleado:
 // - misPermisosUI(): el empleado ve su historial y pide permisos nuevos.
 // - gestionarPermisosUI(): RRHH/ADMIN resuelve los pendientes.
+// - verAuditoriaPermisosUI(): (12/11/2026) la bitacora del modulo 69, con quien
+//   dio de alta, aprobo, rechazo o borro cada permiso.
 
 // El usuario de la sesion no guarda el ID de empleado: se busca en USUARIOS
 // por USUARIO (el mismo criterio que usa el login para entrar).
@@ -370,5 +373,72 @@ void gestionarPermisosUI() {
 
         // Vuelve a listar: el permiso resuelto ya no aparece y, si no queda
         // ninguno, el proximo ciclo lo avisa.
+    }
+}
+
+// (12/11/2026) Bitacora de permisos, de solo lectura. Las filas las escriben
+// los tres triggers del modulo 69; aca no se edita ni se borra nada, a
+// proposito: una auditoria que la app puede reescribir no audita.
+// Paginado con el mismo helper que compras y ventas (paginacion.h): la
+// bitacora crece con cada cambio de estado y no se puede volcar entera.
+void verAuditoriaPermisosUI() {
+    if (globalCon == nullptr) {
+        cout << ROJO << "No hay conexión activa a la base de datos." << RESET << endl;
+        return;
+    }
+
+    cout << MAGENTA << "\n=== AUDITORIA DE PERMISOS ===" << RESET << endl;
+
+    const size_t W_FEC = 19, W_ACC = 14, W_EMP = 22, W_TIPO = 11, W_EST = 21, W_USU = 15;
+    const size_t ANCHO = W_FEC + W_ACC + W_EMP + W_TIPO + W_EST + W_USU + 5 * 3;
+    cout << "\n"
+         << tablaCelda("FECHA", W_FEC) << " | "
+         << tablaCelda("ACCION", W_ACC) << " | "
+         << tablaCelda("EMPLEADO", W_EMP) << " | "
+         << tablaCelda("TIPO", W_TIPO) << " | "
+         << tablaCelda("ESTADO", W_EST) << " | "
+         << tablaCelda("QUIEN", W_USU) << "\n"
+         << tablaLinea(ANCHO) << "\n";
+
+    try {
+        const int total = mostrarPaginadoSP(
+            "CALL SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO(?, ?)",
+            "CALL SP_CONTAR_AUDITORIA_PERMISOS()",
+            {},
+            [=](sql::ResultSet *res) {
+                const string accion = res->getString("ACCION");
+                const string &color = (accion == "ALTA")  ? VERDE
+                                    : (accion == "BAJA")  ? ROJO
+                                                          : AMARILLO;
+                // En el alta no habia estado anterior y en la baja no hay uno
+                // nuevo: se muestran como "-" y no como "NULL".
+                const string antes   = res->isNull("ESTADO_ANTERIOR") ? "-" : res->getString("ESTADO_ANTERIOR");
+                const string despues = res->isNull("ESTADO_NUEVO")    ? "-" : res->getString("ESTADO_NUEVO");
+                const string empleado = res->isNull("EMPLEADO")
+                                      ? "(empleado borrado)" : res->getString("EMPLEADO");
+                const string tipo = res->isNull("TIPO_PERMISO") ? "-" : res->getString("TIPO_PERMISO");
+                // Sin sesion (SQL a mano o mantenimiento) el actor queda NULL:
+                // el registro existe igual y hay que decirlo, no ocultarlo.
+                const string quien = res->isNull("USUARIO_ADMIN")
+                                   ? "(sin sesion)" : res->getString("USUARIO_ADMIN");
+
+                cout << tablaCelda(res->getString("FECHA_CAMBIO"), W_FEC) << " | "
+                     << color << tablaCelda(accion, W_ACC) << RESET << " | "
+                     << tablaCelda(empleado, W_EMP) << " | "
+                     << tablaCelda(tipo, W_TIPO) << " | "
+                     << tablaCelda(antes + " > " + despues, W_EST) << " | "
+                     << tablaCelda(quien, W_USU) << "\n"
+                     << tablaLinea(ANCHO) << "\n";
+            });
+
+        if (total == 0) {
+            cout << "[!] Todavia no hay movimientos de permisos registrados." << endl;
+            return;
+        }
+        cout << tablaLinea(ANCHO) << endl;
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &e) {
+        cout << ROJO << "No se pudo leer la auditoria: " << e.what() << RESET << endl;
     }
 }

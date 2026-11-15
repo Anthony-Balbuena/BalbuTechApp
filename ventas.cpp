@@ -68,7 +68,8 @@ static const vector<OpcionVenta>& opcionesVentas() {
         {"Reporte por periodo",          {"CONSULTAR_REPORTES"}, AccionVenta::ReportePeriodo},
         {"Ganancias por periodo",        {"CONSULTAR_REPORTES"}, AccionVenta::GananciasPeriodo},
         {"Garantias",                    {"GARANTIAS_REGISTRAR", "GARANTIAS_RECLAMAR",
-                                          "GARANTIAS_FINALIZAR", "GARANTIAS_CONSULTAR"},
+                                          "GARANTIAS_FINALIZAR", "GARANTIAS_CONSULTAR",
+                                          "GARANTIAS_ASIGNAR", "GARANTIAS_AVANZAR"},
                                                                AccionVenta::Garantias},
         {"Historial de venta",           {"CONSULTAR_HISTORIAL_VENTA"}, AccionVenta::Historial},
         {"Exportar datos para la web",   {"CONSULTAR_REPORTES"}, AccionVenta::ExportarWeb},
@@ -108,7 +109,7 @@ static void imprimirMenuVentas(const vector<const OpcionVenta*>& visibles) {
 static bool buscarPorId(int id, LineaCarrito &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'EXCLUIR')"));
         pstmt->setString(1, to_string(id));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool ok = false;
@@ -131,7 +132,7 @@ static bool buscarPorId(int id, LineaCarrito &out) {
 static bool buscarPorCodigo(const string &codigo, LineaCarrito &out) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'EXCLUIR')"));
         pstmt->setString(1, codigo);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         bool ok = false;
@@ -154,7 +155,7 @@ static bool buscarPorCodigo(const string &codigo, LineaCarrito &out) {
 static int stockDe(int idProducto) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_INVENTARIO(?)"));
+            "CALL SP_CONSULTAR_INVENTARIO(?, 'EXCLUIR')"));
         pstmt->setString(1, to_string(idProducto));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         int stock = 0;
@@ -178,7 +179,7 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
     if (buscarPorCodigo(entrada, out)) return true;
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?)"));
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'EXCLUIR')"));
         pstmt->setString(1, entrada);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         struct Cand { int id; string codigo; string nombre; double precio; };
@@ -231,7 +232,7 @@ static double tasaIVA() {
 static void avisoStockCritico(int idProducto, int cantPorDescontar) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_INVENTARIO(?)"));
+            "CALL SP_CONSULTAR_INVENTARIO(?, 'EXCLUIR')"));
         pstmt->setString(1, to_string(idProducto));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         while (res->next()) {
@@ -310,7 +311,11 @@ static void pagarVenta(const CierreVenta &c) {
         pp->setDouble(5, recibido);
         string msg = Recogermensaje(pp.get());
         drenarResultados(pp.get());
-        cout << VERDE << msg << RESET << endl;
+        if (msg.rfind("Error DB:", 0) == 0 || msg.rfind("ERROR:", 0) == 0) {
+            cout << ROJO << msg << RESET << endl;
+        } else {
+            cout << VERDE << msg << RESET << endl;
+        }
 
         std::unique_ptr<sql::PreparedStatement> pe(globalCon->prepareStatement(
             "CALL SP_VENTA_ESTADO(?)"));
@@ -438,7 +443,7 @@ static CierreVenta cerrarVenta(const vector<LineaCarrito> &carrito) {
 static void listarProductosParaVenta(double tasa) {
     try {
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_INVENTARIO('')"));
+            "CALL SP_CONSULTAR_INVENTARIO('', 'EXCLUIR')"));
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         // (08/11/2026) tablaCelda: printf cuenta bytes y un nombre con acento
         // o simbolo (Core™) corria las columnas de la derecha.
@@ -1417,7 +1422,7 @@ static void cobrarVentaUI() {
 // (30/10/2026) El vendedor atiende y registra, pero NO cierra reclamos: por eso
 // cada opcion pide su permiso (modulo 62). La UI lista en vez de pedir IDs a
 // ciegas y las tablas usan tabla.h para que los acentos no desalineen.
-enum class AccionGarantia { Registrar, Reclamar, Finalizar, Consultar, Volver };
+enum class AccionGarantia { Registrar, Reclamar, Asignar, Avance, Finalizar, Consultar, Volver };
 
 struct OpcionGarantia {
     const char* etiqueta;
@@ -1429,6 +1434,8 @@ static const vector<OpcionGarantia>& opcionesGarantias() {
     static const vector<OpcionGarantia> opciones = {
         {"Registrar garantia",  "GARANTIAS_REGISTRAR", AccionGarantia::Registrar},
         {"Reclamar garantia",   "GARANTIAS_RECLAMAR",  AccionGarantia::Reclamar},
+        {"Asignar tecnico",     "GARANTIAS_ASIGNAR",   AccionGarantia::Asignar},
+        {"Registrar avance",    "GARANTIAS_AVANZAR",   AccionGarantia::Avance},
         {"Finalizar reclamo",   "GARANTIAS_FINALIZAR", AccionGarantia::Finalizar},
         {"Consultar garantias", "GARANTIAS_CONSULTAR", AccionGarantia::Consultar},
         {"Volver",              "",                    AccionGarantia::Volver}
@@ -1646,61 +1653,313 @@ static void reclamoRegistrarUI() {
 static void reclamoFinalizarUI() {
     cout << "\n--- FINALIZAR RECLAMO ---" << endl;
     try {
+        // (15/11/2026) El cierre va por la ASIGNACION, no por el reclamo suelto:
+        // SP_FINALIZAR_RECLAMO(id_asignacion) cierra la asignacion Y el reclamo
+        // juntos. Antes se llamaba 27_SP_FINALIZAR_RECLAMO_TOTAL, que dejaba
+        // asignaciones EN_PROCESO colgando de un reclamo ya CERRADO.
         std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
-            "CALL SP_CONSULTAR_RECLAMOS(?, ?)"));
-        pLista->setInt(1, 0);
-        pLista->setInt(2, 1);
+            "CALL SP_CONSULTAR_ASIGNACIONES(?, ?)"));
+        pLista->setInt(1, 1);   // solo las que siguen en curso
+        pLista->setInt(2, 0);   // todos los tecnicos
         std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
 
         vector<int> ids;
-        const size_t W_REC = 7, W_GAR = 7, W_FECHA = 19, W_EST = 10, W_DESC = 30;
-        const size_t ANCHO = W_REC + W_GAR + W_FECHA + W_EST + W_DESC + 4 * 3;
+        const size_t W_ASI = 9, W_REC = 8, W_GAR = 7, W_TEC = 22, W_PRI = 8, W_EST = 12, W_FECHA = 19;
+        const size_t ANCHO = W_ASI + W_REC + W_GAR + W_TEC + W_PRI + W_EST + W_FECHA + 6 * 3;
         const string linea(ANCHO, '-');
         cout << "\n"
+             << tablaCelda("ASIGNAC", W_ASI) << " | "
              << tablaCelda("RECLAMO", W_REC) << " | "
              << tablaCelda("GARANT", W_GAR) << " | "
-             << tablaCelda("FECHA", W_FECHA) << " | "
+             << tablaCelda("TECNICO", W_TEC) << " | "
+             << tablaCelda("PRIORID", W_PRI) << " | "
              << tablaCelda("ESTADO", W_EST) << " | "
-             << tablaCelda("DESCRIPCION", W_DESC) << "\n"
+             << tablaCelda("FECHA", W_FECHA) << "\n"
              << linea << "\n";
 
         while (res->next()) {
-            ids.push_back(res->getInt("ID_RECLAMO_GARAN"));
-            string estado = res->getString("ESTADO");
-            cout << tablaCelda(to_string(res->getInt("ID_RECLAMO_GARAN")), W_REC) << " | "
+            ids.push_back(res->getInt("ID_ASIGNACION"));
+            string estado = res->getString("ESTADO_ASIGNACION");
+            cout << tablaCelda(to_string(res->getInt("ID_ASIGNACION")), W_ASI) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_RECLAMO_GARAN")), W_REC) << " | "
                  << tablaCelda(to_string(res->getInt("ID_GARANTIA")), W_GAR) << " | "
-                 << tablaCelda(res->getString("FECHA_RECLAMO"), W_FECHA) << " | "
+                 << tablaCelda(res->getString("TECNICO"), W_TEC) << " | "
+                 << tablaCelda(res->getString("PRIORIDAD"), W_PRI) << " | "
                  << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
-                 << tablaCelda(res->getString("DESCRIPCION"), W_DESC) << "\n"
+                 << tablaCelda(res->getString("FECHA_ASIGNACION"), W_FECHA) << "\n"
                  << linea << "\n";
         }
         drenarResultados(pLista.get());
 
         if (ids.empty()) {
-            cout << "\n[!] No hay reclamos abiertos para finalizar." << endl;
+            cout << "\n[!] No hay asignaciones en curso para finalizar." << endl;
             return;
         }
 
-        int rId = (int)leerNumeroConIntentos("ID reclamo: ", 1, 999999999);
+        int aId = (int)leerNumeroConIntentos("ID asignacion: ", 1, 999999999);
         bool pertenece = false;
         for (int id : ids) {
-            if (id == rId) { pertenece = true; break; }
+            if (id == aId) { pertenece = true; break; }
         }
         if (!pertenece) {
-            cout << ROJO << "Ese reclamo no esta en la lista de abiertos." << RESET << endl;
+            cout << ROJO << "Esa asignacion no esta en la lista de abiertas." << RESET << endl;
             return;
         }
 
+        string nota = leerDatoSeguro("Nota final (Enter para omitir): ");
+
         std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
-            "CALL 27_SP_FINALIZAR_RECLAMO_TOTAL(?, ?)"));
-        pstmt->setInt(1, rId);
-        setEmpleadoSesion(pstmt.get(), 2);
+            "CALL SP_FINALIZAR_RECLAMO(?, ?)"));
+        pstmt->setInt(1, aId);
+        if (nota.empty()) pstmt->setNull(2, sql::DataType::VARCHAR);
+        else pstmt->setString(2, nota);
         cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
         drenarResultados(pstmt.get());
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const exception &) {
         cout << ROJO << "No se pudo finalizar el reclamo." << RESET << endl;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// (15/11/2026) Asignar un reclamo a un tecnico.
+// ---------------------------------------------------------------------------
+static void asignarTecnicoUI() {
+    cout << "\n--- ASIGNAR TECNICO A UN RECLAMO ---" << endl;
+    try {
+        std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_RECLAMOS(?, ?)"));
+        pLista->setInt(1, 0);   // todas las garantias
+        pLista->setInt(2, 1);   // solo abiertos
+        std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
+
+        vector<int> reclamos;
+        const size_t W_REC = 8, W_GAR = 7, W_FECHA = 19, W_EST = 10, W_DESC = 30;
+        const size_t ANCHO = W_REC + W_GAR + W_FECHA + W_EST + W_DESC + 4 * 3;
+        cout << "\n"
+             << tablaCelda("RECLAMO", W_REC) << " | "
+             << tablaCelda("GARANT", W_GAR) << " | "
+             << tablaCelda("FECHA", W_FECHA) << " | "
+             << tablaCelda("ESTADO", W_EST) << " | "
+             << tablaCelda("DESCRIPCION", W_DESC) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        while (res->next()) {
+            reclamos.push_back(res->getInt("ID_RECLAMO_GARAN"));
+            string estado = res->getString("ESTADO");
+            cout << tablaCelda(to_string(res->getInt("ID_RECLAMO_GARAN")), W_REC) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_GARANTIA")), W_GAR) << " | "
+                 << tablaCelda(res->getString("FECHA_RECLAMO"), W_FECHA) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << " | "
+                 << tablaCelda(res->getString("DESCRIPCION"), W_DESC) << "\n"
+                 << tablaLinea(ANCHO) << "\n";
+        }
+        drenarResultados(pLista.get());
+
+        if (reclamos.empty()) {
+            cout << "\n[!] No hay reclamos abiertos para asignar." << endl;
+            return;
+        }
+
+        int idRec = (int)leerNumeroConIntentos("ID reclamo: ", 1, 999999999);
+        bool enLista = false;
+        for (int r : reclamos) { if (r == idRec) { enLista = true; break; } }
+        if (!enLista) {
+            cout << ROJO << "Ese reclamo no esta en la lista de abiertos." << RESET << endl;
+            return;
+        }
+
+        // Tecnicos: empleados ACTIVO con usuario de rol TECNICO. Sin usuario no
+        // podrian registrar el avance, asi que no se ofrecen. Vienen ordenados
+        // de menos a mas trabajo en curso.
+        std::unique_ptr<sql::PreparedStatement> pTec(globalCon->prepareStatement(
+            "CALL SP_TECNICOS_DISPONIBLES()"));
+        std::unique_ptr<sql::ResultSet> rTec(pTec->executeQuery());
+
+        vector<int> tecnicos;
+        const size_t W_ID = 6, W_NOM = 25, W_CAR = 18, W_EN = 8;
+        const size_t ANCHO_T = W_ID + W_NOM + W_CAR + W_EN + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_ID) << " | "
+             << tablaCelda("TECNICO", W_NOM) << " | "
+             << tablaCelda("CARGO", W_CAR) << " | "
+             << tablaCelda("EN CURSO", W_EN) << "\n"
+             << tablaLinea(ANCHO_T) << "\n";
+
+        while (rTec->next()) {
+            tecnicos.push_back(rTec->getInt("ID_EMPLEADO"));
+            cout << tablaCelda(to_string(rTec->getInt("ID_EMPLEADO")), W_ID) << " | "
+                 << tablaCelda(rTec->getString("NOMBRE"), W_NOM) << " | "
+                 << tablaCelda(rTec->getString("CARGO"), W_CAR) << " | "
+                 << tablaCelda(to_string(rTec->getInt("EN_CURSO")), W_EN) << "\n"
+                 << tablaLinea(ANCHO_T) << "\n";
+        }
+        drenarResultados(pTec.get());
+
+        if (tecnicos.empty()) {
+            cout << "\n[!] No hay tecnicos con usuario de rol TECNICO." << endl;
+            cout << "    Crea el usuario del tecnico con ese rol antes de asignarle trabajo." << endl;
+            return;
+        }
+
+        int idTec = (int)leerNumeroConIntentos("ID tecnico: ", 1, 999999999);
+        bool tecEnLista = false;
+        for (int t : tecnicos) { if (t == idTec) { tecEnLista = true; break; } }
+        if (!tecEnLista) {
+            cout << ROJO << "Ese tecnico no esta en la lista." << RESET << endl;
+            return;
+        }
+
+        string prioridad = leerDatoSeguro("Prioridad (BAJA/MEDIA/ALTA/URGENTE, Enter = MEDIA): ");
+        if (prioridad.empty()) prioridad = "MEDIA";
+        string observaciones = leerDatoSeguro("Observaciones (Enter para omitir): ");
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_ASIGNAR_TECNICO_RECLAMO(?, ?, ?, ?)"));
+        pstmt->setInt(1, idRec);
+        pstmt->setInt(2, idTec);
+        pstmt->setString(3, prioridad);
+        if (observaciones.empty()) pstmt->setNull(4, sql::DataType::VARCHAR);
+        else pstmt->setString(4, observaciones);
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo asignar el tecnico." << RESET << endl;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// (15/11/2026) Registrar el avance de una reparacion, con su repuesto.
+// ---------------------------------------------------------------------------
+static void avanceReparacionUI() {
+    cout << "\n--- REGISTRAR AVANCE DE REPARACION ---" << endl;
+    try {
+        // (15/11/2026) Un tecnico ve SOLO sus asignaciones; gerencia ve todas.
+        // El SP tambien lo exige del lado del servidor: esto es comodidad.
+        const bool esGerencia = tienePermiso("GARANTIAS_ASIGNAR");
+        std::unique_ptr<sql::PreparedStatement> pLista(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_ASIGNACIONES(?, ?)"));
+        pLista->setInt(1, 1);   // solo en curso
+        pLista->setInt(2, esGerencia ? 0 : sesionActual.idEmpleado);
+        std::unique_ptr<sql::ResultSet> res(pLista->executeQuery());
+
+        vector<int> asignaciones;
+        const size_t W_ASI = 9, W_REC = 8, W_TEC = 22, W_PRI = 8, W_EST = 12;
+        const size_t ANCHO = W_ASI + W_REC + W_TEC + W_PRI + W_EST + 4 * 3;
+        cout << "\n"
+             << tablaCelda("ASIGNAC", W_ASI) << " | "
+             << tablaCelda("RECLAMO", W_REC) << " | "
+             << tablaCelda("TECNICO", W_TEC) << " | "
+             << tablaCelda("PRIORID", W_PRI) << " | "
+             << tablaCelda("ESTADO", W_EST) << "\n"
+             << tablaLinea(ANCHO) << "\n";
+
+        while (res->next()) {
+            asignaciones.push_back(res->getInt("ID_ASIGNACION"));
+            string estado = res->getString("ESTADO_ASIGNACION");
+            cout << tablaCelda(to_string(res->getInt("ID_ASIGNACION")), W_ASI) << " | "
+                 << tablaCelda(to_string(res->getInt("ID_RECLAMO_GARAN")), W_REC) << " | "
+                 << tablaCelda(res->getString("TECNICO"), W_TEC) << " | "
+                 << tablaCelda(res->getString("PRIORIDAD"), W_PRI) << " | "
+                 << tablaColorEstado(estado) << tablaCelda(estado, W_EST) << RESET << "\n"
+                 << tablaLinea(ANCHO) << "\n";
+        }
+        drenarResultados(pLista.get());
+
+        if (asignaciones.empty()) {
+            cout << "\n[!] No hay asignaciones en curso." << endl;
+            return;
+        }
+
+        int idAsi = (int)leerNumeroConIntentos("ID asignacion: ", 1, 999999999);
+        bool enLista = false;
+        for (int a : asignaciones) { if (a == idAsi) { enLista = true; break; } }
+        if (!enLista) {
+            cout << ROJO << "Esa asignacion no esta en la lista de abiertas." << RESET << endl;
+            return;
+        }
+
+        string accion = leerDatoSeguro("Que se hizo: ");
+
+        // El repuesto: SOLO productos marcados ES_REPUESTO (modo SOLO). Elegir el
+        // producto es lo que descuenta stock; Enter deja la reparacion sin repuesto.
+        std::unique_ptr<sql::PreparedStatement> pRep(globalCon->prepareStatement(
+            "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO('', 'SOLO')"));
+        std::unique_ptr<sql::ResultSet> rRep(pRep->executeQuery());
+
+        vector<int> repuestos;
+        const size_t W_PID = 6, W_COD = 14, W_PNOM = 25, W_PST = 8;
+        const size_t ANCHO_R = W_PID + W_COD + W_PNOM + W_PST + 3 * 3;
+        cout << "\n"
+             << tablaCelda("ID", W_PID) << " | "
+             << tablaCelda("CODIGO", W_COD) << " | "
+             << tablaCelda("REPUESTO", W_PNOM) << " | "
+             << tablaCelda("STOCK", W_PST) << "\n"
+             << tablaLinea(ANCHO_R) << "\n";
+
+        while (rRep->next()) {
+            repuestos.push_back(rRep->getInt("ID_PRODUCTO"));
+            int stock = 0;
+            try { stock = rRep->getInt("STOCK"); } catch (...) { stock = 0; }
+            cout << tablaCelda(to_string(rRep->getInt("ID_PRODUCTO")), W_PID) << " | "
+                 << tablaCelda(rRep->getString("CODIGO"), W_COD) << " | "
+                 << tablaCelda(rRep->getString("NOMBRE"), W_PNOM) << " | "
+                 << tablaCelda(to_string(stock), W_PST) << "\n"
+                 << tablaLinea(ANCHO_R) << "\n";
+        }
+        drenarResultados(pRep.get());
+
+        double dCero = 0;
+        int idRepuesto = 0;
+        int cantidad = 0;
+        if (repuestos.empty()) {
+            cout << "\n[!] No hay productos marcados como repuesto. Se registra sin repuesto." << endl;
+        } else {
+            idRepuesto = (int)leerNumeroConIntentos(
+                "ID repuesto (Enter = sin repuesto): ", 0, 999999999, &dCero);
+            if (idRepuesto > 0) {
+                bool repEnLista = false;
+                for (int r : repuestos) { if (r == idRepuesto) { repEnLista = true; break; } }
+                if (!repEnLista) {
+                    cout << ROJO << "Ese producto no esta marcado como repuesto." << RESET << endl;
+                    return;
+                }
+                cantidad = (int)leerNumeroConIntentos("Cantidad de repuesto: ", 1, 999999999);
+            }
+        }
+
+        int tiempo = (int)leerNumeroConIntentos("Minutos empleados (Enter = 0): ", 0, 999999999, &dCero);
+        string estado = leerDatoSeguro(
+            "Estado del avance (PENDIENTE/EN_PROCESO/COMPLETADO/CANCELADO, Enter = EN_PROCESO): ");
+        if (estado.empty()) estado = "EN_PROCESO";
+        string ruta = leerDatoSeguro("Evidencia (ruta o nombre, Enter para omitir): ");
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(globalCon->prepareStatement(
+            "CALL SP_REGISTRAR_AVANCE_REPARACION(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        pstmt->setInt(1, idAsi);
+        pstmt->setInt(2, sesionActual.idUsuario);
+        pstmt->setString(3, accion);
+        if (idRepuesto > 0) {
+            pstmt->setInt(4, idRepuesto);
+            pstmt->setInt(5, cantidad);
+        } else {
+            pstmt->setNull(4, sql::DataType::INTEGER);
+            pstmt->setNull(5, sql::DataType::INTEGER);
+        }
+        pstmt->setDouble(6, 0.0);   // el costo del repuesto lo calcula el SP
+        pstmt->setInt(7, tiempo);
+        pstmt->setString(8, estado);
+        if (ruta.empty()) pstmt->setNull(9, sql::DataType::VARCHAR);
+        else pstmt->setString(9, ruta);
+        cout << ">>> " << Recogermensaje(pstmt.get()) << " <<<" << endl;
+        drenarResultados(pstmt.get());
+    } catch (const CancelarOperacionException &e) {
+        cout << "\n[!] " << e.what() << endl;
+    } catch (const exception &) {
+        cout << ROJO << "No se pudo registrar el avance." << RESET << endl;
     }
 }
 
@@ -1828,6 +2087,8 @@ static void ejecutarSubmenuGarantias() {
         switch (elegido.accion) {
             case AccionGarantia::Registrar: garantiaRegistrarUI(); break;
             case AccionGarantia::Reclamar:  reclamoRegistrarUI(); break;
+            case AccionGarantia::Asignar:   asignarTecnicoUI(); break;
+            case AccionGarantia::Avance:    avanceReparacionUI(); break;
             case AccionGarantia::Finalizar: reclamoFinalizarUI(); break;
             case AccionGarantia::Consultar: consultarGarantiasUI(); break;
             case AccionGarantia::Volver:    break;

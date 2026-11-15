@@ -10,7 +10,12 @@ código.
 `empleados.cpp` y el resto de los módulos de UI (cada uno pregunta por su
 permiso).
 
-Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 26/10/2026.
+> **Absorbe el `44` (14/11/2026):** la migración de roles vive ahora **en este
+> mismo archivo**, al final, en la sección «MIGRACION_ROLES (ex módulo 44)». Corre
+> después de la matriz y de los diez parches finos, que es el orden que tenían
+> como archivos aparte.
+
+Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/11/2026.
 
 ## Tablas
 
@@ -441,6 +446,781 @@ firma del cuadre quedó fuera de esta fase.
 > alguien vuelve a asignarle `CLIENTES_EDITAR` a `RRHH` desde la app, el
 > próximo import se lo saca.
 
+## Matriz de permisos finos
+
+El módulo es el único dueño de la matriz: absorbe diez módulos que antes
+repartían los permisos finos en archivos separados (45, 46, 47, 49, 50, 51, 52,
+53, 58 y 62). Cada sección conserva su texto original.
+
+| Sección | Módulo absorbido | Qué agrega |
+|---|---|---|
+| 1 | [45- PERMISO_CONSULTAR_ASISTENCIA.md](#1-45-permiso-consultar-asistencia) | 45 - Permiso CONSULTAR_ASISTENCIA | `CONSULTAR_ASISTENCIA`, `CONSULTAR_REPORTES`, `EMPLEADOS_VER`, `JUSTIFICAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA` |
+| 2 | [46- PERMISOS_PROVEEDORES.md](#2-46-permisos-finos-de-proveedores) | 46 - Permisos finos de Proveedores | `GESTIONAR_PROVEEDORES`, `PROVEEDORES`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `PROVEEDORES_VER` |
+| 3 | [47- PERMISO_HISTORIAL_VENTA.md](#3-47-permiso-consultar-historial-venta) | 47 - Permiso CONSULTAR_HISTORIAL_VENTA | `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_REPORTES`, `GESTIONAR_VENTAS` |
+| 4 | [49- PERMISOS_CATEGORIAS.md](#4-49-permisos-finos-de-categor-as) | 49 - Permisos finos de Categorías | `CATEGORIAS`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `CATEGORIAS_VER`, `GESTIONAR_CATEGORIAS` |
+| 5 | [50- PERMISOS_MARCAS.md](#5-50-permisos-finos-de-marcas) | 50 - Permisos finos de Marcas | `GESTIONAR_MARCAS`, `MARCAS`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `MARCAS_VER` |
+| 6 | [51- PERMISOS_METODOS_PAGO.md](#6-51-permisos-finos-de-m-todos-de-pago) | 51 - Permisos finos de Métodos de pago | `DELETE`, `GESTIONAR_METODOS_PAGO`, `METODOS_PAGO`, `METODOS_PAGO_CREAR`, `METODOS_PAGO_EDITAR`, `METODOS_PAGO_ESTADO` |
+| 7 | [52- PERMISOS_COMPRAS.md](#7-52-permisos-finos-de-compras) | 52 - Permisos finos de Compras | `COMPRAS`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_PAGAR`, `COMPRAS_REGISTRAR`, `COMPRAS_REPORTES` |
+| 8 | [53- PERMISOS_CAJA.md](#8-53-permisos-finos-de-caja) | 53 - Permisos finos de Caja | `ABRIR_CAJA`, `CERRAR_CAJA`, `CONSULTAR_CAJA`, `GESTIONAR_VENTAS`, `TURNO_CAJA` |
+| 9 | [58- PERMISOS_INVENTARIO.md](#9-58-permisos-finos-de-inventario) | 58 - Permisos finos de Inventario | `GESTIONAR_INVENTARIO`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `INVENTARIO_VER` |
+| 10 | [62- PERMISOS_GARANTIAS.md](#10-62-permisos-finos-de-garantias) | 62 - Permisos finos de Garantias | `BALBU_TECH_TEST`, `GARANTIAS_CONSULTAR`, `GARANTIAS_FINALIZAR`, `GARANTIAS_RECLAMAR`, `GARANTIAS_REGISTRAR`, `GESTIONAR_VENTAS` |
+
+Ninguna sección usa los roles `EMPLEADO` ni `CAJERO`, así que el resultado no
+depende del orden entre estos diez parches y la sección `MIGRACION_ROLES` del
+final, que solo borra los pares y los roles de esos dos nombres.
+
+El bloque va **al final** del módulo a propósito: primero se crean las tablas,
+los 54 permisos base y la matriz de los siete roles; después se reparten los
+finos. Es el mismo orden que tenían como archivos aparte.
+
+> **Aviso de despliegue.** Varias secciones borran el permiso paraguas
+> (`GESTIONAR_COMPRAS`, `GESTIONAR_PROVEEDORES`, ...). El binario tiene que estar
+> desplegado antes: el binario viejo sigue pidiendo el paraguas y el ítem
+> desaparece del menú hasta que se actualice. No se pierden datos.
+
+### 1. 45 - Permiso CONSULTAR_ASISTENCIA
+
+##### Qué hace
+
+Separa los reportes de asistencia del permiso general `CONSULTAR_REPORTES` y
+habilita el fichaje a todos los roles. La asistencia deja de depender del
+módulo Empleados: pasa a un ítem propio del menú principal.
+
+##### Matriz que deja
+
+| Permiso | Roles |
+|---|---|
+| `REGISTRAR_ASISTENCIA` | ADMIN, GERENTE, SUBGERENTE, RRHH, VENDEDOR, ALMACEN, CONTABILIDAD |
+| `CONSULTAR_ASISTENCIA` | ADMIN, GERENTE, SUBGERENTE, RRHH |
+| `JUSTIFICAR_ASISTENCIA` | ADMIN, GERENTE, RRHH, SUBGERENTE |
+| `EMPLEADOS_VER` | ADMIN, GERENTE, SUBGERENTE, RRHH |
+
+VENDEDOR no recibe `CONSULTAR_ASISTENCIA`: el cajero puede fichar y ver su
+propia asistencia, pero no la de todos. Conserva `CONSULTAR_REPORTES` y todos
+los reportes de venta.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH_TEST < "modulos/45- PERMISO_CONSULTAR_ASISTENCIA.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué no hace
+
+- No borra permisos ni pares rol-permiso.
+- No toca datos de empleados, contratos ni asistencia.
+- No crea procedimientos almacenados.
+
+---
+
+### 2. 46 - Permisos finos de Proveedores
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_PROVEEDORES` por cuatro permisos
+finos, con el mismo corte que Clientes:
+
+| Permiso | Acción |
+|---|---|
+| `PROVEEDORES_VER` | Buscar y listar |
+| `PROVEEDORES_CREAR` | Agregar |
+| `PROVEEDORES_EDITAR` | Actualizar |
+| `PROVEEDORES_ESTADO` | Activar/Desactivar |
+
+La app deja de usar el permiso viejo: el ítem Proveedores del menú principal
+se muestra con cualquiera de los cuatro, y cada opción del submenú pide el
+suyo.
+
+##### Matriz que deja
+
+| Rol | Permisos de Proveedores |
+|---|---|
+| `ADMIN` | los 4 |
+| `GERENTE` | los 4 |
+| `SUBGERENTE` | los 4 |
+| `ALMACEN` | los 4 |
+| `RRHH` | ninguno |
+| `VENDEDOR` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **34 permisos** y **122 pares rol-permiso**
+(ADMIN 34, GERENTE 28, SUBGERENTE 22, RRHH 12, VENDEDOR 10, ALMACEN 12,
+CONTABILIDAD 4).
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_PROVEEDORES`; si el módulo corre
+antes, el ítem Proveedores desaparece del menú hasta que se despliegue el
+binario nuevo. No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/46- PERMISOS_PROVEEDORES.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- Cualquier rol personalizado que tuviera `GESTIONAR_PROVEEDORES` recibe los
+  cuatro permisos finos antes de que se borre el paraguas.
+- Los roles del set final (`ADMIN`, `GERENTE`, `SUBGERENTE`, `ALMACEN`)
+  reciben los cuatro aunque el paraguas ya no exista.
+- No toca datos de proveedores, compras ni productos.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica la tabla `PROVEEDORES`.
+- No crea procedimientos almacenados.
+
+---
+
+### 3. 47 - Permiso CONSULTAR_HISTORIAL_VENTA
+
+##### Qué hace
+
+Separa el historial de venta del permiso general `CONSULTAR_REPORTES`. La
+opción `Historial de venta` del submenú Ventas pasa a pedir
+`CONSULTAR_HISTORIAL_VENTA`, así el vendedor conserva el historial aunque no
+tenga reportes ni ganancias. `Garantías` no cambia: sigue con
+`GESTIONAR_VENTAS`.
+
+Con este cambio, `VENDEDOR` ve **10 opciones** en Ventas: las 7 de gestión,
+`Historial de venta`, `Garantías` y `Volver`. Deja de ver `Reporte por rango`,
+`Ganancias`, `Reporte por periodo`, `Ganancias por periodo` y
+`Exportar datos para la web`.
+
+##### Matriz que deja
+
+| Permiso | Roles |
+|---|---|
+| `CONSULTAR_HISTORIAL_VENTA` | ADMIN, GERENTE, SUBGERENTE, VENDEDOR |
+| `CONSULTAR_REPORTES` | ADMIN, GERENTE, SUBGERENTE, RRHH, CONTABILIDAD (VENDEDOR ya no) |
+
+Totales después de la migración: **35 permisos** y **125 pares rol-permiso**
+(ADMIN 35, GERENTE 29, SUBGERENTE 23, RRHH 12, VENDEDOR 10, ALMACEN 12,
+CONTABILIDAD 4).
+
+`VENDEDOR` cambia un permiso por otro y sigue con 10; `ADMIN`, `GERENTE` y
+`SUBGERENTE` suman uno cada uno. Por eso el total pasa de 122 a 125 pares.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `CONSULTAR_REPORTES` para el historial; si el
+módulo corre antes, la opción desaparece del submenú hasta que se despliegue el
+binario nuevo. No se pierden datos: solo se oculta una opción.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/47- PERMISO_HISTORIAL_VENTA.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE`, `SUBGERENTE` y `VENDEDOR` quedan con el historial; los
+  tres primeros también conservan `CONSULTAR_REPORTES`.
+- `RRHH` y `CONTABILIDAD` no cambian: conservan `CONSULTAR_REPORTES`.
+  `ALMACEN` no tiene ese permiso y tampoco lo necesita.
+- No toca datos de ventas, pagos, caja ni garantías.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica las tablas de ventas.
+- No crea permisos de Garantías: esa opción sigue con `GESTIONAR_VENTAS`.
+- No crea procedimientos almacenados.
+
+---
+
+### 4. 49 - Permisos finos de Categorías
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_CATEGORIAS` por cuatro permisos
+finos, con el mismo corte que Clientes y Proveedores:
+
+| Permiso | Acción |
+|---|---|
+| `CATEGORIAS_VER` | Buscar |
+| `CATEGORIAS_CREAR` | Agregar |
+| `CATEGORIAS_EDITAR` | Actualizar |
+| `CATEGORIAS_ESTADO` | Activar/Desactivar |
+
+La app deja de usar el permiso viejo: el ítem Categorías del menú principal se
+muestra con cualquiera de los cuatro, y cada opción del submenú pide el suyo.
+`Volver` es siempre visible.
+
+##### Matriz que deja
+
+| Rol | Permisos de Categorías |
+|---|---|
+| `ADMIN` | los 4 |
+| `GERENTE` | los 4 |
+| `SUBGERENTE` | los 4 |
+| `ALMACEN` | los 4 |
+| `RRHH` | ninguno |
+| `VENDEDOR` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **38 permisos** y **137 pares rol-permiso**
+(ADMIN 38, GERENTE 32, SUBGERENTE 26, RRHH 12, VENDEDOR 10, ALMACEN 15,
+CONTABILIDAD 4).
+
+El catálogo pasa de 35 a 38: se va un permiso y entran cuatro. Cada uno de los
+cuatro roles que tenía el paraguas gana tres pares (los cuatro finos menos el
+viejo), así que el total pasa de 125 a 137.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_CATEGORIAS`; si el módulo corre
+antes, el ítem Categorías desaparece del menú hasta que se despliegue el
+binario nuevo. No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/49- PERMISOS_CATEGORIAS.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE`, `SUBGERENTE` y `ALMACEN` reciben los cuatro permisos
+  finos aunque el paraguas ya no exista (base nueva o reimportación del 36).
+- `RRHH`, `VENDEDOR` y `CONTABILIDAD` siguen sin acceso al módulo.
+- No toca datos de categorías, productos, marcas ni movimientos de inventario.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica la tabla `CATEGORIAS`.
+- No crea procedimientos almacenados ni triggers.
+- No toca los otros módulos del menú.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_CATEGORIAS`, el
+  módulo le quita el paraguas y **no** le da los finos (solo el set final de
+  roles los recibe).
+
+---
+
+### 5. 50 - Permisos finos de Marcas
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_MARCAS` por cuatro permisos
+finos, con el mismo corte que Clientes, Proveedores y Categorías:
+
+| Permiso | Acción |
+|---|---|
+| `MARCAS_VER` | Buscar y Listar |
+| `MARCAS_CREAR` | Agregar |
+| `MARCAS_EDITAR` | Actualizar |
+| `MARCAS_ESTADO` | Activar/Desactivar |
+
+La app deja de usar el permiso viejo: el ítem Marcas del menú principal se
+muestra con cualquiera de los cuatro, y cada opción del submenú pide el suyo.
+`Volver` es siempre visible.
+
+##### Matriz que deja
+
+| Rol | Permisos de Marcas |
+|---|---|
+| `ADMIN` | los 4 |
+| `GERENTE` | los 4 |
+| `SUBGERENTE` | los 4 |
+| `ALMACEN` | los 4 |
+| `RRHH` | ninguno |
+| `VENDEDOR` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **41 permisos** y **149 pares rol-permiso**
+(ADMIN 41, GERENTE 35, SUBGERENTE 29, RRHH 12, VENDEDOR 10, ALMACEN 18,
+CONTABILIDAD 4).
+
+El catálogo pasa de 38 a 41: se va un permiso y entran cuatro. Cada uno de los
+cuatro roles que tenía el paraguas gana tres pares (los cuatro finos menos el
+viejo), así que el total pasa de 137 a 149.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_MARCAS`; si el módulo corre
+antes, el ítem Marcas desaparece del menú hasta que se despliegue el
+binario nuevo. No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/50- PERMISOS_MARCAS.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE`, `SUBGERENTE` y `ALMACEN` reciben los cuatro permisos
+  finos aunque el paraguas ya no exista (base nueva o reimportación del 36).
+- `RRHH`, `VENDEDOR` y `CONTABILIDAD` siguen sin acceso al módulo.
+- No toca datos de marcas, productos, categorías ni movimientos de inventario.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica la tabla `MARCAS`.
+- No crea procedimientos almacenados ni triggers.
+- No toca los otros módulos del menú.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_MARCAS`, el
+  módulo le quita el paraguas y **no** le da los finos (solo el set final de
+  roles los recibe).
+
+---
+
+### 6. 51 - Permisos finos de Métodos de pago
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_METODOS_PAGO` por cuatro permisos
+finos, con el mismo corte que Clientes, Proveedores, Categorías y Marcas:
+
+| Permiso | Acción |
+|---|---|
+| `METODOS_PAGO_VER` | Buscar y Listar |
+| `METODOS_PAGO_CREAR` | Agregar |
+| `METODOS_PAGO_EDITAR` | Actualizar |
+| `METODOS_PAGO_ESTADO` | Activar/Desactivar |
+
+La app deja de usar el permiso viejo: el ítem Métodos de pago del menú
+principal se muestra con cualquiera de los cuatro, y cada opción del submenú
+pide el suyo. `Volver` es siempre visible.
+
+##### Matriz que deja
+
+| Rol | Permisos de Métodos de pago |
+|---|---|
+| `ADMIN` | los 4 |
+| `GERENTE` | los 4 |
+| `SUBGERENTE` | los 4 |
+| `VENDEDOR` | solo `METODOS_PAGO_VER` |
+| `RRHH` | ninguno |
+| `ALMACEN` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales en su primera aplicación (23/10/2026): **44 permisos** y **161 pares
+rol-permiso** (ADMIN 44, GERENTE 38, SUBGERENTE 32, RRHH 12, VENDEDOR 13,
+ALMACEN 18, CONTABILIDAD 4).
+
+> (26/10/2026) VENDEDOR ya no recibe los cuatro: conserva solo
+> `METODOS_PAGO_VER` y el `DELETE` de abajo le quita los tres de gestión. La
+> matriz vigente completa está en `36- PERMISOS_ROLES.md` (54 permisos y 197
+> pares).
+
+El catálogo pasa de 41 a 44: se va un permiso y entran cuatro. Cada uno de los
+cuatro roles que tenía el paraguas gana tres pares (los cuatro finos menos el
+viejo), así que el total pasa de 149 a 161.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_METODOS_PAGO`; si el módulo corre
+antes, el ítem Métodos de pago desaparece del menú hasta que se despliegue el
+binario nuevo. No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/51- PERMISOS_METODOS_PAGO.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE` y `SUBGERENTE` reciben los cuatro permisos finos aunque el
+  paraguas ya no exista (base nueva o reimportación del 36).
+- (26/10/2026) `VENDEDOR` recibe solo `METODOS_PAGO_VER`: consulta los métodos
+  existentes y no los mantiene.
+- `RRHH`, `ALMACEN` y `CONTABILIDAD` siguen sin acceso al módulo.
+- No toca datos de métodos de pago, ventas, pagos ni cierres de caja.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica la tabla `METODOS_PAGO`.
+- No crea procedimientos almacenados ni triggers.
+- No toca los otros módulos del menú.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_METODOS_PAGO`,
+  el módulo le quita el paraguas y **no** le da los finos (solo el set final de
+  roles los recibe).
+
+---
+
+### 7. 52 - Permisos finos de Compras
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_COMPRAS` por seis permisos finos, con
+el mismo patrón que Clientes, Proveedores, Categorías, Marcas y Métodos de pago:
+
+| Permiso | Acción |
+|---|---|
+| `COMPRAS_VER` | Ver compra con IVA |
+| `COMPRAS_REGISTRAR` | Compra rápida (carrito) |
+| `COMPRAS_PAGAR` | Pagar compra |
+| `COMPRAS_CANCELAR` | Cancelar compra |
+| `COMPRAS_DEVOLVER` | Devolución de compra |
+| `COMPRAS_REPORTES` | Reporte por periodo y Precios por suplidor |
+
+La app deja de usar el permiso viejo: el ítem Compras del menú principal se
+muestra con cualquiera de los seis, y cada opción del submenú pide el suyo.
+`Volver` es siempre visible.
+
+##### Matriz que deja
+
+| Rol | Permisos de Compras |
+|---|---|
+| `ADMIN` | los 6 |
+| `GERENTE` | los 6 |
+| `SUBGERENTE` | los 6 |
+| `ALMACEN` | los 6 |
+| `RRHH` | ninguno |
+| `VENDEDOR` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **49 permisos** y **181 pares rol-permiso**
+(ADMIN 49, GERENTE 43, SUBGERENTE 37, RRHH 12, VENDEDOR 13, ALMACEN 23,
+CONTABILIDAD 4).
+
+El catálogo pasa de 44 a 49: se va un permiso y entran seis. Cada uno de los
+cuatro roles que tenía el paraguas gana cinco pares (los seis finos menos el
+viejo), así que el total pasa de 161 a 181.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_COMPRAS`; si el módulo corre antes,
+el ítem Compras desaparece del menú hasta que se despliegue el binario nuevo.
+No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/52- PERMISOS_COMPRAS.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE`, `SUBGERENTE` y `ALMACEN` reciben los seis permisos finos
+  aunque el paraguas ya no exista (base nueva o reimportación del 36).
+- `RRHH`, `VENDEDOR` y `CONTABILIDAD` siguen sin acceso al módulo.
+- No toca datos de compras, pagos, devoluciones, inventario ni proveedores.
+- Las altas rápidas de producto y suplidor siguen exigiendo
+  `GESTIONAR_PRODUCTOS` y `PROVEEDORES_CREAR`: el permiso de Compras no las
+  habilita por sí solo.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica las tablas `COMPRAS`, `DETALLE_COMPRA`, `PAGOS_COMPRA` ni
+  `DEVOLUCION_COMPRA`.
+- No crea procedimientos almacenados ni triggers.
+- No toca los otros módulos del menú.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_COMPRAS`, el
+  módulo le quita el paraguas y **no** le da los finos (solo el set final de
+  roles los recibe).
+
+---
+
+### 8. 53 - Permisos finos de Caja
+
+##### Qué hace
+
+Separa el módulo Caja de `GESTIONAR_VENTAS` con tres permisos propios:
+
+| Permiso | Acción |
+|---|---|
+| `CONSULTAR_CAJA` | Ver el estado del turno abierto |
+| `ABRIR_CAJA` | Abrir el turno de la caja |
+| `CERRAR_CAJA` | Cerrar el turno y registrar el cuadre |
+
+El ítem Caja del menú principal se muestra con cualquiera de los tres, y cada
+opción del submenú pide el suyo. `Volver` es siempre visible.
+`GESTIONAR_VENTAS` sigue existiendo y sigue mandando en el módulo Ventas.
+
+> El cierre sigue siendo directo: el vendedor abre, consulta y cierra su turno,
+> sin confirmación de un segundo actor. El flujo con firma del cuadre queda
+> para una fase posterior.
+
+##### Matriz que deja
+
+| Rol | Permisos de Caja |
+|---|---|
+| `ADMIN` | los 3 |
+| `GERENTE` | los 3 |
+| `SUBGERENTE` | los 3 |
+| `VENDEDOR` | los 3 |
+| `RRHH` | ninguno |
+| `ALMACEN` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **52 permisos** y **193 pares rol-permiso**
+(ADMIN 52, GERENTE 46, SUBGERENTE 40, RRHH 12, VENDEDOR 16, ALMACEN 23,
+CONTABILIDAD 4).
+
+> (26/10/2026) VENDEDOR bajó a 12 permisos y el total a 197 por el ajuste de
+> Clientes y Métodos de pago. Los totales de arriba son los de esta migración;
+> la matriz vigente está en `36- PERMISOS_ROLES.md`.
+
+El catálogo pasa de 49 a 52: entran tres permisos y cada uno de los cuatro
+roles que ya veía Caja gana tres pares, así que el total pasa de 181 a 193.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo pide `GESTIONAR_VENTAS` para el ítem Caja; si el módulo corre
+antes, el ítem desaparece del menú hasta que se despliegue el binario nuevo.
+No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/53- PERMISOS_CAJA.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- Los cuatro roles del set que ya veían Caja reciben los tres permisos finos
+  aunque el ítem ya no mire `GESTIONAR_VENTAS`.
+- Los roles personalizados que hoy tengan `GESTIONAR_VENTAS` también reciben
+  los tres, para que no pierdan el módulo.
+- No toca turnos, pagos ni cuadres existentes.
+
+##### Qué no hace
+
+- No borra roles, usuarios ni permisos.
+- No modifica `TURNO_CAJA` ni sus procedimientos.
+- No agrega estados de cierre ni confirmación por un segundo actor.
+- No toca los otros módulos del menú.
+
+---
+
+### 9. 58 - Permisos finos de Inventario
+
+##### Qué hace
+
+Reemplaza el permiso paraguas `GESTIONAR_INVENTARIO` por tres permisos finos,
+con el mismo patrón que Clientes, Proveedores, Categorías, Marcas, Métodos de
+pago y Compras:
+
+| Permiso | Acción |
+|---|---|
+| `INVENTARIO_VER` | Movimientos (kardex) |
+| `INVENTARIO_AJUSTAR` | Ajuste de stock |
+| `INVENTARIO_COSTO` | Ajustar p.compra |
+
+La app deja de usar el permiso viejo: el ítem Inventario del menú principal se
+muestra con cualquiera de los tres, y cada opción del submenú pide el suyo.
+`Volver` es siempre visible. Es el **último módulo con permiso paraguas de la
+Tanda B**.
+
+##### Matriz que deja
+
+| Rol | Permisos de Inventario |
+|---|---|
+| `ADMIN` | los 3 |
+| `GERENTE` | los 3 |
+| `SUBGERENTE` | los 3 |
+| `ALMACEN` | los 3 |
+| `RRHH` | ninguno |
+| `VENDEDOR` | ninguno |
+| `CONTABILIDAD` | ninguno |
+
+Totales después de la migración: **54 permisos** y **201 pares rol-permiso**
+(ADMIN 54, GERENTE 48, SUBGERENTE 42, RRHH 12, VENDEDOR 16, ALMACEN 25,
+CONTABILIDAD 4).
+
+> (26/10/2026) VENDEDOR bajó a 12 permisos y el total a 197 por el ajuste de
+> Clientes y Métodos de pago. La matriz vigente está en `36- PERMISOS_ROLES.md`.
+
+El catálogo pasa de 52 a 54: se va un permiso y entran tres. Cada uno de los
+cuatro roles que tenía el paraguas gana dos pares (los tres finos menos el
+viejo), así que el total pasa de 193 a 201.
+
+##### Orden de despliegue
+
+1. Compilar y desplegar el binario nuevo.
+2. Hacer backup de la base viva.
+3. Correr este módulo.
+
+El binario viejo sigue pidiendo `GESTIONAR_INVENTARIO`; si el módulo corre
+antes, el ítem Inventario desaparece del menú hasta que se despliegue el binario
+nuevo. No se pierden datos: solo se oculta el módulo.
+
+##### Cómo aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/58- PERMISOS_INVENTARIO.sql"
+```
+
+Es idempotente: se puede correr dos veces sin duplicar pares.
+
+##### Qué preserva
+
+- `ADMIN`, `GERENTE`, `SUBGERENTE` y `ALMACEN` reciben los tres permisos finos
+  aunque el paraguas ya no exista (base nueva o reimportación del 36).
+- `RRHH`, `VENDEDOR` y `CONTABILIDAD` siguen sin acceso al módulo.
+- No toca datos de productos, stock, movimientos ni compras.
+- Las compras siguen moviendo stock por diseño: ese efecto no depende de
+  `INVENTARIO_AJUSTAR`.
+
+##### Qué no hace
+
+- No borra roles ni usuarios.
+- No modifica las tablas de inventario ni los procedimientos de stock.
+- No crea procedimientos almacenados ni triggers.
+- No toca los otros módulos del menú.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_INVENTARIO`, el
+  módulo le quita el paraguas y **no** le da los finos (solo el set final de
+  roles los recibe).
+
+---
+
+### 10. 62 - Permisos finos de Garantias
+
+##### Que hace
+
+Saca Garantias de `GESTIONAR_VENTAS` y le da cuatro permisos propios, con el
+mismo patron que Clientes, Proveedores, Inventario y demas:
+
+| Permiso | Accion |
+|---|---|
+| `GARANTIAS_REGISTRAR` | Registrar una garantia a mano |
+| `GARANTIAS_RECLAMAR` | Abrir un reclamo sobre una garantia vigente |
+| `GARANTIAS_FINALIZAR` | Cerrar un reclamo (decision de Gerencia) |
+| `GARANTIAS_CONSULTAR` | Ver garantias y reclamos |
+
+El item "Garantias" del submenu de Ventas se muestra con cualquiera de los
+cuatro, y cada opcion adentro pide el suyo. `Volver` es siempre visible.
+
+La diferencia clave: **el vendedor atiende y registra, pero no cierra
+reclamos**. `VENDEDOR` conserva registrar, reclamar y consultar.
+
+##### Matriz que deja
+
+| Rol | Registrar | Reclamar | Finalizar | Consultar |
+|---|:-:|:-:|:-:|:-:|
+| `ADMIN` | si | si | si | si |
+| `GERENTE` | si | si | si | si |
+| `SUBGERENTE` | si | si | si | si |
+| `VENDEDOR` | si | si | **no** | si |
+| `CONTABILIDAD` | no | no | no | si |
+| `RRHH` | no | no | no | no |
+| `ALMACEN` | no | no | no | no |
+
+Totales despues de la migracion: **58 permisos** y **213 pares rol-permiso**
+(ADMIN 58, GERENTE 52, SUBGERENTE 46, RRHH 12, VENDEDOR 15, ALMACEN 25,
+CONTABILIDAD 5). Antes eran 54 permisos y 197 pares.
+
+##### Por que
+
+- `GESTIONAR_VENTAS` es el paraguas de nueve acciones de Ventas. Colgar
+  Garantias de el obliga a dar todo el modulo de ventas a quien solo tiene
+  que consultar una garantia.
+- Contabilidad necesita ver garantias y reclamos para costos, pero no
+  registrar ni decidir.
+- Cerrar un reclamo es una decision con costo (cambio, devolucion,
+  reembolso). El que atiende al cliente no deberia ser el que autoriza.
+
+##### Orden de despliegue
+
+1. Correr el módulo `25` completo (la sección del ex `63` va incluida).
+2. Compilar y desplegar el binario nuevo.
+3. Correr este modulo.
+
+El binario viejo abre Garantias con `GESTIONAR_VENTAS`; si este modulo corre
+antes, el item desaparece del menu hasta desplegar el binario nuevo. No se
+pierden datos: solo se oculta el modulo.
+
+##### Como aplicarlo
+
+```bash
+mysql -h127.0.0.1 -uroot -p BALBU_TECH < "modulos/62- PERMISOS_GARANTIAS.sql"
+```
+
+Es idempotente: los permisos usan `ON DUPLICATE KEY UPDATE` y los pares
+tambien, asi que correrlo dos veces no duplica nada.
+
+##### Que preserva
+
+- `GESTIONAR_VENTAS` no se borra ni se le quitan pares: lo siguen usando las
+  otras nueve acciones de Ventas.
+- Los roles que no estan en la matriz no reciben nada.
+- No toca datos de ventas, garantias ni reclamos.
+- No cambia los otros modulos del menu.
+
+##### Que no hace
+
+- No borra roles ni usuarios.
+- No migra roles personalizados: si alguno tuviera `GESTIONAR_VENTAS` y
+  esperaba ver Garantias, deja de verla y no recibe los permisos finos.
+- No crea procedimientos ni triggers: eso es el modulo 63.
+
+##### Detalle de la app
+
+`roles.cpp` agrega los cuatro permisos al item "Ventas" del menu principal.
+Sin eso, `CONTABILIDAD` tendria `GARANTIAS_CONSULTAR` y no podria llegar a
+usarlo: el modulo se abriria solo para quien tiene `GESTIONAR_VENTAS`.
+
+##### Verificacion
+
+Aplicado en `BALBU_TECH_TEST` el 30/10/2026, dos veces seguidas sin error:
+
+- Matriz verificada: ADMIN 4, GERENTE 4, SUBGERENTE 4, VENDEDOR 3,
+  CONTABILIDAD 1.
+- Catalogo en 58 permisos y 213 pares.
+- `GESTIONAR_VENTAS` sigue en ADMIN, GERENTE, SUBGERENTE y VENDEDOR.
+- `test-menus-por-rol.sh`: el rol sintetico con solo `GESTIONAR_VENTAS` deja
+  de ver Garantias (8 opciones en Ventas), y el submenu de Garantias muestra
+  5 opciones para ADMIN, 4 para VENDEDOR (sin "Finalizar reclamo") y 2 para
+  CONTABILIDAD.
+- `test-migracion-roles.sh`: VENDEDOR pasa de 12 a 15 permisos.
+
+---
+
 ## Procedimientos almacenados
 
 ### `SP_ASIGNAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
@@ -535,3 +1315,103 @@ permiso; `FALSE` si el usuario no existe o no lo tiene.
 - **Quitar un permiso que no estaba no es error**, es aviso.
 - **El import re-aplica la matriz y borra los pares viejos de `RRHH`.**
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.
+
+## MIGRACION_ROLES (ex módulo 44)
+
+Migración de roles: absorbida dentro del `36` el 14/11/2026 (ver «Estado de la
+documentación» y el `## Log` de `odd/tasks/consolidacion-modulos.md`). El cuerpo
+del ex `44` viaja **verbatim**: acá solo se degradaron los encabezados un nivel.
+
+Script de migración, no de esquema: **no crea tablas, procedimientos, triggers ni
+vistas**. Deja cualquier base existente en el set final de 7 roles y retira los
+dos que el rediseño del 22/10/2026 absorbió.
+
+Set final: `ADMIN`, `GERENTE`, `SUBGERENTE`, `RRHH`, `VENDEDOR`, `ALMACEN`,
+`CONTABILIDAD`.
+
+Retirados: `EMPLEADO` (renombrado a `VENDEDOR` en la base del trabajo) y
+`CAJERO` (absorbido por `VENDEDOR`).
+
+**Es usado por:** nadie desde la app. Es la última sección de este archivo, así
+que corre al final del `36`; también se puede aplicar solo sobre una base ya
+poblada.
+
+Fuente: `modulos/36- PERMISOS_ROLES.sql`, sección del ex módulo `44` · Base:
+`BALBU_TECH` · Revisado: 22/10/2026 · Fusionado: 14/11/2026.
+
+### Por qué existe
+
+Ninguno de los dos módulos **retira un rol**: el `INSERT IGNORE INTO ROLES` del 3
+suma nombres y nunca borra los viejos, y el 36 sí limpia (borra los permisos
+paraguas con sus pares y reconstruye la matriz) pero no toca las filas de
+`ROLES`. La fila del rol retirado queda huérfana del set final.
+
+Consecuencia en una base vieja: `EMPLEADO` y `CAJERO` sobrevivían como roles
+**fuera del set de 7**. Los permisos paraguas que el 36 borra
+(`GESTIONAR_EMPLEADOS`, `GESTIONAR_CLIENTES`, `GESTIONAR_USUARIOS`,
+`CONSULTAR_CLIENTES`) desaparecen de esos roles por el `ON DELETE CASCADE` de
+`FK_ROL_PERMISO_PERMISO`, pero los que sobreviven por nombre
+(`GESTIONAR_VENTAS`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`,
+`SOLICITAR_PERMISO`, `GESTIONAR_METODOS_PAGO`, `CONSULTAR_REPORTES`) siguen
+asignados. O sea: el usuario sigue entrando con un menú recortado y a medias, con
+un rol que ya no forma parte del modelo y que nadie vuelve a mirar.
+
+El repo no tenía forma de arreglarlo. Según el informe del 22/10/2026, la
+migración se aplicó a mano en la base del trabajo con un script que quedó en
+`backups/` (gitignored); en este repo no hay ningún script así versionado
+(`backups/` solo tiene `pre_asist_v2_20261017_100847.sql`). Este bloque hace ese
+trabajo y queda versionado.
+
+### Qué hace, en orden
+
+| Paso | Sentencia | Por qué ese orden |
+|---|---|---|
+| 1 | `INSERT IGNORE` de los 7 roles | `USUARIOS.ID_ROL` es `NOT NULL`: sin el rol destino, el paso 2 no tiene a dónde mover |
+| 2 | `UPDATE USUARIOS` de `EMPLEADO`/`CAJERO` a `VENDEDOR` | `FK_USUARIO_ROL` es `RESTRICT`: con usuarios colgando, el rol no se puede borrar |
+| 3 | `DELETE FROM ROL_PERMISO` de los dos roles | `FK_ROL_PERMISO_ROL` es `RESTRICT`: con pares colgando, el rol no se puede borrar |
+| 4 | `DELETE FROM ROLES` de los dos roles | recién acá no queda nada que los referencie |
+| 5 | `SELECT` de comprobación | tiene que devolver `Roles retirados que quedan: 0` y 7 filas |
+
+Las dos FKs que apuntan a `ROLES` **no tienen `ON DELETE`**: si se invierte el
+orden, el `DELETE` falla y la migración queda a medias. Por eso el script va
+numerado en ese orden y no se reordena.
+
+> **Corrección al fusionar (14/11/2026):** el texto original decía «la matriz es
+> del módulo `36`, que corre antes». Ahora la matriz y esta migración son el
+> mismo archivo y el orden se cumple solo: la sección va **al final**. El riesgo
+> que anotaba la spec S4 —que un parche fino asignara permisos a `EMPLEADO` o
+> `CAJERO` y esta migración los borrara— ya no depende del orden de import: los
+> diez parches finos van arriba y la migración abajo, siempre.
+
+### Idempotencia
+
+Se puede correr las veces que haga falta:
+
+- En una base nueva (import desde cero) los pasos 2 a 4 no tocan ninguna fila:
+  `EMPLEADO` y `CAJERO` no existen.
+- Sobre una base ya migrada, el paso 2 no encuentra usuarios con esos roles y los
+  pasos 3 y 4 no encuentran filas.
+- Nunca duplica roles (`INSERT IGNORE` sobre `NOMBRE_ROL`, que es único) ni
+  permisos.
+
+### Qué NO hace
+
+- **No toca roles personalizados** (`PRUEBA_*` del test, o cualquier rol creado a
+  mano): solo actúa sobre los dos nombres retirados.
+- **No reparte permisos**: la matriz es de este mismo archivo y va arriba. Los
+  usuarios movidos a `VENDEDOR` heredan los 10 permisos de ese rol.
+- **No borra empleados ni usuarios**: solo cambia el `ID_ROL` de los que estaban
+  en los roles retirados.
+
+### Verificación
+
+```sql
+SELECT NOMBRE_ROL FROM ROLES ORDER BY ID_ROL;                    -- 7 filas
+SELECT COUNT(*) FROM ROLES WHERE NOMBRE_ROL IN ('EMPLEADO','CAJERO');  -- 0
+SELECT R.NOMBRE_ROL, COUNT(*) FROM USUARIOS U JOIN ROLES R ON R.ID_ROL=U.ID_ROL
+ GROUP BY R.NOMBRE_ROL;                                          -- sin EMPLEADO/CAJERO
+```
+
+Test automático: `db/test-migracion-roles.sh` (crea los dos roles retirados con un
+usuario cada uno, extrae esta sección del `36`, la corre dos veces y verifica el
+resultado).

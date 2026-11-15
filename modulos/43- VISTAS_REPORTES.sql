@@ -1,10 +1,13 @@
+
+
+SELECT * FROM USUARIOS;
 -- 43- VISTAS_REPORTES.sql
 -- (20/10/2026) Vistas que cruzan tablas creadas en modulos posteriores.
 --
 -- Por que viven aca y no en su modulo original:
 -- MariaDB valida las tablas referenciadas al crear una VIEW. Estas 5 leen
--- DETALLE_COMPRA / DEVOLUCION_COMPRA (modulo 22) y DEVOLUCIONES (modulo 26),
--- que se importan despues de los modulos donde estaban definidas (19, 19.5,
+-- DETALLE_COMPRA / DEVOLUCION_COMPRA (modulo 19) y DEVOLUCIONES (modulo 26),
+-- que se importan despues de los modulos donde estaban definidas (19,
 -- 23 y 24). En una base existente nunca fallaban porque las tablas ya estaban;
 -- en una reconstruccion desde cero el CREATE VIEW fallaba y el import seguia
 -- con --force, dejando la base sin estas 5 vistas.
@@ -186,3 +189,4 @@ FROM VW_VENTA_NETA N
 JOIN VENTAS V ON V.ID_VENTA = N.ID_VENTA
 JOIN EMPLEADOS E ON E.ID_EMPLEADO = V.ID_EMPLEADO
 JOIN CLIENTES  C ON C.ID_CLIENTE  = V.ID_CLIENTE;
+

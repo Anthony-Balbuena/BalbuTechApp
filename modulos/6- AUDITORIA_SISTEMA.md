@@ -2,11 +2,11 @@
 
 Bitácora genérica del sistema: qué tabla se tocó, qué registro, qué acción, quién
 y con qué valores antes y después. Es la tabla donde escriben los triggers de
-auditoría de otros módulos (`27` y `40`, además de los tres de este archivo).
+auditoría de otros módulos (`27` y `32`, además de los tres de este archivo).
 
-**Depende de:** `PROVEEDORES` (5) para sus tres triggers.
-**Es usada por:** `27_SP_FINALIZAR_RECLAMO_TOTAL` (27) y `TR_MAPA_COMPRA_RECIBIDA`
-(40); los módulos de UI **no** la consultan.
+**Depende de:** `PROVEEDORES` (5) y `USUARIOS` (10) para sus tres triggers.
+**Es usada por:** `27_SP_FINALIZAR_RECLAMO_TOTAL` (25) y `TR_MAPA_COMPRA_RECIBIDA`
+(32); los módulos de UI **no** la consultan.
 
 > **La app no lee ni llama nada de este módulo**: ni los dos `SP` de consulta, ni
 > el de limpieza. La tabla solo recibe filas.
@@ -34,7 +34,7 @@ Fuente: `modulos/6- AUDITORIA_SISTEMA.sql` · Base: `BALBU_TECH` · Revisado: 25
 > **`USUARIO_SISTEMA` ya distingue a la persona.** La app deja su id en
 > `@ID_USUARIO_ACTUAL` al iniciar sesión y el trigger busca el nombre en
 > `USUARIOS`. Si no hay variable (un cambio por consola), cae a `USER()`, el
-> usuario de MySQL. Ver módulo 57.
+> usuario de MySQL.
 >
 > **No hay FK ni `ON DELETE`**: borrar un proveedor o un reclamo deja su auditoría
 > huérfana, que es justamente lo que se busca en una bitácora.
@@ -52,8 +52,8 @@ sin filtros trae todo desde 1900 hasta hoy, de lo más nuevo a lo más viejo.
 >
 > **Tope de 500 filas** para no tragarse la tabla entera.
 
-> **Nombre.** El `DROP` ahora borra las dos variantes (con y sin `6_`), así un
-> reimport no deja una versión vieja viva. Ver módulo 57.
+> **Nombre.** El `DROP` borra las dos variantes (con y sin `6_`), así un
+> reimport no deja una versión vieja viva.
 
 ### `6_SP_CONSULTAR_HISTORIAL_REGISTRO(P_TABLA, P_ID_REGISTRO)`
 
@@ -61,7 +61,7 @@ El historial de **un** registro concreto: `ID_AUDITORIA`, `ACCION`,
 `USUARIO_SISTEMA`, `FECHA_HORA`, `VALOR_ANTERIOR`, `VALOR_NUEVO`, del más nuevo al
 más viejo.
 
-> El `DROP` borra las dos variantes (con y sin `6_`). Ver módulo 57.
+> El `DROP` borra las dos variantes (con y sin `6_`).
 
 ### `SP_LIMPIAR_AUDITORIA(P_DIAS_ANTIGUEDAD)`
 
@@ -106,8 +106,22 @@ exista.
 
 ### Triggers mudados
 
-`TR_AUDITORIA_PRODUCTOS_UPDATE` (cambio de precio) **se movió al módulo 9**, con
+`TR_AUDITORIA_PRODUCTOS_UPDATE` (cambio de precio) **vive en el módulo 9**, con
 su tabla. Acá queda solo el comentario.
+
+## Historial
+
+(25/10/2026) Los `DROP` de los dos `SP` de consulta no coincidían con sus
+`CREATE` (se borraba el nombre sin prefijo y se creaba el `6_`), quedaban
+versiones viejas vivas y `6_SP_LISTAR_AUDITORIA_GENERAL` usaba
+`DATE(FECHA_HORA)`, que anulaba `IX_AUDITORIA_FECHA`. Se corrigió acá mismo y
+además se agregó `TR_AUDIT_PROVEEDORES_DELETE`, que faltaba: hasta entonces un
+proveedor borrado no dejaba rastro.
+
+Ese arreglo vivió un tiempo en el módulo `57`, que solo repetía estos mismos
+objetos. El 12/11/2026 se disolvió dentro de este módulo: repetir una definición
+idéntica no arregla nada y, importado después, solo puede pisar una versión
+buena con una vieja.
 
 ## Reglas de negocio
 

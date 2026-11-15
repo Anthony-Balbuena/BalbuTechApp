@@ -97,7 +97,11 @@ SELECT R.ROUTINE_NAME,
    AND R.ROUTINE_TYPE = 'PROCEDURE'
    AND R.ROUTINE_NAME NOT IN (
        'SP_EXIGIR_PERMISO', 'SP_LOGIN_PARAMETROS', 'SP_LOGIN_AUTENTICAR',
-       'SP_CERRAR_SESION_SERVIDOR', 'SP_REGISTRAR_ACCESO', 'SP_ESTADO_BLOQUEO_LOGIN'
+       'SP_CERRAR_SESION_SERVIDOR', 'SP_REGISTRAR_ACCESO', 'SP_ESTADO_BLOQUEO_LOGIN',
+       -- (15/11/2026) Helper interno del movimiento de stock: no lleva guarda
+       -- propia, la llevan las puertas que lo llaman. Misma lista que
+       -- db/injectar-guardas.py y db/check-app-sps.sh.
+       'SP_MOVER_STOCK'
    )
 ON DUPLICATE KEY UPDATE PERMISO = VALUES(PERMISO);
 
@@ -106,8 +110,11 @@ ON DUPLICATE KEY UPDATE PERMISO = VALUES(PERMISO);
 -- cortarían llamadas legítimas.
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_VENTAS'
  WHERE RUTINA IN ('SP_MARCAR_GARANTIAS_VENCIDAS', 'SP_REGISTRAR_LIQUIDACION',
-                  'SP_REGISTRAR_DEVOLUCION', 'SP_DEVOLUCION_PENDIENTE_POR_DETALLE',
-                  'SP_REGISTRAR_AVANCE_REPARACION');
+                  'SP_REGISTRAR_DEVOLUCION', 'SP_DEVOLUCION_PENDIENTE_POR_DETALLE');
+-- (15/11/2026) SP_REGISTRAR_AVANCE_REPARACION salio de este paraguas: lo tenia
+-- GESTIONAR_VENTAS, que VENDEDOR tiene, asi que un vendedor podia llamar el
+-- avance de reparacion - justo el SP que mueve el stock de repuestos. Ahora va
+-- con GARANTIAS_AVANZAR, abajo con el resto de garantias.
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'COMPRAS_PAGAR'
  WHERE RUTINA IN ('24_SP_REGISTRAR_PAGO', 'SP_ANULAR_PAGO');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'COMPRAS_DEVOLVER'
@@ -174,8 +181,9 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_REGISTRAR'
  WHERE RUTINA IN ('SP_REGISTRAR_GARANTIA', 'SP_LINEAS_VENTA_CON_GARANTIA');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_RECLAMAR'
  WHERE RUTINA = '27_SP_REGISTRAR_RECLAMO_GARANTIA';
-UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_FINALIZAR'
- WHERE RUTINA = '27_SP_FINALIZAR_RECLAMO_TOTAL';
+-- (15/11/2026) 27_SP_FINALIZAR_RECLAMO_TOTAL SE ELIMINO: el cierre va por
+-- SP_FINALIZAR_RECLAMO(id_asignacion). Sin el SP, su fila de mapeo sobra.
+DELETE FROM PERMISO_POR_RUTINA WHERE RUTINA = '27_SP_FINALIZAR_RECLAMO_TOTAL';
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
  WHERE RUTINA IN ('SP_CONSULTAR_GARANTIAS', 'SP_CONSULTAR_RECLAMOS');
 -- SP_CONSULTAR_GARANTIAS llama internamente a SP_MARCAR_GARANTIAS_VENCIDAS
@@ -184,6 +192,25 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
 -- pantalla que la dispara.
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
  WHERE RUTINA = 'SP_MARCAR_GARANTIAS_VENCIDAS';
+
+-- (15/11/2026) Asignacion de reclamos y bitacora de reparacion. Los tres SP
+-- estaban en GESTIONAR_VENTAS o sin fila, y son tres trabajos distintos:
+--   asignar  -> GARANTIAS_ASIGNAR  (gerencia decide quien repara)
+--   reparar  -> GARANTIAS_AVANZAR  (el tecnico registra el avance)
+--   cerrar   -> GARANTIAS_FINALIZAR (ya estaba; cierra Gerencia)
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_ASIGNAR'
+ WHERE RUTINA = 'SP_ASIGNAR_TECNICO_RECLAMO';
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_AVANZAR'
+ WHERE RUTINA = 'SP_REGISTRAR_AVANCE_REPARACION';
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_FINALIZAR'
+ WHERE RUTINA = 'SP_FINALIZAR_RECLAMO';
+-- (15/11/2026) La lista de asignaciones que alimentan las pantallas de avance y
+-- de cierre. Antes no existia ningun SP que listara ASIGNACIONES_RECLAMOS.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_CONSULTAR'
+ WHERE RUTINA = 'SP_CONSULTAR_ASIGNACIONES';
+-- Quien puede asignar es quien necesita la lista de tecnicos.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GARANTIAS_ASIGNAR'
+ WHERE RUTINA = 'SP_TECNICOS_DISPONIBLES';
 
 -- Historial propio: "Mis vacaciones" y "Mis permisos" se abren con
 -- SOLICITAR_PERMISO. El historial del empleado no puede exigir el permiso de
@@ -255,3 +282,35 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_PRODUCTOS'
 -- de arriba los agarra por el nombre (%KARDEX%), pero se deja explicito.
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'INVENTARIO_VER'
  WHERE RUTINA IN ('SP_KARDEX_PAGINADO', 'SP_CONTAR_MOVIMIENTOS');
+
+-- (12/11/2026) Auditoria de permisos: la pantalla "Ver auditoria de permisos"
+-- se abre con GESTIONAR_PERMISOS_EMPLEADO, el mismo permiso que aprueba y
+-- rechaza. El heuristico de arriba no las conoce (son rutinas nuevas y su
+-- nombre no cae en ninguna regla), asi que quedarian en SIN_MAPEO y con
+-- EXIGIR = 1 cortarian la consulta.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PERMISOS_EMPLEADO'
+ WHERE RUTINA IN ('SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO',
+                  'SP_CONTAR_AUDITORIA_PERMISOS');
+
+-- ================================================================
+-- ACTIVAR EXIGENCIA (lista verificada)
+-- ================================================================
+-- (15/11/2026) El INSERT heuristico de arriba NUNCA prende la exigencia:
+-- propone el permiso y deja EXIGIR como estaba, para que una base recien
+-- mapeada quede en modo auditoria hasta que alguien revise. Este bloque es el
+-- acto explicito de prenderla, y SOLO para rutinas cuyo mapeo ya se verifico y
+-- cuyos roles realmente tienen el permiso. Una rutina que no exista no rompe
+-- nada: el UPDATE simplemente no toca ninguna fila.
+--
+-- Las dos son del flujo de garantias y quedaban en 0 mientras sus hermanas
+-- (SP_CONSULTAR_RECLAMOS, SP_ASIGNAR_TECNICO_RECLAMO, ...) ya exigian:
+--   SP_CONSULTAR_ASIGNACIONES -> GARANTIAS_CONSULTAR  (TECNICO la tiene)
+--   SP_TECNICOS_DISPONIBLES   -> GARANTIAS_ASIGNAR    (quien asigna la tiene)
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA IN ('SP_CONSULTAR_ASIGNACIONES', 'SP_TECNICOS_DISPONIBLES');
+
+-- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
+SELECT RUTINA, PERMISO, EXIGIR
+  FROM PERMISO_POR_RUTINA
+ WHERE PERMISO LIKE 'GARANTIAS%'
+ ORDER BY EXIGIR, RUTINA;

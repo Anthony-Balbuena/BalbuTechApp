@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Test de la migracion de roles (modulo 44) — 22/10/2026.
-# Simula una base vieja: crea EMPLEADO y CAJERO con un usuario cada uno, corre el
-# modulo 44 dos veces y verifica que los roles se retiren y los usuarios pasen a
+# Test de la migracion de roles (ex modulo 44) — 22/10/2026, reapuntado 14/11/2026.
+# Simula una base vieja: crea EMPLEADO y CAJERO con un usuario cada uno, corre la
+# migracion dos veces y verifica que los roles se retiren y los usuarios pasen a
 # VENDEDOR sin perder la matriz.
 # Uso: DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh
 set -u
@@ -11,19 +11,31 @@ DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-BALBU_TECH_TEST}"
 DB_USER="${DB_ADMIN_USER:-balbu_admin}"
 DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD (revisar .env)}"
-SQL="modulos/44- MIGRACION_ROLES.sql"
+SQL_FULL="modulos/36- PERMISOS_ROLES.sql"
 
 if [ "$DB_NAME" = "BALBU_TECH" ]; then
     echo "NO correr este test contra la base viva ($DB_NAME). Usa BALBU_TECH_TEST." >&2
     exit 2
 fi
 
-if [ ! -f "$SQL" ]; then
-    echo "FALTA $SQL: correr desde la raiz del repo." >&2
+if [ ! -f "$SQL_FULL" ]; then
+    echo "FALTA $SQL_FULL: correr desde la raiz del repo." >&2
     exit 1
 fi
 
 cd "$(dirname "$0")/.." || exit 1
+
+# (14/11/2026) El modulo 44 se fusiono dentro del 36: la migracion es la ultima
+# seccion del archivo. El test aplica SOLO esa seccion, para no recrear la matriz
+# ni los 3 SP del 36 (que quedarian sin sus guardas de permiso, que el import
+# inyecta despues).
+SQL="$(mktemp)"
+sed -n '/^-- MIGRACION_ROLES (ex modulo 44)/,$p' "$SQL_FULL" > "$SQL"
+if ! grep -q "DELETE FROM ROLES WHERE NOMBRE_ROL IN" "$SQL"; then
+    echo "No se pudo extraer la migracion de roles de $SQL_FULL" >&2
+    rm -f "$SQL"
+    exit 1
+fi
 
 Q() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -N -e "$1" 2>/dev/null; }
 
@@ -42,7 +54,7 @@ limpiar() {
        DELETE FROM ROLES WHERE NOMBRE_ROL IN ('EMPLEADO', 'CAJERO', 'PRUEBA_ALCANCE');
        DELETE FROM EMPLEADOS WHERE CEDULA IN ('TESTMIG001', 'TESTMIG002');" >/dev/null 2>&1 || true
 }
-trap limpiar EXIT
+trap 'rm -f "$SQL"; limpiar' EXIT
 
 fail=0
 comprobar() {
@@ -108,7 +120,7 @@ comprobar "los 7 roles del set final" \
 # (26/10/2026) VENDEDOR queda en 12: perdio CLIENTES_VER y los tres permisos de
 # gestion de metodos de pago; conserva METODOS_PAGO_VER.
 # (30/10/2026) Sube a 15: gano GARANTIAS_REGISTRAR, GARANTIAS_RECLAMAR y
-# GARANTIAS_CONSULTAR (modulo 62). No tiene GARANTIAS_FINALIZAR.
+# GARANTIAS_CONSULTAR (36). No tiene GARANTIAS_FINALIZAR.
 comprobar "permisos de VENDEDOR intactos" \
     "$(Q "SELECT COUNT(*) FROM ROL_PERMISO WHERE ROL_NOMBRE='VENDEDOR'")" "15"
 

@@ -5,7 +5,7 @@ pero únicos si se usan**; dirección opcional. Todo proveedor arranca
 `ACTIVO` y se desactiva con toggle (no hay borrado).
 
 Es referenciado por `PRODUCTOS.ID_PROVEEDOR` (proveedor preferido) y por
-`PRODUCTO_PROVEEDOR` (mapa producto–proveedor, módulo 40).
+`PRODUCTO_PROVEEDOR` (mapa producto–proveedor, módulo 32).
 
 Fuente: `modulos/5- PROVEEDORES.sql` · Base: `BALBU_TECH` · Revisado: 23/10/2026.
 
@@ -84,7 +84,7 @@ busca `LIKE '%<texto>%'` en **nombre o teléfono**.
 
 ## Permisos (app)
 
-Desde el 23/10/2026 el módulo usa 4 permisos finos (módulo 46) en lugar del
+Desde el 23/10/2026 el módulo usa 4 permisos finos (módulo 36) en lugar del
 paraguas `GESTIONAR_PROVEEDORES`:
 
 | Permiso | Acción |

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test de auditoria del sistema (modulo 57) — 25/10/2026.
+# Test de auditoria del sistema (modulo 6) — 25/10/2026.
 # Verifica que los SP de consulta no dejen versiones viejas, que los tres
 # triggers de PROVEEDORES registren INSERT/UPDATE/DELETE y que guarden como
 # USUARIO_SISTEMA el nombre de @ID_USUARIO_ACTUAL.
@@ -30,9 +30,9 @@ limpiar() {
 trap limpiar EXIT
 limpiar
 
-if ! mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-     < "modulos/57- AUDITORIA_SISTEMA_FIX.sql" >/dev/null 2>&1; then
-    echo "FALLO: no se pudo aplicar modulos/57- AUDITORIA_SISTEMA_FIX.sql" >&2
+if ! mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" --force \
+     < "modulos/6- AUDITORIA_SISTEMA.sql" >/dev/null 2>&1; then
+    echo "FALLO: no se pudo aplicar modulos/6- AUDITORIA_SISTEMA.sql" >&2
     exit 1
 fi
 
