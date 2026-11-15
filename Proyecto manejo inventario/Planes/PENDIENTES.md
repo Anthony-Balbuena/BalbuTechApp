@@ -3,7 +3,7 @@
 > **Único archivo de pendientes del proyecto.** De arriba abajo = prioridad.
 > Lo hecho y los detalles largos salieron del repo el 08/11/2026: viven en
 > `../BalbuTechApp-fuera-del-repo/` (ver su `LEEME.md`).
-> Actualizado: 14/11/2026.
+> Actualizado: 15/11/2026.
 
 ---
 
@@ -202,15 +202,14 @@ cablear es el módulo `34` (ítem 8).
 - [ ] **P-3: advertencia de precio descartada.** *(El "monto de la liquidación
   tomado del cliente" salió de la lista: no hay una sola referencia a liquidación
   en el C++.)*
-- [ ] **Definiciones repetidas entre módulos** (medido el 12/11, actualizado el
-  12/11 tras la fusión de auditoría): **8 SPs** están definidos en dos módulos cada
-  uno y gana el último que se importe: `SP_REPORTE_VENTAS`, `SP_REPORTE_PERIODO` y
-  `SP_CIERRE_CAJA` (24 vs 60), `SP_CAMBIAR_CLAVE_USUARIO` (10 vs 67),
-  `SP_LOGIN_AUTENTICAR` (65 vs 66), `SP_REGISTRAR_GARANTIA` (25 vs 63) y
-  `27_SP_REGISTRAR_RECLAMO_GARANTIA` + `27_SP_FINALIZAR_RECLAMO_TOTAL` (27 vs 63).
-  Los tres de auditoría (6 vs 57) desaparecieron al disolver el `57` en el `6`.
-  Se revisa con `bash db/cobertura-modulos.sh`, que lista esta sección siempre.
-- [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI).
+- [x] **Definiciones repetidas entre módulos: ✅ cerrado el 15/11/2026.**
+  Eran 8; las fusiones de módulos dejaron **2**, y hoy no queda ninguna:
+  `SP_CAMBIAR_CLAVE_USUARIO` tenía dueño doble (10 vs 65) y `SP_LOGIN_AUTENTICAR`
+  también (65 vs 66). Se retiró la copia vieja de cada par —la del `10` escribía
+  `CONTRASENA` con el hash del cliente y la del `65` no tenía token—, así que el
+  dueño único es el `65` para la primera y el `66` para la segunda.
+  `bash db/cobertura-modulos.sh` lo reporta como "Definiciones repetidas: ninguna".
+- [ ] **`SP_ACTUALIZAR_VACACIONES`**: al cablear la edición, validar solapamiento y fecha futura (hoy no lo hace; no es alcanzable desde la UI). **No se borra**: es la base de esa pantalla y el trigger `TR_VALIDAR_LIMITE_VACACIONES_UPDATE` ya cubre el tope anual.
 - [ ] **Drift TEST ↔ viva en asistencia**: la viva tiene `11_SP_REGISTRAR_ENTRADA` y TEST no; además TEST tenía dos que a la viva le faltaban. Diffear definiciones antes de copiar, no asumir cuál es la buena.
 
 ### 10. Hallazgos del mapa de módulos (21/10)
@@ -232,19 +231,18 @@ solo el repo. No se planifica encima sin mirar primero.
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
   clasificado en el ítem 12. La decisión es por grupo, no por SP suelto.
 
-### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026)
+### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 15/11/2026)
 
 Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
-contra los SP que la app llama y los que esos llaman: **197 definiciones, 186
-rutinas distintas** (11 nombres están definidos en dos módulos). De las que la
-app no llama:
+contra los SP que la app llama y los que esos llaman: **184 definiciones, 184
+rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
-- **45 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **38 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
 - **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
   `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
   interna: no se tocan.
 
-#### 12.1 Las 45 sin llamador
+#### 12.1 Las 38 sin llamador
 
 **a) API sin pantalla — Qt probablemente las quiera, no borrar:**
 
@@ -273,18 +271,32 @@ app no llama:
 | 34 Asignar reclamos | `SP_ASIGNAR_TECNICO_RECLAMO`, `SP_FINALIZAR_RECLAMO` | Sin cablear (ítem 8). |
 | 35 Detalle reparaciones | `SP_REGISTRAR_AVANCE_REPARACION` | Sin cablear (ítem 8). |
 
-**c) Restos y duplicados — candidatos a borrar:**
+**c) Restos y duplicados — RESUELTO el 15/11/2026:**
+
+Se revisaron los 8 y se partieron por lo que realmente son, no por "candidatos":
+
+**Borrados (4)** — sin llamador y con reemplazo ya en su lugar. La definición
+salió del módulo y quedó un `DROP PROCEDURE IF EXISTS` con el motivo, para que
+una base que ya la tenía quede limpia al reimportar:
 
 | SP | Dónde | Por qué |
 |---|---|---|
-| `SP_REPORTE_VENTAS` | 24 **y** 60 | La app usa `_PAGINADO` |
+| `1_SP_VERIFICAR_CATEGORIA_EXISTE` | 1 | Lo valida el `UNIQUE` de `CATEGORIAS.NOMBRE` |
+| `18_SP_CAMBIAR_ESTADO_PRODUCTO` | 9 | El cambio pasa por `SP_TOGGLE_ESTADO_PRODUCTOS` |
+| `SP_INSERTAR_INVENTARIO` | 17 | El alta la hace `20_SP_REGISTRAR_AJUSTE_INVENTARIO` |
 | `11_SP_REGISTRAR_SALIDA` | 11 | Lo reemplazó el fichaje del 66 |
-| `SP_ACTUALIZAR_VACACIONES` | 12 | Le falta validar (ítem 9) |
-| `SP_INSERTAR_INVENTARIO` | 17 | Lo reemplazó el ajuste del 20 |
-| `18_SP_CAMBIAR_ESTADO_PRODUCTO` | 9 | Lo hace el `UPDATE` + trigger |
-| `SP_OBTENER_LOG_USUARIOS` | 29 | Duplica la consulta directa |
-| `SP_ESTADO_BLOQUEO_LOGIN` | 28 | El bloqueo vive en `SP_LOGIN_AUTENTICAR` |
-| `1_SP_VERIFICAR_CATEGORIA_EXISTE` | 1 | Lo valida el `UNIQUE` |
+
+**Se quedan (4)** — borrarlas rompería algo o cerraría una puerta abierta:
+
+| SP | Dónde | Por qué se queda |
+|---|---|---|
+| `SP_REPORTE_VENTAS` | 24 | La app usa `_PAGINADO`, pero esta queda "por compatibilidad" (lo dice el `39`) y `check-app-sps.sh` la exige con mapeo `CONSULTAR_REPORTES` |
+| `SP_ESTADO_BLOQUEO_LOGIN` | 28 | `check-app-sps.sh` la exige, `test-lockout.sh` la usa y `mapear-permisos.sql` la mapea. Borrarla es decisión de negocio, no de limpieza |
+| `SP_OBTENER_LOG_USUARIOS` | 29 | Es el único lector de `LOG_USUARIOS`: si Qt le da pantalla, los triggers dejan de ser huérfanos |
+| `SP_ACTUALIZAR_VACACIONES` | 12 | Es la base de la pantalla de edición (ítem 9); le falta la validación, no el uso |
+
+Resultado medido: `bash db/cobertura-modulos.sh` pasa de **42 sin uso de 190** a
+**38 sin uso de 184**, y de 2 nombres repetidos a **ninguno**.
 
 **d) Liquidaciones:** `SP_REGISTRAR_LIQUIDACION` — parkeado, no se toca.
 
@@ -328,7 +340,7 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
 - [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
   dobles del SQL.** Usar archivo `.sql` o here-doc.
-- [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE`, los `SELECT *` y los `CALL` de semilla.
+- [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE` y los `CALL` de semilla. Los `SELECT *` sueltos ya no están: se sacaron del `43` y del `14` (15/11/2026).
 - [ ] **`db/import.sh`** sigue con `--force` (ahora cuenta los `^ERROR` y avisa): hacerlo fallar de verdad.
 - [ ] **Consolidar los `ALTER` de 25** dentro del `CREATE TABLE`; `DROP IF EXISTS` en los `CREATE` del módulo 11.
 - [ ] **3 tests shell** pendientes y notas obsoletas del índice (`modulos/00- INDICE.md`).
@@ -407,6 +419,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Garantías: flujo completo | 30/10, aplicado en la viva | módulos `62` y `63`; solo falta la prueba manual de §2.8 |
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
+| Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---

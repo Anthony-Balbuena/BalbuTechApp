@@ -324,25 +324,13 @@ Fuente: `modulos/9- PRODUCTOS.sql`, sección del ex módulo `18` · Base:
 
 ### Procedimientos almacenados
 
-#### `18_SP_CAMBIAR_ESTADO_PRODUCTO(P_ID_PRODUCTO, P_ID_EMPLEADO, P_NUEVO_ESTADO, P_MOTIVO)`
+#### `18_SP_CAMBIAR_ESTADO_PRODUCTO` — ELIMINADO el 15/11/2026
 
-**La app no lo llama.** Deja el empleado y el motivo en variables de sesión,
-hace el `UPDATE` de `PRODUCTOS.ESTADO` y después **limpia** esas variables. El
-trigger del módulo lee de ahí.
-
-> **Es el único camino que deja un historial con datos útiles**, y aun así no
-> valida nada: producto inexistente devuelve éxito silencioso (el `UPDATE`
-> afecta 0 filas), empleado inexistente termina en el `1452` del FK del trigger,
-> y cambiar al mismo estado **no escribe historial ni avisa**. **La app no lo
-> llama**: el cambio de estado real pasa por `SP_TOGGLE_ESTADO_PRODUCTOS` (9), que
-> no setea estas variables.
->
-> **No hay `EXIT HANDLER`:** si el `UPDATE` falla, las variables de sesión quedan
-> prendidas con el último empleado y motivo, y el próximo cambio de estado por
-> otro camino los hereda. Es el mismo patrón riesgoso que `@VENTAS_INTERNO` y
-> `@COMPRAS_INTERNO`.
->
-> **Sin mensaje de confirmación**: no devuelve fila, ni siquiera un `EXITO`.
+Cambiaba el estado del producto y dejaba empleado y motivo en variables de
+sesión para que el trigger los registrara. Nadie la llamaba: el cambio real
+pasa por `SP_TOGGLE_ESTADO_PRODUCTOS`, que no setea esas variables. Se retiró
+como resto del ítem 12c de `PENDIENTES.md`; en su lugar quedó un `DROP ... IF
+EXISTS` para limpiar las bases que ya la tenían.
 
 ### Triggers
 
@@ -357,8 +345,10 @@ fallback: si no hay sesión queda `NULL`) y el motivo de `@MOTIVO_CAMBIO`.
 > `FOLLOWS` exige que el líder ya exista, así que hay que mantener ese orden
 > dentro del archivo.
 >
-> **Sin motivo**, queda `'Cambio de estado automático'`, que se confunde con un
-> cambio real hecho por el sistema.
+> **Desde que se retiró el SP, nadie setea esas variables**: el historial se
+> llena con `NULL` y con el motivo `'Cambio de estado automático'`. El trigger
+> se conserva porque la tabla la va a usar el día que se cablee el historial
+> (ítem 12.2 de `PENDIENTES.md`).
 >
 > Un `UPDATE PRODUCTOS SET ESTADO = ...` directo **sí pasa** por el trigger: no
 > hay candado de estado, a diferencia de compras y ventas.

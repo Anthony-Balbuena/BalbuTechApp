@@ -28,53 +28,13 @@ CREATE INDEX IX_INVENTARIO_FECHA ON INVENTARIO (FECHA_ACTUALIZACION);
 
 --INSERTAR
 
-DELIMITER //
-
-DROP PROCEDURE IF EXISTS SP_INSERTAR_INVENTARIO;
-
-/*
-SP_INSERTAR_INVENTARIO
-Da de alta un producto en el inventario con stock en 0.
-Antes de insertar revisa que el producto exista y que no este ya registrado;
-si algo esta mal, devuelve un error y no guarda nada.
+/* SP_INSERTAR_INVENTARIO (ELIMINADO 15/11/2026)
+Daba de alta la fila de INVENTARIO con STOCK_ACTUAL = 0. Nadie la llamaba:
+el alta la hace 20_SP_REGISTRAR_AJUSTE_INVENTARIO, la puerta del ajuste, y la
+app no inserta inventario directo. Item 12c de PENDIENTES.md. El DROP limpia
+las bases que ya la tenian.
 */
-CREATE PROCEDURE SP_INSERTAR_INVENTARIO(
-    IN P_ID_PRODUCTO INT,
-    IN P_STOCK_MINIMO INT,
-    IN P_UBICACION VARCHAR(100)
-)
-proc_label: BEGIN
-    DECLARE V_NOMBRE_PRODUCTO VARCHAR(100);
-
-    -- 1. Validar que el producto exista y obtener su nombre al mismo tiempo
-    SELECT NOMBRE INTO V_NOMBRE_PRODUCTO 
-    FROM PRODUCTOS 
-    WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-
-    IF V_NOMBRE_PRODUCTO IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE ID DE PRODUCTO NO EXISTE EN EL CATÁLOGO.';
-        LEAVE proc_label;
-    END IF;
-
-    -- 2. Validar duplicados en inventario
-    IF EXISTS (SELECT 1 FROM INVENTARIO WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE PRODUCTO YA TIENE UN REGISTRO EN INVENTARIO.';
-        LEAVE proc_label; 
-    END IF;
-
-    -- 3. Insertar
-    INSERT INTO INVENTARIO (ID_PRODUCTO, STOCK_ACTUAL, STOCK_MINIMO, UBICACION)
-    VALUES (P_ID_PRODUCTO, 0, P_STOCK_MINIMO, P_UBICACION);
-
-    -- 4. Devolver confirmación con datos del producto
-    SELECT 
-        'EXITO' AS ESTADO,
-        P_ID_PRODUCTO AS ID, 
-        V_NOMBRE_PRODUCTO AS PRODUCTO, 
-        'AGREGADO AL INVENTARIO CON STOCK 0' AS MENSAJE;
-END//
-
-DELIMITER ;
+DROP PROCEDURE IF EXISTS SP_INSERTAR_INVENTARIO;
 
 
 DROP PROCEDURE IF EXISTS SP_INCREMENTAR_STOCK ;

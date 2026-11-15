@@ -50,9 +50,10 @@ gana el `.sql`.
 > `AFTER UPDATE ON COMPRAS` (19), así que tampoco podía ir al `9`; el `32` ya se
 > importa después del `26`, o sea después de todas las tablas del `ON` de los dos.
 > Juntos por posición, no por tema.
-> Lote 10 (login): `67` dentro de `65`. Solo reescribe `SP_CAMBIAR_CLAVE_USUARIO`:
-> sin tablas, triggers ni vistas, así que no hay `ON` ni `FOLLOWS` que cuidar; solo
-> tiene que quedar después del `10`, que define la versión vieja del mismo `SP`.
+> Lote 10 (login): `67` dentro de `65`. Solo reescribía `SP_CAMBIAR_CLAVE_USUARIO`:
+> sin tablas, triggers ni vistas, así que no había `ON` ni `FOLLOWS` que cuidar.
+> Desde el 15/11/2026 el `10` ya no define la versión vieja de ese `SP`: el dueño
+> único es el `65`.
 > Lote 11 (cédula): `59` dentro de `8`. El `ALTER` va al lado de su tabla; el `8`
 > ya declara la cédula `UNIQUE` inline, así que el parche solo aporta en bases
 > viejas.
@@ -98,9 +99,15 @@ gana el `.sql`.
 | Índices | 62 |
 | **Total `CREATE`** | **383** |
 
-Los cuatro ultimos modulos (`64`, `65`, `66`, `67`) son de seguridad y se
-aplican despues de compilar el binario nuevo: cambian el login, agregan el token
-de sesion que la app vieja no manda y alinean el cambio de clave con ese login.
+Los módulos de seguridad (`65` y `66`) se aplican después de compilar el binario
+nuevo: cambian el login, agregan el token de sesión que la app vieja no manda y
+alinean el cambio de clave con ese login.
+
+> (15/11/2026) Limpieza de restos: `1_SP_VERIFICAR_CATEGORIA_EXISTE`,
+> `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO` y
+> `11_SP_REGISTRAR_SALIDA` salieron del proyecto (quedó su `DROP ... IF EXISTS`).
+> Y los dos `SP` que estaban definidos en dos módulos —`SP_CAMBIAR_CLAVE_USUARIO`
+> y `SP_LOGIN_AUTENTICAR`— quedaron con un solo dueño: `65` y `66`.
 
 ## Cómo leer un módulo
 

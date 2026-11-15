@@ -415,18 +415,16 @@ BEGIN
 END //
 DELIMITER ;
 
-DELIMITER //
-DROP PROCEDURE IF EXISTS SP_CAMBIAR_CLAVE_USUARIO ;
-CREATE PROCEDURE SP_CAMBIAR_CLAVE_USUARIO(
-    IN P_ID_USUARIO INT,
-    IN P_HASH VARCHAR(512)
-)
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM USUARIOS WHERE ID_USUARIO = P_ID_USUARIO) THEN
-        SELECT 'ERROR: EL USUARIO NO EXISTE.' AS MENSAJE;
-    ELSE
-        UPDATE USUARIOS SET CONTRASENA = P_HASH WHERE ID_USUARIO = P_ID_USUARIO;
-        SELECT CONCAT('EXITO: CLAVE DEL USUARIO ID ', P_ID_USUARIO, ' ACTUALIZADA.') AS MENSAJE;
-    END IF;
-END //
-DELIMITER ;
+-- ---------------------------------------------------------------------------
+-- (15/11/2026) SP_CAMBIAR_CLAVE_USUARIO ya NO se define en este modulo.
+--
+-- Su dueno es el modulo 65: recibe el derivado pbkdf2 serializado, lo guarda
+-- con pepper en CLAVE_SERVIDOR, deja CONTRASENA en NULL y cierra las sesiones
+-- del usuario. La version que vivia aca escribia CONTRASENA con el hash del
+-- cliente, asi que el login (que compara CLAVE_SERVIDOR) seguia aceptando la
+-- clave vieja: el reset no servia.
+--
+-- Tener las dos definiciones dejaba el resultado a merced del orden de
+-- importacion. No se deja DROP: reimportar solo el 10 borraria la rutina buena
+-- que crea el 65. El 65 ya hace su propio DROP ... IF EXISTS.
+-- ---------------------------------------------------------------------------

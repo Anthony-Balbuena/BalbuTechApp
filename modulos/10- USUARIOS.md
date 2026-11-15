@@ -143,17 +143,23 @@ activar/desactivar cuentas.
 **Usada por la app** (`usuarios.cpp:buscarUsuario`). Devuelve
 `ID_USUARIO, USUARIO AS NOMBRE_USUARIO, ESTADO`; con filtro vacío trae todos.
 
-### `SP_CAMBIAR_CLAVE_USUARIO(P_ID_USUARIO, P_HASH)`
+### `SP_CAMBIAR_CLAVE_USUARIO` — dueño: módulo 65
 
-**Usada por la app** (`usuarios.cpp:cambiarClaveUsuario`). Setea la clave
-**sin pedir la clave actual**. Si el ID no existe devuelve
-`ERROR: EL USUARIO NO EXISTE.`; si existe,
-`EXITO: CLAVE DEL USUARIO ID <id> ACTUALIZADA.`
+**Usada por la app** (`usuarios.cpp:cambiarClaveUsuario`), pero **no se define
+en este módulo**. Vive en `65- LOGIN_SERVIDOR.sql`, que la reescribió para el
+formato del servidor: recibe el derivado `pbkdf2$iter$sal$hash`, escribe
+`CLAVE_SERVIDOR` con pepper, deja `CONTRASENA` en `NULL` y cierra las sesiones
+del usuario. Si el ID no existe devuelve `ERROR: EL USUARIO NO EXISTE.`; si
+existe, `EXITO: CLAVE DEL USUARIO ID <id> ACTUALIZADA.`
 
-> Es la vía que usa un administrador para resetear claves. El cambio
-> "voluntario" con verificación de la clave vieja era `SP_CAMBIAR_CONTRASENA`,
-> eliminada el 05/11/2026. Desde el módulo `67` este SP escribe
-> `CLAVE_SERVIDOR` con pepper, no `CONTRASENA`.
+> Hasta el 15/11/2026 este módulo tenía su propia copia, la vieja: escribía
+> `CONTRASENA` con el hash del cliente, así que el login —que compara
+> `CLAVE_SERVIDOR`— seguía aceptando la clave anterior y el reset no servía.
+> Con las dos definiciones el resultado dependía del orden de importación, así
+> que se retiró la copia vieja y quedó un solo dueño.
+>
+> El cambio "voluntario" con verificación de la clave vieja era
+> `SP_CAMBIAR_CONTRASENA`, eliminada el 05/11/2026.
 
 ## Triggers
 

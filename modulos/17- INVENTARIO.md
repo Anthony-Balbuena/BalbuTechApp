@@ -37,18 +37,14 @@ Fuente: `modulos/17- INVENTARIO.sql` · Base: `BALBU_TECH` · Revisado: 20/10/20
 
 ## Procedimientos almacenados
 
-### `SP_INSERTAR_INVENTARIO(P_ID_PRODUCTO, P_STOCK_MINIMO, P_UBICACION)`
+### `SP_INSERTAR_INVENTARIO` — ELIMINADO el 15/11/2026
 
-**La app no la llama.** Da de alta la fila de inventario con
-`STOCK_ACTUAL = 0`.
-
-- Producto inexistente → `ERROR: ESTE ID DE PRODUCTO NO EXISTE EN EL CATÁLOGO.`
-- Producto ya registrado → `ERROR: ESTE PRODUCTO YA TIENE UN REGISTRO EN INVENTARIO.`
-- Devuelve un result set:
-  `ESTADO = 'EXITO'`, `ID`, `PRODUCTO`, `MENSAJE = 'AGREGADO AL INVENTARIO CON STOCK 0'`.
-
-> No valida `P_STOCK_MINIMO` negativo ni `P_UBICACION` vacía: eso lo corta la
-> base con el CHECK / `NOT NULL` (error técnico, sin mensaje amigable).
+Daba de alta la fila de inventario con `STOCK_ACTUAL = 0` y devolvía un result
+set con `ESTADO = 'EXITO'`. Nadie la llamaba: el alta la hace
+`20_SP_REGISTRAR_AJUSTE_INVENTARIO`, la puerta del ajuste, que sí deja el
+movimiento en el kardex. Se retiró como resto del ítem 12c de `PENDIENTES.md`;
+en su lugar quedó un `DROP ... IF EXISTS` para limpiar las bases que ya la
+tenían.
 
 ## Triggers
 

@@ -45,7 +45,13 @@ verificador es `CLAVE_SERVIDOR`.
 | Procedimiento | Firma | Devuelve |
 |---|---|---|
 | `SP_LOGIN_PARAMETROS` | `(P_USUARIO)` | `SAL`, `ITER`, `FORMATO` |
-| `SP_LOGIN_AUTENTICAR` | `(P_USUARIO, P_CREDENCIAL)` | `RESULTADO`, `MINUTOS`, datos de sesion |
+
+`SP_LOGIN_AUTENTICAR` **no se define acá**: su dueño es el módulo `66`, que
+parte de esta misma verificación y agrega el token de `SESIONES` (la columna
+`TOKEN` que la app necesita para operar). Hasta el 15/11/2026 el `65` tenía su
+propia copia, sin token; con las dos definiciones el login dependía del orden
+de importación y se retiró la copia vieja. El `66` es quien hace el `DROP ...
+IF EXISTS` y la vuelve a crear.
 
 `FORMATO` puede ser `SERVIDOR`, `PBKDF2`, `SHA256` o `NOEXISTE`. Si el usuario
 no existe se devuelve una sal fija (`AAAAAAAAAAAAAAAAAAAAAA==`) para que el
@@ -204,8 +210,10 @@ Requiere `65` (columnas `SALT_LOGIN`, `ITER_LOGIN`, `CLAVE_SERVIDOR` y
 `SECRETO_SISTEMA`) y `66` (`SESIONES` y `SP_EXIGIR_PERMISO`). Es idempotente:
 se puede reaplicar sin efectos.
 
-El modulo `10` **no se toca**: `SP_CAMBIAR_CLAVE_USUARIO` se redefine aca,
-igual que `66` redefinio `SP_LOGIN_AUTENTICAR`.
+El modulo `10` **ya no la define**: `SP_CAMBIAR_CLAVE_USUARIO` tiene un solo
+dueno, este modulo. Del mismo modo, `SP_LOGIN_AUTENTICAR` tiene un solo dueno,
+el `66` (que la reescribe con el token). Antes cada par estaba duplicado y
+ganaba el ultimo importado.
 
 ### Que no hace
 

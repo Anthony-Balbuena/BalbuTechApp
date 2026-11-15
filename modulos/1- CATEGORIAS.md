@@ -86,12 +86,13 @@ Devuelve las categorías con `FECHA_REGISTRO BETWEEN` las dos fechas (extremos
 inclusive). Pensada para reportes por período. **La app no la llama** (no hay
 `CALL` en el código).
 
-### `1_SP_VERIFICAR_CATEGORIA_EXISTE(P_NOMBRE, P_ID_EXCLUIR)`
+### `1_SP_VERIFICAR_CATEGORIA_EXISTE` — ELIMINADO el 15/11/2026
 
-Devuelve `EXISTE` (0/1): si hay una categoría con ese nombre **ignorando** el
-`P_ID_EXCLUIR`. El ID a excluir permite validar un nombre al editar sin que la
-propia categoría cuente como duplicada. **La app no la llama** (la validación
-de duplicados vive dentro de insertar/actualizar).
+Devolvía `EXISTE` (0/1) ignorando un `P_ID_EXCLUIR`, para validar el nombre al
+editar. Nadie la llamaba: la app valida el duplicado dentro de insertar y
+actualizar, y la base lo corta con el `UNIQUE` de `CATEGORIAS.NOMBRE`. Se retiró
+como resto del ítem 12c de `PENDIENTES.md`; en su lugar quedó un `DROP ... IF
+EXISTS` para limpiar las bases que ya la tenían.
 
 > Las rutinas con prefijo `1_` siguen la convención de prefijo por módulo que
 > usa el repo en otros archivos; se conservan tal cual.

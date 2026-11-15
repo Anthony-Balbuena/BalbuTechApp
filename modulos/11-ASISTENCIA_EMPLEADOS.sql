@@ -145,36 +145,13 @@ DELIMITER ;
 ---Salida
 
 /*
-11_SP_REGISTRAR_SALIDA
-Cierra la jornada del empleado: le pone la hora de salida actual al
-registro de asistencia de hoy. Si el empleado hoy no tiene registro, no
-se modifica nada.
+11_SP_REGISTRAR_SALIDA (ELIMINADO 15/11/2026)
+Cerrada la jornada del dia. La reemplazo el fichaje del modulo 66
+(SP_REGISTRAR_ASISTENCIA con 'SALIDA'), que si valida vacaciones y permisos.
+Nadie la llamaba. Item 12c de PENDIENTES.md. El DROP limpia las bases que ya
+la tenian.
 */
-DELIMITER //
 DROP PROCEDURE IF EXISTS 11_SP_REGISTRAR_SALIDA;
-CREATE PROCEDURE 11_SP_REGISTRAR_SALIDA(
-    IN P_ID_EMPLEADO INT
-)
-BEGIN
-    DECLARE V_HORA_SALIDA TIME;
-    SELECT HORA_SALIDA INTO V_HORA_SALIDA FROM ASISTENCIA_EMPLEADOS
-     WHERE ID_EMPLEADO = P_ID_EMPLEADO AND FECHA = CURRENT_DATE;
-    -- (09/10/2026). SALIDA sin ENTRADA: avisar en vez de callar.
-    IF V_HORA_SALIDA IS NULL
-       AND NOT EXISTS (SELECT 1 FROM ASISTENCIA_EMPLEADOS
-                        WHERE ID_EMPLEADO = P_ID_EMPLEADO AND FECHA = CURRENT_DATE) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: NO TIENE REGISTRO DE ENTRADA HOY.';
-    END IF;
-    -- (10/10/2026). Segunda SALIDA no pisa la primera.
-    IF V_HORA_SALIDA IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: YA TIENE SALIDA REGISTRADA HOY.';
-    END IF;
-    UPDATE ASISTENCIA_EMPLEADOS
-    SET HORA_SALIDA = CURRENT_TIME
-    WHERE ID_EMPLEADO = P_ID_EMPLEADO
-      AND FECHA = CURRENT_DATE;
-END //
-DELIMITER ;
 
 
 ---TARDANZA JUSTIFICADA 

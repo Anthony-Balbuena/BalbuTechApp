@@ -235,27 +235,17 @@ BEGIN
 END //
 DELIMITER ;
 
---6. VERIFICAR SI LA CATEGORIA EXISTE
+--6. VERIFICAR SI LA CATEGORIA EXISTE (ELIMINADO 15/11/2026)
 /*
-1_SP_VERIFICAR_CATEGORIA_EXISTE
-Revisa si ya existe una categoria con ese nombre.
-El ID que se excluye permite validar el nombre al editar sin marcarse
-como duplicado a si misma.
+1_SP_VERIFICAR_CATEGORIA_EXISTE (ELIMINADO)
+Revisaba si ya existia una categoria con ese nombre, ignorando un ID al
+editar. Nadie la llamaba: la app valida el duplicado dentro de insertar y
+actualizar, y la base lo corta con el UNIQUE de CATEGORIAS.NOMBRE.
+Item 12c de PENDIENTES.md. El DROP limpia la rutina en las bases que ya la
+tenian; en una instalacion nueva no hace nada.
 */
 DELIMITER //
--- (08/11/2026) Faltaba el DROP: reimportar el modulo fallaba con 1304.
 DROP PROCEDURE IF EXISTS 1_SP_VERIFICAR_CATEGORIA_EXISTE //
-CREATE PROCEDURE 1_SP_VERIFICAR_CATEGORIA_EXISTE(
-    IN P_NOMBRE VARCHAR(50),
-    IN P_ID_EXCLUIR INT -- Útil para edición: ignora el ID actual
-)
-BEGIN
-    SELECT EXISTS (
-        SELECT 1 FROM CATEGORIAS 
-        WHERE NOMBRE = TRIM(P_NOMBRE) 
-        AND ID_CATEGORIA <> P_ID_EXCLUIR
-    ) AS EXISTE;
-END //
 DELIMITER ;
 
 -- (11/10/2026) Sin USE hardcodeado: la BD la gobierna --database del import.

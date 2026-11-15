@@ -992,34 +992,15 @@ CREATE INDEX IX_HISTORIAL_ESTADO_ANTERIOR ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO_
 -----------------------------------------------------------------------------------------------------------------------------   
 
 DELIMITER //
-DROP PROCEDURE IF EXISTS 18_SP_CAMBIAR_ESTADO_PRODUCTO //
-/*
-18_SP_CAMBIAR_ESTADO_PRODUCTO
-Cambia el estado de un producto (ACTIVO / INACTIVO) y deja constancia del hecho.
-Guarda quien lo hizo y el motivo en variables de sesion para que el trigger los
-utilice, actualiza PRODUCTOS y al final limpia esas variables.
+/* 18_SP_CAMBIAR_ESTADO_PRODUCTO (ELIMINADO 15/11/2026)
+Cambiaba el estado del producto y dejaba empleado y motivo en variables de
+sesion para que TR_LOG_CAMBIO_ESTADO_PRODUCTO los registrara. Nadie la
+llamaba: la app cambia el estado con SP_TOGGLE_ESTADO_PRODUCTOS, que no setea
+esas variables, y HISTORIAL_ESTADOS_PRODUCTO no se lee en ningun lado
+(item 12.2 de PENDIENTES.md).
+Item 12c: se retira la definicion y el DROP limpia las bases que ya la tenian.
 */
-CREATE PROCEDURE 18_SP_CAMBIAR_ESTADO_PRODUCTO(
-    IN P_ID_PRODUCTO INT,
-    IN P_ID_EMPLEADO INT,
-    IN P_NUEVO_ESTADO ENUM('ACTIVO', 'INACTIVO'),
-    IN P_MOTIVO VARCHAR(255)
-)
-BEGIN
-    -- 1. Definir las variables que el Trigger usará
-    SET @ID_EMPLEADO_ACTUAL = P_ID_EMPLEADO;
-    SET @MOTIVO_CAMBIO = P_MOTIVO;
-
-    -- 2. Realizar la actualización. 
-    -- El Trigger 'TR_LOG_CAMBIO_ESTADO_PRODUCTO' se disparará automáticamente aquí
-    UPDATE PRODUCTOS 
-    SET ESTADO = P_NUEVO_ESTADO 
-    WHERE ID_PRODUCTO = P_ID_PRODUCTO;
-    
-    -- 3. Limpiar variables de sesión para evitar conflictos
-    SET @ID_EMPLEADO_ACTUAL = NULL;
-    SET @MOTIVO_CAMBIO = NULL;
-END //
+DROP PROCEDURE IF EXISTS 18_SP_CAMBIAR_ESTADO_PRODUCTO //
 DELIMITER ;
 
 

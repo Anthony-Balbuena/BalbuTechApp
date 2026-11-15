@@ -70,11 +70,13 @@ Devuelve `EXITO: ASISTENCIA REGISTRADA.`
 > No valida que el empleado exista: un ID inválido cae en la FK con error
 > técnico `1452`.
 
-### `11_SP_REGISTRAR_SALIDA(P_ID_EMPLEADO)`
+### `11_SP_REGISTRAR_SALIDA` — ELIMINADO el 15/11/2026
 
-**La app no la llama** (usa `SP_REGISTRAR_ASISTENCIA` con `'SALIDA'`).
-Cierra la jornada de hoy. Mismos errores de "sin entrada" y "ya tiene
-salida", pero **sin** los chequeos de vacaciones/permiso.
+Cerrada la jornada del día (con los errores "sin entrada" y "ya tiene salida",
+pero **sin** los chequeos de vacaciones/permiso). La reemplazó el fichaje del
+módulo 66 (`SP_REGISTRAR_ASISTENCIA` con `'SALIDA'`) y nadie la llamaba: se
+retiró como resto del ítem 12c de `PENDIENTES.md`. En su lugar quedó un `DROP
+... IF EXISTS` para limpiar las bases que ya la tenían.
 
 ### `11_SP_JUSTIFICAR_ASISTENCIA(P_ID_EMPLEADO, P_FECHA, P_NUEVO_ESTADO, P_JUSTIFICACION)`
 
