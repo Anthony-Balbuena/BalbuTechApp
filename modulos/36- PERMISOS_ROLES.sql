@@ -1087,7 +1087,16 @@ repuestos. Fuente: odd/tasks/garantias-asignaciones-reparaciones.md.
 
 Dos permisos nuevos, porque son dos trabajos distintos:
   GARANTIAS_ASIGNAR - decidir QUE tecnico trabaja un reclamo (gerencia)
-  GARANTIAS_AVANZAR - registrar el avance de la reparacion (el tecnico)
+  GARANTIAS_AVANZAR - registrar el avance de la reparacion. Lo tiene TECNICO
+                      (avanza SUS asignaciones) y tambien ADMIN, GERENTE y
+                      SUBGERENTE. (15/11/2026) Antes estaba solo en TECNICO y
+                      era un error: SP_REGISTRAR_AVANCE_REPARACION exige
+                      GARANTIAS_AVANZAR en la guarda ANTES de su propia
+                      autorizacion, y esa autorizacion deja que quien tiene
+                      GARANTIAS_ASIGNAR actue en nombre de otro. Con el permiso
+                      solo en TECNICO, gerencia no podia ni ver la opcion ni
+                      pasar la guarda, y en la viva NADIE podia registrar un
+                      avance.
 
 Por que GARANTIAS_AVANZAR NO reusa GARANTIAS_FINALIZAR: la descripcion de
 GARANTIAS_FINALIZAR es "Cerrar reclamos de garantia" y cierra Gerencia. Si el
@@ -1128,7 +1137,9 @@ FROM ROLES R
 JOIN PERMISOS P ON (
         (P.NOMBRE_PERMISO = 'GARANTIAS_ASIGNAR'
          AND R.NOMBRE_ROL IN ('ADMIN', 'GERENTE', 'SUBGERENTE'))
-     OR (P.NOMBRE_PERMISO IN ('GARANTIAS_AVANZAR', 'GARANTIAS_CONSULTAR', 'CONSULTAR_PRODUCTOS')
+     OR (P.NOMBRE_PERMISO = 'GARANTIAS_AVANZAR'
+         AND R.NOMBRE_ROL IN ('ADMIN', 'GERENTE', 'SUBGERENTE', 'TECNICO'))
+     OR (P.NOMBRE_PERMISO IN ('GARANTIAS_CONSULTAR', 'CONSULTAR_PRODUCTOS')
          AND R.NOMBRE_ROL = 'TECNICO')
      OR (P.NOMBRE_PERMISO = 'REPUESTO_VER'
          AND R.NOMBRE_ROL IN ('ADMIN', 'GERENTE', 'SUBGERENTE', 'ALMACEN'))

@@ -323,6 +323,17 @@ UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
                   'SP_VENTAS_BORRADOR_VIEJO',
                   'SP_HISTORIAL_VENTA_PAGINADO', 'SP_CONTAR_HISTORIAL_VENTA');
 
+-- (15/11/2026) Las dos rutinas de la auditoria de permisos quedaron con
+-- EXIGIR = 0: el bloque de correcciones de arriba les propone el permiso pero
+-- NO prende la exigencia, asi que su guarda solo registraba y no cortaba. Con
+-- el interruptor global SECRETO_SISTEMA.EXIGIR_PERMISO_SP en 0 —que es como
+-- esta en las dos bases— EXIGIR es lo UNICO que decide si la guarda bloquea.
+-- La pantalla se abre con GESTIONAR_PERMISOS_EMPLEADO y es el mismo permiso que
+-- ya tienen sus hermanas, asi que prenderlas no cierra ninguna puerta legitima.
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA IN ('SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO',
+                  'SP_CONTAR_AUDITORIA_PERMISOS');
+
 -- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
 SELECT RUTINA, PERMISO, EXIGIR
   FROM PERMISO_POR_RUTINA

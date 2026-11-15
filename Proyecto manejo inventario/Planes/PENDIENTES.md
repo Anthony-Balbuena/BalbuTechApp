@@ -11,8 +11,8 @@
 
 ### 1. Permisos finos (Tanda A y B) — ✅ cerrado el 12/11/2026
 
-Verificado contra las dos bases el 15/11/2026: **61 permisos, 223 pares en la
-viva y 226 en TEST, 8 roles**, ningún módulo con permiso paraguas y 0 usuarios
+Verificado contra las dos bases el 15/11/2026: **61 permisos, 226 pares en las
+dos bases, 8 roles**, ningún módulo con permiso paraguas y 0 usuarios
 huérfanos. El `36` es el único dueño de la matriz. (Los números viejos de acá
 —58/213/7— quedaron atrás cuando el flujo de garantías sumó 3 permisos y el rol
 `TECNICO`.) Detalle en la tabla de cerrados.
@@ -176,20 +176,6 @@ cablear es el módulo `34` (ítem 8).
 
 - [ ] **`CONTRATOS.SALARIO` sigue legible** — el flujo de contratos pendientes lo lee directo. Si se quiere cerrar, hay que pasarlo a un SP.
 - [ ] **`balbu_app` tiene grants sobre `BALBU_TECH_TEST` en el servidor de producción** — no hace falta ahí; quitarlo cuando el test deje de correr contra la misma instancia.
-- [ ] **La viva tiene 2 rutinas de auditoría con `EXIGIR = 0` (15/11/2026).**
-  `SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO` y `SP_CONTAR_AUDITORIA_PERMISOS`:
-  su guarda **solo registra, no corta**. TEST las tiene en `1`. Con el
-  interruptor global `EXIGIR_PERMISO_SP` apagado (que es como está en las dos
-  bases), `EXIGIR` es lo único que decide si la guarda bloquea. Se arregla
-  agregándolas al bloque «ACTIVAR EXIGENCIA» de `db/mapear-permisos.sql` y
-  corriéndolo contra la viva. **No se tocó a propósito: es una decisión sobre
-  permisos de producción, no un cambio de código.**
-- [ ] **TEST tiene 3 pares que la matriz NO declara (15/11/2026).**
-  `GARANTIAS_AVANZAR` para ADMIN, GERENTE y SUBGERENTE. El módulo `36` —dueño de
-  la matriz— lo asigna **solo a TECNICO**, así que **la viva está bien y TEST
-  tiene 3 de más** (223 pares en la viva, 226 en TEST). Los módulos de matriz
-  **solo agregan**, así que reimportar el `36` no los saca: hay que borrarlos a
-  mano si se quiere TEST idéntico a la viva.
 - [x] **P-3 validaciones — errores pintados en verde: ✅ cerrado el 15/11/2026.**
   Eran **4**, no 5: `ventas.cpp:313`, `compras.cpp:172`, `compras.cpp:275` y
   `compras.cpp:728`. El `empleados.cpp:440` de esta lista era en realidad la
@@ -351,13 +337,6 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   (`DB_USER=root DB_PASSWORD=<DB_ROOT_PASSWORD>`). Con root: **15/15**.
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
-- [ ] **Aplicar a la viva los tombstones de los 4 SP retirados (15/11/2026).**
-  `1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`,
-  `SP_INSERTAR_INVENTARIO` y `11_SP_REGISTRAR_SALIDA` siguen en `BALBU_TECH`
-  (193 rutinas contra 189 del repo). El repo ya tiene su `DROP ... IF EXISTS` en
-  los módulos `1`, `9`, `11` y `17`; aplicarlos a la viva es reimportar **solo
-  esos cuatro módulos** —no `import.sh` completo: reimportar `19` o `21` desarma
-  las cadenas de `FOLLOWS`—. **No se hizo: falta el OK explícito del dueño.**
 - [ ] **Un test roto de la batería: `db/test-contratos-subir.sh` (15/11/2026).**
   Su caso «HAY MAS DE UN EMPLEADO CON ESA CEDULA» es **imposible de armar**:
   intenta insertar dos `EMPLEADOS` con la misma cédula, pero
@@ -460,7 +439,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Asistencia v1 y v2 | 16–17/10 | `Realizado.md` |
 | Flujo de compras / ventas | 08/10 | `Realizado.md` |
 | Observaciones SQL | 09/10 | cerrado salvo "consolidar ALTER" (P2) |
-| Permisos finos Tanda A y B | 22–23/10, cerrado 12/11 | 61 permisos / 223 pares en la viva y 226 en TEST, sin paraguas; `modulos/36` es el único dueño de la matriz. (Eran 58/213/7 roles al cerrarse; el flujo de garantías sumó 3 permisos y el rol `TECNICO`) |
+| Permisos finos Tanda A y B | 22–23/10, cerrado 12/11 | 61 permisos / 226 pares en las dos bases (las matrices quedaron idénticas el 15/11), sin paraguas; `modulos/36` es el único dueño de la matriz. (Eran 58/213/7 roles al cerrarse; el flujo de garantías sumó 3 permisos y el rol `TECNICO`) |
 | Garantías: flujo completo | 30/10, aplicado en la viva | módulos `62` y `63`; solo falta la prueba manual de §2.8 |
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
@@ -469,8 +448,10 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
 | Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
 | Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
-| SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos**, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. **Queda desalineado:** las 4 rutinas que el repo ya retiró (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) siguen en la viva, y 2 rutinas de auditoría siguen con `EXIGIR = 0` |
+| SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos** en ese momento, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. Lo que quedaba desalineado se cerró después ese mismo día: ver la fila «Limpieza y permisos de la viva» |
 | Cierre atómico de venta (P-4, opción C) | 15/11 | `cerrarVenta` envuelve cabecera + líneas + stock en una transacción (`TransaccionVenta`, RAII). El rollback devuelve el stock solo, así que se retiró la compensación con `SP_CANCELAR_VENTA` al fallar una línea. El ID del cliente se pide antes de abrir la transacción y la factura se imprime después del commit. Se hizo en el C++ y no como SP porque se midió que ni los dos SP del flujo ni el trigger de stock commitean por dentro. Test `db/test-cierre-atomico.sh`, que fuerza el fallo de la segunda línea con el carrito armado |
+| Limpieza y permisos de la viva (15/11/2026) | 15/11 | **Tres cierres:** (1) los 4 tombstones retirados de `BALBU_TECH` —189 rutinas, igual que el repo—; (2) las 2 rutinas de auditoría de permisos quedaron con `EXIGIR = 1` (`EXIGIR = 0` pasó de 2 a **0** en las dos bases); (3) `GARANTIAS_AVANZAR` para ADMIN/GERENTE/SUBGERENTE. Backup `backups/balbu_tech_antes_limpieza_y_permisos_20261115_191222.sql` y el de TEST del mismo timestamp |
+| `GARANTIAS_AVANZAR` faltaba en la matriz del `36` | 15/11 | **El diagnóstico inicial estaba al revés.** `SP_REGISTRAR_AVANCE_REPARACION` exige `GARANTIAS_AVANZAR` en la guarda ANTES de su autorización, y esa autorización deja que quien tiene `GARANTIAS_ASIGNAR` actúe en nombre de otro: con el permiso solo en TECNICO, **en la viva NADIE podía registrar un avance de reparación** (ni la opción se veía). El módulo `36` era el incompleto, no TEST. Corregido en el `36` y aplicado a la viva; las matrices de las dos bases quedaron **idénticas** (226 pares cada una, 61 permisos) |
 | Barrido de borradores vacíos (P-4, opción D) | 15/11 | Decisión del dueño: alcance **acotado**. Al entrar a la app se cancelan **solo** las ventas `EN_PROCESO` **sin líneas** con más de 48 h. No retienen stock, no se pueden cobrar, y nadie trabaja en algo sin líneas. **Nunca toca una venta con líneas** (puede ser un apartado legítimo). Reusa `SP_VENTAS_BORRADOR_VIEJO` + `SP_CANCELAR_VENTA`, sin SQL nuevo; avisa cuántas canceló. Test `db/test-borradores-barrido.sh` |
 | «Historial de venta» paginado | 15/11 | `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el historial completo (30 filas hoy en la viva, sin tope). Se agregaron `SP_HISTORIAL_VENTA_PAGINADO` y `SP_CONTAR_HISTORIAL_VENTA` en el `39`, con `P_ID_VENTA = 0` = todas. Pantalla de 10 en 10 con `mostrarPaginadoSPCon`. El `COUNT` lleva el mismo `JOIN` que el `SELECT` para que las páginas cuadren. Aserciones agregadas a `db/test-historial-garantias-venta.sh` |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0 (hoy 131/0); backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
