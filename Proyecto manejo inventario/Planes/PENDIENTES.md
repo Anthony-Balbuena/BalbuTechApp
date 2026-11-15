@@ -11,14 +11,15 @@
 
 ### 1. Permisos finos (Tanda A y B) — ✅ cerrado el 12/11/2026
 
-Verificado contra las dos bases: **58 permisos, 213 pares, 7 roles**, ningún
-módulo con permiso paraguas, 0 usuarios huérfanos y `EMPLEADO`/`CAJERO`
-erradicados. El `36` es el único dueño de la matriz. Detalle en la tabla de
-cerrados.
+Verificado contra las dos bases el 15/11/2026: **61 permisos, 223 pares en la
+viva y 226 en TEST, 8 roles**, ningún módulo con permiso paraguas y 0 usuarios
+huérfanos. El `36` es el único dueño de la matriz. (Los números viejos de acá
+—58/213/7— quedaron atrás cuando el flujo de garantías sumó 3 permisos y el rol
+`TECNICO`.) Detalle en la tabla de cerrados.
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos aplicada (la crea `36`; el resto son los módulos de soporte). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 123/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería completa en verde. Detalle en `Realizado.md`, hoy fuera del repo.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplicada (la crea `36`; el resto son los módulos de soporte; hoy son 61 permisos). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 123/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería de entonces en verde. **Ojo: esa «batería completa» eran 12 tests de 25; ver P2.** Detalle en `Realizado.md`, hoy fuera del repo.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
@@ -44,87 +45,68 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 
 **Manual, por área:**
 
-#### 2.1 Sesión y menú principal
+> **Casi todo esto ya lo cubre `db/test-menus-por-rol.sh`**, que entra a la app
+> con cada rol y **cuenta las opciones** del menú principal y de cada submenú, y
+> verifica que estén las etiquetas esperadas. Los números de la lista vieja
+> estaban desactualizados; estos son los que verifica el test y los que valen:
+>
+> | Rol | Opciones en el menú principal |
+> |---|---|
+> | ADMIN | 19 |
+> | GERENTE | 15 |
+> | SUBGERENTE | 15 |
+> | RRHH | 5 |
+> | VENDEDOR | 9 |
+> | ALMACEN | 10 |
+> | CONTABILIDAD | 5 |
+>
+> Por área, también automático: Usuarios (un rol de solo `USUARIOS_VER` ve solo
+> consulta), Empleados (SUBGERENTE 3, solo lectura), Clientes (VENDEDOR 4 sin
+> buscar ni listar; CONTABILIDAD 3), Proveedores (ALMACEN 6), Categorías (ALMACEN
+> 5), Marcas (ALMACEN 6), Métodos de pago, Asistencia (VENDEDOR 3 sin reportes;
+> SUBGERENTE 7 con Justificar), Productos (ALMACEN 7; CONTABILIDAD 4; un rol de
+> solo gestión 4), Ventas (VENDEDOR 10; uno sin reportes ni garantías 8),
+> Garantías **por permiso** (ADMIN/GERENTE/SUBGERENTE, VENDEDOR, TECNICO,
+> CONTABILIDAD), Compras, Caja e Inventario.
 
-- [ ] ADMIN entra y ve **19** opciones.
-- [ ] GERENTE ve **16** y **no** aparecen Roles ni Usuarios.
-- [ ] SUBGERENTE ve **16**, con Empleados (solo 3: buscar, listar, volver) y Asistencia (7, con Justificar).
-- [ ] RRHH ve **6**; VENDEDOR **10**; ALMACEN **11**; CONTABILIDAD **5**.
-- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`). Desde el módulo 64 `FN_TIENE_PERMISO` también devuelve 0 para esa cuenta.
-- [ ] **Bloqueo por fuerza bruta (módulo 64):** cinco fallos del mismo usuario dentro de 15 minutos cierran el acceso con el aviso `Cuenta bloqueada por intentos fallidos`. Cerrar y reabrir la app **no** reinicia el contador. Un intento bloqueado **no** agrega filas en `LOG_ACCESOS` (si agregara, la ventana se correría sola y el bloqueo no vencería nunca). Pasados los 15 minutos, la clave correcta vuelve a entrar.
-- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos que le quedan de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
-- [ ] Al reingresar después de quitar los permisos, la opción sigue ausente.
+#### 2.1 Lo que queda manual de verdad (permisos y cambio en caliente)
 
-#### 2.2 Usuarios (solo ADMIN)
+- [ ] **Cambio en caliente:** con una sesión de VENDEDOR abierta, quitarle desde ADMIN los tres permisos de Clientes (`CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`) y volver al menú principal. Clientes desaparece **sin re-login** (el menú consulta `FN_TIENE_PERMISO` en cada vuelta).
+- [ ] Al reingresar después de quitarlos, la opción sigue ausente.
+- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú, **no** queda un hueco y pasa a 3 opciones.
+- [ ] Sin `PROVEEDORES_CREAR`, la opción de alta desaparece y el resto sigue funcionando.
+- [ ] Un rol sin `CONSULTAR_PRODUCTOS` no ve Productos; uno sin ningún `EMPLEADOS_*` no ve Empleados (salvo `REGISTRAR_ASISTENCIA`/`CONSULTAR_ASISTENCIA`, que abren **Asistencia**).
+- [ ] `CONSULTAR_ASISTENCIA` **no** abre Empleados.
+- [ ] ADMIN, GERENTE, SUBGERENTE y RRHH ven los reportes de Asistencia.
+- [ ] Justificar una ausencia y ver el cambio en el reporte.
+- [ ] Un usuario con `GARANTIAS_CONSULTAR` y sin `GESTIONAR_VENTAS` llega a Garantías por el ítem «Ventas» del menú principal.
+- [ ] Usuario con `ESTADO = INACTIVO` **no** puede entrar (el login lo rechaza y deja `LOG_ACCESOS` con `INACTIVO`); desde el módulo 64 `FN_TIENE_PERMISO` también devuelve 0.
+
+> Ya **no** hace falta a mano, lo cubren los tests automáticos: los conteos de
+> opciones por rol, el bloqueo por fuerza bruta (5 fallos / 15 min →
+> `db/test-lockout.sh`), el cambio de clave (`db/test-cambio-clave.sh`), fichar
+> sin pedir ID (`db/test-asistencia-propia.sh`), la migración de roles
+> (`db/test-migracion-roles.sh`) y la auditoría de permisos
+> (`db/test-auditoria-permisos.sh`).
+
+#### 2.2 Usuarios, Empleados y Roles: las acciones (los menús ya son automáticos)
 
 - [ ] Crear usuario con rol VENDEDOR y clave; entrar con él.
 - [ ] Editar el nombre y el rol; verificar que el menú cambie en el siguiente ingreso.
 - [ ] Desactivar la cuenta; el login falla con el aviso correspondiente.
 - [ ] Reactivar; el login vuelve a funcionar.
-- [ ] Cambiar la clave; la vieja deja de servir y la nueva entra.
-- [ ] GERENTE **no** ve el módulo Usuarios.
-
-#### 2.3 Empleados
-
 - [ ] RRHH: crear empleado, editarlo, darlo de baja y reactivarlo.
 - [ ] RRHH: gestionar contrato, permiso y vacaciones desde el submenú.
-- [ ] SUBGERENTE: entra a Empleados pero solo ve consulta; **no** puede crear, editar ni dar de baja.
-- [ ] Un usuario sin ningún permiso `EMPLEADOS_*` no ve el módulo (salvo que tenga `REGISTRAR_ASISTENCIA` o `CONSULTAR_ASISTENCIA`, que abren **Asistencia**, no Empleados).
-
-#### 2.4 Clientes
-
-- [ ] VENDEDOR: solo crear, editar y cambiar estado (4 opciones contando Volver); **no** aparecen Buscar ni Listar.
-- [ ] CONTABILIDAD: solo `CLIENTES_VER`; ve la consulta y nada más.
-- [ ] Quitar `CLIENTES_ESTADO` a VENDEDOR: la opción desaparece del submenú, **no** queda un hueco y pasa a 3 opciones.
-
-#### 2.5 Proveedores
-
-- [ ] ALMACEN: ver, crear, editar y cambiar estado (6 opciones en el submenú).
-- [ ] Sin `PROVEEDORES_CREAR`, la opción de alta desaparece y el resto sigue funcionando.
-
-#### 2.6 Asistencia
-
-- [ ] Los 7 roles pueden **fichar** (`REGISTRAR_ASISTENCIA`).
-- [ ] VENDEDOR ve 3 opciones, **sin** reportes.
-- [ ] SUBGERENTE ve 7, con Justificar.
-- [ ] ADMIN, GERENTE, SUBGERENTE y RRHH ven los reportes (`CONSULTAR_ASISTENCIA`).
-- [ ] "Mi asistencia" usa el `ID_EMPLEADO` de la sesión, **no** pide ID a mano.
-- [ ] `CONSULTAR_ASISTENCIA` **no** abre Empleados.
-- [ ] Justificar una ausencia y ver el cambio en el reporte.
-
-#### 2.7 Productos
-
-- [ ] ALMACEN ve 7 (gestión + consulta).
-- [ ] CONTABILIDAD ve 4 (solo consulta).
-- [ ] Un rol sin `CONSULTAR_PRODUCTOS` no ve el módulo.
-- [ ] `PRUEBA_PROD_GEST` (solo gestión) ve 4 y no ve las de consulta.
-
-#### 2.8 Ventas
-
-- [ ] VENDEDOR ve 10: las 7 de gestión, historial, garantías y volver, **sin** reportes ni exportación.
-- [ ] `PRUEBA_VEN_GEST` (sin `CONSULTAR_REPORTES`) ve 8: solo las acciones sobre la venta, **sin** Garantías.
-- [ ] **Garantías** ya no cuelga de `GESTIONAR_VENTAS`: se abre con cualquiera de sus 4 permisos (módulo `62`) y el submenú filtra por permiso.
-- [ ] ADMIN/GERENTE/SUBGERENTE ven 5 opciones en Garantías; VENDEDOR 4 (sin "Finalizar reclamo"); CONTABILIDAD 2 (solo consultar).
-- [ ] Un usuario con `GARANTIAS_CONSULTAR` y sin `GESTIONAR_VENTAS` llega a Garantías por el ítem "Ventas" del menú principal.
-
-#### 2.9 Roles
-
-- [ ] Crear un rol nuevo, asignarle `CLIENTES_VER` y entrar con un usuario de ese rol.
-- [ ] Quitarle el permiso y verificar que el módulo desaparezca.
+- [ ] **Roles:** crear un rol nuevo, asignarle `CLIENTES_VER` y entrar con un usuario de ese rol; después quitarle el permiso y verificar que el módulo desaparezca.
 - [ ] Borrar el rol: los usuarios que lo tenían no pueden entrar (verificar el mensaje).
 - [ ] Renombrar un rol: los permisos lo siguen (`ON UPDATE CASCADE`).
 
-#### 2.10 Migración de roles (módulo 44)
+#### 2.3 Migración de roles (módulo 44) — ✅ verificado en la viva el 15/11/2026
 
-- [ ] En TEST, el test automático ya lo cubre (11/11).
-- [ ] En la viva, confirmar que no quedan roles `EMPLEADO` ni `CAJERO` y que sus usuarios pasaron a `VENDEDOR`:
-
-```sql
-SELECT NOMBRE_ROL FROM ROLES ORDER BY NOMBRE_ROL;
-SELECT COUNT(*) FROM USUARIOS U LEFT JOIN ROLES R ON R.ID_ROL = U.ID_ROL WHERE R.ID_ROL IS NULL;
-```
-
-Ambas deben dar 7 roles y 0 usuarios huérfanos.
+La viva quedó en **8 roles** (los 7 del rediseño —ADMIN, GERENTE, SUBGERENTE,
+RRHH, VENDEDOR, ALMACEN, CONTABILIDAD— más **TECNICO**, que agregó el flujo de
+garantías), con **0 usuarios huérfanos** y **0 roles `EMPLEADO`/`CAJERO`**. TEST
+está igual. El test automático lo cubre (11/11).
 
 ### 3. RRHH: pruebas visuales pendientes
 
@@ -133,7 +115,7 @@ Ambas deben dar 7 roles y 0 usuarios huérfanos.
 - [ ] **28 Accesos:** entrar/salir y ver las filas.
 - [ ] Limpiar los datos de prueba (permisos, vacaciones, log) al terminar.
 
-Cierre: build OK, `check-app-sps` 123/0, visual OK, sin datos de prueba.
+Cierre: build OK, `check-app-sps` 131/0, visual OK, sin datos de prueba.
 
 ### 4. Contratos: cargar los datos de la empresa
 
@@ -194,19 +176,28 @@ cablear es el módulo `34` (ítem 8).
 
 - [ ] **`CONTRATOS.SALARIO` sigue legible** — el flujo de contratos pendientes lo lee directo. Si se quiere cerrar, hay que pasarlo a un SP.
 - [ ] **`balbu_app` tiene grants sobre `BALBU_TECH_TEST` en el servidor de producción** — no hace falta ahí; quitarlo cuando el test deje de correr contra la misma instancia.
-- [x] **P-3 validaciones — errores pintados en verde: ✅ arreglado el 14/11/2026.**
+- [ ] **La viva tiene 2 rutinas de auditoría con `EXIGIR = 0` (15/11/2026).**
+  `SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO` y `SP_CONTAR_AUDITORIA_PERMISOS`:
+  su guarda **solo registra, no corta**. TEST las tiene en `1`. Con el
+  interruptor global `EXIGIR_PERMISO_SP` apagado (que es como está en las dos
+  bases), `EXIGIR` es lo único que decide si la guarda bloquea. Se arregla
+  agregándolas al bloque «ACTIVAR EXIGENCIA» de `db/mapear-permisos.sql` y
+  corriéndolo contra la viva. **No se tocó a propósito: es una decisión sobre
+  permisos de producción, no un cambio de código.**
+- [ ] **TEST tiene 3 pares que la matriz NO declara (15/11/2026).**
+  `GARANTIAS_AVANZAR` para ADMIN, GERENTE y SUBGERENTE. El módulo `36` —dueño de
+  la matriz— lo asigna **solo a TECNICO**, así que **la viva está bien y TEST
+  tiene 3 de más** (223 pares en la viva, 226 en TEST). Los módulos de matriz
+  **solo agregan**, así que reimportar el `36` no los saca: hay que borrarlos a
+  mano si se quiere TEST idéntico a la viva.
+- [x] **P-3 validaciones — errores pintados en verde: ✅ cerrado el 15/11/2026.**
   Eran **4**, no 5: `ventas.cpp:313`, `compras.cpp:172`, `compras.cpp:275` y
   `compras.cpp:728`. El `empleados.cpp:440` de esta lista era en realidad la
-  **441** y **ya estaba bien**: usa salida temprana
-  (`if (error) { rojo; return; } verde;`). Los otros dos que aparecen al barrer el
-  código (`permisos.cpp`, `vacaciones.cpp`) pasan por un helper
-  `mensajeDeError()` que sí chequea. Se aplicó el patrón de `caja.cpp`/`accesos.cpp`
-  en los 4 lugares y `bash build.sh` da OK. **Falta la prueba end-to-end**, que
-  necesita un login de la app (`BALBU_PASS`): eso es lo que desbloquea re-sembrar
-  el admin de TEST (P2, abajo).
-- [ ] **P-3: advertencia de precio descartada.** *(El "monto de la liquidación
-  tomado del cliente" salió de la lista: no hay una sola referencia a liquidación
-  en el C++.)*
+  **441** y **ya estaba bien** (usa salida temprana). Los otros dos que aparecen
+  al barrer el código (`permisos.cpp`, `vacaciones.cpp`) pasan por un helper
+  `mensajeDeError()` que sí chequea. Se aplicó el patrón de `caja.cpp`/
+  `accesos.cpp` en los 4 lugares y la **prueba end-to-end está hecha**: la app
+  corre dentro de la batería (los tests de pantalla entran, navegan y salen).
 - [x] **Definiciones repetidas entre módulos: ✅ cerrado el 15/11/2026.**
   Eran 8; las fusiones de módulos dejaron **2**, y hoy no queda ninguna:
   `SP_CAMBIAR_CLAVE_USUARIO` tenía dueño doble (10 vs 65) y `SP_LOGIN_AUTENTICAR`
@@ -222,87 +213,43 @@ cablear es el módulo `34` (ítem 8).
 - [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`) está copiado en 6 objetos por flujo (compras y ventas) más las 5 vistas del 43. Extraer una función compartida.
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
 
-### 11. Verificar antes de creer (sin confirmar al 12/11/2026)
+### 11. Verificar antes de creer — ✅ resuelto el 15/11/2026
 
-Nada de acá está probado salvo lo que dice explícitamente "verificado". Son
-afirmaciones del archivo viejo o del código que no se pudieron cerrar revisando
-solo el repo. No se planifica encima sin mirar primero.
+Acá vivía **P-4**, la última afirmación que no se había podido verificar. Se midió
+y se cerró completa (las cuatro opciones, con sus tests). **No queda nada
+pendiente en esta sección.**
 
-- [ ] **P-4 venta multi-línea atómica.** No hay `START TRANSACTION` en
-  `ventas.cpp` y no existe un SP que cierre la venta completa: se abre con
-  `21_SP_INICIAR_VENTA` y cada línea entra con `SP_AGREGAR_DETALLE_VENTA`. Hay
-  que decidir si una venta abierta con líneas sueltas es un borrador aceptable
-  o un agujero que deja stock descontado sin venta cerrada.
-  **Medido el 15/11/2026 (solo lectura):** el descuento de stock **no** es un
-  agujero de carrera — lo hace `TR_AUDITORIA_MOVIMIENTO_VENTA` con
-  `UPDATE ... WHERE STOCK_ACTUAL >= NEW.CANTIDAD` y `ROW_COUNT()` en la misma
-  sentencia. El problema real es otro: **nadie avisa de un borrador viejo**.
-  **Aplicado (opción A, 15/11/2026):** las 4 ventas `EN_PROCESO` de la viva
-  quedaron resueltas — la #15 se cobró (`REALIZADA` + pago de 82.600) y la #8
-  se canceló, ambas por el dueño el mismo día; las #17 y #18 (0 líneas, total 0,
-  31 días) se cancelaron por `SP_CANCELAR_VENTA`. Backup
-  `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql`. Quedan
-  **0 ventas `EN_PROCESO`** en la viva.
-  **Abierto (decisión de negocio):**
-  1. ~~**¿Cuánto tiempo puede estar una venta sin cobrar?**~~ **Resuelto el
-     15/11/2026: 48 h.** Las ventas con saldo que pasan las 48 h se marcan en
-     rojo en «Cobrar venta en proceso».
-  2. **Aplicado el 15/11/2026 (opción B):** `VISTA_VENTAS_PENDIENTES_PAGO` (43)
-     trae `FECHA` y `HORAS_ABIERTA`; `cobrarVentaUI` muestra la columna
-     `ABIERTA` en rojo pasadas las 48 h y avisa cuántas retienen stock. Como la
-     vista filtra `SALDO > 0`, un borrador de total 0 **no aparece** ahí: para
-     esos se agregó `SP_VENTAS_BORRADOR_VIEJO(48)` (39), que los lista aparte en
-     amarillo con la instrucción de cancelarlos por ID. Umbral en un solo lugar
-     (`HORAS_PLAZO_COBRO` en `ventas.cpp`), y los SP lo reciben por parámetro.
-     Test `db/test-cobrar-plazo.sh`.
-     **Ojo, interacción con D (15/11/2026):** desde que la opción D corre, el
-     barrido cancela esos borradores **al entrar**, así que en el flujo normal
-     el aviso en amarillo ya no se ve: cuando llegás a la pantalla no queda
-     ninguno. El aviso **se deja** como red de seguridad para cuando el barrido
-     no puede correr (un usuario sin `GESTIONAR_VENTAS`, o un fallo al
-     cancelar), pero conviene saber que es un camino poco frecuente.
-     `test-cobrar-plazo.sh` ahora comprueba lo contrario: que NO aparezca.
-  3. **Aplicado el 15/11/2026 (opción C):** cierre **atómico** desde el C++.
-     `cerrarVenta` envuelve cabecera + TODAS las líneas + el descuento de stock
-     en una transacción (`TransaccionVenta`, guard RAII que revierte al salir del
-     scope si nadie confirmó). El descuento lo hace
-     `TR_AUDITORIA_MOVIMIENTO_VENTA` **dentro de la misma transacción**, así que
-     el rollback devuelve el stock solo: ya no se compensa con
-     `SP_CANCELAR_VENTA` cuando una línea falla. El ID del cliente se pide
-     **antes** de abrir la transacción (no se espera teclado con una abierta) y
-     la factura se imprime **después** del commit. Se eligió el C++ y no el SP
-     `SP_REGISTRAR_VENTA_COMPLETA` porque se midió que ni
-     `21_SP_INICIAR_VENTA`, ni `SP_AGREGAR_DETALLE_VENTA`, ni el trigger de stock
-     tienen transacción propia: envolver el cierre da la misma garantía por una
-     fracción del costo. **Queda pendiente el SP si algún día aparece un segundo
-     cliente** (la Qt app): con el C++ la garantía es solo de este cliente.
-     Test `db/test-cierre-atomico.sh`: fuerza el fallo de la SEGUNDA línea con el
-     carrito ya armado (FIFO + cambio de stock desde otra conexión) y verifica que
-     la PRIMERA línea —que ya se había insertado y ya había descontado stock— se
-     revierta. Con el código viejo quedaban 1 venta CANCELADA, 1 línea y 2
-     movimientos.
-  4. **Aplicado el 15/11/2026 (opción D, alcance acotado):** barrido al entrar a
-     la app que cancela **solo** las ventas `EN_PROCESO` **SIN líneas** con más
-     de 48 h. Reusa `SP_VENTAS_BORRADOR_VIEJO` (lista) y `SP_CANCELAR_VENTA`
-     (cancela), sin SQL nuevo. Se llama desde `main.cpp` en los dos caminos de
-     login, y avisa cuántas canceló. **Nunca toca una venta con líneas**: esa
-     puede ser un apartado legítimo y cancelarla le borraría la venta a un
-     cajero. Test `db/test-borradores-barrido.sh`, con esa aserción explícita.
-- [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
-  clasificado en el ítem 12. La decisión es por grupo, no por SP suelto.
+- [x] **P-4 venta multi-línea: ✅ cerrado el 15/11/2026.** Las cuatro opciones
+  quedaron resueltas: **A** limpiar las ventas `EN_PROCESO` de la viva,
+  **B** aviso de antigüedad a las 48 h, **C** cierre **atómico** de la venta y
+  **D** barrido de borradores vacíos al entrar. Cada una con su test propio; el
+  detalle y las decisiones están en la tabla de cerrados.
+  Lo único que queda como decisión futura es **cuándo pasar el cierre atómico a
+  un SP**, y solo si algún día aparece un segundo cliente (la Qt app): con el
+  C++ la garantía es de este cliente.
 
 ### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 15/11/2026)
 
 Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
-contra los SP que la app llama y los que esos llaman: **184 definiciones, 184
+contra los SP que la app llama y los que esos llaman: **189 definiciones, 189
 rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
-- **38 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **39 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
 - **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
   `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
   interna: no se tocan.
 
-#### 12.1 Las 38 sin llamador
+> (15/11/2026) El conteo pasó de 184/38 a 189/39: entraron 5 SP nuevos (el
+> paginado de ventas, el historial y el borrador viejo) y **`SP_HISTORIAL_VENTA`
+> (21) pasó a la lista de sin uso** — la pantalla «Historial de venta» ahora usa
+> `SP_HISTORIAL_VENTA_PAGINADO` (39). **No se retira todavía**: su caso puntual
+> (una venta concreta) sigue teniendo sentido y `db/test-historial-garantias-venta.sh`
+> lo sigue verificando. Si se retira, va con los tombstones de abajo.
+
+- [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
+  clasificado abajo. La decisión es **por grupo**, no por SP suelto.
+
+#### 12.1 Las 39 sin llamador
 
 **a) API sin pantalla — Qt probablemente las quiera, no borrar:**
 
@@ -355,8 +302,9 @@ una base que ya la tenía quede limpia al reimportar:
 | `SP_OBTENER_LOG_USUARIOS` | 29 | Es el único lector de `LOG_USUARIOS`: si Qt le da pantalla, los triggers dejan de ser huérfanos |
 | `SP_ACTUALIZAR_VACACIONES` | 12 | Es la base de la pantalla de edición (ítem 9); le falta la validación, no el uso |
 
-Resultado medido: `bash db/cobertura-modulos.sh` pasa de **42 sin uso de 190** a
-**38 sin uso de 184**, y de 2 nombres repetidos a **ninguno**.
+Resultado medido entonces: `bash db/cobertura-modulos.sh` pasó de **42 sin uso de
+190** a **38 sin uso de 184**, y de 2 nombres repetidos a **ninguno**. (Hoy son
+**39 sin uso de 189**: entraron los SP nuevos y `SP_HISTORIAL_VENTA`; ver arriba.)
 
 **d) Liquidaciones:** `SP_REGISTRAR_LIQUIDACION` — parkeado, no se toca.
 
@@ -403,6 +351,13 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   (`DB_USER=root DB_PASSWORD=<DB_ROOT_PASSWORD>`). Con root: **15/15**.
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
+- [ ] **Aplicar a la viva los tombstones de los 4 SP retirados (15/11/2026).**
+  `1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`,
+  `SP_INSERTAR_INVENTARIO` y `11_SP_REGISTRAR_SALIDA` siguen en `BALBU_TECH`
+  (193 rutinas contra 189 del repo). El repo ya tiene su `DROP ... IF EXISTS` en
+  los módulos `1`, `9`, `11` y `17`; aplicarlos a la viva es reimportar **solo
+  esos cuatro módulos** —no `import.sh` completo: reimportar `19` o `21` desarma
+  las cadenas de `FOLLOWS`—. **No se hizo: falta el OK explícito del dueño.**
 - [ ] **Un test roto de la batería: `db/test-contratos-subir.sh` (15/11/2026).**
   Su caso «HAY MAS DE UN EMPLEADO CON ESA CEDULA» es **imposible de armar**:
   intenta insertar dos `EMPLEADOS` con la misma cédula, pero
@@ -505,11 +460,11 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Asistencia v1 y v2 | 16–17/10 | `Realizado.md` |
 | Flujo de compras / ventas | 08/10 | `Realizado.md` |
 | Observaciones SQL | 09/10 | cerrado salvo "consolidar ALTER" (P2) |
-| Permisos finos Tanda A y B | 22–23/10, cerrado 12/11 | 58 permisos / 213 pares en TEST y en la viva, sin paraguas; `modulos/36` es el único dueño de la matriz |
+| Permisos finos Tanda A y B | 22–23/10, cerrado 12/11 | 61 permisos / 223 pares en la viva y 226 en TEST, sin paraguas; `modulos/36` es el único dueño de la matriz. (Eran 58/213/7 roles al cerrarse; el flujo de garantías sumó 3 permisos y el rol `TECNICO`) |
 | Garantías: flujo completo | 30/10, aplicado en la viva | módulos `62` y `63`; solo falta la prueba manual de §2.8 |
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
-| Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
+| Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** (hoy 39 de 189) |
 | Batería de aceptación en TEST | 15/11 | Los **25** `db/test-*.sh` corridos con el entorno completo: **24 en verde, 1 en rojo** (`test-contratos-subir`, caso obsoleto por `UQ_EMPLEADOS_CEDULA`; ver P2). La tabla de comandos de arriba solo listaba 12 y se reportaba como «batería completa»: corregido el 15/11. Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
 | «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
 | Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
@@ -518,7 +473,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Cierre atómico de venta (P-4, opción C) | 15/11 | `cerrarVenta` envuelve cabecera + líneas + stock en una transacción (`TransaccionVenta`, RAII). El rollback devuelve el stock solo, así que se retiró la compensación con `SP_CANCELAR_VENTA` al fallar una línea. El ID del cliente se pide antes de abrir la transacción y la factura se imprime después del commit. Se hizo en el C++ y no como SP porque se midió que ni los dos SP del flujo ni el trigger de stock commitean por dentro. Test `db/test-cierre-atomico.sh`, que fuerza el fallo de la segunda línea con el carrito armado |
 | Barrido de borradores vacíos (P-4, opción D) | 15/11 | Decisión del dueño: alcance **acotado**. Al entrar a la app se cancelan **solo** las ventas `EN_PROCESO` **sin líneas** con más de 48 h. No retienen stock, no se pueden cobrar, y nadie trabaja en algo sin líneas. **Nunca toca una venta con líneas** (puede ser un apartado legítimo). Reusa `SP_VENTAS_BORRADOR_VIEJO` + `SP_CANCELAR_VENTA`, sin SQL nuevo; avisa cuántas canceló. Test `db/test-borradores-barrido.sh` |
 | «Historial de venta» paginado | 15/11 | `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el historial completo (30 filas hoy en la viva, sin tope). Se agregaron `SP_HISTORIAL_VENTA_PAGINADO` y `SP_CONTAR_HISTORIAL_VENTA` en el `39`, con `P_ID_VENTA = 0` = todas. Pantalla de 10 en 10 con `mostrarPaginadoSPCon`. El `COUNT` lleva el mismo `JOIN` que el `SELECT` para que las páginas cuadren. Aserciones agregadas a `db/test-historial-garantias-venta.sh` |
-| Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
+| Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0 (hoy 131/0); backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---
 
@@ -528,7 +483,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 # Build
 ./build.sh
 
-# SPs que usa la app (debe dar 123/0, siempre contra TEST)
+# SPs que usa la app (debe dar 131/0, siempre contra TEST)
 DB_HOST=127.0.0.1 DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh
 
 # Cobertura: que SPs existen y nadie llama (no necesita base de datos)
