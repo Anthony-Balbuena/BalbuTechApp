@@ -290,7 +290,7 @@ una base que ya la tenía quede limpia al reimportar:
 
 Resultado medido entonces: `bash db/cobertura-modulos.sh` pasó de **42 sin uso de
 190** a **38 sin uso de 184**, y de 2 nombres repetidos a **ninguno**. (Hoy son
-**39 sin uso de 189**: entraron los SP nuevos y `SP_HISTORIAL_VENTA`; ver arriba.)
+**38 sin uso de 188**. Ver arriba.)
 
 **d) Liquidaciones:** `SP_REGISTRAR_LIQUIDACION` — parkeado, no se toca.
 
@@ -318,23 +318,6 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
 
 ## 🟡 P2 — Media (reproducibilidad y limpieza)
 
-- [x] **La clave del usuario `admin` en TEST no coincide con la del `.env`: ✅ cerrado el 15/11/2026.**
-  Se re-sembró con `db/seed-admin.sh` sobre `BALBU_TECH_TEST`, con backup previo
-  `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`. El seed deja
-  `CONTRASENA` con el hash PBKDF2 y limpia `SALT_LOGIN`/`ITER_LOGIN`/
-  `CLAVE_SERVIDOR`, así que el primer login lo migra al formato del `65`.
-  `test-menus-por-rol.sh` volvió a verde en los seis casos ADMIN, y
-  `test-asistencia-propia.sh` ya no depende de `CONTRASENA` ni del orden: deriva
-  la clave de `BALBU_PASS` con `db/lib-clave-prueba.sh` (antes copiaba el hash
-  del admin, que el primer login deja en `NULL`).
-- [x] **`test-contrato-borrador.sh` daba falso negativo con `DB_USER=balbu_app`: ✅ cerrado el 15/11/2026.**
-  Ese test hace SQL directo y `balbu_app` solo tiene `EXECUTE`, así que el
-  `DELETE`/`INSERT` del marcador `302998878xx` fallaba en silencio (estaba
-  tapado con `2>/dev/null`), dejaba filas y la corrida siguiente abortaba con
-  «BASE SUCIA»; el caso 14 fallaba con «estado ''» porque la fila nunca se
-  había creado. Ahora sondea el permiso al arrancar con un
-  `DELETE ... WHERE 1 = 0` y corta con el comando exacto
-  (`DB_USER=root DB_PASSWORD=<DB_ROOT_PASSWORD>`). Con root: **15/15**.
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
 - [ ] **Un test roto de la batería: `db/test-contratos-subir.sh` (15/11/2026).**
@@ -443,19 +426,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Garantías: flujo completo | 30/10, aplicado en la viva | módulos `62` y `63`; solo falta la prueba manual de §2.8 |
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
-| Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** (hoy 39 de 189) |
-| Batería de aceptación en TEST | 15/11 | Los **25** `db/test-*.sh` corridos con el entorno completo: **24 en verde, 1 en rojo** (`test-contratos-subir`, caso obsoleto por `UQ_EMPLEADOS_CEDULA`; ver P2). La tabla de comandos de arriba solo listaba 12 y se reportaba como «batería completa»: corregido el 15/11. Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
-| «Ver venta con IVA» paginado | 15/11 | La pantalla listaba las 20 últimas ventas e imprimía la factura **completa** de las 20: una venta vieja quedaba inalcanzable y tapaba la terminal. Ahora lista de 10 en 10 (`SP_VENTAS_ULTIMAS_PAGINADO` + `SP_CONTAR_VENTAS_ULTIMAS`, mapeados a `GESTIONAR_VENTAS`) y el detalle se pide por ID. `SP_VENTAS_ULTIMAS` se conserva: la usa «Cancelar venta». Test nuevo `db/test-ventas-ver-iva.sh`, con RED observado revirtiendo solo el `.cpp` |
-| Limpieza de las ventas `EN_PROCESO` de la viva | 15/11 | Las 4 se resolvieron: #15 cobrada, #8 cancelada (por el dueño), #17 y #18 (vacías) canceladas por `SP_CANCELAR_VENTA`. Quedan 0. Backup `backups/balbu_tech_viva_antes_cancelar_ventas_20261115_142026.sql` |
-| Plazo de cobro de 48 h (P-4, opción B) | 15/11 | Decisión del dueño: **48 h**. `VISTA_VENTAS_PENDIENTES_PAGO` (43) suma `FECHA` y `HORAS_ABIERTA`; «Cobrar venta en proceso» marca en rojo las vencidas y avisa cuántas retienen stock. `SP_VENTAS_BORRADOR_VIEJO(48)` (39) cubre el caso que la vista no ve (borradores vacíos, saldo 0). Test `db/test-cobrar-plazo.sh`. De paso se corrigió que 3 rutinas nuevas habían quedado con `EXIGIR = 0` (guarda en modo auditoría): ahora las 180 exigen |
-| SP nuevos aplicados a la **viva** | 15/11 | Módulos `39` y `43` + `mapear-permisos.sql` en `BALBU_TECH`, con backup `backups/balbu_tech_antes_sp_paginado_20261115_151029.sql`. Viva: **193 procedimientos** en ese momento, `check-app-sps` contra la viva **131/0**, mapeo 48. Los 3 SP nuevos y el historial paginado responden. Lo que quedaba desalineado se cerró después ese mismo día: ver la fila «Limpieza y permisos de la viva» |
-| Cierre atómico de venta (P-4, opción C) | 15/11 | `cerrarVenta` envuelve cabecera + líneas + stock en una transacción (`TransaccionVenta`, RAII). El rollback devuelve el stock solo, así que se retiró la compensación con `SP_CANCELAR_VENTA` al fallar una línea. El ID del cliente se pide antes de abrir la transacción y la factura se imprime después del commit. Se hizo en el C++ y no como SP porque se midió que ni los dos SP del flujo ni el trigger de stock commitean por dentro. Test `db/test-cierre-atomico.sh`, que fuerza el fallo de la segunda línea con el carrito armado |
-| Trigger drift de compras ARREGLADO (por accidente) | 15/11 | Un `bash db/import.sh` corrió **completo contra la viva** por error (el `.env` exporta `DB_NAME=BALBU_TECH` y faltó el override). Consecuencia real: el orden de las cadenas de `COMPRAS UPDATE` y `DETALLE_COMPRA INSERT` quedó **igual al de una instalación limpia** —o sea, el import las **corrigió**, no las rompió—, se cayeron los tombstones (que era lo buscado) y 4 rutinas quedaron sin guarda (el script aborta antes de inyectarlas con `set -e`). Las 4 se reinjectaron. Verificado contra una instalación limpia: **triggers, procedimientos y tablas idénticos**. Datos intactos salvo los 3 pares de `GARANTIAS_AVANZAR`. Backup previo: `backups/balbu_tech_antes_reparar_follows_20261115_192257.sql` |
-| `SP_HISTORIAL_VENTA` retirado | 15/11 | No tenía `LIMIT`: devolvía el historial completo. La app ya usaba `SP_HISTORIAL_VENTA_PAGINADO` (39), así que quedó sin llamador. Tombstone en el `21` + `DROP` en las dos bases + fila de mapeo huérfana borrada; `db/test-historial-garantias-venta.sh` migrado al paginado. Repo y bases en **188 procedimientos** |
-| Limpieza y permisos de la viva (15/11/2026) | 15/11 | **Tres cierres:** (1) los 4 tombstones retirados de `BALBU_TECH` —189 rutinas, igual que el repo—; (2) las 2 rutinas de auditoría de permisos quedaron con `EXIGIR = 1` (`EXIGIR = 0` pasó de 2 a **0** en las dos bases); (3) `GARANTIAS_AVANZAR` para ADMIN/GERENTE/SUBGERENTE. Backup `backups/balbu_tech_antes_limpieza_y_permisos_20261115_191222.sql` y el de TEST del mismo timestamp |
-| `GARANTIAS_AVANZAR` faltaba en la matriz del `36` | 15/11 | **El diagnóstico inicial estaba al revés.** `SP_REGISTRAR_AVANCE_REPARACION` exige `GARANTIAS_AVANZAR` en la guarda ANTES de su autorización, y esa autorización deja que quien tiene `GARANTIAS_ASIGNAR` actúe en nombre de otro: con el permiso solo en TECNICO, **en la viva NADIE podía registrar un avance de reparación** (ni la opción se veía). El módulo `36` era el incompleto, no TEST. Corregido en el `36` y aplicado a la viva; las matrices de las dos bases quedaron **idénticas** (226 pares cada una, 61 permisos) |
-| Barrido de borradores vacíos (P-4, opción D) | 15/11 | Decisión del dueño: alcance **acotado**. Al entrar a la app se cancelan **solo** las ventas `EN_PROCESO` **sin líneas** con más de 48 h. No retienen stock, no se pueden cobrar, y nadie trabaja en algo sin líneas. **Nunca toca una venta con líneas** (puede ser un apartado legítimo). Reusa `SP_VENTAS_BORRADOR_VIEJO` + `SP_CANCELAR_VENTA`, sin SQL nuevo; avisa cuántas canceló. Test `db/test-borradores-barrido.sh` |
-| «Historial de venta» paginado | 15/11 | `SP_HISTORIAL_VENTA` (21) **no tenía `LIMIT`**: devolvía el historial completo (30 filas hoy en la viva, sin tope). Se agregaron `SP_HISTORIAL_VENTA_PAGINADO` y `SP_CONTAR_HISTORIAL_VENTA` en el `39`, con `P_ID_VENTA = 0` = todas. Pantalla de 10 en 10 con `mostrarPaginadoSPCon`. El `COUNT` lleva el mismo `JOIN` que el `SELECT` para que las páginas cuadren. Aserciones agregadas a `db/test-historial-garantias-venta.sh` |
+| Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** (hoy 38 de 188) |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0 (hoy 131/0); backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---
