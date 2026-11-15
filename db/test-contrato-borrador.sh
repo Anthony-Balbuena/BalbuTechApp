@@ -50,6 +50,18 @@ if [ -z "$PASS" ]; then
   exit 1
 fi
 
+# (15/11/2026) Este test escribe SQL directo (marcador y chequeo de estado) y
+# `balbu_app` solo tiene EXECUTE: los DELETE/INSERT fallaban en silencio por el
+# 2>/dev/null, dejaban filas 302998878xx y la corrida siguiente abortaba con
+# "BASE SUCIA". Se sondea el permiso con un DELETE que no toca ninguna fila
+# (sin privilegio igual falla) y se dice como resolverlo.
+if ! mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" \
+       -e "DELETE FROM CONTRATOS WHERE 1 = 0" >/dev/null 2>&1; then
+  echo "FALTA privilegio de escritura sobre $DB para '$USER'." >&2
+  echo "Este test hace SQL directo: corre con DB_USER=root y DB_PASSWORD=<DB_ROOT_PASSWORD>." >&2
+  exit 1
+fi
+
 TMP="$(mktemp -d /tmp/opencode/contrato-borrador.XXXXXX)"
 limpiar_marcador() {
   mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e \
@@ -543,7 +555,7 @@ if entroAlMenu "$out" && [ "$rc" != "124" ]; then
   problemas=""
   grep -qF "EXITO: CONTRATO" "$out" || problemas="no finalizo el contrato"
   estado="$(mariadb -N -h "$HOST" -u "$USER" -p"$PASS" "$DB" -e \
-    "SELECT CONCAT(ESTADO, '|', FECHA_FIN) FROM CONTRATOS WHERE CEDULA='30299887808';" 2>/dev/null)"
+    "SELECT CONCAT(ESTADO, '|', FECHA_FIN) FROM CONTRATOS WHERE CEDULA='30299887808';")"
   case "$estado" in
     FINALIZADO\|*) : ;;
     *) problemas="${problemas:+$problemas; }estado '$estado' (se esperaba FINALIZADO)" ;;

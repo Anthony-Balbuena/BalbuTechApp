@@ -28,8 +28,8 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de 58 permisos ap
 | `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 123/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
-| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=... DB_PASSWORD=... bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 |
-| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave-root> bash db/test-contrato-borrador.sh` | contrato borrador | 15/15 (`balbu_app` no sirve: el test hace SQL directo y corta avisando) |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-asistencia-propia.sh` | fichar sin pedir ID | OK |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-migracion-roles.sh` | módulo 44 (rol viejo → VENDEDOR) | 11/11 |
 | `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-lockout.sh` | módulo 64: bloqueo por 5 fallos / 15 min, sin fila nueva al reintentar bloqueado, `FN_TIENE_PERMISO` con `ESTADO` e índice del log | OK |
 | `BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-login-servidor.sh` | módulo 65: verificación en el servidor, migración automática al primer login, segundo login, clave mala y hash inaccesible para `balbu_app` | OK |
@@ -324,18 +324,23 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
 
 ## 🟡 P2 — Media (reproducibilidad y limpieza)
 
-- [ ] **La clave del usuario `admin` en TEST no coincide con la del `.env` (14/11/2026).**
-  `test-menus-por-rol.sh` usa `BALBU_USER`/`BALBU_PASS` (por defecto `admin` y la
-  clave del `.env`) para los seis casos ADMIN; hoy los seis fallan con
-  «Credenciales inválidas» mientras los roles sembrados por el propio test pasan
-  todos. Verificado: el `admin` de TEST tiene el formato del módulo 65
-  (`CLAVE_SERVIDOR` presente, `CONTRASENA` en `NULL`, `SALT_LOGIN` e `ITER_LOGIN`
-  seteados), así que su clave se rotó en algún momento y no es la del `.env`.
-  No es un fallo de la app ni de la fusión de módulos: se confirmó creando un
-  usuario temporal con rol ADMIN y la clave del `.env`, que sí entra y ve las 5
-  opciones del submenú de garantías. Se arregla re-sembrando el admin de TEST
-  (`db/seed-admin.sh BALBU_TECH_TEST`, con backup), o pasando `BALBU_USER` y
-  `BALBU_PASS` reales al correr el test. No hace falta para la viva.
+- [x] **La clave del usuario `admin` en TEST no coincide con la del `.env`: ✅ cerrado el 15/11/2026.**
+  Se re-sembró con `db/seed-admin.sh` sobre `BALBU_TECH_TEST`, con backup previo
+  `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`. El seed deja
+  `CONTRASENA` con el hash PBKDF2 y limpia `SALT_LOGIN`/`ITER_LOGIN`/
+  `CLAVE_SERVIDOR`, así que el primer login lo migra al formato del `65`.
+  `test-menus-por-rol.sh` volvió a verde en los seis casos ADMIN, y
+  `test-asistencia-propia.sh` ya no depende de `CONTRASENA` ni del orden: deriva
+  la clave de `BALBU_PASS` con `db/lib-clave-prueba.sh` (antes copiaba el hash
+  del admin, que el primer login deja en `NULL`).
+- [x] **`test-contrato-borrador.sh` daba falso negativo con `DB_USER=balbu_app`: ✅ cerrado el 15/11/2026.**
+  Ese test hace SQL directo y `balbu_app` solo tiene `EXECUTE`, así que el
+  `DELETE`/`INSERT` del marcador `302998878xx` fallaba en silencio (estaba
+  tapado con `2>/dev/null`), dejaba filas y la corrida siguiente abortaba con
+  «BASE SUCIA»; el caso 14 fallaba con «estado ''» porque la fila nunca se
+  había creado. Ahora sondea el permiso al arrancar con un
+  `DELETE ... WHERE 1 = 0` y corta con el comando exacto
+  (`DB_USER=root DB_PASSWORD=<DB_ROOT_PASSWORD>`). Con root: **15/15**.
 - [ ] **`db/import.sh` no dropea la base** y un `DROP` se lleva el grant de
   `balbu_app`: hay que volver a otorgarlo con `db/aplicar-grants.sh`.
 - [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
@@ -420,6 +425,7 @@ repo: está en `../BalbuTechApp-fuera-del-repo/`.
 | Historial laboral (cargo ancho) | 12/11, fusionado 14/11 | dentro de `modulos/15` (ex módulo `68`); `db/test-historial-laboral.sh` 14/0 |
 | Consolidación de módulos | 12–14/11 | **19 lotes, capa 1 cerrada**; `modulos/` pasó de 70 a **31 `.sql`**; el detalle vive en `odd/tasks/consolidacion-modulos.md` |
 | Limpieza de restos SQL (ítem 12c) | 15/11 | 4 SP retirados con su `DROP` (`1_SP_VERIFICAR_CATEGORIA_EXISTE`, `18_SP_CAMBIAR_ESTADO_PRODUCTO`, `SP_INSERTAR_INVENTARIO`, `11_SP_REGISTRAR_SALIDA`) y los 2 duplicados con dueño único (`65` y `66`). `cobertura-modulos.sh`: **38 sin uso de 184, 0 repetidos** |
+| Batería de aceptación en TEST, en verde | 15/11 | 12 suites + `build.sh`, todas exit 0 (`test-menus-por-rol`, `test-garantias` 13/0, `test-contrato-borrador` 15/15, `test-migracion-roles`, `test-lockout`, `test-login-servidor`, `test-login-eof`, `test-permisos-sp`, `test-asistencia-propia`, `check-app-sps` 127/0, `test-cobertura-modulos`). Admin de TEST re-sembrado con backup `backups/balbu_tech_test_antes_seed_admin_20261115_115456.sql`; dos tests corregidos porque daban falso negativo (copiaban `CONTRASENA` y usaban `balbu_app` para SQL directo) |
 | Auditoría de permisos en la viva | 14/11 | sección `AUDITORIA` del `13` + `mapear-permisos.sql`; `check-app-sps` contra la viva 123/0; backup `backups/balbu_tech_antes_auditoria_permisos_20261114_134302.sql` |
 
 ---

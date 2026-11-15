@@ -17,7 +17,6 @@ DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-BALBU_TECH_TEST}"
 DB_USER="${DB_ADMIN_USER:-balbu_admin}"
 DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD}"
-BALBU_USER="${BALBU_USER:-admin}"
 BALBU_PASS="${BALBU_PASS:?Falta BALBU_PASS}"
 
 if [ "$DB_NAME" = "BALBU_TECH" ]; then
@@ -50,9 +49,15 @@ limpiar() {
 }
 trap limpiar EXIT
 
-HASH=$(Q "SELECT CONTRASENA FROM USUARIOS WHERE USUARIO='$BALBU_USER';")
+# (15/11/2026) La clave de prueba se DERIVA de BALBU_PASS; antes se copiaba
+# USUARIOS.CONTRASENA del admin. Desde el modulo 65 esa columna queda en NULL
+# la primera vez que el admin entra (el hash real pasa a CLAVE_SERVIDOR), asi
+# que el usuario de prueba quedaba con la clave vacia y el test fallaba con
+# "Credenciales invalidas" sin que hubiera nada roto.
+. "$(dirname "$0")/lib-clave-prueba.sh"
+HASH=$(clave_pbkdf2 "$BALBU_PASS")
 if [ -z "$HASH" ]; then
-    echo "No existe el usuario '$BALBU_USER' en $DB_NAME." >&2
+    echo "No se pudo derivar la clave de prueba (¿falta python3?)." >&2
     exit 1
 fi
 
