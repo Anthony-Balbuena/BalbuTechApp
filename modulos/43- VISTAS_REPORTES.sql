@@ -1,6 +1,6 @@
 
 
-SELECT * FROM USUARIOS;
+
 -- 43- VISTAS_REPORTES.sql
 -- (20/10/2026) Vistas que cruzan tablas creadas en modulos posteriores.
 --
