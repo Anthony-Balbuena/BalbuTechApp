@@ -31,6 +31,7 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplic
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-ventas-ver-iva.sh` | «Ver venta con IVA» paginado: contrato de los SP, fallback de página y la pantalla sin volcar facturas | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cobrar-plazo.sh` | plazo de cobro de 48 h: vigencia de los SP, borradores vacíos y el aviso en rojo de la pantalla | todos OK |
+| `DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root DB_ADMIN_PASSWORD=<clave-root> bash db/test-compras.sh` | flujo de compras: alta y lineas, la linea cuadra al centavo con la factura, BRUTO y vistas, pagos y estados, devolucion que baja el TOTAL, stock y los tres frenos | 32/32 |
 | `DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root DB_ADMIN_PASSWORD=<clave-root> bash db/test-historial-garantias-venta.sh` | historial de venta (incluido el paginado nuevo) y ventas garantizables | OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-borradores-barrido.sh` | barrido de borradores vacíos al entrar: cancela el viejo y **no** toca el vacío reciente ni la venta con líneas | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cierre-atomico.sh` | cierre atómico: si falla la segunda línea, la primera —ya insertada y con stock descontado— se revierte; y el camino feliz sigue igual | todos OK |
@@ -228,10 +229,12 @@ cablear es el módulo `34` (ítem 8).
   devuelven **exactamente lo mismo** antes y después.
   **LO QUE FALTA: el lado de ESCRITURA.** `SP_REGISTRAR_PAGO_COMPRA` y cuatro
   triggers (7 lugares, todos en el `19`) siguen con la fórmula escrita a mano.
-  **No se tocaron todavía porque el flujo de compras NO TIENE TEST**: de los 25
-  tests, ninguno cubre registrar una compra, pagarla ni devolverla. Cambiar la
-  validación de pagos sin red es exactamente lo que no hay que hacer. El orden es:
-  escribir el test de compras primero, y recién después centralizar.
+  **(15/11/2026) La red YA EXISTE:** `db/test-compras.sh`, 32 comprobaciones
+  sobre el flujo completo (alta, líneas, la línea cuadrando al centavo con la
+  factura, BRUTO, pagos, estados, devolución y stock). Se verificó que **caza**
+  el defecto: rompiendo a propósito el bruto de `TR_AUTO_RECIBIR_COMPRA` (sin el
+  ITBIS), el test da **12 fallos**. Ahora sí se puede centralizar la escritura
+  contra `VW_COMPRA_NETA`, con el test como red.
   (Dato que hace segura esa parte: todas las columnas son `DECIMAL(_,2)`, así que
   el `ROUND(...,2)` de la vista es un no-op y reemplazar la fórmula no cambia
   ningún número.)
@@ -368,9 +371,9 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería son 25 tests, no 12, y hay que correrlos todos.** Hasta el
+- [ ] **La batería son 26 tests, no 12, y hay que correrlos todos.** Hasta el
   15/11 se corrían solo los de la tabla de arriba y se reportaba como «batería
-  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 25
+  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 26
   en verde**. Ojo con dos cosas al correrlos: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
   que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. **Que estén todos en
