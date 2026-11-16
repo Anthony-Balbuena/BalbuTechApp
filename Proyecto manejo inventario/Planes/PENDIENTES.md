@@ -219,25 +219,6 @@ cablear es el módulo `34` (ítem 8).
 
 ### 10. Hallazgos del mapa de módulos (21/10)
 
-- [ ] **El BRUTO** (`TOTAL + ITBIS − ITBIS devuelto`): falta la mitad de compras.
-  **(15/11/2026) LADO DE LECTURA, HECHO.** Ventas ya estaba centralizado en
-  `VW_VENTA_NETA`. Compras no tenía vista neta, así que la fórmula estaba escrita
-  a mano en **dos estilos distintos** y `VISTA_COMPRAS_PENDIENTES_PAGO` la
-  repetía **dos veces en la misma vista** (en el `SELECT` y en el `WHERE`).
-  Ahora existe **`VW_COMPRA_NETA`** (43) y las dos vistas de compras leen de ahí.
-  Verificado con las 31 compras de la viva: las 7 vistas y los SPs de lectura
-  devuelven **exactamente lo mismo** antes y después.
-  **LO QUE FALTA: el lado de ESCRITURA.** `SP_REGISTRAR_PAGO_COMPRA` y cuatro
-  triggers (7 lugares, todos en el `19`) siguen con la fórmula escrita a mano.
-  **(15/11/2026) La red YA EXISTE:** `db/test-compras.sh`, 32 comprobaciones
-  sobre el flujo completo (alta, líneas, la línea cuadrando al centavo con la
-  factura, BRUTO, pagos, estados, devolución y stock). Se verificó que **caza**
-  el defecto: rompiendo a propósito el bruto de `TR_AUTO_RECIBIR_COMPRA` (sin el
-  ITBIS), el test da **12 fallos**. Ahora sí se puede centralizar la escritura
-  contra `VW_COMPRA_NETA`, con el test como red.
-  (Dato que hace segura esa parte: todas las columnas son `DECIMAL(_,2)`, así que
-  el `ROUND(...,2)` de la vista es un no-op y reemplazar la fórmula no cambia
-  ningún número.)
 - [ ] **`FN_TASA_ITBIS` no permite 0 %**: cae al 18 por diseño.
 
 ### 11. Verificar antes de creer — ✅ resuelto el 15/11/2026

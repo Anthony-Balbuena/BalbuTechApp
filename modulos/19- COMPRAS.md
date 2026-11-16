@@ -267,18 +267,29 @@ Fuente: `modulos/19- COMPRAS.sql`, seccion PAGOS_COMPRA · Revisado: 12/11/2026.
 
 ### El concepto que manda: se paga el BRUTO
 
-En **todo** este módulo (2 SP y 4 triggers) el tope de pago se calcula igual:
+El tope de pago es el **BRUTO**: `COMPRAS.TOTAL` (la base) **+** el ITBIS de las
+líneas **−** el ITBIS devuelto de las devoluciones `PROCESADA`. Por eso una
+compra con `TOTAL = 100` e ITBIS de 18 exige **118** de pagos para quedar
+`RECIBIDA`.
 
-```
-BRUTO = COMPRAS.TOTAL
-      + SUM(DETALLE_COMPRA.MONTO_ITBIS)
-      - SUM(ITBIS devuelto de devoluciones PROCESADA)
-```
-
-Es decir, `COMPRAS.TOTAL` guarda la **base** y el ITBIS se suma al cobrar. Por
-eso una compra con `TOTAL = 100` e ITBIS de 18 exige **118** de pagos para
-quedar `RECIBIDA`. Cualquier cambio en esta fórmula hay que hacerlo en los seis
-lugares a la vez.
+> **(15/11/2026) La fórmula ya NO vive acá.** Estaba escrita a mano en **siete**
+> lugares de este módulo (2 SP y 4 triggers, uno de ellos en dos ramas), y cada
+> copia podía desincronizarse de las demás y de las vistas. Ahora **los siete
+> leen `VW_COMPRA_NETA`** (43), la misma vista que usan `VISTA_COMPRA_CON_IVA` y
+> `VISTA_COMPRAS_PENDIENTES_PAGO`.
+>
+> Es exactamente lo que **ventas ya hacía**: su ruta de escritura (21 y 24) lee
+> `BRUTO_NETO` de `VW_VENTA_NETA`. Compras se faltaba.
+>
+> **Para cambiar el BRUTO ahora se cambia en `VW_COMPRA_NETA` y nada más:** los
+> siete puntos de este módulo y las tres vistas lo heredan. El test
+> `db/test-compras.sh` (33 comprobaciones) cubre el flujo entero, así que un
+> cambio mal hecho en esa fórmula tiene red.
+>
+> **Ojo con el orden del import:** este módulo **lee una vista del 43**, que
+> corre después. Funciona porque MariaDB no valida el cuerpo de un trigger al
+> crearlo, solo al ejecutarlo, y en una base nueva no hay filas de `PAGOS_COMPRA`
+> durante el import. Es la misma dependencia que ventas ya tiene.
 
 ### Tablas
 

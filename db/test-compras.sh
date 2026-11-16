@@ -237,6 +237,24 @@ SELECT IF((SELECT COUNT(*) FROM COMPRAS WHERE ID_PROVEEDOR = @prov AND ESTADO NO
   'OK las compras del test terminaron RECIBIDA o CANCELADA',
   'FALLO alguna compra quedo en un estado inesperado') AS prueba;
 
+-- =====================================================================
+-- F. El reporte por periodo tiene que coincidir con la vista
+-- =====================================================================
+-- (15/11/2026) El reporte arma SUBTOTAL/ITBIS/BRUTO con su propia agregacion.
+-- Este control lo ancla a VW_COMPRA_NETA: si alguien cambia una definicion y no
+-- la otra, los numeros dejan de coincidir y esto lo caza. Se emiten los DOS
+-- resultados con marcas y se comparan en bash, DENTRO de la transaccion.
+SELECT 'FASE_REPORTE' AS marca;
+CALL SP_REPORTE_PERIODO_COMPRA(DATE_SUB(CURDATE(), INTERVAL 1 DAY), CURDATE());
+SELECT 'FASE_REPORTE_ESPERADO' AS marca;
+SELECT ROUND(IFNULL(SUM(SUBTOTAL_ORIGINAL), 0), 2) AS SUBTOTAL,
+       ROUND(IFNULL(SUM(ITBIS_NETO), 0), 2)       AS ITBIS,
+       ROUND(IFNULL(SUM(BRUTO_NETO), 0), 2)       AS BRUTO
+  FROM VW_COMPRA_NETA
+ WHERE ESTADO = 'RECIBIDA'
+   AND DATE(FECHA) BETWEEN DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND CURDATE();
+SELECT 'FASE_FIN' AS marca;
+
 ROLLBACK;
 SQL
 )
@@ -244,8 +262,30 @@ SQL
 # ---------------------------------------------------------------------------
 # Resultado
 # ---------------------------------------------------------------------------
-fallos=$(printf '%s\n' "$OUT" | grep -c "^FALLO" || true)
-oks=$(printf '%s\n' "$OUT" | grep -c "^OK" || true)
+fallos=$(printf '%s
+' "$OUT" | grep -c "^FALLO" || true)
+oks=$(printf '%s
+' "$OUT" | grep -c "^OK" || true)
+
+# ---------------------------------------------------------------------------
+# El reporte por periodo contra la vista (seccion E)
+# ---------------------------------------------------------------------------
+seccion() {   # $1 = marca inicial, $2 = marca final
+    printf '%s
+' "$OUT" | awk -v a="$1" -v b="$2" '$0 == a {on=1; next} $0 == b {on=0} on'
+}
+# La linea del reporte trae TRANSACCIONES, SUBTOTAL, ITBIS, BRUTO; la esperada
+# trae SUBTOTAL, ITBIS, BRUTO. Se comparan los tres ultimos contra los tres.
+rep_tres=$(seccion FASE_REPORTE FASE_REPORTE_ESPERADO | grep -E "^[0-9]" | head -1 | awk -F'	' '{print $2"|"$3"|"$4}')
+esp_tres=$(seccion FASE_REPORTE_ESPERADO FASE_FIN    | grep -E "^[0-9]" | head -1 | awk -F'	' '{print $1"|"$2"|"$3}')
+if [ -n "$rep_tres" ] && [ "$rep_tres" = "$esp_tres" ]; then
+    echo "  OK el reporte por periodo coincide con VW_COMPRA_NETA (SUBTOTAL|ITBIS|BRUTO = $rep_tres)"
+    oks=$((oks + 1))
+else
+    echo "  FALLO el reporte por periodo NO coincide con la vista (reporte='$rep_tres' vista='$esp_tres')"
+    fallos=$((fallos + 1))
+fi
+
 
 printf '%s\n' "$OUT" | grep "^OK" | sed 's/^/  /'
 
