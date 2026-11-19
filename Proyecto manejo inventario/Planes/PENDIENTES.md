@@ -170,10 +170,19 @@ cablear es el módulo `34` (ítem 8).
   retiró (lo reemplazó el par paginado) y `SP_ACTUALIZAR_BONO` queda sin cablear a
   propósito. Tests: `db/test-bonos.sh` (18 comprobaciones + 7 frenos),
   `db/test-bonos-pantalla.sh` y el caso nuevo de `db/test-menus-por-rol.sh`.
-  **Falta aplicar a la viva** (módulo 14, 36, `db/mapear-permisos.sql` y
-  `db/injectar-guardas.py`, en ese orden): toca la matriz de permisos, así que va
-  con autorización del dueño. Ahí se ven los 11 bonos `PENDIENTE` por $10.330 que
-  hoy nadie puede pagar.
+  **Aplicado en la viva el 18/11/2026**, con backup previo
+  `backups/balbu_tech_antes_bonos_20261118_214014.sql` (704 K, 47 tablas, 188 SP,
+  6 funciones, 82 triggers, 26 vistas) y el orden obligatorio
+  `14 → 36 → mapear-permisos → injectar-guardas → check-app-sps`. Resultado:
+  `check-app-sps` contra `BALBU_TECH` da **Faltantes 0 (136), guardas completas,
+  53 mapeos**; permisos 61 → 62; `SP_CONTAR_BONOS('PENDIENTE')` devuelve **11** y
+  el paginado trae los 11 bonos por **$10.330,00**; la vista pasó a devolver
+  `0` (no `NULL`) para quien no tiene bonos y sigue sumando 10330.00. Nada más se
+  movió: 47 tablas, 26 vistas, 6 funciones y 82 triggers iguales al backup, y
+  `SP_LISTAR_BONOS` es el único SP retirado. **Queda verlo con los ojos**: abrir
+  «Empleados → Gestionar bonos» con `abalbuena` y confirmar los 11; el humo por la
+  app no se puede hacer desde acá porque el `BALBU_USER` del `.env` es `admin`
+  (de TEST) y en la viva el admin es `abalbuena`.
 - [x] **Auditoría de permisos — ✅ aplicada en la viva el 14/11/2026.** La bitácora
   está completa y probada en TEST (`db/test-auditoria-permisos.sh` 19/0) y vive
   **dentro del módulo `13`**: guarda el actor, audita alta/cambio/baja y agrega la
