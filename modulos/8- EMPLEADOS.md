@@ -13,7 +13,7 @@ sección, al final) cuelgan de este ID.
 > `TR_VINCULAR_CONTRATO` es `AFTER INSERT ON EMPLEADOS` y es el único de ese
 > tipo, así que no hay orden que cuidar.
 
-Fuente: `modulos/8- EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 14/11/2026.
+Fuente: `modulos/8- EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 18/11/2026.
 
 ## Tablas
 
@@ -156,13 +156,85 @@ nombre o cargo; devuelve `ID, CEDULA, NOMBRE, CARGO, ESTADO`, con los
 
 ### `SP_GENERAR_RECIBO_EMPLEADO(P_ID_EMPLEADO)`
 
-**La app no la llama.** Volante de pago de un activo: sueldo bruto,
+**Usada por la app** (`nomina.cpp`, 18/11/2026). Volante de pago: sueldo bruto,
 `DESCUENTO_SFS` (3.04%), `DESCUENTO_AFP` (2.87%), `SUELDO_NETO` (bruto menos
-5.91%) y fecha de emisión `dd/mm/yyyy`. ID nulo →
-`ERROR: DEBE PROPORCIONAR UN ID DE EMPLEADO.`; inexistente o inactivo →
-`ERROR: EL EMPLEADO NO EXISTE O NO SE ENCUENTRA ACTIVO.`
+5.91%), el `ESTADO` del empleado, los bonos pendientes y el total, con la fecha
+de emisión `dd/mm/yyyy`.
+
+Columnas: `EMPRESA`, `ID_EMPLEADO`, `NOMBRE`, `CEDULA`, `CARGO`, `ESTADO`,
+`SUELDO_BRUTO`, `DESCUENTO_SFS`, `DESCUENTO_AFP`, `SUELDO_NETO`,
+`CANTIDAD_BONOS_PENDIENTES`, `TOTAL_BONOS_PENDIENTES`, `TOTAL_A_PAGAR`,
+`FECHA_EMISION`.
+
+- ID nulo → `ERROR: DEBE PROPORCIONAR UN ID DE EMPLEADO.`
+- Inexistente → `ERROR: EL EMPLEADO NO EXISTE.`
+
+> **(18/11/2026)** Tres cosas que este SP hace y dos que no:
+> - Los bonos (14) son **arrastre**: toma **todos** los `PENDIENTE` del
+>   empleado, de cualquier mes. La nómina de octubre nunca se corrió y esos
+>   bonos no los levantaría ningún mes.
+> - `TOTAL_A_PAGAR = SUELDO_NETO + TOTAL_BONOS_PENDIENTES`.
+> - Ya **no exige `ACTIVO`**: un despedido con bonos pendientes igual cobra lo
+>   que trabajó; el estado va como columna para que se vea en el recibo.
+> - **No marca nada.** Es consulta pura: un recibo no es un pago, y marcar al
+>   imprimir dejaría bonos `PAGADO` sin que salga plata.
+> - **No cambia la base de los descuentos.** `SUELDO_BRUTO` sigue siendo
+>   `SALARIO` y SFS/AFP se calculan sobre `SALARIO`: si el bono cotiza, es
+>   gravable o integra el bruto lo define el contador. El bono se suma después
+>   del neto y el recibo no afirma nada previsional.
 
 > Los porcentajes de SFS/AFP están **hardcodeados** en el SP.
+
+### `SP_PAGAR_NOMINA_EMPLEADO(P_ID_EMPLEADO)` — nuevo (18/11/2026)
+
+**Usada por la app.** El acto de pagar: marca `PAGADO` **todos** los bonos
+`PENDIENTE` del empleado con `FECHA_PAGO = CURRENT_DATE` y `PAGADO_POR`
+resuelto con `FN_USUARIO_SESION()`, y devuelve cuántos y cuánto.
+
+- ID nulo → `ERROR: DEBE PROPORCIONAR UN ID DE EMPLEADO.`
+- Inexistente → `ERROR: EL EMPLEADO NO EXISTE.`
+- Sin bonos pendientes → `AVISO: EL EMPLEADO CON ID <id> NO TIENE BONOS
+  PENDIENTES. NO SE PAGO NADA.` (no es un error: puede que ya se le pagó).
+- Con bonos → `EXITO: SE PAGARON <n> BONO(S) POR $<monto>. EL SUELDO BASE SE
+  PAGA FUERA DEL SISTEMA.`
+
+> Existe separado del recibo a propósito: el recibo se mira cuantas veces se
+> quiera; esto escribe. Si marcara al emitir, dos consultas pagarían dos veces.
+>
+> **El sistema no paga sueldos:** no hay tabla de nómina. Lo que queda
+> registrado son los bonos; el sueldo base se paga fuera y el mensaje lo dice
+> para que nadie crea que la nómina quedó asentada.
+>
+> No exige `ACTIVO`, igual que el recibo.
+
+## Pantalla (app C++)
+
+`nomina.cpp` / `nomina.h`, colgada del submenú de Empleados como
+«Nómina (recibo y pago)» (18/11/2026).
+
+| Acción | SP |
+|---|---|
+| Listar empleados (10 por página, con `ID`, `NOMBRE` y `ESTADO`) | `SELECT` directo paginado |
+| Recibo del mes | `SP_GENERAR_RECIBO_EMPLEADO` |
+| Detalle de los bonos incluidos | `SP_LISTAR_BONOS_PENDIENTES_EMPLEADO` (14) |
+| Pagar la nómina | `SP_PAGAR_NOMINA_EMPLEADO` |
+
+- Abre con el permiso **`GESTIONAR_NOMINA`** (36: ADMIN, GERENTE y RRHH;
+  SUBGERENTE no). Las tres rutinas exigen ese mismo permiso: pantalla y rutina
+  con permisos distintos dejarían al rol legítimo en `SIN_PERMISO`. El ítem
+  «Empleados» del menú principal también lo incluye; sin eso la pantalla existe
+  pero nadie llega.
+- Dos mitades separadas a propósito: el recibo es consulta y el pago es el acto.
+  El pago pide confirmación explícita (`s/n`) antes de tocar la base.
+- El pago es **por empleado**, no masivo: un botón que paga a toda la plantilla
+  de una vez no se deshace.
+- Si el empleado no tiene pendientes, la pantalla lo dice y no llama al SP: no
+  hay nada que pagar y eso no es una falla.
+
+> **Ojo al leer un `CALL` en C++:** el `ResultSet` de un procedimiento hay que
+> soltarlo (`res.reset()`) y después llamar a `drenarResultados(ps.get())` antes
+> de la consulta siguiente. Si no, la conexión queda con un resultado abierto y
+> la próxima consulta muere con `Commands out of sync`.
 
 ## Triggers
 

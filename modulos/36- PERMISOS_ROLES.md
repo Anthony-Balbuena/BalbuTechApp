@@ -15,7 +15,7 @@ permiso).
 > después de la matriz y de los diez parches finos, que es el orden que tenían
 > como archivos aparte.
 
-Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/11/2026.
+Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 18/11/2026.
 
 ## Tablas
 
@@ -27,11 +27,12 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/1
 | `NOMBRE_PERMISO` | `VARCHAR(80)` | NOT NULL, **UNIQUE** | Clave que consulta la app. |
 | `DESCRIPCION` | `VARCHAR(200)` | NULL | Texto para la UI. |
 
-**Semillas (54, idempotentes con `ON DUPLICATE KEY UPDATE`):**
+**Semillas (idempotentes con `ON DUPLICATE KEY UPDATE`):**
 `GESTIONAR_ROLES`, `USUARIOS_VER`, `USUARIOS_CREAR`, `USUARIOS_EDITAR`,
 `USUARIOS_ESTADO`, `USUARIOS_CLAVE`, `EMPLEADOS_VER`, `EMPLEADOS_CREAR`,
 `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `JUSTIFICAR_ASISTENCIA`,
 `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO`,
+`GESTIONAR_BONOS_EMPLEADO`, `GESTIONAR_NOMINA`,
 `CLIENTES_VER`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`,
 `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`,
 `PROVEEDORES_ESTADO`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`,
@@ -55,10 +56,18 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/1
 > **El módulo Empleados usa 6 permisos finos** (`EMPLEADOS_VER`,
 > `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`,
 > `GESTIONAR_PERMISOS_EMPLEADO` y `GESTIONAR_VACACIONES_EMPLEADO`) más
-> `GESTIONAR_CONTRATOS` para el bloque de contratos. El viejo
-> `GESTIONAR_EMPLEADOS` **ya no existe**: mismo borrado en cascada que
-> `GESTIONAR_USUARIOS`. La asistencia **ya no vive acá**: desde el 23/10/2026
-> tiene su propio ítem y sus propios permisos (ver más abajo).
+> `GESTIONAR_CONTRATOS` para el bloque de contratos, `GESTIONAR_BONOS_EMPLEADO`
+> para la pantalla de bonos (18/11/2026) y `GESTIONAR_NOMINA` para el recibo y
+> su pago. El viejo `GESTIONAR_EMPLEADOS` **ya no existe**: mismo borrado en
+> cascada que `GESTIONAR_USUARIOS`. La asistencia **ya no vive acá**: desde el
+> 23/10/2026 tiene su propio ítem y sus propios permisos (ver más abajo).
+
+> **`GESTIONAR_NOMINA` no reutiliza `GESTIONAR_BONOS_EMPLEADO`** (18/11/2026):
+> no es lo mismo cargar y anular plata suelta que cerrar el mes de una persona.
+> El permiso nuevo deja la matriz honesta si mañana hay una tabla de nómina de
+> verdad. Las tres rutinas del recibo y del pago lo exigen, y el ítem
+> «Empleados» del menú principal también lo incluye: si no, un rol solo-nómina
+> no vería la puerta.
 
 > **El módulo Clientes usa 4 permisos finos** (`CLIENTES_VER`, `CLIENTES_CREAR`,
 > `CLIENTES_EDITAR` y `CLIENTES_ESTADO`). Los viejos `GESTIONAR_CLIENTES` y
@@ -119,7 +128,7 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/1
 > edición ni baja. Un permiso nuevo **solo** entra por semilla. Lo que la app sí
 > administra es **qué rol lo tiene**.
 >
-> **Los 54 se consultan en el código**: los de Empleados y Asistencia en
+> **Los permisos se consultan en el código**: los de Empleados y Asistencia en
 > `empleados.cpp`, los de Clientes en `clientes.cpp`, los de Proveedores en
 > `proveedores.cpp`, los de Categorías en `categorias.cpp`, los de Marcas en
 > `marcas.cpp`, los de Métodos de pago en `metodos_pago.cpp`, los de Compras en
@@ -145,19 +154,30 @@ Fuente: `modulos/36- PERMISOS_ROLES.sql` · Base: `BALBU_TECH` · Revisado: 14/1
 > **`ON DELETE CASCADE`** del permiso: borrar un permiso limpia la matriz sin
 > avisar.
 
-**Matriz que queda al importar:**
+**Matriz que queda al importar** (verificada en `BALBU_TECH_TEST` el
+18/11/2026: **63 permisos** y **232 pares** rol-permiso):
 
 | Rol | Permisos |
 |---|---|
-| `ADMIN` | **los 54** |
-| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (48) |
-| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO` y `GESTIONAR_CONTRATOS` (42) |
-| `RRHH` | los 7 finos de Empleados, `GESTIONAR_CONTRATOS`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (12) |
-| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (12) |
-| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `INVENTARIO_VER`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (25) |
-| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (4) |
+| `ADMIN` | **los 63** |
+| `GERENTE` | todos **menos** `GESTIONAR_ROLES` y los 5 `USUARIOS_*` (57) |
+| `SUBGERENTE` | todos **menos** `GESTIONAR_ROLES`, los 5 `USUARIOS_*`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`, `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`, `GESTIONAR_VACACIONES_EMPLEADO`, `GESTIONAR_BONOS_EMPLEADO`, `GESTIONAR_NOMINA` y `GESTIONAR_CONTRATOS` (49) |
+| `RRHH` | los 6 finos de Empleados, `GESTIONAR_CONTRATOS`, `GESTIONAR_BONOS_EMPLEADO`, `GESTIONAR_NOMINA`, `CONSULTAR_REPORTES`, `CONSULTAR_ASISTENCIA`, `REGISTRAR_ASISTENCIA`, `JUSTIFICAR_ASISTENCIA` y `SOLICITAR_PERMISO` (14) |
+| `VENDEDOR` | `GESTIONAR_VENTAS`, `CLIENTES_CREAR`, `CLIENTES_EDITAR`, `CLIENTES_ESTADO`, `METODOS_PAGO_VER`, `CONSULTAR_HISTORIAL_VENTA`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (15) |
+| `ALMACEN` | `GESTIONAR_PRODUCTOS`, `CATEGORIAS_VER`, `CATEGORIAS_CREAR`, `CATEGORIAS_EDITAR`, `CATEGORIAS_ESTADO`, `MARCAS_VER`, `MARCAS_CREAR`, `MARCAS_EDITAR`, `MARCAS_ESTADO`, `INVENTARIO_VER`, `INVENTARIO_AJUSTAR`, `INVENTARIO_COSTO`, `COMPRAS_VER`, `COMPRAS_REGISTRAR`, `COMPRAS_PAGAR`, `COMPRAS_CANCELAR`, `COMPRAS_DEVOLVER`, `COMPRAS_REPORTES`, `PROVEEDORES_VER`, `PROVEEDORES_CREAR`, `PROVEEDORES_EDITAR`, `PROVEEDORES_ESTADO`, `CONSULTAR_PRODUCTOS`, `REGISTRAR_ASISTENCIA`, `SOLICITAR_PERMISO` (26) |
+| `CONTABILIDAD` | `CONSULTAR_REPORTES`, `CONSULTAR_PRODUCTOS`, `CLIENTES_VER`, `REGISTRAR_ASISTENCIA` (5) |
+| `TECNICO` | `GARANTIAS_AVANZAR`, `GARANTIAS_CONSULTAR` y `CONSULTAR_PRODUCTOS` (3) |
 
-> Total: **197 pares rol-permiso** (54 + 48 + 42 + 12 + 12 + 25 + 4).
+> Total: **232 pares rol-permiso** (63 + 57 + 49 + 14 + 15 + 26 + 5 + 3).
+>
+> `TECNICO` es el rol del técnico de garantías: entra con su propio usuario
+> (`USUARIOS.ID_EMPLEADO`) y solo avanza las reparaciones que tiene asignadas.
+> Sus 3 permisos se reparten en la sección de garantías del módulo
+> (`GARANTIAS_AVANZAR` también lo tienen ADMIN, GERENTE y SUBGERENTE).
+>
+> **Las cuentas de esta tabla se midieron contra la base**, no se estimaron. Si
+> un import futuro cambia la matriz, esta tabla es la que hay que volver a
+> contar.
 
 ### Mapa del submenú de Clientes
 
@@ -320,12 +340,23 @@ visible.
 | 9 | Ver contratos | `GESTIONAR_CONTRATOS` |
 | 10 | Finalizar contrato | `GESTIONAR_CONTRATOS` |
 | 11 | Gestionar permisos | `GESTIONAR_PERMISOS_EMPLEADO` |
-| 12 | Gestionar vacaciones | `GESTIONAR_VACACIONES_EMPLEADO` |
-| 13 | Volver al Menu Principal | *(siempre)* |
+| 12 | Ver auditoria de permisos | `GESTIONAR_PERMISOS_EMPLEADO` |
+| 13 | Gestionar vacaciones | `GESTIONAR_VACACIONES_EMPLEADO` |
+| 14 | Gestionar bonos | `GESTIONAR_BONOS_EMPLEADO` |
+| 15 | Nomina (recibo y pago) | `GESTIONAR_NOMINA` |
+| 16 | Volver al Menu Principal | *(siempre)* |
 
 > `SUBGERENTE` conserva el ítem `Empleados` con `EMPLEADOS_VER`: ve solo
 > `Buscar`, `Listar` y `Volver`. `VENDEDOR` ya no entra a Empleados; ficha desde
 > el ítem `Asistencia`.
+>
+> El ítem `Empleados` del menú principal se abre con **cualquiera** de sus
+> permisos finos (`EMPLEADOS_VER`, `EMPLEADOS_CREAR`, `EMPLEADOS_EDITAR`,
+> `EMPLEADOS_BAJA`, `GESTIONAR_PERMISOS_EMPLEADO`,
+> `GESTIONAR_VACACIONES_EMPLEADO`, `GESTIONAR_BONOS_EMPLEADO`,
+> `GESTIONAR_NOMINA`, `GESTIONAR_CONTRATOS`). Un permiso que no esté en esa
+> lista deja la pantalla inalcanzable aunque el rol lo tenga: pasó con
+> `GESTIONAR_NOMINA` y se corrigió antes de commitear.
 
 ### Mapa del submenú de Asistencia
 
@@ -833,8 +864,8 @@ ALMACEN 18, CONTABILIDAD 4).
 
 > (26/10/2026) VENDEDOR ya no recibe los cuatro: conserva solo
 > `METODOS_PAGO_VER` y el `DELETE` de abajo le quita los tres de gestión. La
-> matriz vigente completa está en `36- PERMISOS_ROLES.md` (54 permisos y 197
-> pares).
+> matriz vigente completa está en la tabla «Matriz que queda al importar» de
+> este mismo documento.
 
 El catálogo pasa de 41 a 44: se va un permiso y entran cuatro. Cada uno de los
 cuatro roles que tenía el paraguas gana tres pares (los cuatro finos menos el
@@ -1074,7 +1105,8 @@ Totales después de la migración: **54 permisos** y **201 pares rol-permiso**
 CONTABILIDAD 4).
 
 > (26/10/2026) VENDEDOR bajó a 12 permisos y el total a 197 por el ajuste de
-> Clientes y Métodos de pago. La matriz vigente está en `36- PERMISOS_ROLES.md`.
+> Clientes y Métodos de pago. La matriz vigente está en la tabla «Matriz que
+> queda al importar» de este documento.
 
 El catálogo pasa de 52 a 54: se va un permiso y entran tres. Cada uno de los
 cuatro roles que tenía el paraguas gana dos pares (los tres finos menos el
@@ -1233,7 +1265,7 @@ Aplicado en `BALBU_TECH_TEST` el 30/10/2026, dos veces seguidas sin error:
   `EXITO: PERMISO <permiso> ASIGNADO A <rol>`.
 
 > No existe camino para **crear** un permiso desde la app: solo se asignan los
-> 54 sembrados.
+> permisos sembrados.
 
 ### `SP_QUITAR_PERMISO_A_ROL(P_ROL_NOMBRE, P_NOMBRE_PERMISO)`
 

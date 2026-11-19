@@ -7,11 +7,15 @@ nombre.
 **El `.sql` es la fuente de verdad; el `.md` lo explica.** Si hay diferencia,
 gana el `.sql`.
 
-Última revisión: 14/11/2026 · 31 `.sql` + 31 `.md`
+Última revisión: 18/11/2026 · 31 `.sql` + 31 `.md`
 
 > Los totales de la tabla de abajo son los de la revisión del 05/11/2026 y **no**
 > se recontaron al fusionar módulos: la fusión no creó ni borró ningún objeto,
 > solo movió sentencias de archivo. El conteo de archivos sí es el real.
+>
+> **(18/11/2026)** Excepción: el `8` y el `14` sí se recontaron contra la base
+> al agregar la nómina (14 `SP` y 7 `SP`, respectivamente). El resto sigue sin
+> recontar.
 
 > **(14/11/2026) Diecinueve lotes de consolidación de módulos.** Lote 1: los diez parches de permisos
 > (`45`, `46`, `47`, `49`, `50`, `51`, `52`, `53`, `58`, `62`) viven dentro de
@@ -166,12 +170,12 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
-| [EMPLEADOS](<8- EMPLEADOS.md>) | 2T · 11SP · 3TR | Empleados, cargo, salario y estado, el `UNIQUE` de cédula (absorbe el 59) y los contratos (absorbe el 42). | ◐ |
+| [EMPLEADOS](<8- EMPLEADOS.md>) | 2T · 14SP · 3TR | Empleados, cargo, salario y estado, el `UNIQUE` de cédula (absorbe el 59), los contratos (absorbe el 42) y la nómina: recibo con los bonos del mes y su pago. | ◐ |
 | [USUARIOS](<10- USUARIOS.md>) | 1T · 9SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
 | [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 7SP · 1TR | Entrada y salida por día. | ✅ |
 | [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 8SP · 2TR | Solicitudes y cupo de vacaciones. | ✅ |
 | [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 2T · 6SP · 3TR · 1V | Permisos y ausencias del empleado, y su bitácora de auditoría (absorbe el 30 y el 69). | ✅ |
-| [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 6SP · 2TR · 1V | Bonos y descuentos de nómina; pantalla de gestión con permiso propio. | ✅ |
+| [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 7SP · 2TR · 1V | Bonos y descuentos de nómina; pantalla de gestión con permiso propio y pagador auditado. | ✅ |
 | [HISTORIAL_LABORAL_EMPLEADO](<15- HISTORIAL_LABORAL_EMPLEADO.md>) | 1T · 1TR · 2 ALTER | Cambios de cargo y salario. | — |
 | [LIQUIDACIONES](<16- LIQUIDACIONES.md>) | 1T · 1SP · 3TR · 2V | Liquidación al despedir. | — |
 
@@ -237,10 +241,12 @@ repetida de la base:
 
 ## Qué no usa la app
 
-Cinco módulos completos: **6** (auditoría), **14** (bonos), **15** (historial
-laboral), **16** (liquidaciones) y **29** (log de usuarios). El historial de stock
-(`32`) salió de esta lista: la app no lee su tabla, pero **sí** llama cuatro de
-sus `SP` (los del mapa producto–proveedor).
+Cuatro módulos completos, que la app no lee ni llama: **6** (auditoría), **15**
+(historial laboral), **16** (liquidaciones) y **29** (log de usuarios).
+
+> El **14** (bonos) salió de esta lista el 18/11/2026, cuando se cableó su
+> pantalla; el **32** (historial de stock) salió antes: la app no lee su tabla,
+> pero **sí** llama cuatro de sus `SP` (los del mapa producto–proveedor).
 
 > Las asignaciones de reclamos y el detalle de reparaciones (ex `34` y `35`) viven
 > ahora dentro del `25`. La app tampoco los usa: de ese módulo llama solo la
@@ -251,8 +257,10 @@ sus `SP` (los del mapa producto–proveedor).
 
 Parciales, que conviene mirar antes de tocarlos:
 
-- **8 EMPLEADOS**: la app usa 4 de sus 10 `SP` (insertar, actualizar, despedir,
-  reactivar) y lee la tabla directo.
+- **8 EMPLEADOS**: la app usa 9 de sus 14 `SP` (los 4 de gestión de empleado,
+  el recibo y el pago de nómina, y los 3 de contratos) y lee la tabla directo.
+  Quedan sin llamador `SP_REPORTE_NOMINA_TOTAL`, `SP_CONSULTAR_EMPLEADOS`,
+  `SP_AUMENTO_POR_CARGO`, `SP_ANIVERSARIOS_MES` y `SP_BUSQUEDA_RAPIDA_EMPLEADOS`.
 - **17 INVENTARIO**: el `SP` de alta no se llama; la tabla y el kardex sí se usan.
 - **19 COMPRAS**: de sus 4 `SP` de pagos se usan 2 (`SP_REGISTRAR_PAGO_COMPRA`
   y `SP_COMPRAS_PENDIENTES`). Anular un pago y la nota de crédito no tienen

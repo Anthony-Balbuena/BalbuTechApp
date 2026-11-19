@@ -19,15 +19,17 @@ huérfanos. El `36` es el único dueño de la matriz. (Los números viejos de ac
 
 ### 2. Pruebas de aceptación: todo lo hecho (Tanda A y B)
 
-Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplicada (la crea `36`; el resto son los módulos de soporte; hoy son 61 permisos). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 123/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería de entonces en verde. **Ojo: esa «batería completa» eran 12 tests de 25; ver P2.** Detalle en `Realizado.md`, hoy fuera del repo.
+Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplicada (la crea `36`; el resto son los módulos de soporte; hoy son 63 permisos). (03/11/2026) La viva quedó al día: se aplicaron `62`, `63`, `64`, `65` y `66` con backups previos `backups/balbu_tech_antes_t2_20261103_152050.sql`, `backups/balbu_tech_antes_login_srv_20261103_163105.sql` y `backups/balbu_tech_antes_guardas_20261103_165608.sql`; `check-app-sps` 123/0 con cobertura de guardas completa en ambas bases. (05/11/2026) La base local de casa (3306) también quedó al día: `63`, `64`, `65`, `66` y `62` en `BALBU_TECH`, y `64`, `65` y `66` en TEST, con backups `backups/BALBU_TECH_antes_62-66_casa_20261105_004038.sql` y `backups/BALBU_TECH_TEST_antes_62-66_casa_20261105_004038.sql`; `EXIGIR = 1` en 169 rutinas de la viva y 161 en TEST, y la batería de entonces en verde. **Ojo: esa «batería completa» eran 12 tests de 25; ver P2.** Detalle en `Realizado.md`, hoy fuera del repo.
 
 **Automático (ya corre, solo hay que ejecutarlo):**
 
 | Comando | Cubre | Esperado |
 |---|---|---|
 | `bash build.sh` | compila | OK |
-| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 131/0 |
+| `DB_NAME=BALBU_TECH_TEST bash db/check-app-sps.sh` | SPs que usa la app | 139/0 |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-menus-por-rol.sh` | menú principal + submenús de Usuarios, Empleados, Clientes, Proveedores, Categorías, Marcas, Métodos de pago, Asistencia, Productos, Ventas, Garantías, Compras, Caja e Inventario | todos OK |
+| `DB_NAME=BALBU_TECH_TEST DB_ADMIN_USER=root DB_ADMIN_PASSWORD=<clave-root> bash db/test-nomina.sh` | nómina: columnas de auditoría, el recibo que no marca nada, el arrastre de bonos, el pago con fecha y actor, el despedido que igual cobra y los frenos | 26/26 |
+| `BALBU_ALLOW_DEV_LOGIN=1 BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-nomina-pantalla.sh` | pantalla de nómina de punta a punta: el permiso abre el módulo, el recibo con los 2 bonos, el total y el pago marcado en la base con el usuario de la sesión; responder `n` no marca nada | 11/11 |
 | `DB_NAME=BALBU_TECH_TEST bash db/test-garantias.sh` | módulo 63: registro automático, autor, fechas y cierre | 11/0 + 3 errores esperados |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-ventas-ver-iva.sh` | «Ver venta con IVA» paginado: contrato de los SP, fallback de página y la pantalla sin volcar facturas | todos OK |
 | `BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=... BALBU_PASS=... DB_NAME=BALBU_TECH_TEST bash db/test-cobrar-plazo.sh` | plazo de cobro de 48 h: vigencia de los SP, borradores vacíos y el aviso en rojo de la pantalla | todos OK |
@@ -77,6 +79,8 @@ Todo se prueba **primero en `BALBU_TECH_TEST`**, con la matriz de permisos aplic
 
 - [ ] RRHH: crear empleado, editarlo, darlo de baja y reactivarlo.
 - [ ] RRHH: gestionar contrato, permiso y vacaciones desde el submenú.
+- [ ] RRHH: cobrar la nómina de un empleado con bonos pendientes — el recibo tiene que mostrar el arrastre (bonos de meses anteriores) y el pago tiene que dejar fecha y usuario.
+- [ ] SUBGERENTE: no ve «Gestionar bonos» ni «Nómina (recibo y pago)» (los dos permisos quedaron fuera de su rol).
 - [ ] SUBGERENTE: entra a Empleados pero solo ve consulta; **no** puede crear, editar ni dar de baja.
 - [ ] Un usuario sin ningún permiso `EMPLEADOS_*` no ve el módulo (salvo que tenga `REGISTRAR_ASISTENCIA` o `CONSULTAR_ASISTENCIA`, que abren **Asistencia**, no Empleados).
 
@@ -191,6 +195,15 @@ cablear es el módulo `34` (ítem 8).
   `elegir`, porque no se elige una fila: se sale al menú. El arreglo cubre a las 6
   pantallas que comparten el paginador. Test de regresión en
   `db/test-bonos-pantalla.sh` (fuerza 2 páginas, tecla inválida y `N`).
+- [x] **Nómina — recibo y pago de los bonos dentro del sueldo — ✅ implementado y probado en TEST el 18/11/2026** (falta aplicarlo a la viva). Cierra un agujero de plata: «pagar un bono» solo hacía `UPDATE ESTADO='PAGADO'`, sin fecha ni actor, así que no había forma de responder *cuándo y quién* le pagó a un empleado. Decisión del dueño: **el bono se paga dentro del sueldo del mes**, no aparte (opción A), y el recibo **arrastra** los `PENDIENTE` de cualquier mes — la nómina de octubre nunca se corrió y esos 7 bonos por $7.175 no los levantaría ningún mes.
+  - **Módulo 14:** `FECHA_PAGO DATE NULL` + `PAGADO_POR VARCHAR(50) NULL` (nombre de usuario, como `AUDITORIA_SISTEMA.USUARIO_SISTEMA`: si se borra la cuenta, el bono igual dice quién pagó), en el `CREATE TABLE` y con `ALTER` idempotente por `INFORMATION_SCHEMA`; `SP_PAGAR_BONO` los escribe con `FN_USUARIO_SESION()` (sin sesión quedan `NULL`, no se inventa); `SP_LISTAR_BONOS_PENDIENTES_EMPLEADO` nuevo; `TR_BLOQUEAR_CAMBIO_BONO` ahora también congela fecha y pagador (con `<=>`, porque un `<>` contra `NULL` no frenaba nada).
+  - **Módulo 8:** `SP_GENERAR_RECIBO_EMPLEADO` suma `CANTIDAD_BONOS_PENDIENTES`, `TOTAL_BONOS_PENDIENTES` y `TOTAL_A_PAGAR`, **no marca nada** (un recibo no es un pago: marcar al imprimir dejaría bonos pagados sin que salga plata) y ya no exige `ACTIVO` (un despedido con bonos pendientes igual cobra; sin eso la pantalla no tenía salida); `SP_PAGAR_NOMINA_EMPLEADO` nuevo, que es el acto de pago, por empleado (no masivo) y con confirmación `s/n`.
+  - **`SUELDO_BRUTO` y SFS/AFP no cambian de base:** el bono se suma **después** del neto. Si cotiza o es gravable lo define el contador; el recibo no afirma nada previsional y el sistema **no** paga sueldos (no hay tabla de nómina).
+  - **Módulo 36:** permiso nuevo `GESTIONAR_NOMINA` (ADMIN, GERENTE y RRHH; SUBGERENTE no) en vez de reutilizar `GESTIONAR_BONOS_EMPLEADO`; las 3 rutinas mapeadas a ese permiso con `EXIGIR = 1`; `GESTIONAR_NOMINA` agregado a la lista del ítem «Empleados» de `roles.cpp` (sin eso la pantalla existía pero nadie llegaba).
+  - **Pantalla:** `nomina.cpp`/`nomina.h`, «Empleados → Nómina (recibo y pago)»; lista paginada, recibo con el detalle de bonos y el total.
+  - **Tests:** `db/test-nomina.sh` (26 comprobaciones; **RED verificado con las definiciones viejas: 9 fallos**) y `db/test-nomina-pantalla.sh` (11, incluida «responder `n` no marca nada»). **Batería completa: 30/30 verdes, 0 rojos.** `check-app-sps` en TEST: Faltantes 0 (139), guardas completas, 56 mapeos.
+  - **Bug encontrado al cablear la pantalla:** leer el `ResultSet` de un `CALL` sin `res.reset()` + `drenarResultados()` deja la conexión envenenada y la consulta siguiente muere con `Commands out of sync`; el patrón quedó documentado en el `.md` del 8.
+  - **Pendiente de aplicar a la viva** (requiere autorización y backup previo), y **el bono ID 4 ($2.000) que se pagó a mano en la viva** queda con `FECHA_PAGO` y `PAGADO_POR` en `NULL`: no se rellenan con datos inventados.
 - [x] **Auditoría de permisos — ✅ aplicada en la viva el 14/11/2026.** La bitácora
   está completa y probada en TEST (`db/test-auditoria-permisos.sh` 19/0) y vive
   **dentro del módulo `13`**: guarda el actor, audita alta/cambio/baja y agrega la
@@ -217,7 +230,7 @@ cablear es el módulo `34` (ítem 8).
 
 ### 8. Decisiones de producto (una vez cada una)
 
-- [ ] **¿RRHH va o no?** (12, 13, 16 y el historial de 15; el 14 ya quedó cableado el 18/11/2026). Con lo ya hecho, va.
+- [ ] **¿RRHH va o no?** (12, 13, 16 y el historial de 15; el 14 y la nómina ya quedaron cableados el 18/11/2026). Con lo ya hecho, va.
 - [ ] **¿Asignaciones de reclamos?** (tabla `ASIGNACIONES_RECLAMOS` y sus 2 SP, ex módulo `34`, hoy dentro del `25`). Cablear el flujo o borrarlos con su tabla. *Medido el 12/11: ninguno de sus 2 SP lo llama nadie; revalidado el 14/11 tras la fusión.*
 - [ ] **¿Detalle de reparaciones?** (tabla `DETALLE_REPARACIONES` y su SP, ex módulo `35`, hoy dentro del `25`). ¿Repuesto con stock o texto libre? *Medido el 12/11: su único SP no lo llama nadie; revalidado el 14/11 tras la fusión.*
 - [ ] **¿19 anular pago y quitar/modificar línea?** ¿Pantalla o SQL? *Medido el 12/11: 4 SP sin uso; el «22» es hoy la sección del detalle dentro del `19`.*
@@ -266,10 +279,10 @@ pendiente en esta sección.**
 ### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 18/11/2026)
 
 Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
-contra los SP que la app llama y los que esos llaman: **189 definiciones, 189
+contra los SP que la app llama y los que esos llaman: **191 definiciones, 191
 rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
-- **34 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **33 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
 - **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
   `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
   interna: no se tocan.
@@ -288,11 +301,18 @@ rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 > estaban sin uso queda **uno solo, `SP_ACTUALIZAR_BONO`, sin cablear a
 > propósito**: corregir el monto de un bono sin rastro es peor que anularlo y
 > volver a registrarlo, que deja historia. No es deuda: es una decisión.
+>
+> (18/11/2026) **191/33 al cablear la nómina (módulos 8 y 14).** Entraron
+> `SP_PAGAR_NOMINA_EMPLEADO` y `SP_LISTAR_BONOS_PENDIENTES_EMPLEADO` (los dos con
+> llamador desde la pantalla de nómina) y `SP_GENERAR_RECIBO_EMPLEADO` pasó de
+> huérfano a tener pantalla, así que salió del grupo **a**. El `191` coincide con
+> lo que `db/injectar-guardas.py` encuentra en la base, y eso es la contraprueba
+> de que el conteo estático no se quedó corto.
 
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
   clasificado abajo. La decisión es **por grupo**, no por SP suelto.
 
-#### 12.1 Las 34 sin llamador
+#### 12.1 Las 33 sin llamador
 
 **a) API sin pantalla — Qt probablemente las quiera, no borrar:**
 
@@ -303,7 +323,7 @@ rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 | 19 Pagos de compra | `SP_ANULAR_PAGO_COMPRA`, `SP_REGISTRAR_NOTA_CREDITO_COMPRA` |
 | 22 Detalle de compra | `SP_MODIFICAR_LINEA_COMPRA`, `SP_QUITAR_DETALLE_COMPRA` |
 | 17 Inventario (ex 20) | `SP_KARDEX_PRODUCTO`, `SP_KARDEX_TODOS` |
-| 8 Empleados | `SP_ANIVERSARIOS_MES`, `SP_AUMENTO_POR_CARGO`, `SP_BUSQUEDA_RAPIDA_EMPLEADOS`, `SP_CONSULTAR_EMPLEADOS`, `SP_GENERAR_RECIBO_EMPLEADO`, `SP_REPORTE_NOMINA_TOTAL` |
+| 8 Empleados | `SP_ANIVERSARIOS_MES`, `SP_AUMENTO_POR_CARGO`, `SP_BUSQUEDA_RAPIDA_EMPLEADOS`, `SP_CONSULTAR_EMPLEADOS`, `SP_REPORTE_NOMINA_TOTAL` |
 | 12 Vacaciones | `SP_CONSULTAR_EMPLEADOS_DE_VACACIONES`, `SP_REPORTE_DIAS_CONSUMIDOS`, `SP_VALIDAR_CUPO_VACACIONES` |
 | 9 Productos | `SP_REPORTE_STOCK_CRITICO` |
 | 1 Categorías | `1_SP_CATEGORIAS_POR_FECHA` |
@@ -317,7 +337,7 @@ rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
 | Módulo | SP | Nota |
 |---|---|---|
-| 14 Bonos empleados | `SP_ACTUALIZAR_BONO` | **Cableado el 18/11/2026**: la pantalla «Empleados → Gestionar bonos» usa registrar, pagar, anular y el listado paginado. Queda sólo `SP_ACTUALIZAR_BONO` sin uso, **a propósito** (corregir el monto sin rastro es peor que anular y volver a registrar). |
+| 14 Bonos empleados | `SP_ACTUALIZAR_BONO` | **Cableado el 18/11/2026**: la pantalla «Empleados → Gestionar bonos» usa registrar, pagar, anular y el listado paginado; la nómina (8) usa el detalle de pendientes. Queda sólo `SP_ACTUALIZAR_BONO` sin uso, **a propósito** (corregir el monto sin rastro es peor que anular y volver a registrar). |
 | 34 Asignar reclamos | `SP_ASIGNAR_TECNICO_RECLAMO`, `SP_FINALIZAR_RECLAMO` | Sin cablear (ítem 8). |
 | 35 Detalle reparaciones | `SP_REGISTRAR_AVANCE_REPARACION` | Sin cablear (ítem 8). |
 
@@ -387,10 +407,11 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería son 28 tests, no 12, y hay que correrlos todos.** Hasta el
+- [ ] **La batería son 30 tests, no 12, y hay que correrlos todos.** Hasta el
   15/11 se corrían solo los de la tabla de arriba y se reportaba como «batería
-  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 28
-  en verde**. Ojo con dos cosas al correrlos: casi todos usan
+  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 30
+  en verde** (18/11/2026: entraron `test-nomina.sh` y `test-nomina-pantalla.sh`).
+  Ojo con dos cosas al correrlos: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
   que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. Además,
   `test-contrato-borrador.sh` y `test-contratos-subir.sh` hacen SQL directo y
@@ -409,10 +430,10 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
 - [ ] **Sidecar `.borrador`** guarda PII en texto plano junto al HTML (registrado y aceptado por el dueño).
 - [ ] **`contratos/firmados/`**: sin listado, renombre ni limpieza; la administra RRHH a mano.
 - [ ] **P-6**: decidir cablear o retirar lo construido y no cableado. **Al 18/11/2026
-  quedan solo liquidaciones (16) y los 4 SP del módulo 19** (`SP_ASIGNAR_FACTURA_COMPRA`,
+  quedan solo liquidaciones (16) y 5 SP del módulo 19** (`SP_ASIGNAR_FACTURA_COMPRA`,
   `SP_ANULAR_PAGO_COMPRA`, `SP_REGISTRAR_NOTA_CREDITO_COMPRA`,
-  `SP_MODIFICAR_LINEA_COMPRA`/`SP_QUITAR_DETALLE_COMPRA`): garantías, reclamos,
-  reparaciones y bonos ya están cableados y probados.
+  `SP_MODIFICAR_LINEA_COMPRA`, `SP_QUITAR_DETALLE_COMPRA`): garantías, reclamos,
+  reparaciones, bonos y nómina ya están cableados y probados.
 - [ ] **Orden de los tres triggers `AFTER UPDATE` de `EMPLEADOS` invertido (13/11/2026).**
   En TEST y en la viva quedaron `TR_AUDITORIA_PERFIL_EMPLEADO`=1 y
   `TR_DESACTIVAR_USUARIO_POST_LIQUIDACION`=3, al revés que en una importación limpia
