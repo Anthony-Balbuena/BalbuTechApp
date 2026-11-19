@@ -25,6 +25,10 @@ SELECT R.ROUTINE_NAME,
            WHEN R.ROUTINE_NAME LIKE '%ROL%'                                         THEN 'GESTIONAR_ROLES'
 
            -- Empleados (incluye permisos y vacaciones del empleado)
+           -- (18/11/2026) Bonos del empleado: modulo 14, pantalla nueva. Va
+           -- antes que las reglas de Empleados para que ningun LIKE generico
+           -- se lo quede.
+           WHEN R.ROUTINE_NAME LIKE '%BONO%'                                        THEN 'GESTIONAR_BONOS_EMPLEADO'
            WHEN R.ROUTINE_NAME LIKE '%VACACION%' AND R.ROUTINE_NAME LIKE '%SOLICITAR%' THEN 'SOLICITAR_PERMISO'
            WHEN R.ROUTINE_NAME LIKE '%VACACION%'                                    THEN 'GESTIONAR_VACACIONES_EMPLEADO'
            WHEN R.ROUTINE_NAME LIKE '%PERMISO%' AND R.ROUTINE_NAME LIKE '%SOLICITAR%' THEN 'SOLICITAR_PERMISO'
@@ -130,10 +134,19 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'JUSTIFICAR_ASISTENCIA'
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PERMISOS_EMPLEADO'
  WHERE RUTINA IN ('SP_GESTIONAR_PERMISO', 'SP_LISTAR_PERMISOS_PENDIENTES');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'EMPLEADOS_EDITAR'
+ WHERE RUTINA = 'SP_AUMENTO_POR_CARGO';
+-- (18/11/2026) Bonos del empleado (modulo 14): dejan EMPLEADOS_EDITAR y pasan a
+-- su propio permiso. Es plata de un empleado, y la pantalla nueva se abre con
+-- GESTIONAR_BONOS_EMPLEADO: si la rutina exigiera otro permiso, el rol que llega
+-- a la pantalla (RRHH, por ejemplo) recibiria SIN_PERMISO al llamarla.
+-- SP_LISTAR_BONOS ya no existe (lo reemplazo el par paginado): su fila se borra
+-- unas lineas abajo, como las demas rutinas retiradas.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_BONOS_EMPLEADO'
  WHERE RUTINA IN ('SP_REGISTRAR_BONO', 'SP_ACTUALIZAR_BONO', 'SP_ANULAR_BONO',
-                  'SP_PAGAR_BONO', 'SP_AUMENTO_POR_CARGO');
+                  'SP_PAGAR_BONO', 'SP_LISTAR_BONOS_PAGINADO', 'SP_CONTAR_BONOS');
+DELETE FROM PERMISO_POR_RUTINA WHERE RUTINA = 'SP_LISTAR_BONOS';
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'EMPLEADOS_VER'
- WHERE RUTINA IN ('SP_LISTAR_BONOS', 'SP_ANIVERSARIOS_MES');
+ WHERE RUTINA = 'SP_ANIVERSARIOS_MES';
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_ROLES'
  WHERE RUTINA IN ('SP_LIMPIAR_AUDITORIA', 'SP_LIMPIAR_LOGS_ANTIGUOS',
                   'SP_REPORTAR_ACCESOS');
@@ -333,6 +346,15 @@ UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
 UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
  WHERE RUTINA IN ('SP_CONSULTAR_AUDITORIA_PERMISOS_PAGINADO',
                   'SP_CONTAR_AUDITORIA_PERMISOS');
+
+-- (18/11/2026) Par paginado de bonos: el heuristico les propone el permiso pero
+-- las deja en modo auditoria. Sus cuatro hermanas (registrar, actualizar, pagar,
+-- anular) ya exigen, y la pantalla que las llama —«Gestionar bonos»— se abre con
+-- GESTIONAR_BONOS_EMPLEADO, el mismo permiso. Prenderlas no cierra ninguna
+-- puerta legitima y evita que el listado quede como la unica lectura sin control
+-- de un modulo que ahora tiene pantalla.
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA IN ('SP_LISTAR_BONOS_PAGINADO', 'SP_CONTAR_BONOS');
 
 -- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
 SELECT RUTINA, PERMISO, EXIGIR

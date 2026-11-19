@@ -140,6 +140,11 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 ('JUSTIFICAR_ASISTENCIA', 'Justificar asistencia'),
 ('GESTIONAR_PERMISOS_EMPLEADO', 'Aprobar o rechazar permisos de empleados'),
 ('GESTIONAR_VACACIONES_EMPLEADO', 'Aprobar o rechazar vacaciones'),
+-- (18/11/2026) Bonos: el modulo 14 existia desde siempre pero no tenia pantalla,
+-- asi que sus 5 SP quedaron sin uso mientras el trigger del 1% de las ventas
+-- llenaba la tabla (la viva llego a 11 bonos PENDIENTE sin forma de verlos).
+-- Mismo criterio que vacaciones: es plata de un empleado, no lo toca cualquiera.
+('GESTIONAR_BONOS_EMPLEADO', 'Registrar, pagar y anular bonos de empleados'),
 ('CLIENTES_VER', 'Consultar y buscar clientes'),
 ('CLIENTES_CREAR', 'Registrar clientes'),
 ('CLIENTES_EDITAR', 'Actualizar datos de clientes'),
@@ -191,7 +196,7 @@ ON DUPLICATE KEY UPDATE DESCRIPCION = VALUES(DESCRIPCION);
 -- el modulo y despues se puede ajustar desde la app (submenu Roles).
 -- Todas las altas son idempotentes (ON DUPLICATE KEY UPDATE).
 
--- ADMIN: acceso total (los 54 permisos del sistema).
+-- ADMIN: acceso total (todos los permisos del sistema).
 INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
 SELECT 'ADMIN', ID_PERMISO FROM PERMISOS
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -231,6 +236,9 @@ WHERE NOMBRE_PERMISO NOT IN (
     'EMPLEADOS_BAJA',
     'GESTIONAR_PERMISOS_EMPLEADO',
     'GESTIONAR_VACACIONES_EMPLEADO',
+    -- (18/11/2026) Pagar bonos es plata: misma linea que vacaciones, el
+    -- SUBGERENTE no la tiene y el GERENTE si.
+    'GESTIONAR_BONOS_EMPLEADO',
     'GESTIONAR_CONTRATOS'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -249,6 +257,7 @@ WHERE NOMBRE_PERMISO IN (
     'JUSTIFICAR_ASISTENCIA',
     'GESTIONAR_PERMISOS_EMPLEADO',
     'GESTIONAR_VACACIONES_EMPLEADO',
+    'GESTIONAR_BONOS_EMPLEADO',
     'GESTIONAR_CONTRATOS',
     'CONSULTAR_REPORTES',
     'CONSULTAR_ASISTENCIA',
