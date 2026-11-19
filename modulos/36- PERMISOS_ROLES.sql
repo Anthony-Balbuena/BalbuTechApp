@@ -145,6 +145,10 @@ INSERT INTO PERMISOS (NOMBRE_PERMISO, DESCRIPCION) VALUES
 -- llenaba la tabla (la viva llego a 11 bonos PENDIENTE sin forma de verlos).
 -- Mismo criterio que vacaciones: es plata de un empleado, no lo toca cualquiera.
 ('GESTIONAR_BONOS_EMPLEADO', 'Registrar, pagar y anular bonos de empleados'),
+-- (18/11/2026) Nomina: el recibo del mes (sueldo + bonos pendientes) y el acto
+-- de pagarla. Va aparte de bonos porque no es lo mismo: bonos es cargar y
+-- anular plata suelta, nomina es cerrar el mes de una persona.
+('GESTIONAR_NOMINA', 'Ver el recibo de nomina y pagarlo'),
 ('CLIENTES_VER', 'Consultar y buscar clientes'),
 ('CLIENTES_CREAR', 'Registrar clientes'),
 ('CLIENTES_EDITAR', 'Actualizar datos de clientes'),
@@ -239,6 +243,8 @@ WHERE NOMBRE_PERMISO NOT IN (
     -- (18/11/2026) Pagar bonos es plata: misma linea que vacaciones, el
     -- SUBGERENTE no la tiene y el GERENTE si.
     'GESTIONAR_BONOS_EMPLEADO',
+    -- (18/11/2026) Lo mismo con la nomina: quien paga el mes es gerencia.
+    'GESTIONAR_NOMINA',
     'GESTIONAR_CONTRATOS'
 )
 ON DUPLICATE KEY UPDATE ROL_NOMBRE = ROL_NOMBRE;
@@ -258,6 +264,7 @@ WHERE NOMBRE_PERMISO IN (
     'GESTIONAR_PERMISOS_EMPLEADO',
     'GESTIONAR_VACACIONES_EMPLEADO',
     'GESTIONAR_BONOS_EMPLEADO',
+    'GESTIONAR_NOMINA',
     'GESTIONAR_CONTRATOS',
     'CONSULTAR_REPORTES',
     'CONSULTAR_ASISTENCIA',

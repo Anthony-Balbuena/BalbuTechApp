@@ -537,15 +537,33 @@ DELIMITER ;
 DELIMITER //
 /*
 SP_GENERAR_RECIBO_EMPLEADO
-Genera el volante de pago de un empleado activo: sueldo bruto, los
-descuentos de SFS y AFP y el sueldo neto con la fecha de emision.
-Si el ID no existe o el empleado no esta activo manda un error.
+Genera el volante de pago de un empleado: sueldo bruto, los descuentos de SFS
+y AFP y el sueldo neto con la fecha de emision.
+Si el ID no existe manda un error. Acepta a un empleado INACTIVO (despedido)
+porque sus bonos pendientes se tienen que poder cobrar; su estado va en el
+recibo para que se vea.
+
+(18/11/2026) Suma los bonos del modulo 14. El bono es salario variable, y la
+decision del dueno es que se cobre junto con el sueldo del mes, no aparte.
+Toma TODOS los PENDIENTE del empleado, de cualquier mes (arrastre): la nomina
+de octubre nunca se corrio y esos bonos no los levantaria ningun mes.
+
+Dos cosas que este SP NO hace, a proposito:
+  - No marca nada. El recibo es consulta; un recibo no es un pago, y marcar al
+    imprimir dejaria bonos PAGADO sin que salga plata. El acto de pagar es
+    SP_PAGAR_NOMINA_EMPLEADO, unas lineas mas abajo.
+  - No cambia la base de los descuentos. SUELDO_BRUTO sigue siendo SALARIO y
+    SFS/AFP se siguen calculando sobre SALARIO: si el bono integra el bruto,
+    cotiza o es gravable, lo define el contador. El bono se suma DESPUES del
+    neto, en TOTAL_A_PAGAR, y el recibo no afirma nada previsional.
 */
 drop PROCEDURE IF EXISTS  SP_GENERAR_RECIBO_EMPLEADO ;
 CREATE PROCEDURE SP_GENERAR_RECIBO_EMPLEADO  (
     IN P_ID_EMPLEADO INT
 )
 proc_label: BEGIN
+    DECLARE v_bonos_cant INT DEFAULT 0;
+    DECLARE v_bonos_total DECIMAL(12, 2) DEFAULT 0;
 
     -- 1. VALIDAR QUE EL ID NO SEA NULO
     IF P_ID_EMPLEADO IS NULL THEN
@@ -553,31 +571,114 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 2. VALIDAR QUE EL EMPLEADO EXISTA Y ESTÉ ACTIVO
-    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO AND ESTADO = 'ACTIVO') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE O NO SE ENCUENTRA ACTIVO.';
+    -- 2. VALIDAR QUE EL EMPLEADO EXISTA
+    -- (18/11/2026) Antes exigia ESTADO = 'ACTIVO'. Se saco: un despedido con
+    -- bonos PENDIENTE igual tiene que cobrar lo que trabajo, y si el recibo lo
+    -- rechazara, la pantalla de nomina no tendria como mostrarlo ni pagarlo
+    -- (SP_PAGAR_NOMINA_EMPLEADO siempre lo acepto). El estado va como columna
+    -- para que quien mira el recibo sepa si la persona sigue en la empresa.
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
         LEAVE proc_label;
     END IF;
 
-    -- 3. GENERAR EL RECIBO DETALLADO
+    -- 3. BONOS PENDIENTES (arrastre de todos los meses)
+    SELECT COUNT(*), IFNULL(SUM(MONTO), 0)
+      INTO v_bonos_cant, v_bonos_total
+      FROM BONOS_EMPLEADOS
+     WHERE ID_EMPLEADO = P_ID_EMPLEADO
+       AND ESTADO = 'PENDIENTE';
+
+    -- 4. GENERAR EL RECIBO DETALLADO
     SELECT 
         'BALBU_TECH - SOLUCIONES TECNOLÓGICAS' AS EMPRESA,
         ID_EMPLEADO,
         NOMBRE,
         CEDULA,
         CARGO,
+        ESTADO,
         SALARIO AS SUELDO_BRUTO,
         -- Cálculo de Seguridad Social (SFS 3.04%, AFP 2.87% - Valores típicos en RD)
         ROUND(SALARIO * 0.0304, 2) AS DESCUENTO_SFS,
         ROUND(SALARIO * 0.0287, 2) AS DESCUENTO_AFP,
         -- Cálculo del Neto
         ROUND(SALARIO - (SALARIO * 0.0591), 2) AS SUELDO_NETO,
+        v_bonos_cant AS CANTIDAD_BONOS_PENDIENTES,
+        v_bonos_total AS TOTAL_BONOS_PENDIENTES,
+        ROUND(SALARIO - (SALARIO * 0.0591), 2) + v_bonos_total AS TOTAL_A_PAGAR,
         DATE_FORMAT(CURRENT_DATE, '%d/%m/%Y') AS FECHA_EMISION
     FROM EMPLEADOS
     WHERE ID_EMPLEADO = P_ID_EMPLEADO;
 
 END //
 
+DELIMITER ;
+
+
+---9b. PAGO DE LA NOMINA
+/*
+SP_PAGAR_NOMINA_EMPLEADO (18/11/2026)
+El acto de pagar: marca PAGADO todos los bonos PENDIENTE del empleado, con
+fecha y usuario, y devuelve cuantos y cuanto.
+
+Por que existe separado del recibo: el recibo se puede mirar cuantas veces se
+quiera sin consecuencias; esto escribe. Si marcaramos al emitir, imprimir dos
+veces pagaria dos veces.
+
+Sin bonos pendientes contesta AVISO, no error: no hay nada que hacer y eso no
+es una falla. No exige que el empleado este ACTIVO: uno despedido con bonos
+pendientes igual cobra lo que trabajo.
+
+Ojo con el alcance: el sistema NO paga sueldos (no hay tabla de nomina). Lo que
+queda registrado son los bonos; el sueldo base se paga fuera del sistema y el
+mensaje lo dice para que nadie crea que la nomina quedo asentada.
+*/
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_PAGAR_NOMINA_EMPLEADO;
+CREATE PROCEDURE SP_PAGAR_NOMINA_EMPLEADO(
+    IN P_ID_EMPLEADO INT
+)
+proc_label: BEGIN
+    DECLARE v_cant INT DEFAULT 0;
+    DECLARE v_total DECIMAL(12, 2) DEFAULT 0;
+    DECLARE v_usuario VARCHAR(50) DEFAULT NULL;
+
+    IF P_ID_EMPLEADO IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: DEBE PROPORCIONAR UN ID DE EMPLEADO.';
+        LEAVE proc_label;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    SELECT COUNT(*), IFNULL(SUM(MONTO), 0)
+      INTO v_cant, v_total
+      FROM BONOS_EMPLEADOS
+     WHERE ID_EMPLEADO = P_ID_EMPLEADO
+       AND ESTADO = 'PENDIENTE';
+
+    IF v_cant = 0 THEN
+        SELECT CONCAT('AVISO: EL EMPLEADO CON ID ', P_ID_EMPLEADO,
+                      ' NO TIENE BONOS PENDIENTES. NO SE PAGO NADA.') AS MENSAJE;
+        LEAVE proc_label;
+    END IF;
+
+    -- Sin sesion valida queda NULL: no se inventa el nombre del pagador.
+    SET v_usuario = (SELECT USUARIO FROM USUARIOS WHERE ID_USUARIO = FN_USUARIO_SESION());
+
+    UPDATE BONOS_EMPLEADOS
+       SET ESTADO = 'PAGADO',
+           FECHA_PAGO = CURRENT_DATE,
+           PAGADO_POR = v_usuario
+     WHERE ID_EMPLEADO = P_ID_EMPLEADO
+       AND ESTADO = 'PENDIENTE';
+
+    SELECT CONCAT('EXITO: SE PAGARON ', v_cant, ' BONO(S) POR $',
+                  FORMAT(v_total, 2),
+                  '. EL SUELDO BASE SE PAGA FUERA DEL SISTEMA.') AS MENSAJE;
+END//
 DELIMITER ;
 
 

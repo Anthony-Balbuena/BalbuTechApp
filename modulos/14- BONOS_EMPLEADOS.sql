@@ -19,6 +19,15 @@ CREATE TABLE BONOS_EMPLEADOS (
     DESCRIPCION VARCHAR(200),
     FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ESTADO ENUM('PENDIENTE', 'PAGADO', 'ANULADO') NOT NULL DEFAULT 'PENDIENTE',
+    -- (18/11/2026) Rastro del pago. Antes "pagar" era solo pasar ESTADO a
+    -- PAGADO: FECHA_REGISTRO es cuando el trigger de ventas creo el bono, no
+    -- cuando salio la plata, y no habia forma de saber quien lo pago. Son NULL
+    -- mientras el bono este PENDIENTE o ANULADO.
+    FECHA_PAGO DATE NULL,
+    -- El nombre de usuario, no un id: AUDITORIA_SISTEMA.USUARIO_SISTEMA ya
+    -- guarda el nombre por la misma razon. Si la cuenta se borra, el bono
+    -- todavia dice quien lo pago.
+    PAGADO_POR VARCHAR(50) NULL,
     PRIMARY KEY (ID_BONO),
     CONSTRAINT FK_BONO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
 ) ENGINE = InnoDB;
@@ -26,6 +35,35 @@ CREATE TABLE BONOS_EMPLEADOS (
 
 ALTER TABLE BONOS_EMPLEADOS
 MODIFY COLUMN ESTADO ENUM('PENDIENTE', 'PAGADO', 'ANULADO') NOT NULL DEFAULT 'PENDIENTE';
+
+-- ----------------------------------------------------------------
+-- Bases que ya tienen la tabla sin las columnas de pago
+-- ----------------------------------------------------------------
+-- (18/11/2026) Mismo patron que el modulo 13: cada paso se pregunta antes a
+-- INFORMATION_SCHEMA, asi que correr el modulo dos veces no rompe nada y una
+-- instalacion nueva los saltea (las columnas ya vienen en el CREATE TABLE).
+-- La viva llego a esta version ya con 11 bonos, uno de ellos PAGADO a mano: su
+-- FECHA_PAGO y su PAGADO_POR quedan NULL y NO se rellenan con datos inventados.
+
+SET @existe := (SELECT COUNT(*)
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'BONOS_EMPLEADOS'
+                   AND COLUMN_NAME = 'FECHA_PAGO');
+SET @sql := IF(@existe = 0,
+    'ALTER TABLE BONOS_EMPLEADOS ADD COLUMN FECHA_PAGO DATE NULL AFTER ESTADO',
+    'DO 0');
+PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
+
+SET @existe := (SELECT COUNT(*)
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'BONOS_EMPLEADOS'
+                   AND COLUMN_NAME = 'PAGADO_POR');
+SET @sql := IF(@existe = 0,
+    'ALTER TABLE BONOS_EMPLEADOS ADD COLUMN PAGADO_POR VARCHAR(50) NULL AFTER FECHA_PAGO',
+    'DO 0');
+PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
 
 
 
@@ -156,7 +194,8 @@ DELIMITER ;
 
 /*
 SP_PAGAR_BONO
-Marca un bono como PAGADO.
+Marca un bono como PAGADO y deja registrado cuando (FECHA_PAGO) y quien
+(PAGADO_POR, el usuario de la sesion).
 Si el bono no existe manda error, si ya estaba pagado avisa y si esta
 anulado no deja pagarlo; solo un bono pendiente se puede pagar.
 */
@@ -188,9 +227,17 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 3. Actualizar el estado a PAGADO
+    -- 3. Actualizar el estado a PAGADO y dejar el rastro del pago
+    -- (18/11/2026) Antes solo cambiaba ESTADO: no quedaba ni cuando ni quien lo
+    -- pago, asi que un bono pagado era indistinguible de uno que alguien
+    -- tildo. PAGADO_POR toma el nombre de la sesion; si la conexion no trae una
+    -- sesion valida el subselect da NULL y la columna queda vacia, que es la
+    -- verdad (no se inventa el nombre de nadie).
     UPDATE BONOS_EMPLEADOS 
-    SET ESTADO = 'PAGADO' 
+    SET ESTADO = 'PAGADO',
+        FECHA_PAGO = CURRENT_DATE,
+        PAGADO_POR = (SELECT USUARIO FROM USUARIOS
+                       WHERE ID_USUARIO = FN_USUARIO_SESION())
     WHERE ID_BONO = P_ID_BONO;
 
     -- 4. Confirmación
@@ -320,6 +367,43 @@ END//
 DELIMITER ;
 
 
+/*
+SP_LISTAR_BONOS_PENDIENTES_EMPLEADO (18/11/2026)
+Los bonos PENDIENTE de un empleado, para el recibo de nomina.
+No pagina a proposito: es el detalle de UNA persona, no un listado del area.
+Va aparte de SP_LISTAR_BONOS_PAGINADO porque ese filtra por estado para toda
+la plantilla, y filtrar por empleado ahi obligaba a cambiar su firma (y la de
+SP_CONTAR_BONOS) para algo que solo usa el recibo.
+*/
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_LISTAR_BONOS_PENDIENTES_EMPLEADO;
+CREATE PROCEDURE SP_LISTAR_BONOS_PENDIENTES_EMPLEADO(
+    IN P_ID_EMPLEADO INT
+)
+proc_label: BEGIN
+    IF P_ID_EMPLEADO IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: DEBE PROPORCIONAR UN ID DE EMPLEADO.';
+        LEAVE proc_label;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM EMPLEADOS WHERE ID_EMPLEADO = P_ID_EMPLEADO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL EMPLEADO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    SELECT b.ID_BONO,
+           b.FECHA,
+           b.TIPO_BONO,
+           b.MONTO,
+           b.DESCRIPCION
+      FROM BONOS_EMPLEADOS b
+     WHERE b.ID_EMPLEADO = P_ID_EMPLEADO
+       AND b.ESTADO = 'PENDIENTE'
+     ORDER BY b.FECHA, b.ID_BONO;
+END//
+DELIMITER ;
+
+
 
 
 
@@ -403,7 +487,13 @@ BEGIN
         IF NEW.ESTADO <> OLD.ESTADO
            OR NEW.MONTO <> OLD.MONTO
            OR NEW.TIPO_BONO <> OLD.TIPO_BONO
-           OR NEW.ID_EMPLEADO <> OLD.ID_EMPLEADO THEN
+           OR NEW.ID_EMPLEADO <> OLD.ID_EMPLEADO
+           -- (18/11/2026) La auditoria del pago tambien es historia: un bono
+           -- ya pagado no cambia de fecha ni de pagador. Va con <=> (igualdad
+           -- segura con NULL) porque las columnas arrancan en NULL y un
+           -- <> contra NULL da NULL, o sea que no frenaba nada.
+           OR NOT (NEW.FECHA_PAGO <=> OLD.FECHA_PAGO)
+           OR NOT (NEW.PAGADO_POR <=> OLD.PAGADO_POR) THEN
             SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'ERROR: EL BONO PAGADO O ANULADO NO CAMBIA.';
         END IF;

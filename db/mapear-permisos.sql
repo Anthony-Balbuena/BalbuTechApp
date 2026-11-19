@@ -145,6 +145,14 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_BONOS_EMPLEADO'
  WHERE RUTINA IN ('SP_REGISTRAR_BONO', 'SP_ACTUALIZAR_BONO', 'SP_ANULAR_BONO',
                   'SP_PAGAR_BONO', 'SP_LISTAR_BONOS_PAGINADO', 'SP_CONTAR_BONOS');
 DELETE FROM PERMISO_POR_RUTINA WHERE RUTINA = 'SP_LISTAR_BONOS';
+-- (18/11/2026) Nomina. Sin esta correccion el heuristico manda el recibo a
+-- EMPLEADOS_VER (por el LIKE '%EMPLEADO%') y el pago a GESTIONAR_BONOS_EMPLEADO
+-- (por el LIKE '%PAGAR%'? no: por '%EMPLEADO%' tambien). La pantalla se abre con
+-- GESTIONAR_NOMINA, asi que un rol que llega ahi recibiria SIN_PERMISO al llamar
+-- al SP: el permiso de la puerta y el de la rutina tienen que ser el mismo.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_NOMINA'
+ WHERE RUTINA IN ('SP_GENERAR_RECIBO_EMPLEADO', 'SP_PAGAR_NOMINA_EMPLEADO',
+                  'SP_LISTAR_BONOS_PENDIENTES_EMPLEADO');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'EMPLEADOS_VER'
  WHERE RUTINA = 'SP_ANIVERSARIOS_MES';
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_ROLES'
@@ -355,6 +363,17 @@ UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
 -- de un modulo que ahora tiene pantalla.
 UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
  WHERE RUTINA IN ('SP_LISTAR_BONOS_PAGINADO', 'SP_CONTAR_BONOS');
+
+-- (18/11/2026) Nomina: las tres rutinas nuevas del recibo y del pago. El
+-- heuristico les propone el permiso pero las deja en modo auditoria, y con el
+-- interruptor global en 0 EXIGIR es lo unico que decide si la guarda corta. La
+-- pantalla «Nomina (recibo y pago)» se abre con GESTIONAR_NOMINA, el mismo
+-- permiso que estas tres, asi que prenderlas no cierra ninguna puerta legitima.
+-- SP_GENERAR_RECIBO_EMPLEADO entra aca aunque ya existia: estaba sin llamador y
+-- su guarda apuntaba a EMPLEADOS_VER, un permiso que no abre esta pantalla.
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA IN ('SP_GENERAR_RECIBO_EMPLEADO', 'SP_PAGAR_NOMINA_EMPLEADO',
+                  'SP_LISTAR_BONOS_PENDIENTES_EMPLEADO');
 
 -- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
 SELECT RUTINA, PERMISO, EXIGIR
