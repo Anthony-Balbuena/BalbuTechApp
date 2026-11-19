@@ -171,7 +171,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 | [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 7SP · 1TR | Entrada y salida por día. | ✅ |
 | [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 8SP · 2TR | Solicitudes y cupo de vacaciones. | ✅ |
 | [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 2T · 6SP · 3TR · 1V | Permisos y ausencias del empleado, y su bitácora de auditoría (absorbe el 30 y el 69). | ✅ |
-| [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 5SP · 2TR · 1V | Bonos y descuentos de nómina. | — |
+| [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 6SP · 2TR · 1V | Bonos y descuentos de nómina; pantalla de gestión con permiso propio. | ✅ |
 | [HISTORIAL_LABORAL_EMPLEADO](<15- HISTORIAL_LABORAL_EMPLEADO.md>) | 1T · 1TR · 2 ALTER | Cambios de cargo y salario. | — |
 | [LIQUIDACIONES](<16- LIQUIDACIONES.md>) | 1T · 1SP · 3TR · 2V | Liquidación al despedir. | — |
 

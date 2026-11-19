@@ -163,7 +163,17 @@ cablear es el módulo `34` (ítem 8).
 
 ### 7. RRHH: módulos que faltan
 
-- [ ] **14 Bonos** — pantalla mínima (listar, pagar, anular). El 1% ya lo genera el trigger de 24. *Medido el 12/11 con `db/cobertura-modulos.sh`: la app no llama ninguno de sus 5 SP.*
+- [x] **14 Bonos — ✅ cableado y probado en TEST el 18/11/2026.** Pantalla «Empleados
+  → Gestionar bonos» (`bonos.cpp`) con listar paginado por estado, pagar, anular y
+  registrar; permiso nuevo `GESTIONAR_BONOS_EMPLEADO` (ADMIN, GERENTE y RRHH;
+  SUBGERENTE no). El 1 % lo sigue generando el trigger de 24. `SP_LISTAR_BONOS` se
+  retiró (lo reemplazó el par paginado) y `SP_ACTUALIZAR_BONO` queda sin cablear a
+  propósito. Tests: `db/test-bonos.sh` (18 comprobaciones + 7 frenos),
+  `db/test-bonos-pantalla.sh` y el caso nuevo de `db/test-menus-por-rol.sh`.
+  **Falta aplicar a la viva** (módulo 14, 36, `db/mapear-permisos.sql` y
+  `db/injectar-guardas.py`, en ese orden): toca la matriz de permisos, así que va
+  con autorización del dueño. Ahí se ven los 11 bonos `PENDIENTE` por $10.330 que
+  hoy nadie puede pagar.
 - [x] **Auditoría de permisos — ✅ aplicada en la viva el 14/11/2026.** La bitácora
   está completa y probada en TEST (`db/test-auditoria-permisos.sh` 19/0) y vive
   **dentro del módulo `13`**: guarda el actor, audita alta/cambio/baja y agrega la
@@ -190,7 +200,7 @@ cablear es el módulo `34` (ítem 8).
 
 ### 8. Decisiones de producto (una vez cada una)
 
-- [ ] **¿RRHH va o no?** (12, 13, 14, 16 y el historial de 15). Con lo ya hecho, va.
+- [ ] **¿RRHH va o no?** (12, 13, 16 y el historial de 15; el 14 ya quedó cableado el 18/11/2026). Con lo ya hecho, va.
 - [ ] **¿Asignaciones de reclamos?** (tabla `ASIGNACIONES_RECLAMOS` y sus 2 SP, ex módulo `34`, hoy dentro del `25`). Cablear el flujo o borrarlos con su tabla. *Medido el 12/11: ninguno de sus 2 SP lo llama nadie; revalidado el 14/11 tras la fusión.*
 - [ ] **¿Detalle de reparaciones?** (tabla `DETALLE_REPARACIONES` y su SP, ex módulo `35`, hoy dentro del `25`). ¿Repuesto con stock o texto libre? *Medido el 12/11: su único SP no lo llama nadie; revalidado el 14/11 tras la fusión.*
 - [ ] **¿19 anular pago y quitar/modificar línea?** ¿Pantalla o SQL? *Medido el 12/11: 4 SP sin uso; el «22» es hoy la sección del detalle dentro del `19`.*
@@ -236,13 +246,13 @@ pendiente en esta sección.**
   un SP**, y solo si algún día aparece un segundo cliente (la Qt app): con el
   C++ la garantía es de este cliente.
 
-### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 15/11/2026)
+### 12. Inventario: qué SP y qué trigger no llama nadie (12/11/2026, actualizado el 18/11/2026)
 
 Medido con `bash db/cobertura-modulos.sh` (estático, no abre la base) y cruzado
-contra los SP que la app llama y los que esos llaman: **188 definiciones, 188
+contra los SP que la app llama y los que esos llaman: **189 definiciones, 189
 rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
-- **38 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
+- **34 no las llama nadie**: ni la app, ni otro SP, ni un `CALL` de importación.
 - **4 las llama otro SP**: `SP_EXIGIR_PERMISO`, `SP_REGISTRAR_ACCESO`,
   `SP_MARCAR_GARANTIAS_VENCIDAS` y `PARA_ACTUALIZARDATOS`. Son infraestructura
   interna: no se tocan.
@@ -253,11 +263,19 @@ rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 > `SP_HISTORIAL_VENTA_PAGINADO`), así que volvió a 188. El test
 > `db/test-historial-garantias-venta.sh` se migró al SP paginado en vez de
 > quedarse verificando una rutina muerta.
+>
+> (18/11/2026) **189/34 al cablear los bonos (módulo 14).** Entraron
+> `SP_LISTAR_BONOS_PAGINADO` y `SP_CONTAR_BONOS`, salió `SP_LISTAR_BONOS`
+> (reemplazado por el paginado), y los 3 de escritura más el par nuevo pasaron a
+> tener llamador: la pantalla «Empleados → Gestionar bonos». De los 5 que
+> estaban sin uso queda **uno solo, `SP_ACTUALIZAR_BONO`, sin cablear a
+> propósito**: corregir el monto de un bono sin rastro es peor que anularlo y
+> volver a registrarlo, que deja historia. No es deuda: es una decisión.
 
 - [ ] **¿Qué se borra del inventario de SP y triggers?** Está todo listado y
   clasificado abajo. La decisión es **por grupo**, no por SP suelto.
 
-#### 12.1 Las 38 sin llamador
+#### 12.1 Las 34 sin llamador
 
 **a) API sin pantalla — Qt probablemente las quiera, no borrar:**
 
@@ -282,7 +300,7 @@ rutinas distintas y ningún nombre repetido**. De las que la app no llama:
 
 | Módulo | SP | Nota |
 |---|---|---|
-| 14 Bonos empleados | `SP_REGISTRAR_BONO`, `SP_ACTUALIZAR_BONO`, `SP_ANULAR_BONO`, `SP_PAGAR_BONO`, `SP_LISTAR_BONOS` | Los 5. El 1 % de ventas lo genera un trigger; la pantalla no existe. |
+| 14 Bonos empleados | `SP_ACTUALIZAR_BONO` | **Cableado el 18/11/2026**: la pantalla «Empleados → Gestionar bonos» usa registrar, pagar, anular y el listado paginado. Queda sólo `SP_ACTUALIZAR_BONO` sin uso, **a propósito** (corregir el monto sin rastro es peor que anular y volver a registrar). |
 | 34 Asignar reclamos | `SP_ASIGNAR_TECNICO_RECLAMO`, `SP_FINALIZAR_RECLAMO` | Sin cablear (ítem 8). |
 | 35 Detalle reparaciones | `SP_REGISTRAR_AVANCE_REPARACION` | Sin cablear (ítem 8). |
 
@@ -352,13 +370,18 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería son 26 tests, no 12, y hay que correrlos todos.** Hasta el
+- [ ] **La batería son 30 tests, no 12, y hay que correrlos todos.** Hasta el
   15/11 se corrían solo los de la tabla de arriba y se reportaba como «batería
-  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 26
+  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 30
   en verde**. Ojo con dos cosas al correrlos: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
-  que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. **Que estén todos en
-  verde es lo que hace que un rojo signifique algo.**
+  que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. Además,
+  `test-contrato-borrador.sh` y `test-contratos-subir.sh` hacen SQL directo y
+  **no leen `DB_ADMIN_*`: exigen `DB_USER=root DB_PASSWORD=<clave de root>`
+  explícitos** (el `.env` trae `DB_USER=balbu_app`, y con ese usuario fallan con
+  «INSERT command denied», no con un error de credencial: se ven como rojo de
+  código cuando es de invocación). **Que estén todos en verde es lo que hace que
+  un rojo signifique algo.**
 - [ ] **El cliente `mariadb` dentro de `docker compose exec` pierde las comillas
   dobles del SQL.** Usar archivo `.sql` o here-doc.
 - [ ] **P-5**: agregar los `DROP` que faltan, declarar las 7 rutinas huérfanas, y sacar de los módulos el `UPDATE` y los `CALL` de semilla. Los `SELECT *` sueltos ya no están: se sacaron del `43` y del `14` (15/11/2026).
@@ -368,7 +391,11 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
 - [ ] **`db/crear-usuarios.sh` no existe**: buscar el comando de provisión de la máquina del trabajo y compararlo con `balbu_app` / `balbu_admin`.
 - [ ] **Sidecar `.borrador`** guarda PII en texto plano junto al HTML (registrado y aceptado por el dueño).
 - [ ] **`contratos/firmados/`**: sin listado, renombre ni limpieza; la administra RRHH a mano.
-- [ ] **P-6**: decidir cablear o retirar lo construido y no cableado (garantías, reclamos, reparaciones, bonos manuales).
+- [ ] **P-6**: decidir cablear o retirar lo construido y no cableado. **Al 18/11/2026
+  quedan solo liquidaciones (16) y los 4 SP del módulo 19** (`SP_ASIGNAR_FACTURA_COMPRA`,
+  `SP_ANULAR_PAGO_COMPRA`, `SP_REGISTRAR_NOTA_CREDITO_COMPRA`,
+  `SP_MODIFICAR_LINEA_COMPRA`/`SP_QUITAR_DETALLE_COMPRA`): garantías, reclamos,
+  reparaciones y bonos ya están cableados y probados.
 - [ ] **Orden de los tres triggers `AFTER UPDATE` de `EMPLEADOS` invertido (13/11/2026).**
   En TEST y en la viva quedaron `TR_AUDITORIA_PERFIL_EMPLEADO`=1 y
   `TR_DESACTIVAR_USUARIO_POST_LIQUIDACION`=3, al revés que en una importación limpia

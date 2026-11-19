@@ -10,10 +10,13 @@ cobrada (lo crea el trigger `TR_AUTO_FINALIZAR_VENTA` del módulo 24).
 
 **Depende de:** `EMPLEADOS` (8).
 
-> **La app no gestiona bonos todavía** (no hay `CALL` a estos SP en el C++),
-> pero los bonos de venta **sí se crean** por trigger desde el cobro.
+> **La app ya gestiona bonos** (18/11/2026): submenú *Empleados → Gestionar
+> bonos*, con permiso `GESTIONAR_BONOS_EMPLEADO` (36). Antes había un
+> `SP_LISTAR_BONOS` que nadie llamaba: los bonos de venta se creaban por trigger
+> y no había forma de verlos ni pagarlos (la viva llegó a 11 `PENDIENTE` por
+> $10.330).
 
-Fuente: `modulos/14- BONOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026.
+Fuente: `modulos/14- BONOS_EMPLEADOS.sql` · Base: `BALBU_TECH` · Revisado: 18/11/2026.
 
 ## Tablas
 
@@ -79,10 +82,27 @@ suelto y un `ALTER TABLE ... MODIFY ESTADO ENUM(...) NOT NULL DEFAULT
 - Pasa a `ANULADO` y devuelve
   `EXITO: EL BONO CON ID <id> FUE ANULADO CORRECTAMENTE.`
 
-### `SP_LISTAR_BONOS(P_ESTADO)`
+### `SP_LISTAR_BONOS(P_ESTADO)` — **retirado (18/11/2026)**
 
-Lista los bonos con `NOMBRE_EMPLEADO`; con estado filtra por él, con
-`NULL`/vacío trae todos; ordena por fecha descendente.
+Tenía un único destino: la pantalla de bonos, que no existía. Al cablearla se
+reemplazó por el par paginado de abajo; un listado sin `LIMIT` es una pared de
+texto en cuanto pasan los meses (y los bonos de venta crecen solos). Queda el
+`DROP` para que una base que ya lo tenía se limpie al reimportar (mismo
+precedente que `SP_HISTORIAL_VENTA`).
+
+### `SP_LISTAR_BONOS_PAGINADO(P_ESTADO, P_PAGINA, P_POR_PAGINA)`
+
+Una página de bonos con `NOMBRE_EMPLEADO`; con estado filtra por él, con
+`NULL`/vacío trae todos; ordena por `FECHA DESC, ID_BONO DESC`. Página o
+tamaño inválidos caen a `1` / `10`.
+
+> El `LIMIT` vive adentro del SP porque `balbu_app` no tiene `SELECT` directo
+> sobre la tabla (recorte del 03/11/2026).
+
+### `SP_CONTAR_BONOS(P_ESTADO)`
+
+`TOTAL` de bonos con ese estado, para armar «Página 1 de N». Mismo criterio de
+filtro que el paginado: `NULL`/vacío cuenta todos.
 
 ## Triggers
 
@@ -117,9 +137,35 @@ de cobrar, y cancelar la venta no lo borraba. Ahora lo crea
 `ID_EMPLEADO`, `NOMBRE`, `TOTAL_BONIFICADO`, `CANTIDAD_BONOS`, para **todos**
 los empleados (`LEFT JOIN`).
 
-> **Nota:** el comentario dice que incluye a los que no tienen bonos "en
-> cero", pero `SUM(B.MONTO)` sin filas devuelve **`NULL`**, no 0. Si se usa
-> para reportes, conviene `IFNULL(SUM(...), 0)`. `CANTIDAD_BONOS` sí da 0.
+> **(18/11/2026)** Los `ANULADO` **no** cuentan: un bono anulado es dinero que
+> nunca se otorgó. Antes el `SUM` los sumaba igual y no se notaba porque no
+> había pantalla para anular; con la pantalla, anular uno dejaba el total sin
+> bajar. Ahora el `CASE` los excluye del total y del conteo.
+>
+> Efecto colateral bueno: el `CASE` tiene `ELSE 0`, así que un empleado sin
+> bonos devuelve `0`, no `NULL` (antes `SUM` de cero filas daba `NULL`).
+
+## Pantalla (app C++)
+
+`bonos.cpp` / `bonos.h`, colgada del submenú de Empleados:
+
+| Acción | SP |
+|---|---|
+| Listar (10 por página, filtro por estado) | `SP_LISTAR_BONOS_PAGINADO` + `SP_CONTAR_BONOS` |
+| Pagar | `SP_PAGAR_BONO` |
+| Anular | `SP_ANULAR_BONO` |
+| Registrar | `SP_REGISTRAR_BONO` |
+
+- Abre con el permiso **`GESTIONAR_BONOS_EMPLEADO`** (ADMIN, GERENTE y RRHH;
+  SUBGERENTE no). Las cuatro rutinas de escritura exigen ese mismo permiso:
+  pantalla y rutina con permisos distintos dejarían al rol legítimo en
+  `SIN_PERMISO`.
+- Filtro por defecto `PENDIENTE`, que es la única lista sobre la que se trabaja.
+- **`SP_ACTUALIZAR_BONO` queda sin cablear a propósito:** corregir el monto de
+  un bono sin dejar rastro es peor que anularlo y volver a registrarlo, que sí
+  deja historia.
+- El mensaje del SP se pinta según su familia: `EXITO` verde, `AVISO` amarillo
+  (bono ya pagado o ya anulado, que no es una falla), `ERROR` rojo.
 
 ## Reglas de negocio
 
@@ -131,4 +177,5 @@ los empleados (`LEFT JOIN`).
   anulado no se paga.
 - **Bono automático de venta:** 1% de la venta cobrada, creado por el trigger
   del módulo 24.
+- **Permiso:** registrar, pagar y anular exigen `GESTIONAR_BONOS_EMPLEADO`.
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.
