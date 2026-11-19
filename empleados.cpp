@@ -18,6 +18,7 @@
 #include "contrato.h"
 #include "permisos.h"
 #include "vacaciones.h"
+#include "bonos.h"
 #include "colores.h"
 #include "tabla.h"
 
@@ -33,7 +34,7 @@ namespace {
 enum class AccionEmpleado {
     Agregar, Actualizar, Despedir, Reactivar, Buscar, Listar,
     GenerarContrato, SubirContrato, VerContratos, FinalizarContrato,
-    Permisos, AuditoriaPermisos, Vacaciones, Volver
+    Permisos, AuditoriaPermisos, Vacaciones, Bonos, Volver
 };
 
 struct OpcionEmpleado {
@@ -57,6 +58,10 @@ static const vector<OpcionEmpleado>& opcionesEmpleados() {
         {"Gestionar permisos",           "GESTIONAR_PERMISOS_EMPLEADO",     AccionEmpleado::Permisos},
         {"Ver auditoria de permisos",    "GESTIONAR_PERMISOS_EMPLEADO",     AccionEmpleado::AuditoriaPermisos},
         {"Gestionar vacaciones",         "GESTIONAR_VACACIONES_EMPLEADO",   AccionEmpleado::Vacaciones},
+        // (18/11/2026) Modulo 14: los bonos existian sin pantalla (los carga el
+        // trigger del 1 % de las ventas). Mismo criterio que vacaciones: es
+        // plata de un empleado y la maneja RRHH, no cualquiera.
+        {"Gestionar bonos",              "GESTIONAR_BONOS_EMPLEADO",        AccionEmpleado::Bonos},
         {"Volver al Menu Principal",     "",                                AccionEmpleado::Volver}
     };
     return opciones;
@@ -740,6 +745,7 @@ void ejecutarSubmenuEmpleados() {
             case AccionEmpleado::Permisos:          gestionarPermisosUI(); break;
             case AccionEmpleado::AuditoriaPermisos: verAuditoriaPermisosUI(); break;
             case AccionEmpleado::Vacaciones:        gestionarVacacionesUI(); break;
+            case AccionEmpleado::Bonos:             gestionarBonosUI(); break;
             case AccionEmpleado::Volver:            return;
         }
         pausar();

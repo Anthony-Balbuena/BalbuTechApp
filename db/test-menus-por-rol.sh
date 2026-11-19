@@ -39,10 +39,10 @@ limpiar() {
     # rol (FK_ROL_PERMISO_ROL no tiene ON DELETE CASCADE). Si el rol se borrara
     # primero, el DELETE fallaria y no se limpiaria nada.
     mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" \
-        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest', 'prueba_inv_ver', 'prueba_perm_aud');
-            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
-            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
-            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002', 'TESTIN001', 'TESTPA001');" 2>/dev/null || true
+        -e "DELETE FROM USUARIOS WHERE USUARIO LIKE 'prueba_r7_%' OR USUARIO IN ('prueba_usr_ver', 'prueba_emp_ver', 'prueba_bono_gest', 'prueba_cli_ver', 'prueba_prod_gest', 'prueba_ven_gest', 'prueba_asi_ver', 'prueba_prov_ver', 'prueba_cat_ver', 'prueba_mar_ver', 'prueba_met_ver', 'prueba_com_ver', 'prueba_com_reg_pag', 'prueba_caja_ver', 'prueba_caja_gest', 'prueba_inv_ver', 'prueba_perm_aud');
+            DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_BONO_GEST', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
+            DELETE FROM ROLES WHERE NOMBRE_ROL IN ('PRUEBA_USR_VER', 'PRUEBA_EMP_VER', 'PRUEBA_BONO_GEST', 'PRUEBA_CLI_VER', 'PRUEBA_PROD_GEST', 'PRUEBA_VEN_GEST', 'PRUEBA_ASI_VER', 'PRUEBA_PROV_VER', 'PRUEBA_CAT_VER', 'PRUEBA_MAR_VER', 'PRUEBA_MET_VER', 'PRUEBA_COM_VER', 'PRUEBA_COM_REG_PAG', 'PRUEBA_CAJA_VER', 'PRUEBA_CAJA_GEST', 'PRUEBA_INV_VER', 'PRUEBA_PERM_AUD');
+            DELETE FROM EMPLEADOS WHERE CEDULA LIKE 'TESTR7%' OR CEDULA IN ('TESTUV001', 'TESTEV001', 'TESTBG001', 'TESTCV001', 'TESTPG001', 'TESTVG001', 'TESTAV001', 'TESTPV001', 'TESTCA001', 'TESTMA001', 'TESTME001', 'TESTCO001', 'TESTCO002', 'TESTCJ001', 'TESTCJ002', 'TESTIN001', 'TESTPA001');" 2>/dev/null || true
     rm -rf "$TMP"
 }
 trap limpiar EXIT
@@ -303,7 +303,8 @@ else
     for label in "Agregar Empleado" "Actualizar Datos" "Despedir Empleado" \
                  "Reactivar Empleado" "Marcar asistencia" "Gestionar permisos" \
                  "Ver auditoria de permisos" \
-                 "Gestionar vacaciones" "Generar contrato"; do
+                 "Gestionar vacaciones" "Generar contrato" \
+                 "Gestionar bonos"; do
         if printf '%s\n' "$submenu_emp" | grep -Fq "$label"; then
             echo "FALLO $ROL_EMP: el submenu muestra '$label' sin permiso"
             fail=1; fallos=$((fallos+1))
@@ -312,6 +313,81 @@ else
 
     if [ "$fallos" -eq "$fallos_previos" ]; then
         echo "OK $ROL_EMP (2 opciones en el menu principal y 3 en el submenu)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Submenu Empleados: el permiso de bonos abre su opcion (18/11/2026).
+# El modulo 14 existia sin pantalla; al cablearla, su permiso tiene que abrir
+# SOLO esa accion y no arrastrar el resto del modulo. Es el lado positivo del
+# chequeo anterior, que prueba que sin el permiso no aparece.
+# ---------------------------------------------------------------------------
+ROL_BONO="PRUEBA_BONO_GEST"
+USR_BONO="prueba_bono_gest"
+
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" <<EOF
+DELETE FROM USUARIOS WHERE USUARIO='$USR_BONO';
+DELETE FROM EMPLEADOS WHERE CEDULA='TESTBG001';
+DELETE FROM ROL_PERMISO WHERE ROL_NOMBRE='$ROL_BONO';
+INSERT INTO ROLES (NOMBRE_ROL) VALUES ('$ROL_BONO')
+    ON DUPLICATE KEY UPDATE NOMBRE_ROL = NOMBRE_ROL;
+INSERT INTO ROL_PERMISO (ROL_NOMBRE, ID_PERMISO)
+SELECT '$ROL_BONO', ID_PERMISO FROM PERMISOS WHERE NOMBRE_PERMISO='GESTIONAR_BONOS_EMPLEADO';
+INSERT INTO EMPLEADOS (NOMBRE, CEDULA, CARGO, SALARIO, TELEFONO, EMAIL, FECHA_INGRESO)
+VALUES ('PRUEBA BONO GEST','TESTBG001','PRUEBA',1000,'T-BG-001','bg-001@test.local','2026-11-18');
+INSERT INTO USUARIOS (USUARIO, CONTRASENA, ID_EMPLEADO, ID_ROL)
+SELECT '$USR_BONO', '$HASH', E.ID_EMPLEADO, R.ID_ROL
+  FROM EMPLEADOS E, ROLES R
+ WHERE E.CEDULA='TESTBG001' AND R.NOMBRE_ROL='$ROL_BONO';
+EOF
+
+fallos_previos=$fallos
+salida_bono="$TMP/out-bono-gest.txt"
+# Entrada: Enter del "Presione Enter", 1 = Empleados (es la unica opcion del
+# menu principal ademas de Cerrar sesion), 2 = Volver en el submenu.
+printf '\n1\n2\n' | BALBU_USER="$USR_BONO" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+    timeout "$LIMITE" "$APP" >"$salida_bono" 2>&1
+rc_bono=$?
+
+if ! grep -q "Acceso concedido \[DEV\]" "$salida_bono"; then
+    echo "FALLO $ROL_BONO: no entro al menu (¿usuario/clave/BD?)"
+    fail=1; fallos=$((fallos+1))
+elif [ "$rc_bono" -ne 0 ]; then
+    echo "FALLO $ROL_BONO: la app salio con $rc_bono"
+    fail=1; fallos=$((fallos+1))
+else
+    principal_bono=$(sed -n '1,/=== MODULO DE EMPLEADOS ===/p' "$salida_bono")
+    n_principal_bono=$(printf '%s\n' "$principal_bono" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_principal_bono" -ne 2 ]; then
+        echo "FALLO $ROL_BONO: $n_principal_bono opciones en el menu principal, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    if ! printf '%s\n' "$principal_bono" | grep -Fq "Empleados"; then
+        echo "FALLO $ROL_BONO: GESTIONAR_BONOS_EMPLEADO no abre el modulo Empleados"
+        fail=1; fallos=$((fallos+1))
+    fi
+
+    submenu_bono=$(awk '/=== MODULO DE EMPLEADOS ===/{f=1} f{print} /^=============================$/ && f{exit}' "$salida_bono")
+    n_sub_bono=$(printf '%s\n' "$submenu_bono" | grep -c '^[0-9]\+\. ' || true)
+    if [ "$n_sub_bono" -ne 2 ]; then
+        echo "FALLO $ROL_BONO: $n_sub_bono opciones en el submenu, se esperaban 2"
+        fail=1; fallos=$((fallos+1))
+    fi
+    for label in "Gestionar bonos" "Volver al Menu Principal"; do
+        if ! printf '%s\n' "$submenu_bono" | grep -Fq "$label"; then
+            echo "FALLO $ROL_BONO: falta la opcion '$label' en el submenu"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+    for label in "Gestionar vacaciones" "Buscar Empleado" "Gestionar permisos"; do
+        if printf '%s\n' "$submenu_bono" | grep -Fq "$label"; then
+            echo "FALLO $ROL_BONO: el submenu muestra '$label' con solo el permiso de bonos"
+            fail=1; fallos=$((fallos+1))
+        fi
+    done
+
+    if [ "$fallos" -eq "$fallos_previos" ]; then
+        echo "OK $ROL_BONO (el permiso de bonos abre su opcion y nada mas)"
     fi
 fi
 

@@ -180,6 +180,7 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Usuarios",         {"USUARIOS_VER", "USUARIOS_CREAR", "USUARIOS_EDITAR", "USUARIOS_ESTADO", "USUARIOS_CLAVE"}, AccionMenu::Usuarios},
         {"Empleados",        {"EMPLEADOS_VER", "EMPLEADOS_CREAR", "EMPLEADOS_EDITAR", "EMPLEADOS_BAJA",
                               "GESTIONAR_PERMISOS_EMPLEADO", "GESTIONAR_VACACIONES_EMPLEADO",
+                              "GESTIONAR_BONOS_EMPLEADO",
                               "GESTIONAR_CONTRATOS"}, AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},

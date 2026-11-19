@@ -64,6 +64,7 @@ inline const std::string &tablaColorEstado(const std::string &estado) {
         estado == "REALIZADA" || estado == "RECIBIDA" ||
         estado == "APROBADO" || estado == "APROBADA" ||
         estado == "PRESENTE" || estado == "PAGADA" ||
+        estado == "PAGADO" ||
         estado == "CERRADO") {
         return VERDE;
     }
@@ -72,6 +73,7 @@ inline const std::string &tablaColorEstado(const std::string &estado) {
         estado == "AGOTADO" || estado == "CRÍTICO" ||
         estado == "RECHAZADO" || estado == "RECHAZADA" ||
         estado == "AUSENTE" || estado == "ANULADA" ||
+        estado == "ANULADO" ||
         estado == "VENCIDA") {
         return ROJO;
     }
