@@ -145,11 +145,11 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_BONOS_EMPLEADO'
  WHERE RUTINA IN ('SP_REGISTRAR_BONO', 'SP_ACTUALIZAR_BONO', 'SP_ANULAR_BONO',
                   'SP_PAGAR_BONO', 'SP_LISTAR_BONOS_PAGINADO', 'SP_CONTAR_BONOS');
 DELETE FROM PERMISO_POR_RUTINA WHERE RUTINA = 'SP_LISTAR_BONOS';
--- (18/11/2026) Nomina. Sin esta correccion el heuristico manda el recibo a
--- EMPLEADOS_VER (por el LIKE '%EMPLEADO%') y el pago a GESTIONAR_BONOS_EMPLEADO
--- (por el LIKE '%PAGAR%'? no: por '%EMPLEADO%' tambien). La pantalla se abre con
--- GESTIONAR_NOMINA, asi que un rol que llega ahi recibiria SIN_PERMISO al llamar
--- al SP: el permiso de la puerta y el de la rutina tienen que ser el mismo.
+-- (18/11/2026) Nomina. Sin esta correccion el heuristico manda el recibo y el
+-- pago del mes al permiso de Empleados (los dos nombres llevan "EMPLEADO", asi
+-- que caen en el LIKE generico). La pantalla se abre con GESTIONAR_NOMINA, asi
+-- que un rol que llega ahi recibiria SIN_PERMISO al llamar al SP: el permiso de
+-- la puerta y el de la rutina tienen que ser el mismo.
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_NOMINA'
  WHERE RUTINA IN ('SP_GENERAR_RECIBO_EMPLEADO', 'SP_PAGAR_NOMINA_EMPLEADO',
                   'SP_LISTAR_BONOS_PENDIENTES_EMPLEADO');
