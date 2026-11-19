@@ -182,7 +182,15 @@ cablear es el módulo `34` (ítem 8).
   `SP_LISTAR_BONOS` es el único SP retirado. **Queda verlo con los ojos**: abrir
   «Empleados → Gestionar bonos» con `abalbuena` y confirmar los 11; el humo por la
   app no se puede hacer desde acá porque el `BALBU_USER` del `.env` es `admin`
-  (de TEST) y en la viva el admin es `abalbuena`.
+  (de TEST) y en la viva el admin es `abalbuena`. **Al probarla apareció un bug de
+  verdad** (18/11/2026): con más de una página, el paginador redibujaba la tabla
+  entera en silencio ante cualquier tecla que no fuera `N`/`P`, así que tipear el
+  número de una fila parecía colgar la pantalla. `paginacion.h` ahora avisa
+  («Tecla no valida: N siguiente, P anterior, Enter para continuar.») y vuelve a
+  pedir la tecla **sin** redibujar; el prompt dice `[Enter] continuar` y no
+  `elegir`, porque no se elige una fila: se sale al menú. El arreglo cubre a las 6
+  pantallas que comparten el paginador. Test de regresión en
+  `db/test-bonos-pantalla.sh` (fuerza 2 páginas, tecla inválida y `N`).
 - [x] **Auditoría de permisos — ✅ aplicada en la viva el 14/11/2026.** La bitácora
   está completa y probada en TEST (`db/test-auditoria-permisos.sh` 19/0) y vive
   **dentro del módulo `13`**: guarda el actor, audita alta/cambio/baja y agrega la
@@ -379,9 +387,9 @@ bitácoras, y cada venta o compra pagando su costo puede ser un precio razonable
   fallan los segundos. Se resuelve pasando `DB_APP_PASSWORD` explícito (es la
   primera opción y ya está soportada). Conviene documentarlo en la tabla de
   comandos o renombrar la variable en los tests que faltan.
-- [ ] **La batería son 30 tests, no 12, y hay que correrlos todos.** Hasta el
+- [ ] **La batería son 28 tests, no 12, y hay que correrlos todos.** Hasta el
   15/11 se corrían solo los de la tabla de arriba y se reportaba como «batería
-  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 30
+  completa». Con el entorno completo (`DB_APP_PASSWORD` incluido) están **los 28
   en verde**. Ojo con dos cosas al correrlos: casi todos usan
   `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD`, y **varios default a `BALBU_TECH`**, así
   que hay que pasarles `DB_NAME=BALBU_TECH_TEST` explícito. Además,
