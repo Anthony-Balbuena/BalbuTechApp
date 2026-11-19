@@ -244,19 +244,44 @@ DELIMITER ;
 
 
 /*
-SP_LISTAR_BONOS
-Lista los bonos con el nombre del empleado, mas recientes primero.
+SP_LISTAR_BONOS (RETIRADO 18/11/2026)
+Tenía un único destino: la pantalla de bonos, que no existía. Al cablearla se
+reemplazó por el par paginado de abajo: un listado sin LIMIT es una pared de
+texto en cuanto pasan los meses (y en la viva ya hay bonos que crecen solos por
+el trigger del 1% de las ventas). Queda el DROP para que una base que ya lo
+tenía se limpie al reimportar.
+*/
+
+DROP PROCEDURE IF EXISTS SP_LISTAR_BONOS;
+
+
+/*
+SP_LISTAR_BONOS_PAGINADO
+Una pagina de bonos con el nombre del empleado, mas recientes primero.
 Si llega un estado (PENDIENTE, PAGADO o ANULADO) filtra por el; si viene
-NULL o vacio trae todos.
+NULL o vacio trae todos. El LIMIT vive aca adentro porque el usuario de la app
+no tiene SELECT directo sobre la tabla (recorte de balbu_app del 03/11).
 */
 
 DELIMITER //
-DROP PROCEDURE IF EXISTS SP_LISTAR_BONOS;
-CREATE PROCEDURE SP_LISTAR_BONOS(
-    IN P_ESTADO VARCHAR(20) -- Puedes pasarle 'PENDIENTE', 'PAGADO', 'ANULADO', o dejarlo en NULL para ver todos
+DROP PROCEDURE IF EXISTS SP_LISTAR_BONOS_PAGINADO;
+CREATE PROCEDURE SP_LISTAR_BONOS_PAGINADO(
+    IN P_ESTADO     VARCHAR(20),
+    IN P_PAGINA     INT,
+    IN P_POR_PAGINA INT
 )
 BEGIN
-    SELECT 
+    DECLARE v_offset INT DEFAULT 0;
+
+    IF P_PAGINA IS NULL OR P_PAGINA < 1 THEN
+        SET P_PAGINA = 1;
+    END IF;
+    IF P_POR_PAGINA IS NULL OR P_POR_PAGINA < 1 THEN
+        SET P_POR_PAGINA = 10;
+    END IF;
+    SET v_offset = (P_PAGINA - 1) * P_POR_PAGINA;
+
+    SELECT
         b.ID_BONO,
         b.ID_EMPLEADO,
         e.NOMBRE AS NOMBRE_EMPLEADO,
@@ -269,7 +294,28 @@ BEGIN
     FROM BONOS_EMPLEADOS b
     INNER JOIN EMPLEADOS e ON b.ID_EMPLEADO = e.ID_EMPLEADO
     WHERE (P_ESTADO IS NULL OR P_ESTADO = '' OR b.ESTADO = P_ESTADO)
-    ORDER BY b.FECHA DESC;
+    ORDER BY b.FECHA DESC, b.ID_BONO DESC
+    LIMIT P_POR_PAGINA OFFSET v_offset;
+END//
+DELIMITER ;
+
+
+/*
+SP_CONTAR_BONOS
+Cuantos bonos hay con ese estado, para armar "Pagina 1 de N".
+Mismo criterio de filtro que SP_LISTAR_BONOS_PAGINADO: si no llega estado,
+cuenta todos.
+*/
+
+DELIMITER //
+DROP PROCEDURE IF EXISTS SP_CONTAR_BONOS;
+CREATE PROCEDURE SP_CONTAR_BONOS(
+    IN P_ESTADO VARCHAR(20)
+)
+BEGIN
+    SELECT COUNT(*) AS TOTAL
+      FROM BONOS_EMPLEADOS b
+     WHERE (P_ESTADO IS NULL OR P_ESTADO = '' OR b.ESTADO = P_ESTADO);
 END//
 DELIMITER ;
 
@@ -321,14 +367,19 @@ DELIMITER ;
 VISTA_TOTAL_BONOS_POR_EMPLEADO
 Resume por empleado el total de dinero bonificado y cuantos bonos tiene,
 incluyendo tambien a los que no tienen ningun bono (en cero).
+
+(18/11/2026) Los ANULADO NO cuentan: un bono anulado es dinero que nunca se
+otorgo. Antes el SUM los sumaba igual, y no se notaba porque nadie leia la
+vista (ni habia pantalla para anular). Con la pantalla de bonos, anular uno
+dejaba el total sin bajar: la vista mentia sobre plata.
 */
 
 CREATE OR REPLACE VIEW VISTA_TOTAL_BONOS_POR_EMPLEADO AS
 SELECT 
     E.ID_EMPLEADO,
     E.NOMBRE,
-    SUM(B.MONTO) AS TOTAL_BONIFICADO,
-    COUNT(B.ID_BONO) AS CANTIDAD_BONOS
+    SUM(CASE WHEN B.ESTADO <> 'ANULADO' THEN B.MONTO ELSE 0 END) AS TOTAL_BONIFICADO,
+    COUNT(CASE WHEN B.ESTADO <> 'ANULADO' THEN 1 END) AS CANTIDAD_BONOS
 FROM EMPLEADOS E
 LEFT JOIN BONOS_EMPLEADOS B ON E.ID_EMPLEADO = B.ID_EMPLEADO
 GROUP BY E.ID_EMPLEADO;
