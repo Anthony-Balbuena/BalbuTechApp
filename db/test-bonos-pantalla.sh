@@ -165,6 +165,65 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Paginador con MAS de una pagina (18/11/2026).
+#
+# POR QUE: en TEST siempre habia <= 10 bonos PENDIENTE, asi que el paginador
+# nunca dibujaba su prompt. En la viva hay 11 y el bug aparecio recien ahi:
+# cualquier tecla que no fuera N o P redibujaba la tabla entera en silencio, y
+# el operador que tipeaba el numero de una fila creia que la pantalla se habia
+# colgado. Este bloque fuerza 2 paginas y verifica que (a) la tecla invalida
+# avise, (b) la tabla se dibuje UNA sola vez, (c) se llegue al menu de acciones
+# y (d) N pase a la pagina 2.
+# ---------------------------------------------------------------------------
+PAG_ESTADO=$(Q "SELECT COUNT(*) FROM BONOS_EMPLEADOS WHERE ESTADO='PENDIENTE'")
+FALTAN=$((11 - PAG_ESTADO))
+if [ "$FALTAN" -gt 0 ]; then
+    for i in $(seq 1 "$FALTAN"); do
+        Q "INSERT INTO BONOS_EMPLEADOS (ID_EMPLEADO, FECHA, TIPO_BONO, MONTO, DESCRIPCION)
+           VALUES ($ID_EMP, '$HOY', 'BONIFICACION', 1.00, 'ZZ pantalla pag $i');" >/dev/null
+    done
+fi
+PAG_TOTAL=$(Q "SELECT COUNT(*) FROM BONOS_EMPLEADOS WHERE ESTADO='PENDIENTE'")
+if [ "$PAG_TOTAL" -lt 11 ]; then
+    rojo "no se pudieron forzar 2 paginas (hay $PAG_TOTAL PENDIENTE)"
+else
+    # Entrada: Enter login; 1 Empleados; 1 Gestionar bonos; "1" en el paginador
+    # (tecla invalida, el caso del operador); Enter para salir al menu;
+    # 0 para volver al submenu; 0 para volver al principal.
+    SALIDA_PAG="$TMP/out-pag.txt"
+    printf '\n1\n1\n1\n\n0\n0\n' \
+        | BALBU_USER="$USR" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+          timeout "$LIMITE" "$APP" >"$SALIDA_PAG" 2>&1
+    if ! grep -q "Acceso concedido \[DEV\]" "$SALIDA_PAG"; then
+        rojo "paginador: no entro al menu (¿usuario/clave/BD?)"
+        sed 's/\x1b\[[0-9;]*m//g; s/^/        /' "$SALIDA_PAG" | head -15 >&2
+    else
+        if ! grep -Fq "Tecla no valida: N siguiente, P anterior, Enter para continuar." "$SALIDA_PAG"; then
+            rojo "paginador: la tecla invalida no aviso nada (redibuja en silencio)"
+        fi
+        dibujos=$(grep -c "^Pagina 1 de" "$SALIDA_PAG")
+        if [ "$dibujos" -ne 1 ]; then
+            rojo "paginador: dibujo la pagina 1 $dibujos veces, se esperaba 1"
+        fi
+        if ! grep -Fq "1. Pagar bono" "$SALIDA_PAG"; then
+            rojo "paginador: no se llego al menu de acciones"
+        fi
+        if grep -q "^Pagina 2 de" "$SALIDA_PAG"; then
+            rojo "paginador: salto a la pagina 2 sin que se pidiera"
+        fi
+    fi
+
+    # N tiene que avanzar a la pagina 2 y mostrar otros bonos.
+    SALIDA_N="$TMP/out-pag-n.txt"
+    printf '\n1\n1\nn\n\n0\n0\n' \
+        | BALBU_USER="$USR" BALBU_PASS="$BALBU_PASS" DB_NAME="$DB_NAME" \
+          timeout "$LIMITE" "$APP" >"$SALIDA_N" 2>&1
+    if ! grep -q "^Pagina 2 de" "$SALIDA_N"; then
+        rojo "paginador: N no paso a la pagina 2"
+    fi
+fi
+
 echo
 if [ "${VERBOSE:-0}" = "1" ]; then
     echo "--- salida de la app ---"

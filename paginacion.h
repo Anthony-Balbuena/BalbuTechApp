@@ -104,18 +104,47 @@ inline int navegarPaginas(int total, int porPagina,
 
         std::cout << "\nPagina " << pagina << " de " << paginas
                   << "  (" << total << " registros)" << std::endl;
-        if (paginas > 1) {
-            std::cout << "[N] siguiente   [P] anterior   [Enter] elegir" << std::endl;
+        if (paginas <= 1) break;
+
+        // (18/11/2026) Antes, cualquier tecla que no fuera N o P redibujaba la
+        // tabla entera en silencio. Con listas de mas de una pagina el operador
+        // tipea el numero de la fila que quiere (que no es una opcion), ve la
+        // misma tabla otra vez y cree que la pantalla esta colgada. Ahora avisa
+        // y vuelve a pedir la tecla SIN redibujar. El texto dice "continuar" y
+        // no "elegir" porque no se elige ninguna fila: se sale al menu.
+        bool cambiarPagina = false;
+        std::cout << "[N] siguiente   [P] anterior   [Enter] continuar" << std::endl;
+        for (;;) {
             std::string tecla = leerDatoSeguro("Opcion: ");
-            if (!tecla.empty()) {
-                const char c = static_cast<char>(
-                    std::tolower(static_cast<unsigned char>(tecla[0])));
-                if (c == 'n' && pagina < paginas) { ++pagina; continue; }
-                if (c == 'p' && pagina > 1)       { --pagina; continue; }
-                continue;  // tecla desconocida: redibuja la misma pagina
+            // Vacio = Enter (sale al menu). El EOF tambien cae aca: leerDatoSeguro
+            // hace cin.clear() antes del getline, asi que en EOF devuelve vacio
+            // sin bloquear; re-pedir sin chequearlo seria un bucle infinito.
+            if (tecla.empty() || std::cin.eof()) break;
+
+            const char c = static_cast<char>(
+                std::tolower(static_cast<unsigned char>(tecla[0])));
+            if (c == 'n') {
+                if (pagina < paginas) {
+                    ++pagina;
+                    cambiarPagina = true;
+                    break;
+                }
+                std::cout << "Ya estas en la ultima pagina." << std::endl;
+                continue;
             }
+            if (c == 'p') {
+                if (pagina > 1) {
+                    --pagina;
+                    cambiarPagina = true;
+                    break;
+                }
+                std::cout << "Ya estas en la primera pagina." << std::endl;
+                continue;
+            }
+            std::cout << "Tecla no valida: N siguiente, P anterior, Enter para continuar."
+                      << std::endl;
         }
-        break;
+        if (!cambiarPagina) break;
     }
     return total;
 }
