@@ -96,6 +96,13 @@ static bool mostrarRecibo(int idEmpleado, ResumenNomina& resumen) {
 
     if (!res->next()) {
         cout << ROJO << "No se pudo generar el recibo." << RESET << endl;
+        // Mismo motivo que al final: salir sin drenar deja la conexion con un
+        // resultado abierto y la consulta siguiente no corre. Hoy el SP corta
+        // con SIGNAL si el empleado no existe, asi que se pasa por aca casi
+        // nunca; se cierra igual, para que el dia que el SP devuelva cero
+        // filas el fallo no aparezca a una consulta de distancia.
+        res.reset();
+        drenarResultados(ps.get());
         return false;
     }
 
