@@ -181,6 +181,12 @@ static const vector<ItemMenu>& itemsMenuPrincipal() {
         {"Empleados",        {"EMPLEADOS_VER", "EMPLEADOS_CREAR", "EMPLEADOS_EDITAR", "EMPLEADOS_BAJA",
                               "GESTIONAR_PERMISOS_EMPLEADO", "GESTIONAR_VACACIONES_EMPLEADO",
                               "GESTIONAR_BONOS_EMPLEADO",
+                              // (18/11/2026) Sin esta linea, un rol que solo tiene
+                              // GESTIONAR_NOMINA no ve el item «Empleados» y la
+                              // pantalla de nomina queda inalcanzable aunque la
+                              // tenga: el permiso de la puerta y el del submenu
+                              // tienen que ser el mismo.
+                              "GESTIONAR_NOMINA",
                               "GESTIONAR_CONTRATOS"}, AccionMenu::Empleados},
         {"Mis permisos",     {"SOLICITAR_PERMISO"},                        AccionMenu::MisPermisos},
         {"Mis vacaciones",   {"SOLICITAR_PERMISO"},                        AccionMenu::MisVacaciones},

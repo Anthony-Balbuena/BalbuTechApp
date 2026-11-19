@@ -19,6 +19,7 @@
 #include "permisos.h"
 #include "vacaciones.h"
 #include "bonos.h"
+#include "nomina.h"
 #include "colores.h"
 #include "tabla.h"
 
@@ -34,7 +35,7 @@ namespace {
 enum class AccionEmpleado {
     Agregar, Actualizar, Despedir, Reactivar, Buscar, Listar,
     GenerarContrato, SubirContrato, VerContratos, FinalizarContrato,
-    Permisos, AuditoriaPermisos, Vacaciones, Bonos, Volver
+    Permisos, AuditoriaPermisos, Vacaciones, Bonos, Nomina, Volver
 };
 
 struct OpcionEmpleado {
@@ -62,6 +63,10 @@ static const vector<OpcionEmpleado>& opcionesEmpleados() {
         // trigger del 1 % de las ventas). Mismo criterio que vacaciones: es
         // plata de un empleado y la maneja RRHH, no cualquiera.
         {"Gestionar bonos",              "GESTIONAR_BONOS_EMPLEADO",        AccionEmpleado::Bonos},
+        // (18/11/2026) Nomina: el recibo del mes con los bonos incluidos y el
+        // acto de pagarlo. Permiso propio y no el de bonos: bonos es cargar y
+        // anular plata suelta, esto es cerrar el mes de una persona.
+        {"Nomina (recibo y pago)",       "GESTIONAR_NOMINA",                AccionEmpleado::Nomina},
         {"Volver al Menu Principal",     "",                                AccionEmpleado::Volver}
     };
     return opciones;
@@ -746,6 +751,7 @@ void ejecutarSubmenuEmpleados() {
             case AccionEmpleado::AuditoriaPermisos: verAuditoriaPermisosUI(); break;
             case AccionEmpleado::Vacaciones:        gestionarVacacionesUI(); break;
             case AccionEmpleado::Bonos:             gestionarBonosUI(); break;
+            case AccionEmpleado::Nomina:            gestionarNominaUI(); break;
             case AccionEmpleado::Volver:            return;
         }
         pausar();
