@@ -22,15 +22,11 @@ CREATE TABLE PAGOS (
     PRIMARY KEY (ID_PAGO),
     CONSTRAINT FK_PAGO_VENTA FOREIGN KEY (ID_VENTA) REFERENCES VENTAS (ID_VENTA) ON DELETE CASCADE,
     CONSTRAINT FK_PAGO_METODO FOREIGN KEY (ID_METODO_PAGO) REFERENCES METODOS_PAGO (ID_METODO_PAGO),
-    CONSTRAINT FK_PAGO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_PAGOS_FECHA
-Busca y ordena los pagos por fecha, util para los reportes de caja
-y el cierre del dia.
-*/
-CREATE INDEX IX_PAGOS_FECHA ON PAGOS (FECHA);
+    CONSTRAINT FK_PAGO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Busca y ordena los pagos por fecha, util para los reportes de caja y el cierre del
+    -- dia.
+    INDEX IX_PAGOS_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -213,11 +209,6 @@ proc_label: BEGIN
                  ) AS MENSAJE;
 END //
 DELIMITER ;
-
-
-
-
-
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -492,11 +483,6 @@ END //
 DELIMITER ;
 
 
-
-
-
-
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
@@ -522,20 +508,6 @@ JOIN METODOS_PAGO MP ON P.ID_METODO_PAGO = MP.ID_METODO_PAGO
 JOIN EMPLEADOS E ON P.ID_EMPLEADO = E.ID_EMPLEADO;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
@@ -550,7 +522,6 @@ CAMBIO 12/10/2026: SALDO y MONTO_REALIZADO van a BRUTO
 (SUBTOTAL + ITBIS - ITBIS devuelto), porque desde el 11/10 se cobra el bruto
 y con TOTAL el saldo quedaba negativo en ventas pagadas.
 */
-
 
 
 DELIMITER //
@@ -702,7 +673,7 @@ CREATE TABLE IF NOT EXISTS TURNO_CAJA (
     PRIMARY KEY (ID_TURNO),
     CONSTRAINT FK_TURNO_APERTURA FOREIGN KEY (ID_EMPLEADO_APERTURA) REFERENCES EMPLEADOS (ID_EMPLEADO),
     CONSTRAINT FK_TURNO_CIERRE FOREIGN KEY (ID_EMPLEADO_CIERRE) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DELIMITER //
 DROP PROCEDURE IF EXISTS SP_ABRIR_TURNO ;

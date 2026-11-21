@@ -61,6 +61,12 @@ ventas, compras y productos para mostrar precios con impuesto.
 > como "falta de dato" y vuelve al 18. Un país sin impuesto no se puede
 > configurar sin cambiar la función.
 >
+> (21/11/2026) **Ojo: esto es la tasa de toda la empresa, no la exención por producto.**
+> Un producto con `PRODUCTOS.EXENTO_ITBIS = 1` no lleva ITBIS en sus líneas de venta ni
+> de compra **sin tocar esta tasa** (ver módulo 9). Son dos mecanismos distintos: bajar
+> la tasa a 0 afecta a todos los productos; la exención es por producto. El 0 %
+> global sigue pendiente en `PENDIENTES.md`.
+>
 > **No hay tope superior**: un `VALOR` de `999` devuelve `999.00` y
 > `DECIMAL(5,2)` lo corta en silencio. Nada valida que sea un porcentaje.
 >

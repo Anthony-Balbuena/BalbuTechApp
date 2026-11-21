@@ -9,7 +9,7 @@ y todo empleado arranca ACTIVO.
 CREATE TABLE EMPLEADOS (
     ID_EMPLEADO INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(100) NOT NULL,
-    CEDULA VARCHAR(20) NOT NULL UNIQUE,
+    CEDULA VARCHAR(20) NOT NULL,
     CARGO VARCHAR(50) NOT NULL,
     SALARIO DECIMAL(10, 2) NOT NULL CHECK (SALARIO > 0),
     TELEFONO VARCHAR(20) NOT NULL UNIQUE,
@@ -19,8 +19,9 @@ CREATE TABLE EMPLEADOS (
     ESTADO ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_EMPLEADO),
+    CONSTRAINT UQ_EMPLEADOS_CEDULA UNIQUE (CEDULA),
     CONSTRAINT CK_EMPLEADO_NOMBRE CHECK (CHAR_LENGTH(TRIM(NOMBRE)) > 0)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --1. INSERTAR EMPLEADOS 
 DELIMITER //
@@ -723,10 +724,14 @@ DELIMITER ;
 
 /*
 SECCION EMPLEADOS_CEDULA_UNICA (ex modulo 59)
-Parche para bases viejas: el CREATE TABLE de EMPLEADOS ya declara CEDULA
-UNIQUE inline, pero una base creada antes de esa linea no lo tenia. Este
-ALTER idempotente agrega UQ_EMPLEADOS_CEDULA. En una base nueva agrega un
-segundo indice unico sobre la misma columna.
+Parche para bases viejas: el CREATE TABLE de EMPLEADOS ya declara la cedula
+unica con el constraint UQ_EMPLEADOS_CEDULA, pero una base creada antes de
+esa linea no lo tenia. Este ALTER idempotente agrega el indice si falta.
+(19/11/2026) En una base nueva no hace nada: el indice ya viene declarado en
+el CREATE TABLE. Antes el CREATE TABLE tenia un UNIQUE inline que creaba un
+indice llamado CEDULA y este parche creaba UQ_EMPLEADOS_CEDULA, asi que una
+base fresca quedaba con dos indices unicos identicos sobre CEDULA. Ahora los
+dos caminos usan el mismo nombre.
 */
 -- ================================================================
 -- BALBU_TECH - CEDULA UNICA EN EMPLEADOS
@@ -811,7 +816,7 @@ CREATE TABLE IF NOT EXISTS CONTRATOS (
     FECHA_REGISTRO TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_CONTRATO),
     CONSTRAINT FK_CONTRATO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Si la tabla ya existia sin los datos de la persona, se agregan aqui
 -- (idempotente: se puede volver a correr el archivo sin romper nada).

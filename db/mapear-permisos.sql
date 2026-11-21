@@ -162,6 +162,11 @@ UPDATE PERMISO_POR_RUTINA SET PERMISO = 'CONSULTAR_REPORTES'
  WHERE RUTINA IN ('6_SP_LISTAR_AUDITORIA_GENERAL', '6_SP_CONSULTAR_HISTORIAL_REGISTRO');
 UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PRODUCTOS'
  WHERE RUTINA IN ('PARA_ACTIVARODESACTIVAR_PROC', 'PARA_ACTUALIZARDATOS');
+-- (21/11/2026) Exencion de ITBIS: la heuristica por nombre no matchea
+-- INSERT/ACTUALIZAR/TOGGLE/ESTADO, asi que caeria en CONSULTAR_PRODUCTOS.
+-- Es una escritura del catalogo: mismo permiso que SP_TOGGLE_ESTADO_PRODUCTOS.
+UPDATE PERMISO_POR_RUTINA SET PERMISO = 'GESTIONAR_PRODUCTOS'
+ WHERE RUTINA = 'SP_MARCAR_PRODUCTO_EXENTO';
 
 SELECT COUNT(*) AS MAPEADAS,
        SUM(PERMISO IS NULL) AS SIN_PERMISO,
@@ -374,6 +379,16 @@ UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
 UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
  WHERE RUTINA IN ('SP_GENERAR_RECIBO_EMPLEADO', 'SP_PAGAR_NOMINA_EMPLEADO',
                   'SP_LISTAR_BONOS_PENDIENTES_EMPLEADO');
+
+-- (21/11/2026) Exencion de ITBIS: SP_MARCAR_PRODUCTO_EXENTO es una escritura del
+-- catalogo. El heuristico le propone GESTIONAR_PRODUCTOS (corregido arriba) pero
+-- la deja en modo auditoria, y con el interruptor global en 0 EXIGIR es lo unico
+-- que decide si la guarda corta. Sus hermanas del catalogo ya exigen todas
+-- (SP_INSERTAR_PRODUCTO, SP_ACTUALIZAR_PRODUCTOS, SP_TOGGLE_ESTADO_PRODUCTOS) y
+-- la pantalla que la llama se abre con GESTIONAR_PRODUCTOS, el mismo permiso, asi
+-- que prenderla no cierra ninguna puerta legitima.
+UPDATE PERMISO_POR_RUTINA SET EXIGIR = 1
+ WHERE RUTINA = 'SP_MARCAR_PRODUCTO_EXENTO';
 
 -- Comprobacion: las rutinas de garantias tienen que quedar TODAS exigiendo.
 SELECT RUTINA, PERMISO, EXIGIR

@@ -134,6 +134,14 @@ void registrarProducto() {
         double compra = leerNumeroConIntentos("\nPrecio de compra $ (Enter = 0): ", 0, 999999999.99, &dCero);
 
         double precio = leerNumeroConIntentos("\nPrecio de venta del Producto $ (sin ITBIS): ", 0.01, 999999999.99);
+
+        // (21/11/2026) Exencion de ITBIS. El producto nace gravado (SP_INSERTAR_PRODUCTO
+        // no lleva el flag, ver odd/tasks/exencion-itbis.md) y, si aca se marca, se
+        // aplica despues del alta con SP_MARCAR_PRODUCTO_EXENTO.
+        string exentoResp = leerDatoSeguro("\nExento de ITBIS? (s/N): ");
+        const bool exento = (exentoResp == "s" || exentoResp == "S" ||
+                             exentoResp == "si" || exentoResp == "SI");
+
         try {
             std::unique_ptr<sql::PreparedStatement> pt(globalCon->prepareStatement(
                 "SELECT FN_TASA_ITBIS() AS TASA"));
@@ -141,8 +149,15 @@ void registrarProducto() {
             double tasa = 18.0;
             if (rt->next()) tasa = rt->getDouble("TASA");
             drenarResultados(pt.get());
-            cout << CIAN << "El cliente pagara: $" << (long long)llround(precio * (100.0 + tasa) / 100.0)
-                 << " (ITBIS incluido)" << RESET << endl;
+            // (21/11/2026) Un producto exento no lleva ITBIS: el cliente paga el
+            // precio tal cual, sin el recargo que se mostraba antes.
+            if (exento) {
+                cout << CIAN << "El cliente pagara: $" << (long long)llround(precio)
+                     << " (EXENTO de ITBIS)" << RESET << endl;
+            } else {
+                cout << CIAN << "El cliente pagara: $" << (long long)llround(precio * (100.0 + tasa) / 100.0)
+                     << " (ITBIS incluido)" << RESET << endl;
+            }
         } catch (...) {}
 
         mostrarLista("PROVEEDORES", proveedores);
@@ -178,6 +193,27 @@ void registrarProducto() {
         cout << "--------------------------------------------" << endl;
 
         drenarResultados(pstmt.get());
+
+        // (21/11/2026) Si se marco exento y el alta salio bien, se aplica el flag
+        // sobre el producto recien creado. El ID se lee con LAST_INSERT_ID() (funcion
+        // de sesion, no requiere privilegios sobre PRODUCTOS: balbu_app no los tiene)
+        // y no hubo otro INSERT despues del del SP.
+        if (exento && respuesta.rfind("EXITO", 0) == 0) {
+            int idNuevo = 0;
+            std::unique_ptr<sql::PreparedStatement> pId(globalCon->prepareStatement("SELECT LAST_INSERT_ID() AS ID"));
+            std::unique_ptr<sql::ResultSet> rId(pId->executeQuery());
+            if (rId->next()) idNuevo = rId->getInt("ID");
+            drenarResultados(pId.get());
+
+            if (idNuevo > 0) {
+                std::unique_ptr<sql::PreparedStatement> pEx(globalCon->prepareStatement(
+                    "CALL SP_MARCAR_PRODUCTO_EXENTO(?, 1)"));
+                pEx->setInt(1, idNuevo);
+                string msgEx = Recogermensaje(pEx.get());
+                cout << CIAN << ">>> " << msgEx << " <<<" << RESET << endl;
+                drenarResultados(pEx.get());
+            }
+        }
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {
@@ -193,15 +229,16 @@ void actualizarProducto() {
     try {
         // (08/11/2026) Paginado de 10 en 10: antes traia todos los productos con
         // categoria y marca en un bloque larguisimo.
-        const size_t W_ID = 5, W_PROD = 25, W_PRE = 10, W_CAT = 20, W_MAR = 15;
-        const size_t ANCHO = W_ID + W_PROD + W_PRE + W_CAT + W_MAR + 4 * 3;
+        const size_t W_ID = 5, W_PROD = 25, W_PRE = 10, W_CAT = 20, W_MAR = 15, W_ITB = 8;
+        const size_t ANCHO = W_ID + W_PROD + W_PRE + W_CAT + W_MAR + W_ITB + 5 * 3;
         cout << CIAN << "\n--- LISTADO GENERAL DE PRODUCTOS, CATEGORIAS Y MARCAS ---\n" << RESET;
         cout << "\n"
              << tablaCelda("ID", W_ID) << " | "
              << tablaCelda("PRODUCTO", W_PROD) << " | "
              << tablaCelda("PRECIO", W_PRE) << " | "
              << tablaCelda("CATEGORIA", W_CAT) << " | "
-             << tablaCelda("MARCA", W_MAR) << "\n"
+             << tablaCelda("MARCA", W_MAR) << " | "
+             << tablaCelda("ITBIS", W_ITB) << "\n"
              << tablaLinea(ANCHO) << "\n";
 
         mostrarPaginadoSP(
@@ -211,11 +248,15 @@ void actualizarProducto() {
             [=](sql::ResultSet *res) {
                 char precio[24];
                 snprintf(precio, sizeof(precio), "$%.2f", (double)res->getDouble("PRECIO"));
+                // (21/11/2026) El estado de exencion se muestra en la lista: es la
+                // pantalla desde la que se marca y desmarca.
+                const char *itbis = res->getInt("EXENTO_ITBIS") == 1 ? "EXENTO" : "GRAVADO";
                 cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "
                      << tablaCelda(res->getString("PRODUCTO"), W_PROD) << " | "
                      << tablaCelda(precio, W_PRE) << " | "
                      << tablaCelda(res->getString("CATEGORIA"), W_CAT) << " | "
-                     << tablaCelda(res->getString("MARCA"), W_MAR) << "\n"
+                     << tablaCelda(res->getString("MARCA"), W_MAR) << " | "
+                     << tablaCelda(itbis, W_ITB) << "\n"
                      << tablaLinea(ANCHO) << "\n";
             });
     } catch (const CancelarOperacionException &e) {
@@ -289,6 +330,22 @@ void actualizarProducto() {
         cout << "--------------------------------------------" << endl;
 
         drenarResultados(pstmt.get());
+
+        // (21/11/2026) Exencion de ITBIS: es ortogonal al UPDATE del producto (no se
+        // le agrega un parametro a SP_ACTUALIZAR_PRODUCTOS), asi que se cambia con su
+        // propia rutina. Enter = no tocar el estado actual.
+        string exentoResp = leerDatoSeguro("Exento de ITBIS? (s/N, Enter = no cambiar): ");
+        if (!exentoResp.empty()) {
+            const int exento = (exentoResp == "s" || exentoResp == "S" ||
+                                exentoResp == "si" || exentoResp == "SI") ? 1 : 0;
+            std::unique_ptr<sql::PreparedStatement> pEx(globalCon->prepareStatement(
+                "CALL SP_MARCAR_PRODUCTO_EXENTO(?, ?)"));
+            pEx->setInt(1, idProducto);
+            pEx->setInt(2, exento);
+            string msgEx = Recogermensaje(pEx.get());
+            cout << CIAN << ">>> " << msgEx << " <<<" << RESET << endl;
+            drenarResultados(pEx.get());
+        }
     } catch (const CancelarOperacionException &e) {
         cout << "\n[!] " << e.what() << endl;
     } catch (const invalid_argument&) {

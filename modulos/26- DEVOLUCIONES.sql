@@ -25,29 +25,15 @@ CREATE TABLE DEVOLUCIONES (
     PRIMARY KEY (ID_DEVOLUCION),
     CONSTRAINT FK_DEVOLUCION_VENTA FOREIGN KEY (ID_DETALLE_VENTA) REFERENCES DETALLES_VENTA (ID_DETALLE_VENTA) ON DELETE CASCADE,
     CONSTRAINT FK_DEVOLUCION_GARANTIA FOREIGN KEY (ID_GARANTIA) REFERENCES GARANTIAS (ID_GARANTIA),
-    CONSTRAINT FK_DEVOLUCION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
--- 1. Para rastrear devoluciones de una venta específica
-/*
-INDICE IX_DEVOLUCION_VENTA
-Busca todas las devoluciones que vienen de una venta en concreto.
-*/
-CREATE INDEX IX_DEVOLUCION_VENTA ON DEVOLUCIONES (ID_DETALLE_VENTA);
+    CONSTRAINT FK_DEVOLUCION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Busca todas las devoluciones que vienen de una venta en concreto.
+    INDEX IX_DEVOLUCION_VENTA (ID_DETALLE_VENTA),
+    -- Trae las devoluciones que estan ligadas a un reclamo de garantia.
+    INDEX IX_DEVOLUCION_GARANTIA (ID_GARANTIA),
+    -- Busca devoluciones por estado y fecha, ideal para el reporte de pendientes del dia.
+    INDEX IX_DEVOLUCION_ESTADO_FECHA (ESTADO, FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Para ver qué devoluciones están ligadas a un reclamo de garantía
-/*
-INDICE IX_DEVOLUCION_GARANTIA
-Trae las devoluciones que estan ligadas a un reclamo de garantia.
-*/
-CREATE INDEX IX_DEVOLUCION_GARANTIA ON DEVOLUCIONES (ID_GARANTIA);
-
--- 3. Para el reporte de "Devoluciones Pendientes" del día
-/*
-INDICE IX_DEVOLUCION_ESTADO_FECHA
-Busca devoluciones por estado y fecha, ideal para el reporte de
-pendientes del dia.
-*/
-CREATE INDEX IX_DEVOLUCION_ESTADO_FECHA ON DEVOLUCIONES (ESTADO, FECHA);
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------   
@@ -84,9 +70,12 @@ proc_label: BEGIN
     DECLARE V_CANTIDAD_YA_DEVUELTA INT;
     DECLARE V_CANTIDAD_MAX_PERMITIDA INT;
     DECLARE V_SUBTOTAL_REEMBOLSADO DECIMAL(10,2);
-    -- (11/10/2026) ITBIS reembolsado con tasa vigente.
-    DECLARE V_TASA_TXT VARCHAR(100);
-    DECLARE V_TASA DECIMAL(5, 2);
+    -- (21/11/2026) ITBIS reembolsado: se prorratea desde la linea guardada,
+    -- igual que la ganancia. Nada de tasa vigente: la linea ya guarda lo que
+    -- se cobro, y con un producto exento (MONTO_ITBIS = 0) recalcularlo
+    -- devolveria un impuesto que el cliente nunca pago.
+    DECLARE V_ITBIS_LINEA DECIMAL(10, 2);
+    DECLARE V_ITBIS_DEVUELTO DECIMAL(10, 2);
     -- (12/10/2026) Ganancia devuelta proporcional al margen de la venta.
     DECLARE V_CANT_LINEA INT;
     DECLARE V_GAN_LINEA DECIMAL(10, 2);
@@ -107,8 +96,10 @@ proc_label: BEGIN
 
     -- 2. Validar existencia del detalle de venta y obtener datos básicos
     -- (16/10/2026) Se lee tambien el descuento de la línea: el reembolso es sobre lo cobrado.
-    SELECT CANTIDAD, PRECIO_UNITARIO, IFNULL(PORCENTAJE_DESCUENTO, 0)
-    INTO V_CANTIDAD_VENDIDA, V_PRECIO_UNITARIO, V_DESC_PCT
+    -- (21/11/2026) Y el MONTO_ITBIS guardado en la linea: el ITBIS reembolsado
+    -- sale de ahi, no de la tasa vigente.
+    SELECT CANTIDAD, PRECIO_UNITARIO, IFNULL(PORCENTAJE_DESCUENTO, 0), IFNULL(MONTO_ITBIS, 0)
+    INTO V_CANTIDAD_VENDIDA, V_PRECIO_UNITARIO, V_DESC_PCT, V_ITBIS_LINEA
     FROM DETALLES_VENTA 
     WHERE ID_DETALLE_VENTA = P_ID_DETALLE_VENTA;
 
@@ -151,13 +142,12 @@ proc_label: BEGIN
     -- (16/10/2026) Se devuelve lo cobrado (con descuento), no el precio de lista.
     SET V_SUBTOTAL_REEMBOLSADO = ROUND(P_CANTIDAD * V_PRECIO_UNITARIO * (1 - V_DESC_PCT / 100), 2);
 
-    -- (11/10/2026) ITBIS con la tasa vigente (foto histórica).
-    SELECT VALOR INTO V_TASA_TXT FROM CONFIGURACION WHERE CLAVE = 'ITBIS';
-    IF V_TASA_TXT IS NULL OR V_TASA_TXT + 0 <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.';
-        LEAVE proc_label;
-    END IF;
-    SET V_TASA = V_TASA_TXT + 0;
+    -- (21/11/2026) ITBIS reembolsado: proporcional a lo devuelto, tomado de la
+    -- linea guardada (misma foto historica que la ganancia, abajo). Antes se
+    -- recalculaba con la tasa vigente, lo que devolvia un ITBIS distinto al
+    -- cobrado si la tasa cambiaba despues de vender, y con un producto exento
+    -- (MONTO_ITBIS = 0) devolvia un impuesto que nunca se cobro.
+    SET V_ITBIS_DEVUELTO = ROUND(V_ITBIS_LINEA * P_CANTIDAD / V_CANTIDAD_VENDIDA, 2);
 
     -- (12/10/2026) Margen proporcional de la linea vendida (foto historica).
     SELECT CANTIDAD, MONTO_GANANCIA INTO V_CANT_LINEA, V_GAN_LINEA
@@ -191,7 +181,7 @@ proc_label: BEGIN
         P_MOTIVO, 
         IFNULL(P_CONDICION_PRODUCTO, 'BUENO'), 
         V_SUBTOTAL_REEMBOLSADO, 
-        ROUND(V_SUBTOTAL_REEMBOLSADO * V_TASA / 100, 2),
+        V_ITBIS_DEVUELTO,
         V_GAN_DEVUELTA,
         'PENDIENTE'
     );
@@ -200,8 +190,6 @@ proc_label: BEGIN
 END //
 
 DELIMITER ;
-
-
 
 
 DELIMITER //
@@ -287,9 +275,6 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
-
-
-
 
 
 ------------------------------------------------
@@ -402,8 +387,6 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
-
-
 
 
 -----------------------------------------------------------------------------

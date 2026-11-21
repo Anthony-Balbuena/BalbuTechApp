@@ -296,6 +296,12 @@ Fuente: `modulos/21- VENTAS.sql`, seccion DETALLES_VENTA · Revisado: 14/11/2026
 - `MONTO_GANANCIA = ROUND(subtotal_con_descuento − cantidad × P_COMPRA, 2)`, o
   `NULL` si el costo es 0/`NULL`.
 
+> (21/11/2026) **Excepción — producto exento:** si `PRODUCTOS.EXENTO_ITBIS = 1`,
+> `MONTO_ITBIS` se guarda en `0.00` sin importar la tasa de `CONFIGURACION`. El precio,
+> el descuento, la ganancia, el stock y las guardas de arriba no cambian. La lectura de
+> `PRODUCTOS` trae `PRECIO` y `EXENTO_ITBIS` en la misma consulta. La validación de la
+> tasa (paso 9) sigue: un producto exento necesita la configuración igual que antes.
+
 Inserta y devuelve `EXITO: PRODUCTO AGREGADO CORRECTAMENTE.`
 
 > **El chequeo de stock de acá es la primera red, no la garantía.** Lee sin

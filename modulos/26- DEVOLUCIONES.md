@@ -62,14 +62,21 @@ Fuente: `modulos/26- DEVOLUCIONES.sql` · Base: `BALBU_TECH` · Revisado: 20/10/
    `ERROR: LA GARANTÍA NO CORRESPONDE A ESTE DETALLE DE VENTA.`
 6. cantidad mayor a lo vendido menos lo ya devuelto **o pendiente** →
    `ERROR: LA CANTIDAD SUPERA EL LÍMITE PERMITIDO (YA SE HAN DEVUELTO O ESTÁN PENDIENTES ALGUNAS UNIDADES).`
-7. tasa de ITBIS ausente o `<= 0` → `ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.`
 
 **Cálculos:** `SUBTOTAL_REEMBOLSADO` con el descuento de la línea,
-`MONTO_ITBIS_REEMBOLSADO = ROUND(subtotal × tasa / 100, 2)` y
-`MONTO_GANANCIA_REEMBOLSADA = ROUND(ganancia_línea × cantidad / cantidad_línea, 2)`
+`MONTO_ITBIS_REEMBOLSADO = ROUND(MONTO_ITBIS × cantidad_devuelta / cantidad_vendida, 2)`
+y `MONTO_GANANCIA_REEMBOLSADA = ROUND(ganancia_línea × cantidad / cantidad_línea, 2)`
 (o `NULL` si la línea no tiene ganancia). Devuelve
 `EXITO: DEVOLUCIÓN REGISTRADA COMO PENDIENTE.` + `ID_DEVOLUCION`.
 
+> (21/11/2026) **El ITBIS se prorratea desde la línea guardada, no se recalcula.** Antes
+> era `ROUND(subtotal × tasa / 100, 2)` con la tasa **vigente**, y exigía que la tasa
+> existiera (paso 7, `ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.`): las dos cosas se
+> quitaron. El recálculo tenía dos defectos: con la tasa cambiada después de vender
+> devolvía un ITBIS distinto al cobrado, y con un producto exento (`MONTO_ITBIS = 0`)
+> devolvía un impuesto que el cliente nunca pagó. La línea guardada ya registra lo
+> cobrado — el mismo criterio que la ganancia, tres líneas más abajo en el mismo cuerpo.
+>
 > **La cuota suma `PENDIENTE + APROBADA + REEMBOLSADA` y deja fuera las
 > `RECHAZADA`**: rechazar libera cupo. La misma cuenta repite
 > `TR_BLOQUEAR_CAMBIO_DEVOLUCION` si alguien edita la cantidad a pelo, y

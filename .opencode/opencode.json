@@ -7,7 +7,9 @@
         { "action": "question", "resource": "*", "effect": "allow" },
         { "action": "subagent", "resource": "*", "effect": "deny" },
         { "action": "subagent", "resource": "general", "effect": "allow" },
-        { "action": "subagent", "resource": "qa", "effect": "allow" }
+        { "action": "subagent", "resource": "qa", "effect": "allow" },
+        { "action": "subagent", "resource": "review-risk", "effect": "allow" },
+        { "action": "subagent", "resource": "review-reliability", "effect": "allow" }
       ]
     }
   }

@@ -20,38 +20,21 @@ CREATE TABLE LIQUIDACIONES (
     ) NOT NULL,
     OBSERVACION VARCHAR(200),
     PRIMARY KEY (ID_LIQUIDACION),
-    CONSTRAINT FK_LIQUIDACION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE
-) ENGINE = InnoDB;
-
--- 1. Para buscar liquidaciones por empleado al instante
-/*
-INDICE IX_LIQUIDACION_EMPLEADO
-Busca al instante todas las liquidaciones de un empleado en especifico,
-por ejemplo para revisar su expediente de salida.
-*/
-CREATE INDEX IX_LIQUIDACION_EMPLEADO ON LIQUIDACIONES (ID_EMPLEADO);
-
--- 2. Para reportes de gastos por prestaciones laborales en un rango de tiempo
-/*
-INDICE IX_LIQUIDACION_FECHA
-Acelera los reportes de gastos por prestaciones en un rango de tiempo,
-que filtran por la fecha de la liquidacion.
-*/
-CREATE INDEX IX_LIQUIDACION_FECHA ON LIQUIDACIONES (FECHA_LIQUIDACION);
-
--- 3. Para estadísticas de rotación (Ej: "¿Cuántos se fueron por Renuncia?")
-/*
-INDICE IX_LIQUIDACION_MOTIVO
-Permite contar rapido cuanto se fue por renuncia, despido, fin de
-contrato o desahucio, para las estadisticas de rotacion.
-*/
-CREATE INDEX IX_LIQUIDACION_MOTIVO ON LIQUIDACIONES (MOTIVO);
-
+    CONSTRAINT FK_LIQUIDACION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE,
+    -- Busca al instante todas las liquidaciones de un empleado en especifico, por ejemplo
+    -- para revisar su expediente de salida.
+    INDEX IX_LIQUIDACION_EMPLEADO (ID_EMPLEADO),
+    -- Acelera los reportes de gastos por prestaciones en un rango de tiempo, que filtran
+    -- por la fecha de la liquidacion.
+    INDEX IX_LIQUIDACION_FECHA (FECHA_LIQUIDACION),
+    -- Permite contar rapido cuanto se fue por renuncia, despido, fin de contrato o
+    -- desahucio, para las estadisticas de rotacion.
+    INDEX IX_LIQUIDACION_MOTIVO (MOTIVO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------                
-
 
 
 /*
@@ -145,11 +128,9 @@ END //
 DELIMITER ;
 
 
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
-
 
 
 /*
@@ -164,8 +145,6 @@ SELECT
     SUM(MONTO_LIQUIDACION) AS COSTO_TOTAL_PRESTACIONES
 FROM LIQUIDACIONES
 GROUP BY MOTIVO;
-
-
 
 
 /*

@@ -14,24 +14,14 @@ CREATE TABLE AUDITORIA_SISTEMA (
     FECHA_HORA TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     VALOR_ANTERIOR TEXT, -- Datos antes del cambio (en formato JSON o String)
     VALOR_NUEVO TEXT, -- Datos después del cambio
-    PRIMARY KEY (ID_AUDITORIA)
-) ENGINE = InnoDB;
-
--- Para buscar qué pasó en una fecha específica
-/*
-INDICE IX_AUDITORIA_FECHA
-Ordena y filtra la bitacora por fecha y hora, asi los reportes y las
-busquedas por periodo salen rapidos sin recorrer toda la tabla.
-*/
-CREATE INDEX IX_AUDITORIA_FECHA ON AUDITORIA_SISTEMA (FECHA_HORA);
-
--- Para rastrear todo lo que se le ha hecho a una tabla (ej: 'VENTAS')
-/*
-INDICE IX_AUDITORIA_TABLA
-Permite rastrear rapido todo lo que le paso a una tabla en concreto
-(por ejemplo VENTAS) sin revisar la bitacora completa.
-*/
-CREATE INDEX IX_AUDITORIA_TABLA ON AUDITORIA_SISTEMA (TABLA_AFECTADA);
+    PRIMARY KEY (ID_AUDITORIA),
+    -- Ordena y filtra la bitacora por fecha y hora, asi los reportes y las busquedas por
+    -- periodo salen rapidos sin recorrer toda la tabla.
+    INDEX IX_AUDITORIA_FECHA (FECHA_HORA),
+    -- Permite rastrear rapido todo lo que le paso a una tabla en concreto (por ejemplo
+    -- VENTAS) sin revisar la bitacora completa.
+    INDEX IX_AUDITORIA_TABLA (TABLA_AFECTADA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
@@ -122,7 +112,6 @@ END //
 DELIMITER ;
 
 
-
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
@@ -185,11 +174,6 @@ BEGIN
 END //
 
 DELIMITER ;
-
-
-
-
-
 
 
 /*

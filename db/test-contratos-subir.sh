@@ -6,17 +6,26 @@
 # ocurre despues.
 # Corre contra BALBU_TECH_TEST dentro de un START TRANSACTION / ROLLBACK:
 # cero residuos.
-# Uso:  DB_PASSWORD=<clave> bash db/test-contratos-subir.sh
+# Uso (con el .env cargado):  DB_NAME=BALBU_TECH_TEST bash db/test-contratos-subir.sh
 set -u
 
 HOST="${DB_HOST:-127.0.0.1}"
-USER="${DB_USER:-root}"
-PASS="${DB_PASSWORD:-}"
+# (19/11/2026) SQL directo (INSERT/DELETE): necesita root, no `balbu_app`.
+# Se lee DB_ROOT_PASSWORD del .env y se ignora DB_USER=balbu_app a proposito.
+USER="${DB_ROOT_USER:-root}"
+PASS="${DB_ROOT_PASSWORD:-${DB_PASSWORD:-}}"
 DB="${DB_NAME:-BALBU_TECH_TEST}"
 
-# Sin credencial en el repo: exporta DB_PASSWORD al correr el test.
+# (19/11/2026) Este test ESCRIBE: solo corre contra una base de prueba. Antes no
+# tenia guarda, asi que un `.env` con DB_NAME=BALBU_TECH lo apuntaba a la viva.
+if [ "$DB" != "BALBU_TECH_TEST" ] && [ "$DB" != "BALBU_TECH_TEST_V92" ]; then
+  echo "FALTA DB_NAME de prueba (BALBU_TECH_TEST): este test escribe y no puede correr sobre la viva."
+  exit 1
+fi
+
+# Sin credencial en el repo: exporta DB_ROOT_PASSWORD al correr el test.
 if [ -z "$PASS" ]; then
-  echo "FALTA DB_PASSWORD: exporta la contrasena de MariaDB del usuario $USER antes de correr (el repo no guarda credenciales)."
+  echo "FALTA DB_ROOT_PASSWORD: exporta la contrasena de root de MariaDB antes de correr (el repo no guarda credenciales)."
   exit 1
 fi
 

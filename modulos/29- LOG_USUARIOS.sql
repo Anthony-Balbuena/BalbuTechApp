@@ -14,7 +14,7 @@ CREATE TABLE LOG_USUARIOS (
     ID_USUARIO_ADMIN INT,     -- Quién realizó el cambio
     CONSTRAINT FK_LOG_USUARIOS_USUARIO FOREIGN KEY (ID_USUARIO) REFERENCES USUARIOS (ID_USUARIO),
     CONSTRAINT FK_LOG_USUARIOS_ADMIN FOREIGN KEY (ID_USUARIO_ADMIN) REFERENCES USUARIOS (ID_USUARIO)
-);
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DESCRIBE USUARIOS;
 ----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------

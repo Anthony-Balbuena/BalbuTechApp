@@ -24,15 +24,19 @@ Fuente: `modulos/9- PRODUCTOS.sql` · Base: `BALBU_TECH` · Revisado: 20/10/2026
 | `P_COMPRA` | `DECIMAL(10,2)` | NOT NULL, DEFAULT `0.00`, CHECK `>= 0` | Precio de **compra**. Nace en 0 = pendiente de cargar el real. |
 | `CODIGO` | `VARCHAR(20)` | NOT NULL, **UNIQUE** | Código/barcode. Se normaliza a mayúsculas. |
 | `ESTADO` | `ENUM('ACTIVO','INACTIVO')` | NOT NULL, DEFAULT `'ACTIVO'` | Estado operativo. |
+| `ES_REPUESTO` | `TINYINT(1)` | NOT NULL, DEFAULT `0` | Repuesto de garantía: producto del catálogo que **no se vende**. Única fuente de verdad del destino del repuesto. |
 | `FECHA_CREACION` | `TIMESTAMP` | DEFAULT `CURRENT_TIMESTAMP` | Momento del alta. |
 | `ID_MARCA` | `INT` | NOT NULL, FK → `MARCAS` | Marca. |
 | `ID_CATEGORIA` | `INT` | NOT NULL, FK → `CATEGORIAS` | Categoría. |
 | `ID_PROVEEDOR` | `INT` | NOT NULL, FK → `PROVEEDORES` | Proveedor **preferido** (el mapa completo vive en `PRODUCTO_PROVEEDOR`). |
 | `IMAGEN` | `VARCHAR(255)` | NULL | URL/ruta de imagen. (La BD viva la tenía como `IMAGEN`; se unificó con ese nombre.) |
+| `DIAS_GARANTIA` | `INT` | NULL, DEFAULT `NULL`, CHECK `>= 0` | Días de garantía automática al confirmar la venta. `NULL` o `0` = sin garantía. (19/11/2026: la columna se declara acá; antes se agregaba con un `ALTER` desde el módulo 25.) |
+| `EXENTO_ITBIS` | `TINYINT(1)` | NOT NULL, DEFAULT `0` | Exento de ITBIS: sus líneas de **venta** y de **compra** no llevan impuesto. `0` = gravado (lo de siempre). Única fuente de verdad de la exención. (21/11/2026: va al final a propósito, para que un `ALTER ... AFTER DIAS_GARANTIA` deje una base vieja con el mismo orden de columnas que un import desde cero.) |
 
 **Restricciones de tabla:**
 - `UQ_PRODUCTO_NOMBRE_MARCA` UNIQUE (`NOMBRE`, `ID_MARCA`): no se repite el
   nombre dentro de la misma marca.
+- `CK_PRODUCTO_DIAS_GARANTIA` CHECK (`DIAS_GARANTIA` es `NULL` o `>= 0`).
 - `FK_PRODUCTO_MARCA`, `FK_PRODUCTO_CATEGORIA`, `FK_PRODUCTO_PROVEEDOR`.
 
 **Índices:** `IX_PRODUCTOS_MARCA` y `IX_PRODUCTOS_CATEGORIA` para listados y
@@ -93,12 +97,27 @@ parcial: todo parámetro `NULL` conserva el valor actual (`COALESCE`).
 `PRODUCTO: "<nombre>" - CAMBIO DE: <estado anterior> A: <estado nuevo>`
 (no usa el prefijo `EXITO:`).
 
+### `SP_MARCAR_PRODUCTO_EXENTO(P_ID_PRODUCTO, P_EXENTO)` — (21/11/2026)
+
+**Usada por la app** (`productos.cpp`, alta y edición). Marca o desmarca la exención
+de ITBIS de un producto.
+
+- `P_EXENTO` se **normaliza**: `1` marca exento; cualquier otro valor (o `NULL`) deja
+  el producto gravado, que es el comportamiento de siempre.
+- ID inexistente → `ERROR: EL PRODUCTO NO EXISTE.`
+- Devuelve `PRODUCTO: "<nombre>" - ITBIS: EXENTO|GRAVADO`.
+
+Existe como rutina aparte **a propósito**: `SP_INSERTAR_PRODUCTO` y
+`SP_ACTUALIZAR_PRODUCTOS` ya tienen sus llamadores y este flag es ortogonal al alta y
+a la edición del catálogo. Un producto nuevo nace gravado (`EXENTO_ITBIS DEFAULT 0`) y
+se marca desde esta rutina. Permiso: `GESTIONAR_PRODUCTOS`, exigido.
+
 ### `SP_CONSULTAR_PRODUCTOS_FILTRADO(P_BUSQUEDA)`
 
 **Usada por la app** (`productos.cpp`, `ventas.cpp`, `compras.cpp`,
 `inventario.cpp`). Devuelve
 `ID_PRODUCTO, CODIGO, NOMBRE, MARCA, CATEGORIA, PRECIO, P_COMPRA, ESTADO,
-STOCK, PROVEEDOR, ID_PROVEEDOR`, ordenado por ID.
+STOCK, PROVEEDOR, ID_PROVEEDOR, EXENTO_ITBIS`, ordenado por ID.
 
 - Sin filtro → todos.
 - Texto → `LIKE` por nombre, **código exacto** o ID numérico
@@ -137,6 +156,9 @@ para armar "Página 1 de 2" y habilitar/deshabilitar "siguiente". Permiso:
 **Usada por la app** (`productos.cpp`, `ventas.cpp`, `compras.cpp`). Lista
 solo productos **`ACTIVO`** con stock, mínimo, ubicación, precio y costo.
 Filtra por nombre, código, categoría o ID numérico.
+
+(21/11/2026) Devuelve también `EXENTO_ITBIS`: la pantalla de venta lista sin recargo
+el producto exento.
 
 Calcula `ESTATUS_STOCK`:
 - `IFNULL(STOCK_ACTUAL, 0) = 0` → **`AGOTADO`** (incluye productos sin fila
@@ -199,6 +221,9 @@ y marca para la pantalla de edición.
 (08/11/2026) Una página del listado de edición: `ID_PRODUCTO`, `PRODUCTO`,
 `PRECIO`, `ID_CATEGORIA`, `CATEGORIA`, `ID_MARCA`, `MARCA`. Permiso:
 `GESTIONAR_PRODUCTOS`, el mismo que ya exigía `PARA_ACTUALIZARDATOS`.
+
+(21/11/2026) Devuelve también `EXENTO_ITBIS` (al final): la pantalla de edición lo
+muestra en la lista y desde ahí se marca o desmarca con `SP_MARCAR_PRODUCTO_EXENTO`.
 
 ### `SP_CONTAR_PRODUCTOS()`
 
@@ -268,6 +293,15 @@ borran sin una limpieza acordada.
 - **Proveedor preferido** en `ID_PROVEEDOR`; el historial de proveedores y
   precios vive en `PRODUCTO_PROVEEDOR` (32).
 - **Auditoría de precio de venta** vía trigger.
+- **Exención de ITBIS por producto** (21/11/2026): `EXENTO_ITBIS = 1` significa que
+  sus líneas de venta y de compra no llevan impuesto. Es una propiedad del
+  **catálogo**, no de la línea: si el mismo producto se vendiera gravado y exento
+  según el cliente, este diseño no alcanza. La venta (`SP_AGREGAR_DETALLE_VENTA`) no
+  cobra ITBIS y la compra (`22_SP_AGREGAR_DETALLE_COMPRA`, `SP_MODIFICAR_LINEA_COMPRA`)
+  trata el precio escrito como **neto**. Las devoluciones prorratean el ITBIS desde la
+  línea guardada (foto histórica), no desde la tasa vigente: si no, devolverían un
+  impuesto que nunca se cobró. La tasa de empresa en `0 %` es un tema aparte
+  (`FN_TASA_ITBIS`), no se mezcla con esto.
 - **Sin `USE` hardcodeado:** la base la define el `--database` del import.
 
 ---

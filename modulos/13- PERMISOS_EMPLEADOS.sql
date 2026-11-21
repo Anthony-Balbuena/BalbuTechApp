@@ -28,34 +28,17 @@ CREATE TABLE PERMISOS_EMPLEADOS (
     FECHA_SOLICITUD TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     PRIMARY KEY (ID_PERMISO),
     CONSTRAINT CK_PERMISO_FECHAS CHECK (FECHA_FIN >= FECHA_INICIO),
-    CONSTRAINT FK_PERMISO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
-
-
-
--- 1. Para ver todos los permisos de un empleado (Ej: "¿Cuántas veces ha pedido médico?")
-/*
-INDICE IX_PERMISO_EMPLEADO
-Acelera el historial de permisos de un empleado, que es la consulta que
-mas se usa para ver cuantas veces ha pedido permiso y de que tipo.
-*/
-CREATE INDEX IX_PERMISO_EMPLEADO ON PERMISOS_EMPLEADOS (ID_EMPLEADO);
-
--- 2. Para ver qué permisos están PENDIENTES de aprobar hoy
-/*
-INDICE IX_PERMISO_ESTADO
-Permite filtrar rapidamente los permisos pendientes de aprobar, que es lo
-que ve la pantalla del dia a dia.
-*/
-CREATE INDEX IX_PERMISO_ESTADO ON PERMISOS_EMPLEADOS (ESTADO);
-
--- 3. Para calendarios de ausencias (Ej: "¿Quiénes no vienen la próxima semana?")
-/*
-INDICE IX_PERMISO_FECHAS
-Acelera los calendarios de ausencias, que buscan por rango de fechas para
-saber quien no viene en un periodo.
-*/
-CREATE INDEX IX_PERMISO_FECHAS ON PERMISOS_EMPLEADOS (FECHA_INICIO, FECHA_FIN);
+    CONSTRAINT FK_PERMISO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Acelera el historial de permisos de un empleado, que es la consulta que mas se usa
+    -- para ver cuantas veces ha pedido permiso y de que tipo.
+    INDEX IX_PERMISO_EMPLEADO (ID_EMPLEADO),
+    -- Permite filtrar rapidamente los permisos pendientes de aprobar, que es lo que ve la
+    -- pantalla del dia a dia.
+    INDEX IX_PERMISO_ESTADO (ESTADO),
+    -- Acelera los calendarios de ausencias, que buscan por rango de fechas para saber
+    -- quien no viene en un periodo.
+    INDEX IX_PERMISO_FECHAS (FECHA_INICIO, FECHA_FIN)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -196,8 +179,6 @@ END //
 DELIMITER ;
 
 
-
-
 /*
 SP_HISTORIAL_PERMISOS_EMPLEADO
 Lista todos los permisos de un empleado (tipo, fechas, estado y
@@ -219,7 +200,6 @@ BEGIN
     ORDER BY FECHA_INICIO DESC;
 END //
 DELIMITER ;
-
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -282,7 +262,7 @@ CREATE TABLE IF NOT EXISTS LOG_AUDITORIA_PERMISOS (
     -- de auditoria se queda sin nombre pero no desaparece.
     CONSTRAINT FK_LOG_PERMISO_ADMIN FOREIGN KEY (ID_USUARIO_ADMIN)
         REFERENCES USUARIOS(ID_USUARIO) ON DELETE SET NULL
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------
 -- Actualizacion de una base que ya tiene la tabla vieja

@@ -13,10 +13,9 @@
 #      queda "PENDIENTE DE ALTA" y el borrador pasa a .subido.
 #   8. Generar (12) NO consulta EMPLEADOS; la cedula se valida a 11 digitos.
 #
-# Uso:
-#   DB_NAME=BALBU_TECH_TEST DB_USER=root DB_PASSWORD=<clave> \
-#   BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=<usuario> BALBU_PASS=<clave> \
-#   bash db/test-contrato-borrador.sh
+# Uso (con el .env cargado):
+#   DB_NAME=BALBU_TECH_TEST BALBU_ALLOW_DEV_LOGIN=1 BALBU_USER=<usuario> \
+#   BALBU_PASS=<clave> bash db/test-contrato-borrador.sh
 # El repo no guarda credenciales y este test ESCRIBE: solo corre contra
 # BALBU_TECH_TEST. Usa cedulas marcador 302998878xx y las borra al salir.
 set -u
@@ -27,8 +26,10 @@ LIMITE="${LIMITE:-8}"          # segundos antes de declarar "colgado"
 fail=0
 
 HOST="${DB_HOST:-127.0.0.1}"
-USER="${DB_USER:-root}"
-PASS="${DB_PASSWORD:-}"
+# (19/11/2026) SQL directo (INSERT/DELETE): root, no `balbu_app`; se lee
+# DB_ROOT_PASSWORD del .env y se ignora DB_USER=balbu_app a proposito.
+USER="${DB_ROOT_USER:-root}"
+PASS="${DB_ROOT_PASSWORD:-${DB_PASSWORD:-}}"
 DB="${DB_NAME:-}"
 
 if [ ! -x "$APP" ]; then
@@ -46,7 +47,7 @@ if [ "$DB" != "BALBU_TECH_TEST" ] && [ "$DB" != "BALBU_TECH_TEST_V92" ]; then
   exit 1
 fi
 if [ -z "$PASS" ]; then
-  echo "FALTA DB_PASSWORD: exporta la contrasena de MariaDB del usuario $USER."
+  echo "FALTA DB_ROOT_PASSWORD: exporta la contrasena de root de MariaDB."
   exit 1
 fi
 
@@ -58,7 +59,7 @@ fi
 if ! mariadb -h "$HOST" -u "$USER" -p"$PASS" "$DB" \
        -e "DELETE FROM CONTRATOS WHERE 1 = 0" >/dev/null 2>&1; then
   echo "FALTA privilegio de escritura sobre $DB para '$USER'." >&2
-  echo "Este test hace SQL directo: corre con DB_USER=root y DB_PASSWORD=<DB_ROOT_PASSWORD>." >&2
+  echo "Este test hace SQL directo: necesita root (DB_ROOT_PASSWORD en el .env)." >&2
   exit 1
 fi
 

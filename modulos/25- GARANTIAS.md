@@ -59,10 +59,11 @@ ya vencieron) e `IX_GARANTIA_ESTADO` (las vigentes).
 
 ### `SP_REGISTRAR_GARANTIA(P_ID_DETALLE_VENTA, P_DIAS_VALIDEZ)`
 
-> **Versión vieja, sin autor.** La sección del flujo la reemplaza por
-> `SP_REGISTRAR_GARANTIA(P_ID_DETALLE_VENTA, P_DIAS_VALIDEZ, P_ID_EMPLEADO)`,
-> que es la que llama `ventas.cpp`. Lo que sigue describe la definición que
-> queda en **esta** sección, que el `DROP` del flujo se lleva puesta.
+> **Versión vieja, sin autor — RETIRADA del `.sql` el 19/11/2026.** La sección
+> del flujo define `SP_REGISTRAR_GARANTIA(P_ID_DETALLE_VENTA, P_DIAS_VALIDEZ,
+> P_ID_EMPLEADO)`, que es la que llama `ventas.cpp`. La copia de 2 parámetros
+> era código muerto (el `DROP` del flujo se la llevaba puesta). Lo de abajo
+> queda como historia de lo que hacía.
 
 **Crea la garantía contando desde hoy**.
 
@@ -170,9 +171,10 @@ PENDIENTE ──> APROBADO ──> CERRADO
 
 #### `27_SP_REGISTRAR_RECLAMO_GARANTIA(P_ID_GARANTIA, P_DESCRIPCION)`
 
-> **Versión vieja, sin autor ni validación de fechas.** El flujo la reemplaza
-> por `(P_ID_GARANTIA, P_DESCRIPCION, P_ID_EMPLEADO)`, que es la que llama
-> `ventas.cpp`. Lo que sigue describe la definición de **esta** sección.
+> **Versión vieja, sin autor ni validación de fechas — RETIRADA del `.sql` el
+> 19/11/2026.** El flujo define `(P_ID_GARANTIA, P_DESCRIPCION, P_ID_EMPLEADO)`,
+> que es la que llama `ventas.cpp`. La copia de 2 parámetros era código muerto.
+> Lo de abajo queda como historia.
 
 **Usada por la app** (`ventas.cpp`).
 
@@ -292,12 +294,14 @@ Fuente: `modulos/25- GARANTIAS.sql`, sección ASIGNACIONES_RECLAMOS · Revisado:
 | `ESTADO_ASIGNACION` | `ENUM('PENDIENTE','EN_PROCESO','COMPLETADO','CANCELADO')` | DEFAULT `'PENDIENTE'` | Estado del trabajo. |
 | `OBSERVACIONES` | `VARCHAR(255)` | NULL | Notas. |
 
-**Índices:** `IDX_EMPLEADO_FECHA` **y** `IDX_ASIGNACIONES_EMPLEADO_FECHA`, los dos
-sobre `(ID_EMPLEADO, FECHA_ASIGNACION)`.
+**Índice:** `IDX_EMPLEADO_FECHA` sobre `(ID_EMPLEADO, FECHA_ASIGNACION)`,
+declarado dentro del `CREATE TABLE`.
 
-> **Dos índices idénticos.** El primero se declara dentro del `CREATE TABLE` y el
-> segundo con un `CREATE INDEX` más abajo, con otro nombre: MySQL los acepta
-> como dos estructuras separadas sobre las mismas columnas. Uno sobra.
+> **El índice duplicado se eliminó el 15/11/2026.** `ASIGNACIONES_RECLAMOS`
+> llegó a tener dos índices sobre las mismas columnas: `IDX_EMPLEADO_FECHA` y
+> `IDX_ASIGNACIONES_EMPLEADO_FECHA` (este último heredado del ex módulo 34).
+> Queda uno solo; el `DROP INDEX IF EXISTS` del `.sql` limpia las bases viejas
+> que todavía lo tengan.
 >
 > **La FK del reclamo borra en cascada**: borrar un reclamo se lleva sus
 > asignaciones. La FK del empleado **no** tiene `ON DELETE`, así que un técnico
@@ -307,8 +311,10 @@ sobre `(ID_EMPLEADO, FECHA_ASIGNACION)`.
 > ese estado del `ENUM` es decorativo. Y el `CHECK` de fechas solo compara contra
 > la fecha de asignación por defecto, no contra la del reclamo.
 
-**Migración incluida:** `ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS
-CHK_FECHAS_VALIDAS CHECK (FECHA_FINALIZACION >= FECHA_ASIGNACION)`, idempotente.
+**Migración incluida:** ~~`ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS
+CHK_FECHAS_VALIDAS CHECK (FECHA_FINALIZACION >= FECHA_ASIGNACION)`, idempotente.~~
+(19/11/2026) El `CHECK` ahora se declara dentro del `CREATE TABLE
+ASIGNACIONES_RECLAMOS`: no hay `ALTER` suelto que buscar.
 
 ### Procedimientos almacenados
 
@@ -459,10 +465,14 @@ de arriba:
 Objetos que agrega o reemplaza:
 
 - Columna `PRODUCTOS.DIAS_GARANTIA INT NULL` con
-  `CK_PRODUCTO_DIAS_GARANTIA (NULL o >= 0)`.
-- Columnas `GARANTIAS.ID_EMPLEADO`, `GARANTIAS.FECHA_REGISTRO` y sus FK.
+  `CK_PRODUCTO_DIAS_GARANTIA (NULL o >= 0)`. **Declarada en el módulo 9**, no
+  acá: es una columna de `PRODUCTOS` y la tabla se lee completa en su archivo
+  (19/11/2026 dejó de agregarse con `ALTER` desde este módulo).
+- Columnas `GARANTIAS.ID_EMPLEADO`, `GARANTIAS.FECHA_REGISTRO` y sus FK,
+  declaradas en el `CREATE TABLE GARANTIAS` de este módulo.
 - Columnas `RECLAMOS_GARANTIAS.ID_EMPLEADO`,
-  `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE` y sus FK.
+  `ID_EMPLEADO_CIERRE` y `FECHA_CIERRE` y sus FK, declaradas en el
+  `CREATE TABLE RECLAMOS_GARANTIAS` de este módulo.
 - `SP_REGISTRAR_GARANTIA` (firma nueva, 3 parametros).
 - `27_SP_REGISTRAR_RECLAMO_GARANTIA` (firma nueva, 3 parametros).
 - ~~`27_SP_FINALIZAR_RECLAMO_TOTAL`~~ (firma nueva, 2 parametros): **eliminado el
@@ -490,9 +500,11 @@ Objetos que agrega o reemplaza:
 Ya no hay nada que aplicar aparte: esta sección va dentro de
 `25- GARANTIAS.sql` y corre con el import normal del módulo.
 
-Es idempotente: `ADD COLUMN IF NOT EXISTS`, las FK y el `CHECK` se agregan
-solo si no existen, y los SPs y el trigger se recrean con
-`DROP IF EXISTS` + `CREATE`.
+Es idempotente: los SPs y el trigger se recrean con `DROP IF EXISTS` + `CREATE`.
+Las columnas y restricciones **ya no se agregan con `ALTER`**: están declaradas
+en el `CREATE TABLE` de cada tabla (`PRODUCTOS.DIAS_GARANTIA` quedó en el módulo
+9). Una base vieja que no las tenga ya no se pone al día corriendo este módulo:
+hay que recrearla o migrarla a mano, porque el import es para base fresca.
 
 ### Orden de despliegue
 

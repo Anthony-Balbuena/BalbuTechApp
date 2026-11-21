@@ -96,12 +96,28 @@ gana el `.sql`.
 | Tipo de objeto | Cantidad |
 |---|---|
 | Tablas | 47 |
-| Procedimientos almacenados | 167 |
-| Triggers | 79 |
-| Vistas | 23 |
+| Procedimientos almacenados | 191 |
+| Triggers | 82 |
+| Vistas | 26 |
 | Funciones | 6 |
-| Índices | 62 |
-| **Total `CREATE`** | **383** |
+| Tablas temporales | 1 |
+| **Total `CREATE`** | **353** |
+
+Además hay **59 índices**, todos declarados dentro del `CREATE TABLE` de su
+tabla (ya no son sentencias `CREATE INDEX` sueltas).
+
+> (19/11/2026) Números remedidos: contando los `CREATE` de los `.sql` y
+> cruzados contra la base (**47 tablas / 191 SP / 82 triggers / 26 vistas / 6
+> funciones** en `BALBU_TECH_TEST`). Antes decían 167 SP / 79 triggers / 23
+> vistas / 383 `CREATE`: quedaron viejos con la consolidación de módulos y el
+> cableado de bonos, nómina, garantías y reclamos.
+>
+> (19/11/2026) Los **59 índices** dejaron de ser sentencias `CREATE INDEX`
+> sueltas: se declaran dentro del `CREATE TABLE` de su tabla, como las `FK` y
+> los `CHECK`. Por eso el total de `CREATE` baja de **411 a 353**, aunque los
+> índices siguen existiendo. La ventaja es que reimportar un módulo ya no emite
+> el aviso `1061` (índice duplicado) y no hay que dropear ni reconstruir
+> índices sobre una base con datos.
 
 Los módulos de seguridad (`65` y `66`) se aplican después de compilar el binario
 nuevo: cambian el login, agregan el token de sesión que la app vieja no manda y
@@ -118,7 +134,11 @@ alinean el cambio de clave con ese login.
 1. **Encabezado**: qué es, de qué depende y quién lo usa (con el `cpp` cuando
    aplica).
 2. **Tablas**: columna por columna, con tipo, restricciones y para qué sirve.
-   Los índices van dentro de la sección de su tabla.
+   Los índices van dentro de la sección de su tabla. Toda tabla cierra con
+   `) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`:
+   sin el `COLLATE` explícito la tabla hereda el de la **base**, y una base
+   creada con el default de MariaDB 11 (`utf8mb4_uca1400_ai_ci`) sale con otro
+   collation que la de producción.
 3. **Procedimientos**: firma, validaciones en orden, y los mensajes **exactos**
    que devuelve (para buscarlos en el código).
 4. **Triggers**: cuándo disparan, qué escriben y a qué trigger siguen (`FOLLOWS`).
@@ -136,12 +156,12 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
-| [CATEGORIAS](<1- CATEGORIAS.md>) | 1T · 7SP | Categorías de producto. | ✅ |
-| [MARCAS](<2- MARCAS.md>) | 1T · 7SP | Marcas de producto. | ✅ |
+| [CATEGORIAS](<1- CATEGORIAS.md>) | 1T · 6SP | Categorías de producto. | ✅ |
+| [MARCAS](<2- MARCAS.md>) | 1T · 5SP | Marcas de producto. | ✅ |
 | [METODOS_PAGO](<4-METODOS_PAGO.md>) | 1T · 5SP | Efectivo, tarjeta, transferencia… | ✅ |
 | [PROVEEDORES](<5- PROVEEDORES.md>) | 1T · 4SP | Proveedores. | ✅ |
 | [CLIENTES](<7- CLIENTES.md>) | 1T · 4SP · 2TR | Clientes. | ✅ |
-| [PRODUCTOS](<9- PRODUCTOS.md>) | 2T · 18SP · 2TR · 1V | Productos, precio de venta y de compra, más el historial de estados (absorbe el 18). | ✅ |
+| [PRODUCTOS](<9- PRODUCTOS.md>) | 2T · 17SP · 2TR · 1V | Productos, precio de venta y de compra, más el historial de estados (absorbe el 18). | ✅ |
 
 ### Inventario y stock
 
@@ -160,21 +180,21 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
-| [VENTAS](<21- VENTAS.md>) | 3T · 5SP · 10TR · 1V | Cabecera, detalle e historial de estados (absorbe el 21.5 y el 23). | ✅ |
+| [VENTAS](<21- VENTAS.md>) | 3T · 4SP · 10TR · 1V | Cabecera, detalle e historial de estados (absorbe el 21.5 y el 23). | ✅ |
 | [PAGOS](<24- PAGOS.md>) | 2T · 8SP · 6TR · 1V | Cobros, anulación, reporte de ventas y la caja por turno (absorbe el 41). | ✅ |
-| [GARANTIAS](<25- GARANTIAS.md>) | 4T · 15SP · 5TR | Garantía, reclamo, asignación, reparación y el flujo completo (absorbe el 27, el 34, el 35 y el 63; 3 `SP` quedan redefinidos, 12 rutinas distintas). | ✅ |
+| [GARANTIAS](<25- GARANTIAS.md>) | 4T · 13SP · 5TR | Garantía, reclamo, asignación, reparación y el flujo completo (absorbe el 27, el 34, el 35 y el 63; 13 rutinas distintas). | ✅ |
 | [DEVOLUCIONES](<26- DEVOLUCIONES.md>) | 1T · 2SP · 5TR · 2V | Devolución de mercancía del cliente. | ✅ |
-| [LECTURAS_VENTAS](<39- LECTURAS_VENTAS.md>) | 25SP · 2V | Las consultas de solo lectura de ventas, compras y caja (absorbe el reporte paginado del 60 y las ganancias del 38). | ✅ |
+| [LECTURAS_VENTAS](<39- LECTURAS_VENTAS.md>) | 30SP · 2V | Las consultas de solo lectura de ventas, compras y caja (absorbe el reporte paginado del 60 y las ganancias del 38). | ✅ |
 
 ### RRHH y personal
 
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
 | [EMPLEADOS](<8- EMPLEADOS.md>) | 2T · 14SP · 3TR | Empleados, cargo, salario y estado, el `UNIQUE` de cédula (absorbe el 59), los contratos (absorbe el 42) y la nómina: recibo con los bonos del mes y su pago. | ◐ |
-| [USUARIOS](<10- USUARIOS.md>) | 1T · 9SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
-| [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 7SP · 1TR | Entrada y salida por día. | ✅ |
+| [USUARIOS](<10- USUARIOS.md>) | 1T · 8SP · 1TR | Cuentas de acceso, atadas a un empleado y un rol. | ✅ |
+| [ASISTENCIA_EMPLEADOS](<11-ASISTENCIA_EMPLEADOS.md>) | 1T · 6SP · 1TR | Entrada y salida por día. | ✅ |
 | [VACACIONES_EMPLEADOS](<12- VACACIONES_EMPLEADOS.md>) | 1T · 8SP · 2TR | Solicitudes y cupo de vacaciones. | ✅ |
-| [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 2T · 6SP · 3TR · 1V | Permisos y ausencias del empleado, y su bitácora de auditoría (absorbe el 30 y el 69). | ✅ |
+| [PERMISOS_EMPLEADOS](<13- PERMISOS_EMPLEADOS.md>) | 2T · 6SP · 3TR · 2V | Permisos y ausencias del empleado, y su bitácora de auditoría (absorbe el 30 y el 69). | ✅ |
 | [BONOS_EMPLEADOS](<14- BONOS_EMPLEADOS.md>) | 1T · 7SP · 2TR · 1V | Bonos y descuentos de nómina; pantalla de gestión con permiso propio y pagador auditado. | ✅ |
 | [HISTORIAL_LABORAL_EMPLEADO](<15- HISTORIAL_LABORAL_EMPLEADO.md>) | 1T · 1TR · 2 ALTER | Cambios de cargo y salario. | — |
 | [LIQUIDACIONES](<16- LIQUIDACIONES.md>) | 1T · 1SP · 3TR · 2V | Liquidación al despedir. | — |
@@ -185,7 +205,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 |---|---|---|---|
 | [ROLES](<3- ROLES.md>) | 1T · 4SP | Roles del sistema. | ✅ |
 | [PERMISOS_ROLES](<36- PERMISOS_ROLES.md>) | 2T · 3SP · 1FN | Permisos y qué rol los tiene. Único dueño de la matriz: absorbe los permisos finos de asistencia, proveedores, historial de venta, categorías, marcas, métodos de pago, compras, caja, inventario y garantías (antes 45, 46, 47, 49, 50, 51, 52, 53, 58 y 62) y la migración de roles (antes 44). | ✅ |
-| [LOGIN_SERVIDOR](<65- LOGIN_SERVIDOR.md>) | 1T · 3SP | Verificación de la clave en el servidor con pepper; migración automática del formato viejo, y el cambio de clave en ese formato (absorbe el 67). | ✅ |
+| [LOGIN_SERVIDOR](<65- LOGIN_SERVIDOR.md>) | 1T · 2SP | Verificación de la clave en el servidor con pepper; migración automática del formato viejo, y el cambio de clave en ese formato (absorbe el 67). | ✅ |
 | [SESIONES_GUARDAS](<66- SESIONES_GUARDAS.md>) | 3T · 3SP · 1FN · 1IDX | Token de sesión de 12 h y guarda de permiso dentro de cada `SP` (`PERMISO_POR_RUTINA`, `LOG_PERMISO_SP`). | ✅ |
 | [CONFIGURACION](<33- CONFIGURACION.md>) | 1T · 1FN | Ajustes: ITBIS, datos de la empresa. | ✅ |
 | [AUDITORIA_SISTEMA](<6- AUDITORIA_SISTEMA.md>) | 1T · 3SP · 3TR | Bitácora genérica por tabla y registro (absorbe el 57). | — |
@@ -196,7 +216,7 @@ tablas · ◐ usa solo una parte · — **no** la usa.
 
 | Módulo | Objetos | Qué guarda | App |
 |---|---|---|---|
-| [VISTAS_REPORTES](<43- VISTAS_REPORTES.md>) | 5V | Las cinco vistas del "total con IVA" y los saldos pendientes. | — |
+| [VISTAS_REPORTES](<43- VISTAS_REPORTES.md>) | 7V | Las vistas del "total con IVA" y los saldos pendientes. | — |
 
 > El 43 se importa **al final**: MariaDB valida las tablas al crear una vista y
 > estas leen tablas del 19 y el 26.
@@ -289,9 +309,13 @@ Parciales, que conviene mirar antes de tocarlos:
 ## Estado de la documentación
 
 - **31 de 31** módulos documentados, un `.md` por `.sql`.
-- **372 objetos** `CREATE` verificados **nombre por nombre** contra su `.sql` en
-  la revisión del 05/11/2026; la fusión posterior no agregó ni quitó objetos.
+- **353 sentencias** `CREATE` en los `.sql`, que dan **47 tablas · 191 SP · 82
+  triggers · 26 vistas · 6 funciones · 1 tabla temporal** (19/11/2026), más
+  **59 índices** declarados dentro del `CREATE TABLE` de su tabla. Antes eran
+  411 `CREATE` porque cada índice era una sentencia `CREATE INDEX` aparte. El
+  conteo viejo (372) era de la revisión del 05/11/2026, antes de la
+  consolidación de módulos y del cableado de bonos, nómina, garantías y
+  reclamos: la fusión sí movió objetos.
 - Los `.sql` **no se tocaron** para documentar.
-- Los hallazgos están anotados en cada documento y en
-  `odd/tasks/documentacion-bd.md`, **sin arreglar**: son deuda técnica
-  documentada, no cambios pendientes autorizados.
+- Los hallazgos están anotados en cada documento, **sin arreglar**: son deuda
+  técnica documentada, no cambios pendientes autorizados.

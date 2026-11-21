@@ -15,15 +15,11 @@ CREATE TABLE INVENTARIO (
     FECHA_ACTUALIZACION TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
     PRIMARY KEY (ID_INVENTARIO),
     CONSTRAINT UQ_INVENTARIO_PRODUCTO UNIQUE (ID_PRODUCTO),
-    CONSTRAINT FK_INVENTARIO_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_INVENTARIO_FECHA
-Sirve para ordenar y buscar el inventario por su ultima fecha de cambio,
-asi los reportes salen rapidos sin recorrer toda la tabla.
-*/
-CREATE INDEX IX_INVENTARIO_FECHA ON INVENTARIO (FECHA_ACTUALIZACION);
+    CONSTRAINT FK_INVENTARIO_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE,
+    -- Sirve para ordenar y buscar el inventario por su ultima fecha de cambio, asi los
+    -- reportes salen rapidos sin recorrer toda la tabla.
+    INDEX IX_INVENTARIO_FECHA (FECHA_ACTUALIZACION)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 --INSERTAR
@@ -71,8 +67,6 @@ El ajuste manual ahora tiene una sola via:
 */
 
 
-
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
@@ -117,7 +111,6 @@ Se mantiene 17_TR_VALIDAR_STOCK_MINIMO: no escribe historial, solo alerta.
 */
 
 
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
@@ -140,10 +133,6 @@ JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
 WHERE I.STOCK_ACTUAL <= I.STOCK_MINIMO;
 
 
-
-
-
-
 /*
 VISTA_VALOR_PRODUCTOS
 Muestra cuanta dinero representa cada producto en bodega.
@@ -160,7 +149,6 @@ SELECT
 FROM INVENTARIO I
 JOIN PRODUCTOS P ON I.ID_PRODUCTO = P.ID_PRODUCTO
 ORDER BY VALOR_TOTAL_ITEM DESC;
-
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -190,22 +178,6 @@ BEGIN
     RETURN IFNULL(V_TOTAL, 0);
 END //
 DELIMITER ;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 -- ================================================================
@@ -242,32 +214,17 @@ CREATE TABLE MOVIMIENTOS_INVENTARIO (
     OBSERVACION VARCHAR(200),
     PRIMARY KEY (ID_MOVIMIENTO),
     CONSTRAINT FK_MOVIMIENTO_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO),
-    CONSTRAINT FK_MOVIMIENTO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
-
--- Tu índice para rastrear qué pasó con cada producto
-/*
-INDICE IX_MOVIMIENTO_PRODUCTO
-Busca todos los movimientos de un producto en concreto, asi se rastrea
-rapido que le paso al stock sin leer toda la tabla.
-*/
-CREATE INDEX IX_MOVIMIENTO_PRODUCTO ON MOVIMIENTOS_INVENTARIO (ID_PRODUCTO);
-
-/*
-INDICE IX_CANTIDAD_MOVIINVENTORIO
-Busca movimientos por cantidad, util para revisar entradas o salidas
-grandes de mercancia.
-*/
-CREATE INDEX IX_CANTIDAD_MOVIINVENTORIO ON MOVIMIENTOS_INVENTARIO (CANTIDAD);
-
-/*
-INDICE IX_MOVIMIENTO_FECHA
-Trae los movimientos por fecha: es el que usan los reportes de kardex y
-el cierre del dia, que recorren el dia completo de mas reciente a viejo.
-*/
-CREATE INDEX IX_MOVIMIENTO_FECHA ON MOVIMIENTOS_INVENTARIO (FECHA);
-
-
+    CONSTRAINT FK_MOVIMIENTO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Busca todos los movimientos de un producto en concreto, asi se rastrea
+    -- rapido que le paso al stock sin leer toda la tabla.
+    INDEX IX_MOVIMIENTO_PRODUCTO (ID_PRODUCTO),
+    -- Busca movimientos por cantidad, util para revisar entradas o salidas grandes de
+    -- mercancia.
+    INDEX IX_CANTIDAD_MOVIINVENTORIO (CANTIDAD),
+    -- Trae los movimientos por fecha: es el que usan los reportes de kardex y el cierre
+    -- del dia, que recorren el dia completo de mas reciente a viejo.
+    INDEX IX_MOVIMIENTO_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -393,7 +350,6 @@ END //
 DELIMITER ;
 
 
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
@@ -404,13 +360,6 @@ DELIMITER ;
 --VENTAS
 DELIMITER ;
 -- Trigger TR_AUDITORIA_MOVIMIENTO_VENTA movido a 21 (su tabla).
-
-
-
-
-
-
-
 
 
 -----------------------------------------------------------------------------------------------------------------------------

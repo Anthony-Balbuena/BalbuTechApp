@@ -12,7 +12,7 @@ CREATE TABLE MARCAS (
     ESTADO ENUM('ACTIVA', 'INACTIVA') NOT NULL DEFAULT 'ACTIVA',
     FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_MARCA)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------

@@ -35,94 +35,33 @@ CREATE TABLE GARANTIAS (
         'VENCIDA',
         'CANCELADA'
     ) NOT NULL DEFAULT 'ACTIVA',
+    -- (19/11/2026) Antes vivian como ALTER en la seccion "Flujo de garantias".
+    -- Se trajeron al CREATE para que la tabla se lea completa en un solo lugar.
+    ID_EMPLEADO INT NULL,
+    FECHA_REGISTRO TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ID_GARANTIA),
     CONSTRAINT UQ_GARANTIA_DETALLE UNIQUE (ID_DETALLE_VENTA),
     CONSTRAINT CK_GARANTIA_FECHAS CHECK (FECHA_FIN > FECHA_INICIO),
-    CONSTRAINT FK_GARANTIA_DETALLE FOREIGN KEY (ID_DETALLE_VENTA) REFERENCES DETALLES_VENTA (ID_DETALLE_VENTA) ON DELETE CASCADE
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_GARANTIA_INICIO
-Busca garantias por su fecha de inicio, util para reportes por periodo.
-*/
-CREATE INDEX IX_GARANTIA_INICIO ON GARANTIAS (FECHA_INICIO);
-
-/*
-INDICE IX_GARANTIA_FIN
-Busca garantias por su fecha de vencimiento, util para revisar cuales
-vencen pronto o ya vencieron.
-*/
-CREATE INDEX IX_GARANTIA_FIN ON GARANTIAS (FECHA_FIN);
-
-
-/*
-INDICE IX_GARANTIA_ESTADO
-Busca garantias por estado (ACTIVA, VENCIDA o CANCELADA),
-asi se filtran rapidamente las que estan vigentes.
-*/
-CREATE INDEX IX_GARANTIA_ESTADO ON GARANTIAS (ESTADO);
-
+    CONSTRAINT FK_GARANTIA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    CONSTRAINT FK_GARANTIA_DETALLE FOREIGN KEY (ID_DETALLE_VENTA) REFERENCES DETALLES_VENTA (ID_DETALLE_VENTA) ON DELETE CASCADE,
+    -- Busca garantias por su fecha de inicio, util para reportes por periodo.
+    INDEX IX_GARANTIA_INICIO (FECHA_INICIO),
+    -- Busca garantias por su fecha de vencimiento, util para revisar cuales vencen pronto
+    -- o ya vencieron.
+    INDEX IX_GARANTIA_FIN (FECHA_FIN),
+    -- Busca garantias por estado (ACTIVA, VENCIDA o CANCELADA), asi se filtran rapidamente
+    -- las que estan vigentes.
+    INDEX IX_GARANTIA_ESTADO (ESTADO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------   
 
-DELIMITER //
-DROP PROCEDURE IF EXISTS SP_REGISTRAR_GARANTIA;
-/*
-SP_REGISTRAR_GARANTIA
-Crea la garantia de un producto vendido contando desde hoy.
-Revisa que ese producto no tenga ya una garantia; si la tiene corta con
-error, y si no, guarda las fechas y devuelve el ID nuevo.
-NOTA (Parte 5, 07/10/2026): el UNIQUE UQ_GARANTIA_DETALLE es el
-respaldo del paso 1 - si dos sesiones registran a la vez, el conteo
-pasa a ambas pero el UNIQUE corta a la segunda. Fechas: CHECK
-CK_GARANTIA_FECHAS (FIN > INICIO) y TR_VALIDAR_FECHAS_GARANTIA
-autocorrige un inicio en el pasado (silencioso, no senala).
-*/
-CREATE PROCEDURE SP_REGISTRAR_GARANTIA(
-    IN P_ID_DETALLE_VENTA INT,
-    IN P_DIAS_VALIDEZ INT
-)
-proc_label: BEGIN
-    DECLARE V_EXISTE INT;
-    DECLARE V_NUEVO_ID INT;
-
-    -- 1. Verificar si ya existe una garantía
-    -- (09/10/2026) V4. Detalle inexistente (antes 1452 del FK).
-    IF NOT EXISTS (SELECT 1 FROM DETALLES_VENTA WHERE ID_DETALLE_VENTA = P_ID_DETALLE_VENTA) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL DETALLE DE VENTA NO EXISTE.';
-        LEAVE proc_label;
-    END IF;
-    SELECT COUNT(*) INTO V_EXISTE FROM GARANTIAS WHERE ID_DETALLE_VENTA = P_ID_DETALLE_VENTA;
-    
-    IF V_EXISTE > 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTE PRODUCTO YA TIENE UNA GARANTÍA ASIGNADA.';
-        LEAVE proc_label;
-    END IF;
-
-    -- 2. Insertar el registro
-    INSERT INTO GARANTIAS (ID_DETALLE_VENTA, FECHA_INICIO, FECHA_FIN)
-    VALUES (
-        P_ID_DETALLE_VENTA, 
-        CURRENT_DATE, 
-        DATE_ADD(CURRENT_DATE, INTERVAL P_DIAS_VALIDEZ DAY)
-        
-    );
-
-    -- 3. Capturar el ID recién generado
-    SET V_NUEVO_ID = LAST_INSERT_ID();
-
-    -- 4. Devolver mensaje y el ID para tu interfaz C#
-    SELECT 
-        'EXITO' AS ESTATUS,
-        'GARANTÍA REGISTRADA CON ÉXITO.' AS MENSAJE,
-        V_NUEVO_ID AS ID_GENERADO;
-END //
-DELIMITER ;
-
-
+-- (19/11/2026) ACA VIVIA una SEGUNDA definicion de SP_REGISTRAR_GARANTIA con 2
+-- parametros. Estaba MUERTA: la seccion 4 de este mismo modulo la redefine con
+-- 3 (P_ID_EMPLEADO) y ventas.cpp:1786 llama con 3. Se retiro la copia vieja.
 
 
 DELIMITER //
@@ -202,9 +141,6 @@ END //
 DELIMITER ;
 
 
-
-
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
@@ -242,58 +178,27 @@ CREATE TABLE RECLAMOS_GARANTIAS (
         'RECHAZADO',
         'CERRADO'
     ) NOT NULL DEFAULT 'PENDIENTE',
+    -- (19/11/2026) Antes vivian como ALTER en la seccion "Flujo de garantias".
+    -- Se trajeron al CREATE para que la tabla se lea completa en un solo lugar.
+    ID_EMPLEADO INT NULL,
+    ID_EMPLEADO_CIERRE INT NULL,
+    FECHA_CIERRE TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (ID_RECLAMO_GARAN),
-    CONSTRAINT FK_RECLAMO_GARANTIA FOREIGN KEY (ID_GARANTIA) REFERENCES GARANTIAS (ID_GARANTIA) ON DELETE CASCADE
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_RECLAMO_GARANTIA_FECHA
-Ordena los reclamos por fecha, asi los mas recientes salen primero
-sin recorrer toda la tabla.
-*/
-CREATE INDEX IX_RECLAMO_GARANTIA_FECHA ON RECLAMOS_GARANTIAS (FECHA_RECLAMO);
-
-
+    CONSTRAINT FK_RECLAMO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    CONSTRAINT FK_RECLAMO_EMPLEADO_CIERRE FOREIGN KEY (ID_EMPLEADO_CIERRE) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    CONSTRAINT FK_RECLAMO_GARANTIA FOREIGN KEY (ID_GARANTIA) REFERENCES GARANTIAS (ID_GARANTIA) ON DELETE CASCADE,
+    -- Ordena los reclamos por fecha, asi los mas recientes salen primero sin recorrer toda
+    -- la tabla.
+    INDEX IX_RECLAMO_GARANTIA_FECHA (FECHA_RECLAMO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------   
-DELIMITER //
-DROP PROCEDURE IF EXISTS 27_SP_REGISTRAR_RECLAMO_GARANTIA ;
-/*
-27_SP_REGISTRAR_RECLAMO_GARANTIA
-Registra un reclamo sobre una garantia.
-Revisa que la garantia exista y que este ACTIVA; si no, corta con error,
-y si esta bien, guarda el reclamo en estado PENDIENTE.
-*/
-CREATE PROCEDURE 27_SP_REGISTRAR_RECLAMO_GARANTIA(
-    IN P_ID_GARANTIA INT,
-    IN P_DESCRIPCION VARCHAR(255)
-)
-proc_label: BEGIN
-    DECLARE V_ESTADO_GARANTIA ENUM('ACTIVA', 'VENCIDA', 'CANCELADA');
-
-    -- 1. Verificar si la garantía está ACTIVA
-    SELECT ESTADO INTO V_ESTADO_GARANTIA FROM GARANTIAS WHERE ID_GARANTIA = P_ID_GARANTIA;
-
-    IF V_ESTADO_GARANTIA IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: LA GARANTÍA NO EXISTE.';
-        LEAVE proc_label;
-    END IF;
-
-    IF V_ESTADO_GARANTIA <> 'ACTIVA' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: ESTA GARANTÍA NO ESTÁ ACTIVA Y NO SE PUEDE RECLAMAR.';
-        LEAVE proc_label;
-    END IF;
-
-    -- 2. Registrar el reclamo
-    INSERT INTO RECLAMOS_GARANTIAS (ID_GARANTIA, DESCRIPCION)
-    VALUES (P_ID_GARANTIA, P_DESCRIPCION);
-
-    SELECT 'EXITO: RECLAMO REGISTRADO CORRECTAMENTE.' AS MENSAJE;
-END //
-DELIMITER ;
+-- (19/11/2026) ACA VIVIA una SEGUNDA definicion de 27_SP_REGISTRAR_RECLAMO_GARANTIA
+-- con 2 parametros. Estaba MUERTA: la seccion 4 la redefine con 3 y
+-- ventas.cpp:1853 llama con 3. Se retiro la copia vieja.
 
 -- (11/10/2026) Sin USE hardcodeado: la BD la gobierna --database del import.
 -- USE BALBU_TECH;
@@ -333,18 +238,14 @@ DROP PROCEDURE IF EXISTS 27_SP_FINALIZAR_RECLAMO_TOTAL //
 DELIMITER ;
 
 
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
 
 
-
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
-
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -419,17 +320,17 @@ CREATE TABLE ASIGNACIONES_RECLAMOS (
     ESTADO_ASIGNACION ENUM('PENDIENTE', 'EN_PROCESO', 'COMPLETADO', 'CANCELADO') DEFAULT 'PENDIENTE',
     OBSERVACIONES VARCHAR(255),
     PRIMARY KEY (ID_ASIGNACION),
+    -- (19/11/2026) Antes vivia como ALTER debajo del CREATE.
+    CONSTRAINT CHK_FECHAS_VALIDAS CHECK (FECHA_FINALIZACION >= FECHA_ASIGNACION),
     -- Índices para búsqueda rápida
     INDEX IDX_EMPLEADO_FECHA (ID_EMPLEADO, FECHA_ASIGNACION),
     -- Relaciones
     CONSTRAINT FK_ASIGNACION_RECLAMO FOREIGN KEY (ID_RECLAMO_GARAN) REFERENCES RECLAMOS_GARANTIAS (ID_RECLAMO_GARAN) ON DELETE CASCADE,
     CONSTRAINT FK_ASIGNACION_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE ASIGNACIONES_RECLAMOS 
-ADD CONSTRAINT IF NOT EXISTS CHK_FECHAS_VALIDAS
-CHECK (FECHA_FINALIZACION >= FECHA_ASIGNACION);
-
+-- (19/11/2026) El CHECK CHK_FECHAS_VALIDAS que antes se agregaba aca ahora se
+-- declara dentro del CREATE TABLE de arriba.
 
 
 /*
@@ -640,43 +541,22 @@ CREATE TABLE DETALLE_REPARACIONES (
     ESTADO_AVANCE ENUM('PENDIENTE', 'EN_PROCESO', 'COMPLETADO', 'CANCELADO') NOT NULL DEFAULT 'EN_PROCESO',
     RUTA_EVIDENCIA VARCHAR(255) NULL,
     PRIMARY KEY (ID_REPARACION),
+    -- (19/11/2026) Antes vivia como ALTER debajo del CREATE.
+    CONSTRAINT CHK_CANTIDAD_REPUESTO CHECK (CANTIDAD_REPUESTO IS NULL OR CANTIDAD_REPUESTO > 0),
     CONSTRAINT FK_REPARACION_ASIGNACION FOREIGN KEY (ID_ASIGNACION) REFERENCES ASIGNACIONES_RECLAMOS (ID_ASIGNACION) ON DELETE CASCADE,
     CONSTRAINT FK_DETALLE_USUARIO FOREIGN KEY (ID_USUARIO) REFERENCES USUARIOS(ID_USUARIO),
     CONSTRAINT FK_REPARACION_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- (15/11/2026) Migracion idempotente para bases que ya existen.
-ALTER TABLE DETALLE_REPARACIONES
-ADD COLUMN IF NOT EXISTS ID_PRODUCTO INT NULL AFTER ACCION_REALIZADA;
-
-ALTER TABLE DETALLE_REPARACIONES
-ADD COLUMN IF NOT EXISTS CANTIDAD_REPUESTO INT NULL AFTER ID_PRODUCTO;
-
--- (15/11/2026) REPUESTO_UTILIZADO se va: era un campo de texto libre que hacia
--- las veces de repuesto y dejaba consumir stock "escribiendo el nombre" en vez de
--- eligiendo el producto, que es justo lo que este cambio viene a cerrar. Lo que
--- haya que narrar va en ACCION_REALIZADA, que ya existia para eso.
+-- (19/11/2026) Limpieza que NO se puede expresar en un CREATE TABLE: saca de las
+-- bases viejas una columna que ya no existe en la definicion de arriba. En una
+-- base nueva es un no-op (IF EXISTS).
+-- REPUESTO_UTILIZADO era un campo de texto libre que hacia las veces de repuesto
+-- y dejaba consumir stock "escribiendo el nombre" en vez de eligiendo el
+-- producto, que es justo lo que este cambio vino a cerrar. Lo que haya que
+-- narrar va en ACCION_REALIZADA, que ya existia para eso.
 ALTER TABLE DETALLE_REPARACIONES
 DROP COLUMN IF EXISTS REPUESTO_UTILIZADO;
-
--- La FK no se puede "ADD CONSTRAINT IF NOT EXISTS" de forma portable: mismo
--- patron de comprobacion previa que usa la FK_RECLAMO_EMPLEADO_CIERRE de arriba.
-SET @hay_fk := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'DETALLE_REPARACIONES'
-                  AND CONSTRAINT_NAME = 'FK_REPARACION_PRODUCTO');
-SET @sql_fk := IF(@hay_fk = 0,
-    'ALTER TABLE DETALLE_REPARACIONES ADD CONSTRAINT FK_REPARACION_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO)',
-    'DO 0');
-PREPARE st_fk FROM @sql_fk;
-EXECUTE st_fk;
-DEALLOCATE PREPARE st_fk;
-
-ALTER TABLE DETALLE_REPARACIONES
-ADD CONSTRAINT IF NOT EXISTS CHK_CANTIDAD_REPUESTO
-CHECK (CANTIDAD_REPUESTO IS NULL OR CANTIDAD_REPUESTO > 0);
-
-
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -845,11 +725,12 @@ DELIMITER ;
 /*
 SECCION FLUJO DE GARANTIAS (ex modulo 63) - AUTOR, FECHAS Y CONSULTAS
 
-Ojo: esta seccion redefine tres SPs que ya estan definidos mas arriba en este
-mismo archivo (SP_REGISTRAR_GARANTIA, 27_SP_REGISTRAR_RECLAMO_GARANTIA y
-27_SP_FINALIZAR_RECLAMO_TOTAL). Los DROP PROCEDURE IF EXISTS de aca son los que
-sacan la version vieja. Se dejan las dos a la vista a proposito: son el
-historial del cambio de firma y asi se lee en un solo archivo.
+Ojo: SP_REGISTRAR_GARANTIA y 27_SP_REGISTRAR_RECLAMO_GARANTIA quedan definidos
+UNA sola vez, en esta seccion. Las copias viejas de 2 parametros que vivian mas
+arriba en este mismo archivo se retiraron el 19/11/2026 (eran codigo muerto: el
+DROP de aca las borraba y ventas.cpp llama con 3). De
+27_SP_FINALIZAR_RECLAMO_TOTAL solo queda el DROP: el cierre va por
+SP_FINALIZAR_RECLAMO (15/11/2026).
 
 Problema
 --------
@@ -867,8 +748,9 @@ Solucion
   3. RECLAMOS_GARANTIAS: ID_EMPLEADO, ID_EMPLEADO_CIERRE y FECHA_CIERRE.
   4. SP_REGISTRAR_GARANTIA recibe el empleado y valida los dias.
   5. 27_SP_REGISTRAR_RECLAMO_GARANTIA valida las fechas, no solo el estado.
-  6. 27_SP_FINALIZAR_RECLAMO_TOTAL solo cierra PENDIENTE o APROBADO y guarda
-     quien cerro y cuando.
+  6. 27_SP_FINALIZAR_RECLAMO_TOTAL solo cerraba PENDIENTE o APROBADO y guardaba
+     quien cerro y cuando. **Se elimino el 15/11/2026**: el cierre va por
+     SP_FINALIZAR_RECLAMO, que cierra la asignacion y el reclamo juntos.
   7. SP_MARCAR_GARANTIAS_VENCIDAS escribe VENCIDA; SP_CONSULTAR_GARANTIAS lo
      invoca antes de listar para no depender de un scheduler.
   8. SP_CONSULTAR_GARANTIAS, SP_CONSULTAR_RECLAMOS y
@@ -885,74 +767,29 @@ El binario viejo llama a los SPs con la firma anterior y falla al registrar o
 finalizar. Como GARANTIAS y RECLAMOS_GARANTIAS estan vacias y el flujo no se
 usa, la ventana es de minutos y no se pierden datos.
 
-Idempotente: las columnas usan IF NOT EXISTS, las FK se agregan solo si no
-existen, y los SPs y el trigger se recrean con DROP IF EXISTS + CREATE.
+Idempotente: los SPs y el trigger se recrean con DROP IF EXISTS + CREATE, y las
+columnas y FKs de esta seccion viven dentro del CREATE TABLE de cada tabla (ver
+"Consolidacion de los ALTER", abajo).
 */
 
 -- ---------------------------------------------------------------------------
--- 1. Dias de garantia por producto
+-- Consolidacion de los ALTER (19/11/2026)
 -- ---------------------------------------------------------------------------
-ALTER TABLE PRODUCTOS
-    ADD COLUMN IF NOT EXISTS DIAS_GARANTIA INT NULL DEFAULT NULL
-    COMMENT 'Dias de garantia automatica al confirmar la venta. NULL o 0 = sin garantia';
-
-SET @hay_ck := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS
-                WHERE CONSTRAINT_SCHEMA = DATABASE()
-                  AND CONSTRAINT_NAME = 'CK_PRODUCTO_DIAS_GARANTIA');
-SET @sql_ck := IF(@hay_ck = 0,
-    'ALTER TABLE PRODUCTOS ADD CONSTRAINT CK_PRODUCTO_DIAS_GARANTIA CHECK (DIAS_GARANTIA IS NULL OR DIAS_GARANTIA >= 0)',
-    'DO 0');
-PREPARE st_ck FROM @sql_ck;
-EXECUTE st_ck;
-DEALLOCATE PREPARE st_ck;
-
--- ---------------------------------------------------------------------------
--- 2. GARANTIAS: autor y fecha de registro
--- ---------------------------------------------------------------------------
-ALTER TABLE GARANTIAS
-    ADD COLUMN IF NOT EXISTS ID_EMPLEADO INT NULL,
-    ADD COLUMN IF NOT EXISTS FECHA_REGISTRO TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
-SET @hay_fk := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'GARANTIAS'
-                  AND CONSTRAINT_NAME = 'FK_GARANTIA_EMPLEADO');
-SET @sql_fk := IF(@hay_fk = 0,
-    'ALTER TABLE GARANTIAS ADD CONSTRAINT FK_GARANTIA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)',
-    'DO 0');
-PREPARE st_fk FROM @sql_fk;
-EXECUTE st_fk;
-DEALLOCATE PREPARE st_fk;
-
--- ---------------------------------------------------------------------------
--- 3. RECLAMOS_GARANTIAS: autor, cierre y fecha de cierre
--- ---------------------------------------------------------------------------
-ALTER TABLE RECLAMOS_GARANTIAS
-    ADD COLUMN IF NOT EXISTS ID_EMPLEADO INT NULL,
-    ADD COLUMN IF NOT EXISTS ID_EMPLEADO_CIERRE INT NULL,
-    ADD COLUMN IF NOT EXISTS FECHA_CIERRE TIMESTAMP NULL DEFAULT NULL;
-
-SET @hay_fk := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'RECLAMOS_GARANTIAS'
-                  AND CONSTRAINT_NAME = 'FK_RECLAMO_EMPLEADO');
-SET @sql_fk := IF(@hay_fk = 0,
-    'ALTER TABLE RECLAMOS_GARANTIAS ADD CONSTRAINT FK_RECLAMO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)',
-    'DO 0');
-PREPARE st_fk FROM @sql_fk;
-EXECUTE st_fk;
-DEALLOCATE PREPARE st_fk;
-
-SET @hay_fk := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'RECLAMOS_GARANTIAS'
-                  AND CONSTRAINT_NAME = 'FK_RECLAMO_EMPLEADO_CIERRE');
-SET @sql_fk := IF(@hay_fk = 0,
-    'ALTER TABLE RECLAMOS_GARANTIAS ADD CONSTRAINT FK_RECLAMO_EMPLEADO_CIERRE FOREIGN KEY (ID_EMPLEADO_CIERRE) REFERENCES EMPLEADOS (ID_EMPLEADO)',
-    'DO 0');
-PREPARE st_fk FROM @sql_fk;
-EXECUTE st_fk;
-DEALLOCATE PREPARE st_fk;
+-- Esta seccion traia 5 ALTER TABLE + 5 bloques PREPARE para agregar columnas y
+-- FKs sobre tablas ya creadas. Ya no: cada columna y cada restriccion quedo
+-- declarada en su CREATE TABLE, que es el unico lugar donde hay que mirar.
+--
+--   PRODUCTOS.DIAS_GARANTIA + CK_PRODUCTO_DIAS_GARANTIA
+--       -> modulos/9- PRODUCTOS.sql, CREATE TABLE PRODUCTOS.
+--   GARANTIAS.ID_EMPLEADO + FECHA_REGISTRO + FK_GARANTIA_EMPLEADO
+--       -> CREATE TABLE GARANTIAS, arriba en este archivo.
+--   RECLAMOS_GARANTIAS.ID_EMPLEADO + ID_EMPLEADO_CIERRE + FECHA_CIERRE
+--      + FK_RECLAMO_EMPLEADO + FK_RECLAMO_EMPLEADO_CIERRE
+--       -> CREATE TABLE RECLAMOS_GARANTIAS, arriba en este archivo.
+--
+-- Consecuencia, dicha de frente: el import es para base FRESCA (ver
+-- README-DOCKER.md). Una base vieja que no tenga esas columnas ya no se pone al
+-- dia corriendo este modulo: hay que recrearla o migrarla a mano.
 
 -- ---------------------------------------------------------------------------
 -- 4. Registrar garantia (manual, respaldo de ventas viejas)

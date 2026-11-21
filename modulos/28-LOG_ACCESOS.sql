@@ -16,7 +16,7 @@ CREATE TABLE LOG_ACCESOS (
     -- (03/11/2026, T2) El login cuenta fallos por usuario dentro de la ventana
     -- de bloqueo. Sin este indice cada intento recorre la tabla completa.
     INDEX IX_LOG_ACCESOS_USUARIO_FECHA (USUARIO_INTENTADO, FECHA_ACCESO)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. SP que usa login.cpp en cada intento
 DELIMITER //

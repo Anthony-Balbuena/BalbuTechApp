@@ -7,8 +7,11 @@ La tabla usa InnoDB para permitir transacciones y claves foraneas.
 */
 CREATE TABLE ROLES (
     ID_ROL INT PRIMARY KEY AUTO_INCREMENT,
-    NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE
-) ENGINE = InnoDB; 
+    NOMBRE_ROL VARCHAR(50) NOT NULL UNIQUE,
+    -- Indice no unico sobre NOMBRE_ROL que acelera las busquedas y listados
+    -- de roles por su nombre.
+    INDEX IX_ROLES_NOMBRE (NOMBRE_ROL)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- (22/10/2026) Set final de roles de la tienda: ADMIN, RRHH, VENDEDOR,
 -- GERENTE, SUBGERENTE, ALMACEN y CONTABILIDAD. CAJERO se elimino y sus
 -- permisos pasaron a VENDEDOR; EMPLEADO se renombro a VENDEDOR.
@@ -18,12 +21,6 @@ CREATE TABLE ROLES (
 -- los ID_ROL. El renombre y las bajas van en la migracion viva (backups/).
 -- Sin estas filas fallan los seeds de ROL_PERMISO (FK) y el login. Idempotente.
 INSERT IGNORE INTO ROLES (NOMBRE_ROL) VALUES ('ADMIN'), ('RRHH'), ('VENDEDOR'), ('GERENTE'), ('SUBGERENTE'), ('ALMACEN'), ('CONTABILIDAD');
-/*
-INDICE IX_ROLES_NOMBRE
-Indice no unico sobre NOMBRE_ROL que acelera las busquedas y listados
-de roles por su nombre.
-*/
-CREATE INDEX IX_ROLES_NOMBRE ON ROLES(NOMBRE_ROL);
 
 
 ----------------------------------------------------------------------------------------------------
@@ -67,8 +64,6 @@ END //
 DELIMITER ;
 
 
-
-
 --ACTUALIZAR 
 /*
 SP_ACTUALIZAR_ROL
@@ -106,8 +101,6 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: ROL ID ', P_ID_ROL, ' ACTUALIZADO.') AS MENSAJE;
 END //
 DELIMITER ;
-
-
 
 
 --BUSCAR 

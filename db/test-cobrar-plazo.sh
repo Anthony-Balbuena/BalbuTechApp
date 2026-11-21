@@ -57,6 +57,9 @@ N() { mariadb -N -B -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -
 # --force y el CREATE va ULTIMO, para que corra aunque un DELETE falle: si el
 # script muriera entre el DROP y el CREATE, la base quedaria sin el candado.
 # Las lineas se van solas: la FK FK_DETALLE_VENTA es ON DELETE CASCADE.
+# El cuerpo tiene que ser el MISMO que declara modulos/21 (BEGIN ... END): si se
+# copia la version de una sola sentencia, cada corrida de la bateria deja
+# BALBU_TECH_TEST en drift. De ahi el DELIMITER.
 # ---------------------------------------------------------------------------
 limpiar_db() {
     M --force >/dev/null 2>&1 <<'SQL'
@@ -71,11 +74,15 @@ DELETE FROM MOVIMIENTOS_INVENTARIO WHERE ID_PRODUCTO IN
 DELETE FROM INVENTARIO WHERE ID_PRODUCTO IN
     (SELECT ID_PRODUCTO FROM PRODUCTOS WHERE NOMBRE = 'ZZ PLAZO COBRO');
 DELETE FROM PRODUCTOS WHERE NOMBRE = 'ZZ PLAZO COBRO';
+DELIMITER //
 CREATE TRIGGER TR_BLOQUEAR_BORRADO_VENTA
 BEFORE DELETE ON VENTAS
 FOR EACH ROW
-SIGNAL SQLSTATE '45000'
-SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+END //
+DELIMITER ;
 SQL
 }
 limpiar() { limpiar_db; rm -rf "$TMP"; }

@@ -14,16 +14,12 @@ CREATE TABLE HISTORIAL_MOVIMIENTOS_PRODUCTO (
     FECHA_MOVIMIENTO TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     OBSERVACION VARCHAR(200),
     PRIMARY KEY (ID_MOVIMIENTO),
-    CONSTRAINT FK_HISTORIAL_PROD FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE
-) ENGINE = InnoDB; 
-
-/*
-INDICE IX_HIST_MOVIMIENTO_FECHA
-Trae el historial de movimientos por fecha: hasta ahora solo estaba la PK
-y el FK del producto, y todo lo que pide "que paso en tal dia" tenia que
-recorrer la tabla entera.
-*/
-CREATE INDEX IX_HIST_MOVIMIENTO_FECHA ON HISTORIAL_MOVIMIENTOS_PRODUCTO (FECHA_MOVIMIENTO);
+    CONSTRAINT FK_HISTORIAL_PROD FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO) ON DELETE CASCADE,
+    -- Trae el historial de movimientos por fecha: hasta ahora solo estaba la PK y el FK
+    -- del producto, y todo lo que pide "que paso en tal dia" tenia que recorrer la tabla
+    -- entera.
+    INDEX IX_HIST_MOVIMIENTO_FECHA (FECHA_MOVIMIENTO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -238,13 +234,9 @@ movimiento (lista completa en 17- INVENTARIO.sql).
 ----------------------------------------------------------------------------------------------------------------------------- 
 
 
-
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[FUNTION}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
-
-
 
 
 -- ================================================================
@@ -274,7 +266,7 @@ CREATE TABLE PRODUCTO_PROVEEDOR (
     PRIMARY KEY (ID_PRODUCTO, ID_PROVEEDOR),
     CONSTRAINT FK_MAPA_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO),
     CONSTRAINT FK_MAPA_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_MAPA_COMPRA_RECIBIDA ;

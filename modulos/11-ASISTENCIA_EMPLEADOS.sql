@@ -31,29 +31,18 @@ CREATE TABLE ASISTENCIA_EMPLEADOS (
     OBSERVACION VARCHAR(200),
     PRIMARY KEY (ID_ASISTENCIA),
     CONSTRAINT UQ_ASISTENCIA_DIA UNIQUE (ID_EMPLEADO, FECHA),
-    CONSTRAINT FK_ASISTENCIA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_ASISTENCIA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Facilita las búsquedas de asistencia por fecha, por ejemplo, para consultar la
+    -- asistencia del día actual o de un mes específico.
+    INDEX IX_ASISTENCIA_FECHA (FECHA),
+    -- Facilita la consulta del historial de asistencia y puntualidad de un empleado a
+    -- partir de su ID_EMPLEADO.
+    INDEX IX_ASISTENCIA_EMPLEADO (ID_EMPLEADO),
+    -- Facilita la búsqueda y generación de reportes agrupados por estado de asistencia,
+    -- como PRESENTE, AUSENTE, TARDE o PERMISO.
+    INDEX IX_ASISTENCIA_ESTADO (ESTADO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/*
-ÍNDICE IX_ASISTENCIA_FECHA
-Facilita las búsquedas de asistencia por fecha, por ejemplo, para consultar
-la asistencia del día actual o de un mes específico.
-*/
-CREATE INDEX IX_ASISTENCIA_FECHA ON ASISTENCIA_EMPLEADOS (FECHA);
-
-/*
-ÍNDICE IX_ASISTENCIA_EMPLEADO
-Facilita la consulta del historial de asistencia y puntualidad de un empleado
-a partir de su ID_EMPLEADO.
-*/
-CREATE INDEX IX_ASISTENCIA_EMPLEADO ON ASISTENCIA_EMPLEADOS (ID_EMPLEADO);
-
-/*
-ÍNDICE IX_ASISTENCIA_ESTADO
-Facilita la búsqueda y generación de reportes agrupados por estado de
-asistencia, como PRESENTE, AUSENTE, TARDE o PERMISO.
-*/
-CREATE INDEX IX_ASISTENCIA_ESTADO ON ASISTENCIA_EMPLEADOS (ESTADO);
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -139,7 +128,6 @@ proc_label: BEGIN
     SELECT 'EXITO: ASISTENCIA REGISTRADA.' AS MENSAJE;
 END //
 DELIMITER ;
-
 
 
 ---Salida

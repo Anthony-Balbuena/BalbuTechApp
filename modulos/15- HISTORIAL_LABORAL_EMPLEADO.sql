@@ -29,34 +29,18 @@ CREATE TABLE HISTORIAL_LABORAL_EMPLEADO (
     FECHA_CAMBIO TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     OBSERVACION VARCHAR(280),
     PRIMARY KEY (ID_HISTORIAL_EMPLEADO),
-    CONSTRAINT FK_HISTORIAL_EMPLEADO_REF FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE
-) ENGINE = InnoDB;
+    CONSTRAINT FK_HISTORIAL_EMPLEADO_REF FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO) ON DELETE CASCADE,
+    -- Encuentra al instante todo el historial de un empleado en especifico,
+    -- ordenado por lo que le ha pasado a lo largo del tiempo.
+    INDEX IX_HISTORIAL_EMPLEADO_ID (ID_EMPLEADO),
+    -- Ordena y filtra el historial por fecha de cambio, que es lo que usan los reportes
+    -- para ver que paso en un periodo.
+    INDEX IX_HISTORIAL_EMPLEADO_FECHA (FECHA_CAMBIO),
+    -- Agrupa y filtra el historial por tipo de cambio (AUMENTO, PROMOCION, CAMBIO_PUESTO o
+    -- AJUSTE) para los reportes.
+    INDEX IX_HISTORIAL_EMPLEADO_TIPO (TIPO_CAMBIO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Índices para búsquedas rápidas por empleado, fecha o tipo de cambio
-
-
-/*
-INDICE IX_HISTORIAL_EMPLEADO_ID
-Encuentra al instante todo el historial de un empleado en especifico,
-ordenado por lo que le ha pasado a lo largo del tiempo.
-*/
-CREATE INDEX IX_HISTORIAL_EMPLEADO_ID ON HISTORIAL_LABORAL_EMPLEADO (ID_EMPLEADO);
-
-
-/*
-INDICE IX_HISTORIAL_EMPLEADO_FECHA
-Ordena y filtra el historial por fecha de cambio, que es lo que usan los
-reportes para ver que paso en un periodo.
-*/
-CREATE INDEX IX_HISTORIAL_EMPLEADO_FECHA ON HISTORIAL_LABORAL_EMPLEADO (FECHA_CAMBIO);
-
-
-/*
-INDICE IX_HISTORIAL_EMPLEADO_TIPO
-Agrupa y filtra el historial por tipo de cambio (AUMENTO, PROMOCION,
-CAMBIO_PUESTO o AJUSTE) para los reportes.
-*/
-CREATE INDEX IX_HISTORIAL_EMPLEADO_TIPO ON HISTORIAL_LABORAL_EMPLEADO (TIPO_CAMBIO);
 
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}--------------------------------------------------

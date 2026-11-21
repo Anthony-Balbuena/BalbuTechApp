@@ -28,6 +28,9 @@ struct LineaCompra {
     double precioCompra = 0.0;
     int idProveedor = 0;
     string nombreProveedor;
+    // (21/11/2026) Producto exento de ITBIS: el precio escrito ES el neto, no
+    // hay impuesto que desglosar. Mismo flag que usa SP_AGREGAR_DETALLE_COMPRA.
+    bool exento = false;
 };
 
 struct CierreCompra {
@@ -190,16 +193,18 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
             "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'INCLUIR')"));
         pstmt->setString(1, entrada);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        struct Cand { int id; string codigo; string nombre; };
+        struct Cand { int id; string codigo; string nombre; bool exento; };
         vector<Cand> lista;
         bool exacto = false;
         while (res->next()) {
             if (res->getString("ESTADO") != "ACTIVO") continue;
-            Cand c{res->getInt("ID_PRODUCTO"), res->getString("CODIGO"), res->getString("NOMBRE")};
+            Cand c{res->getInt("ID_PRODUCTO"), res->getString("CODIGO"), res->getString("NOMBRE"),
+                   res->getInt("EXENTO_ITBIS") == 1};
             if ((esNumerico(entrada) && c.id == stoi(entrada)) || c.codigo == entrada) {
                 out.idProducto = c.id;
                 out.codigo = c.codigo;
                 out.nombre = c.nombre;
+                out.exento = c.exento;
                 exacto = true;
                 break;
             }
@@ -221,10 +226,15 @@ static bool resolverProductoC(const string &entrada, LineaCompra &out) {
             out.idProducto = lista[0].id;
             out.codigo = lista[0].codigo;
             out.nombre = lista[0].nombre;
+            out.exento = lista[0].exento;
             return true;
         }
         cout << "\nCoincidencias:" << endl;
-        for (auto &c : lista) cout << c.id << " | " << c.codigo << " | " << c.nombre << endl;
+        for (auto &c : lista) {
+            cout << c.id << " | " << c.codigo << " | " << c.nombre;
+            if (c.exento) cout << " (EXENTO de ITBIS)";
+            cout << endl;
+        }
         int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
         return resolverProductoC(to_string(pick), out);
     } catch (const CancelarOperacionException &) {
@@ -471,31 +481,35 @@ static void mostrarHistorialPrecios(int idProducto) {
 
 static void mostrarCarritoCompra(const vector<LineaCompra> &carrito, double tasa) {
     (void)tasa;
-    cout << "\n--- CARRITO (precios de factura, con IVA) ---" << endl;
+    cout << "\n--- CARRITO (precios de factura) ---" << endl;
     // (08/11/2026) tablaCelda: el nombre del producto y el proveedor pueden
     // traer acentos o simbolos, y printf corre las columnas.
+    // (21/11/2026) La columna decia «C/ITBIS» y el total «con IVA»: con un producto
+    // exento el precio escrito ES el neto, asi que esas etiquetas mentian. Se
+    // quitaron y el exento se marca en la linea.
     const size_t W_PRO = 25, W_CAN = 4, W_PROV = 22, W_UNI = 15, W_TOT = 12;
     const size_t ANCHO = W_PRO + W_CAN + W_PROV + W_UNI + W_TOT + 4 * 3;
     cout << "\n"
          << tablaCelda("PRODUCTO", W_PRO) << " | "
          << tablaCelda("CANT", W_CAN) << " | "
          << tablaCelda("PROVEEDOR", W_PROV) << " | "
-         << tablaCelda("P.UNIT C/ITBIS", W_UNI) << " | "
+         << tablaCelda("P.UNIT", W_UNI) << " | "
          << tablaCelda("TOTAL", W_TOT) << "\n"
          << tablaLinea(ANCHO) << "\n";
     double total = 0.0;
     for (auto &l : carrito) {
-        // El precio escrito ya trae ITBIS: el parcial es directo.
+        // El precio escrito ya es lo que se paga por unidad (neto en un exento).
         double parcial = l.precioCompra * l.cantidad;
         total += parcial;
-        cout << tablaCelda(l.nombre, W_PRO) << " | "
+        string nombre = l.nombre + (l.exento ? " (EXENTO)" : "");
+        cout << tablaCelda(nombre, W_PRO) << " | "
              << tablaCelda(to_string(l.cantidad), W_CAN) << " | "
              << tablaCelda(l.nombreProveedor, W_PROV) << " | "
              << tablaCelda(dinero(l.precioCompra), W_UNI) << " | "
              << tablaCelda(dinero(parcial), W_TOT) << "\n"
              << tablaLinea(ANCHO) << "\n";
     }
-    cout << tablaCelda("Total con IVA =", W_PRO) << " | "
+    cout << tablaCelda("Total =", W_PRO) << " | "
          << tablaCelda("", W_CAN) << " | "
          << tablaCelda("", W_PROV) << " | "
          << tablaCelda("", W_UNI) << " | "
@@ -821,7 +835,11 @@ static void compraRapida() {
         cout << "Producto: " << prod.idProducto << " (" << prod.nombre << ")" << endl;
         cout << "Stock actual: " << stockDeC(prod.idProducto) << endl;
         int cant = (int)leerNumeroConIntentos("Cantidad: ", 1, 999999999);
-        double precio = leerNumeroConIntentos("Precio de factura c/u $ (con ITBIS): ", 0.01, 999999999.99);
+        // (21/11/2026) Un producto exento no lleva ITBIS: el precio escrito es el
+        // neto, no un precio de factura con impuesto adentro (ver S3).
+        double precio = prod.exento
+            ? leerNumeroConIntentos("Precio c/u $ (EXENTO de ITBIS, precio neto): ", 0.01, 999999999.99)
+            : leerNumeroConIntentos("Precio de factura c/u $ (con ITBIS): ", 0.01, 999999999.99);
         mostrarHistorialPrecios(prod.idProducto);
         if (!elegirSuplidor(prod)) {
             cout << ROJO << "Sin suplidor no hay linea." << RESET << endl;

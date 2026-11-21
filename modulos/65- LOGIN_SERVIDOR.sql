@@ -28,7 +28,7 @@
 CREATE TABLE IF NOT EXISTS SECRETO_SISTEMA (
     CLAVE VARCHAR(50) PRIMARY KEY,
     VALOR VARCHAR(255) NOT NULL
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- El valor se genera una sola vez; si ya existe, se respeta.
 INSERT INTO SECRETO_SISTEMA (CLAVE, VALOR)

@@ -19,40 +19,25 @@ CREATE TABLE COMPRAS (
     FACTURA VARCHAR(30) NULL, -- Factura del proveedor (opcional, unica por proveedor)
     PRIMARY KEY (ID_COMPRA),
     CONSTRAINT FK_COMPRA_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR),
-    CONSTRAINT FK_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
- 
--- Para reportes de compras por mes, año o día (Cierres de caja)
-/*
-INDICE IX_COMPRA_FECHA
-Ordena las compras por fecha, asi los reportes por mes, dia o cierre de caja
-salen rapidos sin recorrer toda la tabla.
-*/
-CREATE INDEX IX_COMPRA_FECHA ON COMPRAS (FECHA);
-
--- Para análisis de gastos (Ej: "Busca compras mayores a 50,000 pesos")
-/*
-INDICE IX_COMPRA_TOTAL
-Busca compras por su monto, util para analizar gastos y encontrar las
-compras mas grandes de un periodo.
-*/
-CREATE INDEX IX_COMPRA_TOTAL ON COMPRAS (TOTAL);
-
-/*
-INDICE UQ_COMPRA_FACTURA
-Cada factura vale una sola vez por proveedor: dos compras del mismo
-proveedor no pueden repetir numero (distintos proveedores si pueden y
-las compras sin factura no chocan). Si alguien la fuerza con un UPDATE
-el indice la rechaza solo; el SP da el mensaje amable.
-*/
-CREATE UNIQUE INDEX UQ_COMPRA_FACTURA ON COMPRAS (ID_PROVEEDOR, FACTURA);
-
-/*
-INDICE IX_COMPRA_EMPLEADO
-Busca las compras que hizo cada empleado, para reportes de quien compra
-que (mismo rol que IX_VENTAS_EMPLEADO en el archivo 21).
-*/
-CREATE INDEX IX_COMPRA_EMPLEADO ON COMPRAS (ID_EMPLEADO);
+    CONSTRAINT FK_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Ordena las compras por fecha, asi los reportes por mes, dia o cierre de caja salen
+    -- rapidos sin recorrer toda la tabla.
+    INDEX IX_COMPRA_FECHA (FECHA),
+    -- Busca compras por su monto, util para analizar gastos y encontrar las compras mas
+    -- grandes de un periodo.
+    INDEX IX_COMPRA_TOTAL (TOTAL),
+    -- Cada factura vale una sola vez por proveedor: dos compras del mismo proveedor no
+    -- pueden repetir numero (distintos proveedores si pueden y las compras sin factura no
+    -- chocan). Si alguien la fuerza con un UPDATE el indice la rechaza solo; el SP da el
+    -- mensaje amable.
+    CONSTRAINT UQ_COMPRA_FACTURA UNIQUE (ID_PROVEEDOR, FACTURA),
+    -- Busca las compras que hizo cada empleado, para reportes de quien compra que (mismo
+    -- rol que IX_VENTAS_EMPLEADO en el archivo 21).
+    INDEX IX_COMPRA_EMPLEADO (ID_EMPLEADO),
+    -- Busca todas las compras de un proveedor en concreto, util para ver el historial de
+    -- compras hechas a cada proveedor.
+    INDEX IX_COMPRA_PROVEEDOR (ID_PROVEEDOR)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*
 TABLA HISTORIAL_ESTADOS_COMPRA
@@ -74,27 +59,20 @@ CREATE TABLE HISTORIAL_ESTADOS_COMPRA (
     CONSTRAINT FK_HIST_ESTADO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
     -- (09/10/2026) CHECKs: el historial no admite estados inventados (solo los del ENUM de COMPRAS).
     CONSTRAINT CK_HIST_ESTADO_ANTERIOR CHECK (ESTADO_ANTERIOR IS NULL OR ESTADO_ANTERIOR IN ('ABIERTA', 'RECIBIDA', 'CANCELADA', 'DEVUELTA')),
-    CONSTRAINT CK_HIST_ESTADO_NUEVO CHECK (ESTADO_NUEVO IN ('ABIERTA', 'RECIBIDA', 'CANCELADA', 'DEVUELTA'))
-) ENGINE = InnoDB;
+    CONSTRAINT CK_HIST_ESTADO_NUEVO CHECK (ESTADO_NUEVO IN ('ABIERTA', 'RECIBIDA', 'CANCELADA', 'DEVUELTA')),
+    -- Trae el historial de estados por fecha para los reportes (por compra ya lo cubre el
+    -- FK).
+    INDEX IX_HIST_ESTADO_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Migracion para BDs ya creadas con VARCHAR(20): unifica al ENUM (re-ejecutable).
 ALTER TABLE HISTORIAL_ESTADOS_COMPRA
     MODIFY COLUMN ESTADO_ANTERIOR ENUM('ABIERTA','RECIBIDA','CANCELADA','DEVUELTA') NULL,
     MODIFY COLUMN ESTADO_NUEVO ENUM('ABIERTA','RECIBIDA','CANCELADA','DEVUELTA') NOT NULL;
 
-/*
-INDICE IX_HIST_ESTADO_FECHA
-Trae el historial de estados por fecha para los reportes (por compra
-ya lo cubre el FK).
-*/
-CREATE INDEX IX_HIST_ESTADO_FECHA ON HISTORIAL_ESTADOS_COMPRA (FECHA);
-
-
-
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------   
-
 
 
 DELIMITER //
@@ -363,8 +341,6 @@ DELIMITER ;
 -- Trigger TR_BLOQUEAR_UPDATE_DETALLE_COMPRA: mas abajo en este archivo.
 
 
-
-
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}---------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
@@ -580,7 +556,6 @@ END //
 DELIMITER ;
 
 
-
 /*
 SP_REPORTE_PERIODO_COMPRA (14/10/2026)
 Reporte de compras RECIBIDAS en un rango de fechas (inclusive).
@@ -671,8 +646,13 @@ CREATE TABLE PAGOS_COMPRA (
     CONSTRAINT CHK_PAGOS_COMPRA_MONTO CHECK (MONTO <> 0),
     CONSTRAINT FK_PAGO_COMPRA FOREIGN KEY (ID_COMPRA) REFERENCES COMPRAS (ID_COMPRA),
     CONSTRAINT FK_PAGO_COMPRA_METODO FOREIGN KEY (ID_METODO_PAGO) REFERENCES METODOS_PAGO (ID_METODO_PAGO),
-    CONSTRAINT FK_PAGO_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_PAGO_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Trae todos los pagos de una compra en concreto, para ver como se fue saldando.
+    INDEX IX_PAGOS_COMPRA_COMPRA (ID_COMPRA),
+    -- Trae los pagos por fecha para el cierre de caja y los reportes del dia (mismo rol
+    -- que IX_PAGOS_FECHA en PAGOS de ventas).
+    INDEX IX_PAGOS_COMPRA_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- Deja al dia una BD que ya tenia esta tabla (como la real): agrega las
@@ -703,19 +683,6 @@ ALTER TABLE PAGOS_COMPRA ADD CONSTRAINT IF NOT EXISTS CHK_PAGOS_COMPRA_MONTO CHE
 -- NEUTRALIZADO: duplica el FK inline del CREATE (error 1826 inofensivo pero ensucia el log).
 -- ALTER TABLE PAGOS_COMPRA ADD CONSTRAINT FK_PAGO_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO);
 
-/*
-INDICE IX_PAGOS_COMPRA_COMPRA
-Trae todos los pagos de una compra en concreto, para ver como se fue
-saldando.
-*/
-CREATE INDEX IX_PAGOS_COMPRA_COMPRA ON PAGOS_COMPRA (ID_COMPRA);
-
-/*
-INDICE IX_PAGOS_COMPRA_FECHA
-Trae los pagos por fecha para el cierre de caja y los reportes del dia
-(mismo rol que IX_PAGOS_FECHA en PAGOS de ventas).
-*/
-CREATE INDEX IX_PAGOS_COMPRA_FECHA ON PAGOS_COMPRA (FECHA);
 
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[PAGOS DE LA COMPRA}-----------------------------------------------------------
@@ -1356,7 +1323,6 @@ FROM PAGOS_COMPRA PC
 LEFT JOIN METODOS_PAGO MP ON PC.ID_METODO_PAGO = MP.ID_METODO_PAGO;
 
 
-
 /*
 SP_COMPRAS_PENDIENTES (14/10/2026)
 Compras con dinero de por medio para "Cobrar compra".
@@ -1370,7 +1336,6 @@ BEGIN
       FROM VISTA_COMPRAS_PENDIENTES_PAGO ORDER BY ID_COMPRA DESC LIMIT 20;
 END //
 DELIMITER ;
-
 
 
 -- ================================================================
@@ -1418,9 +1383,12 @@ proc_label: BEGIN
     DECLARE V_CANTIDAD_COMPRADA INT;
     DECLARE V_PRECIO_UNITARIO DECIMAL(10, 2);
     DECLARE V_YA_DEVUELTA INT;
-    -- (11/10/2026) ITBIS devuelto con tasa vigente.
-    DECLARE V_TASA_TXT VARCHAR(100);
-    DECLARE V_TASA DECIMAL(5, 2);
+    -- (21/11/2026) ITBIS devuelto: se prorratea desde la linea de compra
+    -- guardada, igual que la ganancia en la devolucion de venta. Con un
+    -- producto exento (MONTO_ITBIS = 0) recalcularlo con la tasa vigente
+    -- inventaria un credito fiscal que el suplidor no cobro.
+    DECLARE V_ITBIS_LINEA DECIMAL(10, 2);
+    DECLARE V_ITBIS_DEVUELTO DECIMAL(10, 2);
     DECLARE V_PROPIA_TRANSACCION INT DEFAULT 0;
 
     -- Transaccion propia: si nadie la abrio antes, la abre y la cierra
@@ -1451,9 +1419,9 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
-    -- 3. El detalle debe existir (trae compra, cantidad, precio y estado)
-    SELECT DC.ID_COMPRA, DC.CANTIDAD, DC.PRECIO_UNITARIO, C.ESTADO
-      INTO V_ID_COMPRA, V_CANTIDAD_COMPRADA, V_PRECIO_UNITARIO, V_ESTADO_COMPRA
+    -- 3. El detalle debe existir (trae compra, cantidad, precio, ITBIS y estado)
+    SELECT DC.ID_COMPRA, DC.CANTIDAD, DC.PRECIO_UNITARIO, IFNULL(DC.MONTO_ITBIS, 0), C.ESTADO
+      INTO V_ID_COMPRA, V_CANTIDAD_COMPRADA, V_PRECIO_UNITARIO, V_ITBIS_LINEA, V_ESTADO_COMPRA
       FROM DETALLE_COMPRA DC
       JOIN COMPRAS C ON C.ID_COMPRA = DC.ID_COMPRA
      -- BLINDAJE (07/10/2026): FOR UPDATE congela el detalle y la compra
@@ -1489,18 +1457,15 @@ proc_label: BEGIN
     END IF;
 
     -- 6. Guarda la devolucion pendiente con su subtotal al dia de hoy
-    -- (11/10/2026) ITBIS con la tasa vigente (foto histórica).
-    SELECT VALOR INTO V_TASA_TXT FROM CONFIGURACION WHERE CLAVE = 'ITBIS';
-    IF V_TASA_TXT IS NULL OR V_TASA_TXT + 0 <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.';
-        LEAVE proc_label;
-    END IF;
-    SET V_TASA = V_TASA_TXT + 0;
+    -- (21/11/2026) El ITBIS sale de la linea guardada (foto historica), no de la
+    -- tasa vigente: con un producto exento (MONTO_ITBIS = 0) la devolucion
+    -- devolvia un credito fiscal que el suplidor nunca cobro.
+    SET V_ITBIS_DEVUELTO = ROUND(V_ITBIS_LINEA * P_CANTIDAD / V_CANTIDAD_COMPRADA, 2);
     INSERT INTO DEVOLUCION_COMPRA
         (ID_DETALLE_COMPRA, ID_EMPLEADO, CANTIDAD, MOTIVO, CONDICION_PRODUCTO, SUBTOTAL_DEVUELTO, MONTO_ITBIS_DEVUELTO)
     VALUES
         (P_ID_DETALLE_COMPRA, P_ID_EMPLEADO, P_CANTIDAD, P_MOTIVO, P_CONDICION_PRODUCTO,
-         P_CANTIDAD * V_PRECIO_UNITARIO, ROUND(P_CANTIDAD * V_PRECIO_UNITARIO * V_TASA / 100, 2));
+         P_CANTIDAD * V_PRECIO_UNITARIO, V_ITBIS_DEVUELTO);
 
     SET P_ID_DEVOLUCION_GENERADO = LAST_INSERT_ID();
 
@@ -1648,31 +1613,12 @@ CREATE TABLE DETALLE_COMPRA (
     PRIMARY KEY (ID_DETALLE_COMPRA),
     CONSTRAINT UQ_COMPRA_PRODUCTO UNIQUE (ID_COMPRA, ID_PRODUCTO),
     CONSTRAINT FK_DETALLE_COMPRA FOREIGN KEY (ID_COMPRA) REFERENCES COMPRAS (ID_COMPRA) ON DELETE CASCADE,
-    CONSTRAINT FK_DETALLE_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO)
-) ENGINE = InnoDB;
-
--- 1. Optimiza la búsqueda de compras por cada Proveedor
-/*
-INDICE IX_COMPRA_PROVEEDOR
-Busca todas las compras de un proveedor en concreto,
-util para ver el historial de compras hechas a cada proveedor.
-*/
-CREATE INDEX IX_COMPRA_PROVEEDOR ON COMPRAS (ID_PROVEEDOR);
-
--- 2. Acelera la carga de los productos de una factura de compra específica
-/*
-INDICE IX_DETALLE_COMPRA_COMPRA
-Trae rapidamente todos los productos que trae una factura de compra.
-*/
-CREATE INDEX IX_DETALLE_COMPRA_COMPRA ON DETALLE_COMPRA (ID_COMPRA);
-
--- 3. Permite rastrear el historial de precios y compras de un solo Producto
-/*
-INDICE IX_DETALLE_COMPRA_PRODUCTO
-Sirve para rastrear el historial de precios y compras de un solo producto.
-*/
-CREATE INDEX IX_DETALLE_COMPRA_PRODUCTO ON DETALLE_COMPRA (ID_PRODUCTO);
-
+    CONSTRAINT FK_DETALLE_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO),
+    -- Trae rapidamente todos los productos que trae una factura de compra.
+    INDEX IX_DETALLE_COMPRA_COMPRA (ID_COMPRA),
+    -- Sirve para rastrear el historial de precios y compras de un solo producto.
+    INDEX IX_DETALLE_COMPRA_PRODUCTO (ID_PRODUCTO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -1701,6 +1647,9 @@ proc_label: BEGIN
     DECLARE V_ITBIS DECIMAL(10, 2);
     DECLARE V_BRUTO_LINEA DECIMAL(12, 2);
     DECLARE V_PRECIO_NETO DECIMAL(10, 2);
+    -- (21/11/2026) Exento de ITBIS: si el producto lo esta, el precio escrito
+    -- ES el neto (el suplidor no cobra impuesto) y no se desglosa nada.
+    DECLARE V_EXENTO TINYINT(1) DEFAULT 0;
     -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
     -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
     -- no la toca y cualquier error se propaga para que el que llama decida.
@@ -1732,6 +1681,10 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- (21/11/2026) Exencion del producto: decide si el precio escrito es neto.
+    SELECT IFNULL(EXENTO_ITBIS, 0) INTO V_EXENTO
+      FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
     IF IFNULL((SELECT ESTADO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO), 'INACTIVO') <> 'ACTIVO' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO ESTA ACTIVO.';
         LEAVE proc_label;
@@ -1760,12 +1713,20 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
-    -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
-    SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
-    -- (15/10/2026) El ITBIS absorbe el redondeo: el TOTAL siempre cuadra
-    -- al centavo con la factura del suplidor.
-    SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2)) / P_CANTIDAD, 2);
-    SET V_ITBIS = ROUND(V_BRUTO_LINEA - P_CANTIDAD * V_PRECIO_NETO, 2);
+    -- (21/11/2026) Producto exento: el precio escrito ES el neto y no hay ITBIS
+    -- que desglosar. La factura del suplidor de un exento no trae impuesto, asi
+    -- que desglosar como si lo trajera inventaria un credito fiscal inexistente.
+    IF V_EXENTO = 1 THEN
+        SET V_PRECIO_NETO = P_PRECIO;
+        SET V_ITBIS = 0.00;
+    ELSE
+        -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
+        SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
+        -- (15/10/2026) El ITBIS absorbe el redondeo: el TOTAL siempre cuadra
+        -- al centavo con la factura del suplidor.
+        SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2)) / P_CANTIDAD, 2);
+        SET V_ITBIS = ROUND(V_BRUTO_LINEA - P_CANTIDAD * V_PRECIO_NETO, 2);
+    END IF;
     INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, MONTO_ITBIS)
     VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO_NETO, V_ITBIS);
 
@@ -1887,6 +1848,9 @@ proc_label: BEGIN
     DECLARE V_ITBIS DECIMAL(10, 2);
     DECLARE V_BRUTO_LINEA DECIMAL(12, 2);
     DECLARE V_PRECIO_NETO DECIMAL(10, 2);
+    -- (21/11/2026) Exento de ITBIS: si el producto lo esta, el precio escrito
+    -- ES el neto (el suplidor no cobra impuesto) y no se desglosa nada.
+    DECLARE V_EXENTO TINYINT(1) DEFAULT 0;
     -- Transaccion propia: si nadie la abrio antes, la abre y la cierra este
     -- SP; si venimos de adentro de otra (llamada anidada o cierre de caja),
     -- no la toca y cualquier error se propaga para que el que llama decida.
@@ -1939,6 +1903,10 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
 
+    -- (21/11/2026) Exencion del producto: decide si el precio escrito es neto.
+    SELECT IFNULL(EXENTO_ITBIS, 0) INTO V_EXENTO
+      FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
     -- 4. Se va la linea vieja: regresa el stock y recalcula el TOTAL
     DELETE FROM DETALLE_COMPRA WHERE ID_DETALLE_COMPRA = V_ID_DETALLE;
 
@@ -1950,12 +1918,19 @@ proc_label: BEGIN
         LEAVE proc_label;
     END IF;
     SET V_TASA = V_TASA_TXT + 0;
-    -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
-    SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
-    -- (15/10/2026) El ITBIS absorbe el redondeo: el TOTAL siempre cuadra
-    -- al centavo con la factura del suplidor.
-    SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2)) / P_CANTIDAD, 2);
-    SET V_ITBIS = ROUND(V_BRUTO_LINEA - P_CANTIDAD * V_PRECIO_NETO, 2);
+    -- (21/11/2026) Producto exento: el precio escrito ES el neto, sin ITBIS que
+    -- desglosar (misma regla que el alta de linea).
+    IF V_EXENTO = 1 THEN
+        SET V_PRECIO_NETO = P_PRECIO;
+        SET V_ITBIS = 0.00;
+    ELSE
+        -- (13/10/2026) La factura del suplidor trae ITBIS incluido: se descuenta.
+        SET V_BRUTO_LINEA = P_CANTIDAD * P_PRECIO;
+        -- (15/10/2026) El ITBIS absorbe el redondeo: el TOTAL siempre cuadra
+        -- al centavo con la factura del suplidor.
+        SET V_PRECIO_NETO = ROUND((V_BRUTO_LINEA - ROUND(V_BRUTO_LINEA * V_TASA / (100 + V_TASA), 2)) / P_CANTIDAD, 2);
+        SET V_ITBIS = ROUND(V_BRUTO_LINEA - P_CANTIDAD * V_PRECIO_NETO, 2);
+    END IF;
     INSERT INTO DETALLE_COMPRA (ID_COMPRA, ID_PRODUCTO, CANTIDAD, PRECIO_UNITARIO, MONTO_ITBIS)
     VALUES (P_ID_COMPRA, P_ID_PRODUCTO, P_CANTIDAD, V_PRECIO_NETO, V_ITBIS);
 
@@ -2053,12 +2028,6 @@ ENTRADA en MOVIMIENTOS_INVENTARIO dos veces (una con empleado fijo 1).
 Ya lo hacen TR_ACTUALIZAR_STOCK_COMPRA (19- COMPRAS) y
 TR_AUDITORIA_MOVIMIENTO_COMPRA (17- INVENTARIO).
 */
-
-
-
-
-
-
 
 
 ------------------------------------------------------------------------------------------------------------------------------
@@ -2378,8 +2347,15 @@ CREATE TABLE DEVOLUCION_COMPRA (
     ESTADO ENUM('PENDIENTE', 'PROCESADA', 'RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
     PRIMARY KEY (ID_DEVOLUCION_COMPRA),
     CONSTRAINT FK_DEVOLUCION_COMPRA_DETALLE FOREIGN KEY (ID_DETALLE_COMPRA) REFERENCES DETALLE_COMPRA (ID_DETALLE_COMPRA),
-    CONSTRAINT FK_DEVOLUCION_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_DEVOLUCION_COMPRA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Busca las devoluciones por fecha, igual que las demas tablas de compra, para los
+    -- reportes del periodo.
+    INDEX IX_DEVOLUCION_COMPRA_FECHA (FECHA),
+    -- Trae las devoluciones por estado y fecha: es el de "devoluciones pendientes del
+    -- dia". Sin este indice ese reporte recorria la tabla entera (ventas si lo tiene:
+    -- IX_DEVOLUCION_ESTADO_FECHA en el archivo 25).
+    INDEX IX_DEVOLUCION_COMPRA_ESTADO_FECHA (ESTADO, FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- Deja al dia una BD que ya tenia esta tabla (como la real): le pone el
@@ -2389,20 +2365,6 @@ CREATE TABLE DEVOLUCION_COMPRA (
 -- ============================================================
 ALTER TABLE DEVOLUCION_COMPRA MODIFY COLUMN SUBTOTAL_DEVUELTO DECIMAL(10, 2) NOT NULL CHECK (SUBTOTAL_DEVUELTO > 0);
 
-/*
-INDICE IX_DEVOLUCION_COMPRA_FECHA
-Busca las devoluciones por fecha, igual que las demas tablas de compra,
-para los reportes del periodo.
-*/
-CREATE INDEX IX_DEVOLUCION_COMPRA_FECHA ON DEVOLUCION_COMPRA (FECHA);
-
-/*
-INDICE IX_DEVOLUCION_COMPRA_ESTADO_FECHA
-Trae las devoluciones por estado y fecha: es el de "devoluciones
-pendientes del dia". Sin este indice ese reporte recorria la tabla entera
-(ventas si lo tiene: IX_DEVOLUCION_ESTADO_FECHA en el archivo 25).
-*/
-CREATE INDEX IX_DEVOLUCION_COMPRA_ESTADO_FECHA ON DEVOLUCION_COMPRA (ESTADO, FECHA);
 
 -----------------------------------------------------------------------------------------------------------------------
 -- Trigger TR_PROCESAR_DEVOLUCION_COMPRA: mas abajo en este archivo, junto a su tabla.

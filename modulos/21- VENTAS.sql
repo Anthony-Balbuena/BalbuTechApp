@@ -19,31 +19,19 @@ CREATE TABLE VENTAS (
     FACTURA VARCHAR(30) NULL, -- Factura del cliente (opcional, unica por cliente)
     PRIMARY KEY (ID_VENTA),
     CONSTRAINT FK_VENTA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
-    CONSTRAINT FK_VENTA_CLIENTE FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES (ID_CLIENTE)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_VENTA_CLIENTE FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES (ID_CLIENTE),
+    -- Busca todas las ventas de un cliente en concreto, util para ver su historial de
+    -- compras.
+    INDEX IX_VENTAS_CLIENTE (ID_CLIENTE),
+    -- Busca todas las ventas atendidas por un empleado, util para reportes de desempeno.
+    INDEX IX_VENTAS_EMPLEADO (ID_EMPLEADO),
+    -- Una factura no se repite dentro del mismo cliente. Tambien lo bloquea el
+    -- UQ_COMPRA_FACTURA).
+    CONSTRAINT UQ_VENTA_FACTURA UNIQUE (ID_CLIENTE, FACTURA),
+    -- Ordena las ventas por fecha, util para reportes por dia, mes o cierre de caja.
+    INDEX IX_VENTAS_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/*
-INDICE IX_VENTAS_CLIENTE
-Busca todas las ventas de un cliente en concreto,
-util para ver su historial de compras.
-*/
-CREATE INDEX IX_VENTAS_CLIENTE ON VENTAS (ID_CLIENTE);
-
-/*
-INDICE IX_VENTAS_EMPLEADO
-Busca todas las ventas atendidas por un empleado,
-util para reportes de desempeno.
-*/
-CREATE INDEX IX_VENTAS_EMPLEADO ON VENTAS (ID_EMPLEADO);
-
-
-/*
-INDICE UQ_VENTA_FACTURA
-Una factura no se repite dentro del mismo cliente. Tambien lo bloquea el
-indice aunque alguien intente el UPDATE a pelo (mismo rol que
-UQ_COMPRA_FACTURA).
-*/
-CREATE UNIQUE INDEX UQ_VENTA_FACTURA ON VENTAS (ID_CLIENTE, FACTURA);
 
 /*
 TABLA HISTORIAL_ESTADOS_VENTA
@@ -64,19 +52,16 @@ CREATE TABLE HISTORIAL_ESTADOS_VENTA (
     CONSTRAINT FK_HIST_ESTADO_VTA_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
     -- (09/10/2026) CHECKs: el historial no admite estados inventados (solo los del ENUM de VENTAS).
     CONSTRAINT CK_HIST_VENTA_ANTERIOR CHECK (ESTADO_ANTERIOR IS NULL OR ESTADO_ANTERIOR IN ('REALIZADA', 'EN_PROCESO', 'CANCELADA', 'DEVUELTA')),
-    CONSTRAINT CK_HIST_VENTA_NUEVO CHECK (ESTADO_NUEVO IN ('REALIZADA', 'EN_PROCESO', 'CANCELADA', 'DEVUELTA'))
-) ENGINE = InnoDB;
+    CONSTRAINT CK_HIST_VENTA_NUEVO CHECK (ESTADO_NUEVO IN ('REALIZADA', 'EN_PROCESO', 'CANCELADA', 'DEVUELTA')),
+    -- Trae el historial de estados por fecha para los reportes (por venta ya lo cubre el
+    -- FK).
+    INDEX IX_HIST_ESTADO_VENTA_FECHA (FECHA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Migracion para BDs ya creadas con VARCHAR(20): unifica al ENUM (re-ejecutable).
 ALTER TABLE HISTORIAL_ESTADOS_VENTA
     MODIFY COLUMN ESTADO_ANTERIOR ENUM('REALIZADA','EN_PROCESO','CANCELADA','DEVUELTA') NULL,
     MODIFY COLUMN ESTADO_NUEVO ENUM('REALIZADA','EN_PROCESO','CANCELADA','DEVUELTA') NOT NULL;
 
-/*
-INDICE IX_HIST_ESTADO_VENTA_FECHA
-Trae el historial de estados por fecha para los reportes (por venta
-ya lo cubre el FK).
-*/
-CREATE INDEX IX_HIST_ESTADO_VENTA_FECHA ON HISTORIAL_ESTADOS_VENTA (FECHA);
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -119,7 +104,6 @@ END //
 DELIMITER ;
 
 
-
 /*
 LIMPIEZA DE SP DUPLICADO
 21_SP_AGREGAR_PRODUCTO_VENTA hacia lo mismo que SP_AGREGAR_DETALLE_VENTA
@@ -128,7 +112,6 @@ Ahora la alta de detalle es solo por ese SP; aqui queda el DROP para
 limpiar bases viejas que lo tengan todavia.
 */
 DROP PROCEDURE IF EXISTS 21_SP_AGREGAR_PRODUCTO_VENTA ;
-
 
 
 DELIMITER //
@@ -588,19 +571,7 @@ CREATE TABLE DETALLES_VENTA (
     CONSTRAINT UQ_VENTA_PRODUCTO UNIQUE (ID_VENTA, ID_PRODUCTO),
     CONSTRAINT FK_DETALLE_VENTA FOREIGN KEY (ID_VENTA) REFERENCES VENTAS (ID_VENTA) ON DELETE CASCADE,
     CONSTRAINT FK_DETALLE_VENTA_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO)
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_CLIENTE_NOMBRE
-Busca clientes por su nombre, util para localizarlos rapido en el sistema.
-*/
-CREATE INDEX IX_CLIENTE_NOMBRE ON CLIENTES (NOMBRE);
-
-/*
-INDICE IX_VENTAS_FECHA
-Ordena las ventas por fecha, util para reportes por dia, mes o cierre de caja.
-*/
-CREATE INDEX IX_VENTAS_FECHA ON VENTAS (FECHA);
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -644,6 +615,9 @@ proc_label: BEGIN
     DECLARE V_TASA_TXT VARCHAR(100);
     DECLARE V_TASA DECIMAL(5, 2);
     DECLARE V_ITBIS DECIMAL(10, 2);
+    -- (21/11/2026) Exencion por producto: si EXENTO_ITBIS = 1 la linea no lleva
+    -- ITBIS aunque la empresa tenga tasa vigente.
+    DECLARE V_EXENTO TINYINT(1) DEFAULT 0;
     -- (12/10/2026) Ganancia snapshot con el costo vigente al vender.
     DECLARE V_COSTO DECIMAL(10, 2);
     DECLARE V_GANANCIA DECIMAL(10, 2);
@@ -687,7 +661,9 @@ proc_label: BEGIN
 
     -- 2. Obtener precio (antes que el stock: un producto inexistente no
     -- tiene fila y el mensaje debe decirlo, no "STOCK INSUFICIENTE")
-    SELECT PRECIO INTO V_PRECIO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+    -- (21/11/2026) Se lee tambien la exencion de ITBIS en la misma consulta.
+    SELECT PRECIO, IFNULL(EXENTO_ITBIS, 0) INTO V_PRECIO, V_EXENTO
+      FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
 
     -- (09/10/2026) V4. Producto inexistente (NULL reventaba 1048).
     IF V_PRECIO IS NULL THEN
@@ -727,6 +703,11 @@ proc_label: BEGIN
     SET V_TASA = V_TASA_TXT + 0;
     -- (16/10/2026) El descuento baja el bruto: el ITBIS sale sobre lo cobrado.
     SET V_ITBIS = ROUND(ROUND(P_CANTIDAD * V_PRECIO * (1 - IFNULL(P_DESCUENTO_PCT, 0) / 100), 2) * V_TASA / 100, 2);
+    -- (21/11/2026) Producto exento de ITBIS: la linea se guarda sin impuesto. Va
+    -- despues del calculo para que la tasa se siga validando igual que antes.
+    IF V_EXENTO = 1 THEN
+        SET V_ITBIS = 0.00;
+    END IF;
     -- (12/10/2026) Si nunca se compro (P_COMPRA 0 = pendiente), la ganancia queda NULL.
     SELECT P_COMPRA INTO V_COSTO FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
     IF V_COSTO IS NULL OR V_COSTO = 0 THEN
@@ -851,8 +832,6 @@ END //
 DELIMITER ;
 
 
-
-
 DELIMITER //
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_VENTA_FINALIZADA ;
 /*
@@ -881,7 +860,6 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
-
 
 
 DELIMITER //
@@ -958,12 +936,9 @@ END //
 DELIMITER ;
 
 
-
 -----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
-
-
 
 
 -----------------------------------------------------------------------------------------------------------------------
@@ -984,5 +959,4 @@ SELECT
 FROM DETALLES_VENTA DV
 JOIN VENTAS V ON V.ID_VENTA = DV.ID_VENTA
 JOIN PRODUCTOS P ON DV.ID_PRODUCTO = P.ID_PRODUCTO;
-
 

@@ -52,6 +52,11 @@ APP_ABS="$(pwd)/${APP#./}"
 M() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" "$@" 2>&1; }
 N() { mariadb -N -B -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -e "$1"; }
 
+# TR_BLOQUEAR_BORRADO_VENTA no deja borrar ventas ni con bandera: se saca y se
+# vuelve a crear al final del mismo script, para que el candado vuelva aunque un
+# DELETE falle. El cuerpo tiene que ser el MISMO que declara modulos/21
+# (BEGIN ... END): si se copia la version de una sola sentencia, cada corrida de
+# la bateria deja BALBU_TECH_TEST en drift. De ahi el DELIMITER.
 limpiar_db() {
     M --force >/dev/null 2>&1 <<'SQL'
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_VENTA;
@@ -68,11 +73,15 @@ DELETE FROM INVENTARIO WHERE ID_PRODUCTO IN
     (SELECT ID_PRODUCTO FROM PRODUCTOS WHERE NOMBRE LIKE 'ZZ ATOM%');
 DELETE FROM PRODUCTOS WHERE NOMBRE LIKE 'ZZ ATOM%';
 DELETE FROM CLIENTES WHERE NOMBRE = 'ZZ ATOM CLI';
+DELIMITER //
 CREATE TRIGGER TR_BLOQUEAR_BORRADO_VENTA
 BEFORE DELETE ON VENTAS
 FOR EACH ROW
-SIGNAL SQLSTATE '45000'
-SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+END //
+DELIMITER ;
 SQL
 }
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/cierre-atomico.XXXXXX")"

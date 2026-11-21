@@ -20,6 +20,14 @@ DB_NAME="${DB_NAME:-BALBU_TECH_TEST}"
 DB_USER="${DB_ADMIN_USER:-balbu_admin}"
 DB_PASSWORD="${DB_ADMIN_PASSWORD:?Falta DB_ADMIN_PASSWORD (revisar .env)}"
 
+# (19/11/2026) Guarda de viva: el login escribe LOG_ACCESOS (es lo que este test
+# mide), asi que no puede correr sobre BALBU_TECH. Faltaba y el resto de la
+# bateria ya la tenia.
+if [ "$DB_NAME" = "BALBU_TECH" ]; then
+    echo "NO correr este test contra la base viva ($DB_NAME). Usa BALBU_TECH_TEST." >&2
+    exit 2
+fi
+
 Q() { mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --database="$DB_NAME" -N -e "$1" 2>&1; }
 
 if [ ! -x "$APP" ]; then

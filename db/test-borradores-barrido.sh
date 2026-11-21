@@ -50,6 +50,9 @@ N() { mariadb -N -B -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -
 # TR_BLOQUEAR_BORRADO_VENTA no deja borrar ventas ni con bandera: se saca y se
 # vuelve a crear. --force + CREATE ULTIMO, para que el candado vuelva aunque un
 # DELETE falle. Las lineas se van por FK ON DELETE CASCADE.
+# El cuerpo tiene que ser el MISMO que declara modulos/21 (BEGIN ... END): si se
+# copia la version de una sola sentencia, cada corrida de la bateria deja
+# BALBU_TECH_TEST en drift. De ahi el DELIMITER.
 limpiar_db() {
     M --force >/dev/null 2>&1 <<'SQL'
 DROP TRIGGER IF EXISTS TR_BLOQUEAR_BORRADO_VENTA;
@@ -63,11 +66,15 @@ DELETE FROM MOVIMIENTOS_INVENTARIO WHERE ID_PRODUCTO IN
 DELETE FROM INVENTARIO WHERE ID_PRODUCTO IN
     (SELECT ID_PRODUCTO FROM PRODUCTOS WHERE NOMBRE = 'ZZ BARRIDO');
 DELETE FROM PRODUCTOS WHERE NOMBRE = 'ZZ BARRIDO';
+DELIMITER //
 CREATE TRIGGER TR_BLOQUEAR_BORRADO_VENTA
 BEFORE DELETE ON VENTAS
 FOR EACH ROW
-SIGNAL SQLSTATE '45000'
-SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'ERROR: LA VENTA NO SE PUEDE BORRAR; USE SP_CANCELAR_VENTA PARA ANULARLA.';
+END //
+DELIMITER ;
 SQL
 }
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/borradores-barrido.XXXXXX")"

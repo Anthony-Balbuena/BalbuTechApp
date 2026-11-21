@@ -13,14 +13,11 @@ CREATE TABLE CATEGORIAS (
     ICONO_URL VARCHAR(255),
     ESTADO ENUM('ACTIVO', 'INACTIVO') DEFAULT 'ACTIVO',
     FECHA_REGISTRO DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (ID_CATEGORIA)
-) ENGINE = InnoDB;
-/*
-INDICE IX_NOMBRE_CATEGORIA
-Busca categorias por su nombre, asi la busqueda por texto sale rapida
-sin recorrer toda la tabla.
-*/
-CREATE INDEX IX_NOMBRE_CATEGORIA ON CATEGORIAS (NOMBRE);
+    PRIMARY KEY (ID_CATEGORIA),
+    -- Busca categorias por su nombre, asi la busqueda por texto sale rapida sin recorrer
+    -- toda la tabla.
+    INDEX IX_NOMBRE_CATEGORIA (NOMBRE)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 ----------------------------------------------------------------------------------------------------
@@ -156,7 +153,6 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: CATEGORÍA ID ', P_ID_CATEGORIA, ' ACTUALIZADA.') AS MENSAJE;
 END //
 DELIMITER ;
-
 
 
 -- 3. DESACTIVAR  o activar CATEGORIA  

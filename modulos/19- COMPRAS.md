@@ -497,15 +497,20 @@ Fuente: `modulos/19- COMPRAS.sql`, seccion DEVOLUCION_COMPRA · Revisado: 12/11/
    `ERROR: LA COMPRA NO ESTA RECIBIDA; SOLO SE DEVUELVE MERCANCIA DE UNA COMPRA RECIBIDA.`
 5. cantidad mayor a lo comprado menos lo ya devuelto (pendiente + procesado) →
    `ERROR: LA CANTIDAD SUPERA LO COMPRADO (YA HAY DEVOLUCIONES REGISTRADAS DE ESTE PRODUCTO).`
-6. tasa de ITBIS ausente o `<= 0` en `CONFIGURACION` →
-   `ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.`
 
 **Cálculo y guardado:**
 `SUBTOTAL_DEVUELTO = cantidad × PRECIO_UNITARIO` y
-`MONTO_ITBIS_DEVUELTO = ROUND(subtotal × tasa / 100, 2)`, con la tasa **vigente
-al momento de registrar** (foto histórica). Devuelve el ID por el `OUT` y
-`EXITO: DEVOLUCION #<id> REGISTRADA (PENDIENTE).`
+`MONTO_ITBIS_DEVUELTO` prorrateado desde la **línea guardada**:
+`ROUND(MONTO_ITBIS × cantidad_devuelta / cantidad_comprada, 2)`. Devuelve el ID por el
+`OUT` y `EXITO: DEVOLUCION #<id> REGISTRADA (PENDIENTE).`
 
+> (21/11/2026) **Antes se recalculaba con la tasa vigente** y además exigía que la tasa
+> existiera (paso 6, `ERROR: FALTA LA TASA ITBIS EN CONFIGURACION.`); las dos cosas se
+> quitaron. Con una tasa cambiada después de comprar, el recálculo devolvía un ITBIS
+> distinto al registrado, y con un producto exento (`MONTO_ITBIS = 0`) devolvía un
+> crédito fiscal que el suplidor nunca cobró. La línea guardada ya es el registro de lo
+> que se pagó — el mismo criterio que usa la ganancia devuelta.
+>
 > **Concurrencia:** el `SELECT` del detalle usa `FOR UPDATE` sobre
 > `DETALLE_COMPRA` y `COMPRAS`, y así dos devoluciones simultáneas del mismo
 > producto no pasan juntas la validación del paso 5 (evita devolver de más por
@@ -655,6 +660,11 @@ producto una sola vez por compra.
 **Usada por la app** (`compras.cpp`). `P_PRECIO` es el precio **de factura (con
 ITBIS)**.
 
+> (21/11/2026) **Excepción — producto exento:** si el producto tiene
+> `EXENTO_ITBIS = 1`, el suplidor no cobra impuesto, así que `P_PRECIO` se toma como
+> **neto** y `MONTO_ITBIS` se guarda en `0.00` (no se desglosa). Desglosarlo inventaría
+> un crédito fiscal inexistente.
+
 1. compra inexistente → `ERROR: LA COMPRA NO EXISTE.`
 2. compra no `ABIERTA` →
    `ERROR: LA COMPRA NO ESTA ABIERTA (YA FUE RECIBIDA, CANCELADA O DEVUELTA).`
@@ -691,6 +701,9 @@ precio de venta,
 `ABIERTA`. **No hace `UPDATE`** (está prohibido por trigger): **borra la línea
 vieja e inserta la nueva**, así los mismos triggers reajustan stock, total,
 bitácora y costo. `P_PRECIO` es de factura, con el mismo cálculo de ITBIS.
+
+> (21/11/2026) **Misma excepción que el alta:** si el producto es exento
+> (`EXENTO_ITBIS = 1`), `P_PRECIO` se toma como neto y `MONTO_ITBIS` queda en `0.00`.
 
 Valida producto en la compra, compra `ABIERTA`, cantidad y precio positivos y
 producto `ACTIVO`. Devuelve `EXITO: LINEA MODIFICADA.` (+ la advertencia de

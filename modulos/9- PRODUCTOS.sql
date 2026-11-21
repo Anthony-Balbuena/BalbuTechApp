@@ -30,34 +30,39 @@ CREATE TABLE PRODUCTOS (
     -- (09/10/2026) P4. La columna se llama IMAGEN en la BD viva (nadie la usa);
     -- se unifica aqui para que las BD nuevas nazcan igual.
     IMAGEN VARCHAR(255),
+    -- (19/11/2026) Antes vivia como ALTER en el modulo 25 (flujo de garantias).
+    -- Se trajo al CREATE para que esta tabla se lea completa: un dev que mira
+    -- PRODUCTOS tiene que ver los dias de garantia sin abrir otro archivo.
+    -- NULL o 0 = el producto no genera garantia automatica.
+    DIAS_GARANTIA INT NULL DEFAULT NULL
+        COMMENT 'Dias de garantia automatica al confirmar la venta. NULL o 0 = sin garantia',
+    -- (21/11/2026) Exento de ITBIS: sus lineas de venta y de compra no llevan
+    -- impuesto. 0 = gravado, que es el comportamiento de siempre. Es la unica
+    -- fuente de verdad de la exencion (ver odd/tasks/exencion-itbis.md). Va al
+    -- final a proposito: una base vieja se alinea con un ALTER ... AFTER
+    -- DIAS_GARANTIA y asi el orden de columnas queda igual al de un import
+    -- desde cero (si no coincide, db/verificar-esquema.sh lo marca).
+    EXENTO_ITBIS TINYINT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (ID_PRODUCTO),
     CONSTRAINT UQ_PRODUCTO_NOMBRE_MARCA UNIQUE (NOMBRE, ID_MARCA),
+    CONSTRAINT CK_PRODUCTO_DIAS_GARANTIA CHECK (DIAS_GARANTIA IS NULL OR DIAS_GARANTIA >= 0),
     CONSTRAINT FK_PRODUCTO_MARCA FOREIGN KEY (ID_MARCA) REFERENCES MARCAS (ID_MARCA),
     CONSTRAINT FK_PRODUCTO_CATEGORIA FOREIGN KEY (ID_CATEGORIA) REFERENCES CATEGORIAS (ID_CATEGORIA),
     -- (09/10/2026) FK que faltaba: la BD viva ya lo tiene (FK_PRODUCTO_PROVEEDOR);
     -- se agrega aqui para que las BD nuevas (Docker) nazcan con el.
-    CONSTRAINT FK_PRODUCTO_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_PRODUCTO_PROVEEDOR FOREIGN KEY (ID_PROVEEDOR) REFERENCES PROVEEDORES (ID_PROVEEDOR),
+    -- Acelera los listados y filtros que cruzan productos con su marca, evitando recorrer
+    -- toda la tabla cuando se arma un reporte.
+    INDEX IX_PRODUCTOS_MARCA (ID_MARCA),
+    -- Acelera las busquedas por categoria y la generacion de reportes agrupados por
+    -- categoria de producto.
+    INDEX IX_PRODUCTOS_CATEGORIA (ID_CATEGORIA)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- (15/11/2026) Migracion idempotente para bases que ya existen. El DEFAULT 0
 -- deja a todos los productos de hoy significando exactamente lo mismo.
 ALTER TABLE PRODUCTOS
 ADD COLUMN IF NOT EXISTS ES_REPUESTO TINYINT(1) NOT NULL DEFAULT 0 AFTER ESTADO;
-
-
-/*
-INDICE IX_PRODUCTOS_MARCA
-Acelera los listados y filtros que cruzan productos con su marca,
-evitando recorrer toda la tabla cuando se arma un reporte.
-*/
-CREATE INDEX IX_PRODUCTOS_MARCA ON PRODUCTOS (ID_MARCA);
-
-/*
-INDICE IX_PRODUCTOS_CATEGORIA
-Acelera las busquedas por categoria y la generacion de reportes
-agrupados por categoria de producto.
-*/
-CREATE INDEX IX_PRODUCTOS_CATEGORIA ON PRODUCTOS (ID_CATEGORIA);
 
 
 --1. INSERTAR
@@ -391,7 +396,9 @@ BEGIN
         -- (13/10/2026) Proveedor para el listado de compras.
         PR.NOMBRE AS PROVEEDOR,
         -- (15/10/2026) ID del proveedor para la app.
-        P.ID_PROVEEDOR
+        P.ID_PROVEEDOR,
+        -- (21/11/2026) Exencion de ITBIS: ventas y compras calculan por linea.
+        IFNULL(P.EXENTO_ITBIS, 0) AS EXENTO_ITBIS
     FROM PRODUCTOS P
     INNER JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
     INNER JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
@@ -481,7 +488,9 @@ proc_label: BEGIN
         P.ESTADO,
         I.STOCK_ACTUAL AS STOCK,
         PR.NOMBRE AS PROVEEDOR,
-        P.ID_PROVEEDOR
+        P.ID_PROVEEDOR,
+        -- (21/11/2026) La pantalla de Productos muestra el estado de exencion.
+        IFNULL(P.EXENTO_ITBIS, 0) AS EXENTO_ITBIS
     FROM PRODUCTOS P
     INNER JOIN MARCAS M ON P.ID_MARCA = M.ID_MARCA
     INNER JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
@@ -534,7 +543,10 @@ BEGIN
             WHEN I.STOCK_ACTUAL <= I.STOCK_MINIMO THEN 'CRÍTICO' 
             WHEN I.STOCK_ACTUAL <= (I.STOCK_MINIMO * 2) THEN 'STOCK BAJO'
             ELSE 'OK' 
-        END AS ESTATUS_STOCK
+        END AS ESTATUS_STOCK,
+        -- (21/11/2026) La venta necesita saber si el precio mostrado lleva IVA:
+        -- un producto exento se lista sin recargo.
+        IFNULL(P.EXENTO_ITBIS, 0) AS EXENTO_ITBIS
     FROM PRODUCTOS P
     LEFT JOIN INVENTARIO I ON P.ID_PRODUCTO = I.ID_PRODUCTO
     LEFT JOIN CATEGORIAS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
@@ -685,7 +697,10 @@ BEGIN
         C.ID_CATEGORIA,
         C.NOMBRE AS CATEGORIA,
         M.ID_MARCA,
-        M.NOMBRE AS MARCA
+        M.NOMBRE AS MARCA,
+        -- (21/11/2026) El formulario de edicion necesita el flag para mostrarlo
+        -- y para marcar o desmarcar la exencion.
+        IFNULL(P.EXENTO_ITBIS, 0) AS EXENTO_ITBIS
     FROM PRODUCTOS AS P
     LEFT JOIN CATEGORIAS AS C ON P.ID_CATEGORIA = C.ID_CATEGORIA
     LEFT JOIN MARCAS AS M ON P.ID_MARCA = M.ID_MARCA
@@ -921,8 +936,6 @@ END //
 DELIMITER ;
 
 
-
-
 SELECT * FROM `PRODUCTOS`;
 
 -- ================================================================
@@ -957,34 +970,22 @@ CREATE TABLE HISTORIAL_ESTADOS_PRODUCTO (
     FECHA_CAMBIO TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     PRIMARY KEY (ID_HISTORIAL),
     CONSTRAINT FK_HISTORIAL_PRODUCTO FOREIGN KEY (ID_PRODUCTO) REFERENCES PRODUCTOS (ID_PRODUCTO),
-    CONSTRAINT FK_HISTORIAL_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_HISTORIAL_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Ordena el historial por fecha de cambio, asi los ultimos movimientos salen
+    -- primero sin recorrer toda la tabla.
+    INDEX HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO (FECHA_CAMBIO),
+    -- Busca rapido todos los cambios que quedaron con cierto estado actual.
+    INDEX IX_HISTORIAL_ESTADO_ACTUAL (ESTADO),
+    -- Busca rapido en que estado estaba un producto antes de cambiar, util para auditoria
+    -- y reportes de modificaciones.
+    INDEX IX_HISTORIAL_ESTADO_ANTERIOR (ESTADO_ANTERIOR)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- (12/11/2026) En una base existente la columna nacio NOT NULL. Se relaja aca
 -- para que el trigger pueda guardar NULL cuando no hay sesion. Es idempotente
 -- y no reescribe valores: solo cambia la definicion de la columna.
 ALTER TABLE HISTORIAL_ESTADOS_PRODUCTO
     MODIFY COLUMN ID_EMPLEADO INT NULL;
-
--- 2. Índices para optimizar consultas de auditoría
-/*
-INDICE HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO
-Ordena el historial por fecha de cambio, asi los ultimos movimientos
-salen primero sin recorrer toda la tabla.
-*/
-CREATE INDEX HISTORIAL_ESTADOS_PRODUCTO_FECHACAMBIO ON HISTORIAL_ESTADOS_PRODUCTO (FECHA_CAMBIO);
-/*
-INDICE IX_HISTORIAL_ESTADO_ACTUAL
-Busca rapido todos los cambios que quedaron con cierto estado actual.
-*/
-CREATE INDEX IX_HISTORIAL_ESTADO_ACTUAL ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO);
-/*
-INDICE IX_HISTORIAL_ESTADO_ANTERIOR
-Busca rapido en que estado estaba un producto antes de cambiar,
-util para auditoria y reportes de modificaciones.
-*/
-CREATE INDEX IX_HISTORIAL_ESTADO_ANTERIOR ON HISTORIAL_ESTADOS_PRODUCTO (ESTADO_ANTERIOR);
-
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -1001,6 +1002,49 @@ esas variables, y HISTORIAL_ESTADOS_PRODUCTO no se lee en ningun lado
 Item 12c: se retira la definicion y el DROP limpia las bases que ya la tenian.
 */
 DROP PROCEDURE IF EXISTS 18_SP_CAMBIAR_ESTADO_PRODUCTO //
+DELIMITER ;
+
+
+--4. Marcar/desmarcar la exencion de ITBIS
+DELIMITER //
+/*
+SP_MARCAR_PRODUCTO_EXENTO
+Marca o desmarca un producto como exento de ITBIS (ver odd/tasks/exencion-itbis.md).
+Un producto exento no lleva impuesto en sus lineas de venta ni de compra; el flag
+es la unica fuente de verdad de esa condicion.
+
+P_EXENTO se normaliza: 1 marca exento, cualquier otro valor (o NULL) deja el
+producto gravado, que es el comportamiento de siempre.
+
+Rutina aparte a proposito: SP_INSERTAR_PRODUCTO y SP_ACTUALIZAR_PRODUCTOS ya
+tienen sus llamadores y este flag es ortogonal al alta y a la edicion del
+catalogo. Un producto nuevo nace gravado (EXENTO_ITBIS DEFAULT 0) y se marca
+exento desde aca.
+*/
+DROP PROCEDURE IF EXISTS SP_MARCAR_PRODUCTO_EXENTO;
+CREATE PROCEDURE SP_MARCAR_PRODUCTO_EXENTO(
+    IN P_ID_PRODUCTO INT,
+    IN P_EXENTO TINYINT
+)
+proc_label: BEGIN
+    DECLARE V_NOMBRE VARCHAR(100);
+    DECLARE V_EXENTO TINYINT(1);
+
+    IF NOT EXISTS (SELECT 1 FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ERROR: EL PRODUCTO NO EXISTE.';
+        LEAVE proc_label;
+    END IF;
+
+    -- Normaliza: solo 1 marca exento; NULL o cualquier otro valor deja gravado.
+    SET V_EXENTO = IF(IFNULL(P_EXENTO, 0) = 1, 1, 0);
+
+    SELECT NOMBRE INTO V_NOMBRE FROM PRODUCTOS WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
+    UPDATE PRODUCTOS SET EXENTO_ITBIS = V_EXENTO WHERE ID_PRODUCTO = P_ID_PRODUCTO;
+
+    SELECT CONCAT('PRODUCTO: "', V_NOMBRE, '" - ITBIS: ',
+                  IF(V_EXENTO = 1, 'EXENTO', 'GRAVADO')) AS MENSAJE;
+END //
 DELIMITER ;
 
 
@@ -1047,9 +1091,6 @@ END //
 DELIMITER ;
 
 
-
-
-
 ----------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------[VIEW}-------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------- 
@@ -1069,9 +1110,6 @@ FROM HISTORIAL_ESTADOS_PRODUCTO H
 JOIN PRODUCTOS P ON H.ID_PRODUCTO = P.ID_PRODUCTO
 ORDER BY H.FECHA_CAMBIO DESC
 LIMIT 10;
-
-
-
 
 
 -----------------------------------------------------------------------------------------------------------------------

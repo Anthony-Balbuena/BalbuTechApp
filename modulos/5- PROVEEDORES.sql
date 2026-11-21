@@ -8,31 +8,22 @@ opcionales pero unicos si se usan. Todo proveedor arranca ACTIVO.
 CREATE TABLE PROVEEDORES (
     ID_PROVEEDOR INT NOT NULL AUTO_INCREMENT,
     NOMBRE VARCHAR(100) NOT NULL,
-    TELEFONO VARCHAR(15) UNIQUE ,
-    EMAIL VARCHAR(100) UNIQUE ,
+    TELEFONO VARCHAR(15),
+    EMAIL VARCHAR(100),
     DIRECCION VARCHAR(120),
     FECHA_REGISTRO TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     ESTADO ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
     PRIMARY KEY (ID_PROVEEDOR),
     CONSTRAINT UQ_PROVEEDOR_TELEFONO UNIQUE (TELEFONO),
-    CONSTRAINT UQ_PROVEEDOR_EMAIL UNIQUE (EMAIL)
-) ENGINE = InnoDB;
+    CONSTRAINT UQ_PROVEEDOR_EMAIL UNIQUE (EMAIL),
+    -- Acelera las busquedas de proveedores por nombre, que es lo que mas se usa en las
+    -- ayudas de la interfaz y en las busquedas parciales con LIKE.
+    INDEX IX_PROVEEDOR_NOMBRE (NOMBRE),
+    -- Permite filtrar rapidamente los proveedores activos o inactivos en los listados
+    -- administrativos y reportes, sin tener que revisar la tabla.
+    INDEX IX_PROVEEDOR_ESTADO (ESTADO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Para buscar proveedores por nombre (muy común)
-/*
-INDICE IX_PROVEEDOR_NOMBRE
-Acelera las busquedas de proveedores por nombre, que es lo que mas se usa
-en las ayudas de la interfaz y en las busquedas parciales con LIKE.
-*/
-CREATE INDEX IX_PROVEEDOR_NOMBRE ON PROVEEDORES (NOMBRE);
-
--- Para filtrar proveedores activos rápidamente
-/*
-INDICE IX_PROVEEDOR_ESTADO
-Permite filtrar rapidamente los proveedores activos o inactivos en los
-listados administrativos y reportes, sin tener que revisar la tabla.
-*/
-CREATE INDEX IX_PROVEEDOR_ESTADO ON PROVEEDORES (ESTADO);
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}------------------------------------------
 ----------------------------------------------------------------------------------------------------

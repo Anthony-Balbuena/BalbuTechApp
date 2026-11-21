@@ -28,6 +28,10 @@ struct LineaCarrito {
     double precio = 0.0;
     int cantidad = 0;
     double descuento = 0.0; // % de descuento de la línea (16/10/2026)
+    // (21/11/2026) Producto exento de ITBIS: la linea no suma impuesto. Es el
+    // mismo flag que la base usa en SP_AGREGAR_DETALLE_VENTA, para que la vista
+    // previa del carrito cuadre con lo que se guarda.
+    bool exento = false;
 };
 
 namespace {
@@ -119,6 +123,7 @@ static bool buscarPorId(int id, LineaCarrito &out) {
                 out.codigo = res->getString("CODIGO");
                 out.nombre = res->getString("NOMBRE");
                 out.precio = res->getDouble("PRECIO");
+                out.exento = res->getInt("EXENTO_ITBIS") == 1;
                 ok = true;
             }
         }
@@ -142,6 +147,7 @@ static bool buscarPorCodigo(const string &codigo, LineaCarrito &out) {
                 out.codigo = codigo;
                 out.nombre = res->getString("NOMBRE");
                 out.precio = res->getDouble("PRECIO");
+                out.exento = res->getInt("EXENTO_ITBIS") == 1;
                 ok = true;
             }
         }
@@ -182,7 +188,7 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
             "CALL SP_CONSULTAR_PRODUCTOS_FILTRADO(?, 'EXCLUIR')"));
         pstmt->setString(1, entrada);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        struct Cand { int id; string codigo; string nombre; double precio; };
+        struct Cand { int id; string codigo; string nombre; double precio; bool exento; };
         vector<Cand> lista;
         while (res->next()) {
             Cand c;
@@ -190,6 +196,7 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
             c.codigo = res->getString("CODIGO");
             c.nombre = res->getString("NOMBRE");
             c.precio = res->getDouble("PRECIO");
+            c.exento = res->getInt("EXENTO_ITBIS") == 1;
             lista.push_back(c);
         }
         drenarResultados(pstmt.get());
@@ -199,11 +206,14 @@ static bool resolverProducto(const string &entrada, LineaCarrito &out) {
             out.codigo = lista[0].codigo;
             out.nombre = lista[0].nombre;
             out.precio = lista[0].precio;
+            out.exento = lista[0].exento;
             return true;
         }
         cout << "\nCoincidencias:" << endl;
         for (auto &c : lista) {
-            cout << c.id << " | " << c.codigo << " | " << c.nombre << " | $" << c.precio << endl;
+            cout << c.id << " | " << c.codigo << " | " << c.nombre << " | $" << c.precio;
+            if (c.exento) cout << " (EXENTO de ITBIS)";
+            cout << endl;
         }
         int pick = (int)leerNumeroConIntentos("ID elegido: ", 1, 999999999);
         return buscarPorId(pick, out);
@@ -259,20 +269,26 @@ static void avisoStockCritico(int idProducto, int cantPorDescontar) {
 }
 
 static void mostrarCarrito(const vector<LineaCarrito> &carrito, double tasa) {
-    cout << "\n--- CARRITO (precios con IVA) ---" << endl;
+    cout << "\n--- CARRITO ---" << endl;
     double total = 0.0;
     for (size_t i = 0; i < carrito.size(); ++i) {
         auto &l = carrito[i];
+        // (21/11/2026) La tasa es POR LINEA: un producto exento no suma ITBIS, que
+        // es lo mismo que guarda SP_AGREGAR_DETALLE_VENTA. Antes se aplicaba una
+        // sola tasa a todo el carrito y un exento mostraba un impuesto que la base
+        // ya no cobra.
+        const double tasaLinea = l.exento ? 0.0 : tasa;
         // Bruto con descuento; ITBIS redondeado por linea (igual que la base).
         double neto = round(l.precio * l.cantidad * (100.0 - l.descuento)) / 100.0;
-        double parcial = neto + round(neto * tasa) / 100.0;
-        double unitIVA = round(l.precio * (100.0 - l.descuento) * (100.0 + tasa)) / 10000.0;
+        double parcial = neto + round(neto * tasaLinea) / 100.0;
+        double unitIVA = round(l.precio * (100.0 - l.descuento) * (100.0 + tasaLinea)) / 10000.0;
         total += parcial;
         cout << (i + 1) << ". " << l.nombre << " x" << l.cantidad;
         if (l.descuento > 0) cout << " -" << l.descuento << "%";
-        cout << " | $" << unitIVA << " con ITBIS" << " | total $" << parcial << endl;
+        cout << " | $" << unitIVA << (l.exento ? " EXENTO de ITBIS" : " con ITBIS")
+             << " | total $" << parcial << endl;
     }
-    cout << "Total con IVA: $" << total << endl;
+    cout << "Total a pagar: $" << total << endl;
 }
 
 struct CierreVenta {
@@ -531,7 +547,12 @@ static void listarProductosParaVenta(double tasa) {
             try { stock = res->getInt("STOCK_ACTUAL"); } catch (...) { stock = 0; }
             string estatus = "OK";
             try { estatus = res->getString("ESTATUS_STOCK"); } catch (...) {}
-            double conIVA = round((double)res->getDouble("PRECIO") * (100.0 + tasa)) / 100.0;
+            // (21/11/2026) Un producto exento se lista sin recargo: su precio de
+            // venta ya es lo que paga el cliente.
+            bool exento = false;
+            try { exento = res->getInt("EXENTO_ITBIS") == 1; } catch (...) {}
+            const double tasaLinea = exento ? 0.0 : tasa;
+            double conIVA = round((double)res->getDouble("PRECIO") * (100.0 + tasaLinea)) / 100.0;
             char precio[24];
             snprintf(precio, sizeof(precio), "%.2f", conIVA);
             cout << tablaCelda(to_string(res->getInt("ID_PRODUCTO")), W_ID) << " | "

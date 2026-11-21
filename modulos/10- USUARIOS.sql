@@ -20,16 +20,11 @@ CREATE TABLE USUARIOS (
   ESTADO ENUM('ACTIVO','INACTIVO') DEFAULT 'ACTIVO',
   FECHA_CREACION TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT FK_USUARIO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS(ID_EMPLEADO),
-  CONSTRAINT FK_USUARIO_ROL FOREIGN KEY (ID_ROL) REFERENCES ROLES(ID_ROL)
-) ENGINE = InnoDB;
-
-/*
-INDICE IX_USER
-Acelera el login y las busquedas por nombre de usuario, que es el dato
-que mas se consulta en esta tabla.
-*/
-CREATE INDEX IX_USER ON USUARIOS (USUARIO);
-
+  CONSTRAINT FK_USUARIO_ROL FOREIGN KEY (ID_ROL) REFERENCES ROLES(ID_ROL),
+    -- Acelera el login y las busquedas por nombre de usuario, que es el dato que mas se
+    -- consulta en esta tabla.
+    INDEX IX_USER (USUARIO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- Migration: Aumentar tamaño de la columna CONTRASENA para almacenar hashes PBKDF2.
@@ -292,7 +287,6 @@ DELIMITER ;
 DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA ;
 
 
-
 -- ---------------------------------------------------------------------------
 -- (12/11/2026) SP_LOGIN_USUARIO RETIRADO.
 -- Era el login anterior al modulo 65: comparaba en igualdad contra
@@ -305,7 +299,6 @@ DROP PROCEDURE IF EXISTS SP_CAMBIAR_CONTRASENA ;
 -- Se deja el DROP para que una base que ya lo tenga quede limpia al reimportar.
 -- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS SP_LOGIN_USUARIO ;
-
 
 
 -- PROCEDIMIENTOS DE APOYO PARA C++ (Se mantienen iguales)
@@ -365,8 +358,6 @@ DELIMITER ;
 
 -- FN_TIENE_PERMISO vivia aqui en version angosta (solo REGISTRAR_BONO);
 -- la version general y canonica esta en 36- PERMISOS_ROLES.sql (ese archivo la crea al final).
-
-
 
 
 /*

@@ -29,8 +29,20 @@ CREATE TABLE BONOS_EMPLEADOS (
     -- todavia dice quien lo pago.
     PAGADO_POR VARCHAR(50) NULL,
     PRIMARY KEY (ID_BONO),
-    CONSTRAINT FK_BONO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO)
-) ENGINE = InnoDB;
+    CONSTRAINT FK_BONO_EMPLEADO FOREIGN KEY (ID_EMPLEADO) REFERENCES EMPLEADOS (ID_EMPLEADO),
+    -- Encuentra al instante todo el historial de bonos de un empleado en especifico, sin
+    -- tener que revisar la tabla completa.
+    INDEX IX_BONO_EMPLEADO (ID_EMPLEADO),
+    -- Acelera los reportes de contabilidad y los totales por mes o ano, que ordenan y
+    -- filtran por la fecha del bono.
+    INDEX IX_BONO_FECHA (FECHA),
+    -- Permite calcular rapido cuanto dinero se gasta en cada tipo de bono (doble sueldo,
+    -- horas extra o bonificacion).
+    INDEX IX_BONO_TIPO (TIPO_BONO),
+    -- Filtra los bonos por su estado (PENDIENTE, PAGADO o ANULADO), que es lo que usa la
+    -- pantalla para mostrar cada lista.
+    INDEX IX_BONO_ESTADO (ESTADO)
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
  
 
 ALTER TABLE BONOS_EMPLEADOS
@@ -65,35 +77,6 @@ SET @sql := IF(@existe = 0,
     'DO 0');
 PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
 
-
-
-/*
-INDICE IX_BONO_EMPLEADO
-Encuentra al instante todo el historial de bonos de un empleado en
-especifico, sin tener que revisar la tabla completa.
-*/
-CREATE INDEX IX_BONO_EMPLEADO ON BONOS_EMPLEADOS (ID_EMPLEADO);
-
-/*
-INDICE IX_BONO_FECHA
-Acelera los reportes de contabilidad y los totales por mes o ano, que
-ordenan y filtran por la fecha del bono.
-*/
-CREATE INDEX IX_BONO_FECHA ON BONOS_EMPLEADOS (FECHA);
-
-/*
-INDICE IX_BONO_TIPO
-Permite calcular rapido cuanto dinero se gasta en cada tipo de bono
-(doble sueldo, horas extra o bonificacion).
-*/
-CREATE INDEX IX_BONO_TIPO ON BONOS_EMPLEADOS (TIPO_BONO);
-
-/*
-INDICE IX_BONO_ESTADO
-Filtra los bonos por su estado (PENDIENTE, PAGADO o ANULADO), que es lo
-que usa la pantalla para mostrar cada lista.
-*/
-CREATE INDEX IX_BONO_ESTADO ON BONOS_EMPLEADOS (ESTADO);
 
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------[Store procedure}-------------------------------------------------------------------
@@ -147,8 +130,6 @@ proc_label: BEGIN
     SELECT CONCAT('EXITO: BONO DE $', P_MONTO, ' REGISTRADO A: ', v_nombre_empleado, ' (ID: ', P_ID_EMPLEADO, ').') AS MENSAJE;
 END //
 DELIMITER ;
-
-
 
 
 /*
@@ -404,9 +385,6 @@ END//
 DELIMITER ;
 
 
-
-
-
 ----------------------------------------------------------------------------------------------------
 -----------------------------------------[TRIGERR}--------------------------------------------------
 ----------------------------------------------------------------------------------------------------
@@ -441,7 +419,6 @@ de la venta. Solo queda el DROP para limpiar bases viejas.
 */
 DROP TRIGGER IF EXISTS TR_CALCULAR_BONO_VENTA;
 DELIMITER ;
-
 
 
 -----------------------------------------------------------------------------------------------------------------------------
